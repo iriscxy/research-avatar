@@ -1,3 +1,31 @@
+"""
+错误：
+侧边栏 st.radio 创建 page_nav
+↓
+点击“接受，进入 Step 2”
+↓
+直接修改 st.session_state["page_nav"]
+↓
+Streamlit 报错
+
+修改后：
+点击“接受，进入 Step 2”
+↓
+写入 pending_page_nav
+↓
+st.rerun()
+↓
+下一轮运行时，在 st.radio 创建之前同步到 page_nav
+↓
+正常进入 Step2
+# 在 Sidebar 前面插入导航 helper
+# 修改侧边栏导航
+# 修改 Step1 重新验证完成后的逻辑
+# 修改“接受，进入 Step 2”按钮
+"""
+
+
+
 """Watson — Streamlit Web UI.  Run:  streamlit run app.py"""
 
 import os
@@ -8,7 +36,11 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from watson.config import STEP_NAMES, STEP_EMOJIS, STEPS
+from watson.config import (
+    STEP_NAMES, STEP_EMOJIS, STEPS,
+    WATSON_DIR, EXPERIMENT_FILE, CODE_FILE, RUN_LOG_FILE, RESULTS_FILE,
+    ANALYSIS_FILE, PAPER_FILE,
+)
 from watson import state as S
 
 # ── Page config ───────────────────────────────────────────────────────────────
@@ -64,6 +96,54 @@ def _api_ok() -> bool:
     return bool(cfg.DEEPSEEK_API_KEY)
 
 
+# ── Navigation state helper ───────────────────────────────────────────────────
+# Streamlit 不允许在 widget 创建之后，再直接修改同名 session_state key。
+# 因此不要在按钮点击后直接写 st.session_state["page_nav"] = ...
+# 这里使用 pending_page_nav 做延迟跳转：
+#   1. 按钮先写 pending_page_nav
+#   2. st.rerun()
+#   3. 下一轮运行时，在 st.radio 创建之前同步到 page_nav
+
+PAGE_OPTIONS = ["📋 总览"] + [f"{STEP_EMOJIS[s]} {STEP_NAMES[s]}" for s in STEPS]
+
+_pending_page_nav = st.session_state.pop("pending_page_nav", None)
+if _pending_page_nav in PAGE_OPTIONS:
+    st.session_state["page_nav"] = _pending_page_nav
+elif "page_nav" not in st.session_state or st.session_state["page_nav"] not in PAGE_OPTIONS:
+    st.session_state["page_nav"] = PAGE_OPTIONS[0]
+
+
+def request_page_nav(target_page: str) -> None:
+    """安全请求页面跳转，不直接修改已经实例化的 page_nav widget。"""
+    st.session_state["pending_page_nav"] = target_page
+    st.rerun()
+
+
+def clear_downstream_after_idea_change() -> None:
+    """Step1 或研究方向重新生成后，清理旧的 Step2-Step6 产物。
+
+    这样可以避免“新 idea 仍然显示旧 experiment.md / experiment_plan.json”的问题。
+    """
+    paths = [
+        EXPERIMENT_FILE,
+        CODE_FILE,
+        RUN_LOG_FILE,
+        RESULTS_FILE,
+        ANALYSIS_FILE,
+        PAPER_FILE,
+        WATSON_DIR / "experiment_plan.json",
+        WATSON_DIR / "experiment_evidence.json",
+        WATSON_DIR / "experiment_repo_report.json",
+        WATSON_DIR / "download_data_plan.md",
+    ]
+    for path in paths:
+        try:
+            if path.exists():
+                path.unlink()
+        except Exception:
+            pass
+
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 
 with st.sidebar:
@@ -98,8 +178,7 @@ with st.sidebar:
 
     # Step navigation
     st.markdown("**研究进度**")
-    page_options = ["📋 总览"] + [f"{STEP_EMOJIS[s]} {STEP_NAMES[s]}" for s in STEPS]
-    page = st.radio("导航", page_options, label_visibility="collapsed", key="page_nav")
+    page = st.radio("导航", PAGE_OPTIONS, label_visibility="collapsed", key="page_nav")
 
     st.divider()
 
@@ -114,7 +193,8 @@ with st.sidebar:
         S.save_file(S.IDEA_FILE, f"# Research Idea\n\n{sidebar_idea}\n")
         S.save_state({"idea": sidebar_idea})
         st.session_state["idea_input"] = sidebar_idea   # sync Step-1 text area
-        st.toast("✅ 研究方向已保存")
+        clear_downstream_after_idea_change()
+        st.toast("✅ 研究方向已保存，旧的 Step2-Step6 产物已清理")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -288,7 +368,8 @@ def page_idea():
         st.divider()
         from watson.agents import idea as agent
         stream_to_placeholder(agent.run(idea_input.strip(), style=selected_style), "搜索论文并分析中...")
-        st.success("✅ Idea 验证完成！")
+        clear_downstream_after_idea_change()
+        st.success("✅ Idea 验证完成！旧的 Step2-Step6 产物已清理。")
         st.rerun()
 
     # ── Show results ──────────────────────────────────────────────────────────
@@ -309,8 +390,7 @@ def page_idea():
             with act1:
                 if st.button("✅ 接受，进入 Step 2", type="primary", use_container_width=True):
                     step2_key = f"{STEP_EMOJIS['experiment']} {STEP_NAMES['experiment']}"
-                    st.session_state["page_nav"] = step2_key
-                    st.rerun()
+                    request_page_nav(step2_key)
             with act2:
                 propose_btn = st.button("🔄 让 Watson 基于文献提出改进方向", use_container_width=True)
 
