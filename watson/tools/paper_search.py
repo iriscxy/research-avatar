@@ -5,17 +5,65 @@ For idea validation we run two separate searches as required:
   2. Recent papers from top CS conferences (CCF A/B class).
 """
 
+import hashlib
+import json
+import re
 import time
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
+from pathlib import Path
+
 import requests
 
 from ..config import SEMANTIC_SCHOLAR_API_KEY
 
+# ── API result cache ──────────────────────────────────────────────────────────
 
-def _get(url: str, params: dict, timeout: int = 30, retries: int = 3) -> requests.Response:
+_API_CACHE_TTL_DAYS = 7
+
+
+def _api_cache_dir() -> Path:
+    from ..config import WATSON_DIR
+    d = WATSON_DIR / "api_cache"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _cache_key(query: str, max_results: int) -> str:
+    return hashlib.md5(f"{query}:{max_results}".encode()).hexdigest()
+
+
+def _load_api_cache(key: str) -> list[dict] | None:
+    path = _api_cache_dir() / f"{key}.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        ts = datetime.fromisoformat(data["ts"])
+        if (datetime.now(timezone.utc) - ts).days < _API_CACHE_TTL_DAYS:
+            return data["papers"]
+    except Exception:
+        pass
+    return None
+
+
+def _save_api_cache(key: str, papers: list[dict]) -> None:
+    try:
+        path = _api_cache_dir() / f"{key}.json"
+        path.write_text(
+            json.dumps({"ts": datetime.now(timezone.utc).isoformat(), "papers": papers},
+                       ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+
+def _get(url: str, params: dict, timeout: int = 30, retries: int = 3,
+         headers: dict | None = None) -> requests.Response:
     """GET with exponential backoff on 429."""
     for attempt in range(retries):
-        resp = requests.get(url, params=params, timeout=timeout)
+        resp = requests.get(url, params=params, headers=headers or {}, timeout=timeout)
         if resp.status_code == 429:
             wait = 2 ** attempt * 3   # 3s, 6s, 12s
             time.sleep(wait)
@@ -27,6 +75,7 @@ def _get(url: str, params: dict, timeout: int = 30, retries: int = 3) -> request
 
 ARXIV_API = "http://export.arxiv.org/api/query"
 S2_API = "https://api.semanticscholar.org/graph/v1/paper/search"
+OPENALEX_API = "https://api.openalex.org/works"
 
 # Venues considered CCF A or B for CS (NLP/ML/AI/CV tracks)
 CCF_AB_VENUES = {
@@ -88,18 +137,28 @@ def _search_s2(query: str, max_results: int = 10) -> list[dict]:
     params = {
         "query": query,
         "limit": max_results,
-        "fields": "title,abstract,year,authors,externalIds,venue,publicationVenue",
+        "fields": "title,abstract,year,authors,externalIds,venue,publicationVenue,paperId",
     }
     try:
-        resp = _get(S2_API, params, timeout=30)
+        resp = _get(S2_API, params, timeout=30, headers=headers)
         data = resp.json()
     except Exception:
         return []
 
     papers: list[dict] = []
     for p in data.get("data", []):
-        arxiv_id = (p.get("externalIds") or {}).get("ArXiv", "")
-        link = f"https://arxiv.org/abs/{arxiv_id}" if arxiv_id else ""
+        ext = p.get("externalIds") or {}
+        arxiv_id = ext.get("ArXiv", "")
+        doi = ext.get("DOI", "")
+        paper_id = p.get("paperId", "")
+        if arxiv_id:
+            link = f"https://arxiv.org/abs/{arxiv_id}"
+        elif doi:
+            link = f"https://doi.org/{doi}"
+        elif paper_id:
+            link = f"https://www.semanticscholar.org/paper/{paper_id}"
+        else:
+            link = ""
         raw_venue = (
             (p.get("publicationVenue") or {}).get("name")
             or p.get("venue")
@@ -126,6 +185,86 @@ def _is_top_conf(venue: str) -> bool:
     return any(c.upper() in v for c in CCF_AB_VENUES)
 
 
+# ── OpenAlex ───────────────────────────────────────────────────────────────────
+
+def _reconstruct_abstract(inverted_index: dict | None) -> str:
+    """Reconstruct abstract text from OpenAlex inverted-index format."""
+    if not inverted_index or not isinstance(inverted_index, dict):
+        return ""
+    words: list[tuple[int, str]] = []
+    for word, positions in inverted_index.items():
+        for pos in positions:
+            words.append((pos, word))
+    words.sort(key=lambda x: x[0])
+    return " ".join(w for _, w in words)
+
+
+def _search_openalex(query: str, max_results: int = 20) -> list[dict]:
+    params = {
+        "search": query,
+        "per_page": min(max_results, 50),
+        "mailto": "watson@users.noreply.github.com",
+        "select": (
+            "id,title,authorships,publication_year,primary_location,"
+            "cited_by_count,doi,ids,abstract_inverted_index"
+        ),
+    }
+    try:
+        resp = _get(OPENALEX_API, params, timeout=20)
+        data = resp.json()
+    except Exception:
+        return []
+
+    papers: list[dict] = []
+    for item in data.get("results", []):
+        title = str(item.get("title") or "").strip()
+        title = re.sub(r"<[^>]+>", "", title)  # strip HTML tags (e.g. <sup>)
+        if not title:
+            continue
+
+        year = str(item.get("publication_year") or "")
+        abstract = _reconstruct_abstract(item.get("abstract_inverted_index"))
+
+        authorships = item.get("authorships") or []
+        authors = [
+            a.get("author", {}).get("display_name", "")
+            for a in authorships
+            if isinstance(a, dict)
+        ]
+
+        primary_loc = item.get("primary_location") or {}
+        source_info = primary_loc.get("source") or {}
+        venue = str(source_info.get("display_name") or "").strip()
+
+        ids = item.get("ids") or {}
+        arxiv_raw = str(ids.get("arxiv") or "")
+        arxiv_id = ""
+        m = re.search(r"(\d{4}\.\d{4,5})", arxiv_raw)
+        if m:
+            arxiv_id = m.group(1)
+
+        doi = str(item.get("doi") or "").replace("https://doi.org/", "").replace("http://doi.org/", "")
+
+        if arxiv_id:
+            link = f"https://arxiv.org/abs/{arxiv_id}"
+        elif doi:
+            link = f"https://doi.org/{doi}"
+        else:
+            link = str(ids.get("openalex") or "")
+
+        papers.append({
+            "title": title,
+            "summary": abstract[:500],
+            "link": link,
+            "published": year,
+            "authors": authors,
+            "venue": venue,
+            "source": "openalex",
+            "is_top_conf": _is_top_conf(venue),
+        })
+    return papers
+
+
 # ── Deduplication ─────────────────────────────────────────────────────────────
 
 def _dedup(papers: list[dict]) -> list[dict]:
@@ -140,6 +279,58 @@ def _dedup(papers: list[dict]) -> list[dict]:
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
+def search_academic_apis(
+    query: str, max_results: int = 30
+) -> tuple[list[dict], dict[str, int]]:
+    """Search OpenAlex, Semantic Scholar, and arXiv; return (papers, source_counts).
+
+    Results are cached for 7 days in .watson/api_cache/.
+    source_counts keys: "OpenAlex", "Semantic Scholar", "arXiv".
+    When served from cache, source_counts is {} (counts not stored in cache).
+    """
+    key = _cache_key(query, max_results)
+    cached = _load_api_cache(key)
+    if cached is not None:
+        return cached, {}
+
+    all_papers: list[dict] = []
+    source_counts: dict[str, int] = {}
+    # OpenAlex is most generous (50/request, 10K/day) → give it half the budget;
+    # S2 and arXiv split the rest equally.
+    oa_limit = min(50, max(max_results // 2, 20))
+    rest     = max(max_results - oa_limit, 20)
+    s2_limit = rest // 2
+    ax_limit = rest - s2_limit
+
+    try:
+        oa = _search_openalex(query, oa_limit)
+        all_papers.extend(oa)
+        source_counts["OpenAlex"] = len(oa)
+        time.sleep(0.3)
+    except Exception:
+        pass
+
+    try:
+        s2 = _search_s2(query, s2_limit)
+        all_papers.extend(s2)
+        source_counts["Semantic Scholar"] = len(s2)
+        time.sleep(0.5)
+    except Exception:
+        pass
+
+    try:
+        ax = _search_arxiv(query, ax_limit)
+        all_papers.extend(ax)
+        source_counts["arXiv"] = len(ax)
+    except Exception:
+        pass
+
+    results = _dedup(all_papers)[:max_results]
+    if results:
+        _save_api_cache(key, results)
+    return results, source_counts
+
 
 def search_similar(idea: str, max_results: int = 10) -> list[dict]:
     """Find the most thematically similar papers to an idea."""
