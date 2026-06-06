@@ -25,6 +25,7 @@ STATE_FILE = WATSON_DIR / "state.json"
 PAPERS_FILE = WATSON_DIR / "papers.json"          # legacy flat list
 SIMILAR_PAPERS_FILE = WATSON_DIR / "papers_similar.json"
 TOP_CONF_PAPERS_FILE = WATSON_DIR / "papers_top_conf.json"
+ALL_RELEVANT_PAPERS_FILE = WATSON_DIR / "papers_all_relevant.json"
 IDEA_FILE = WATSON_DIR / "idea.md"
 IDEA_ASSESSMENT_FILE = WATSON_DIR / "idea_assessment.md"
 EXPERIMENT_FILE = WATSON_DIR / "experiment.md"
@@ -33,6 +34,7 @@ RUN_LOG_FILE = WATSON_DIR / "run_log.txt"
 RESULTS_FILE = WATSON_DIR / "results.md"
 ANALYSIS_FILE = WATSON_DIR / "analysis.md"
 PAPER_FILE = PAPER_DIR / "paper.tex"
+PAPER_SECTIONS_DIR = PAPER_DIR / "sections"
 
 # Step metadata
 STEPS = ["idea", "experiment", "code", "run", "analysis", "paper"]
