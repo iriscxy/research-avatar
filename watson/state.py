@@ -5,10 +5,13 @@ from typing import Any, Optional
 
 from .config import (
     WATSON_DIR, STATE_FILE, PAPERS_FILE, SIMILAR_PAPERS_FILE, TOP_CONF_PAPERS_FILE,
+    ALL_RELEVANT_PAPERS_FILE,
     IDEA_FILE, IDEA_ASSESSMENT_FILE,
     EXPERIMENT_FILE, CODE_FILE, RUN_LOG_FILE, RESULTS_FILE, ANALYSIS_FILE, PAPER_FILE,
-    EXPERIMENTS_DIR, PAPER_DIR, STEPS,
+    EXPERIMENTS_DIR, PAPER_DIR, PAPER_SECTIONS_DIR, STEPS,
 )
+
+TEMPLATE_LATEX_FILE = WATSON_DIR / "template_latex.json"
 
 # Re-export so callers can do `S.IDEA_FILE`
 __all__ = ["IDEA_FILE", "PAPER_FILE"]
@@ -18,6 +21,7 @@ def ensure_dirs() -> None:
     WATSON_DIR.mkdir(exist_ok=True)
     EXPERIMENTS_DIR.mkdir(exist_ok=True)
     PAPER_DIR.mkdir(exist_ok=True)
+    PAPER_SECTIONS_DIR.mkdir(exist_ok=True)
 
 
 # ── JSON helpers ──────────────────────────────────────────────────────────────
@@ -102,6 +106,11 @@ def load_top_conf_papers() -> list[dict]:
     return data if isinstance(data, list) else []
 
 
+def load_all_relevant_papers() -> list[dict]:
+    data = load_json(ALL_RELEVANT_PAPERS_FILE)
+    return data if isinstance(data, list) else []
+
+
 def load_papers() -> list[dict]:
     """Return all papers (similar + top_conf combined)."""
     return load_similar_papers() + load_top_conf_papers()
@@ -133,3 +142,36 @@ def load_analysis() -> Optional[str]:
 
 def load_paper() -> Optional[str]:
     return load_file(PAPER_FILE)
+
+
+def load_paper_section(key: str) -> Optional[str]:
+    return load_file(PAPER_SECTIONS_DIR / f"{key}.tex")
+
+
+def save_paper_section(key: str, content: str) -> None:
+    save_file(PAPER_SECTIONS_DIR / f"{key}.tex", content)
+
+
+def load_paper_template() -> Optional[dict]:
+    """Return the custom template paper saved by the user, if any."""
+    return load_json(WATSON_DIR / "paper_template.json")
+
+
+def save_paper_template(template: dict) -> None:
+    save_json(WATSON_DIR / "paper_template.json", template)
+
+
+def load_template_latex() -> dict[str, str]:
+    data = load_json(TEMPLATE_LATEX_FILE)
+    if not isinstance(data, dict):
+        return {}
+    # Normalize line endings on load to fix cached content with \r or \r\n
+    return {
+        k: v.replace("\r\n", "\n").replace("\r", "\n")
+        for k, v in data.items()
+        if isinstance(v, str)
+    }
+
+
+def save_template_latex(sections: dict[str, str]) -> None:
+    save_json(TEMPLATE_LATEX_FILE, sections)
