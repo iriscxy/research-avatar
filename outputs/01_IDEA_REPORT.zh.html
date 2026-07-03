@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>研究想法报告 — MoE（工程视角）· Xiuying Chen</title>
+<style>
+  :root{--ink:#1a1a1a;--mut:#5a6270;--line:#e2e6ec;--bg:#fbfcfe;--acc:#2b5c9e;--novel:#0a7f52;--diff:#b5820a;--exist:#a33;--card:#fff;}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.75;margin:0;padding:0 20px 80px}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-size:1.85rem;margin:.6em 0 .1em;letter-spacing:-.01em}
+  h2{font-size:1.32rem;margin:2.2em 0 .5em;padding-bottom:.25em;border-bottom:2px solid var(--line)}
+  h3{font-size:1.08rem;margin:1.4em 0 .3em}
+  .sub{color:var(--mut);font-size:.95rem;margin:.2em 0 1.4em}
+  code{background:#eef1f6;padding:.08em .35em;border-radius:4px;font-size:.9em}
+  a{color:var(--acc);text-decoration:none}
+  a:hover{text-decoration:underline}
+  table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.93rem}
+  th,td{border:1px solid var(--line);padding:.55em .7em;text-align:left;vertical-align:top}
+  th{background:#eef2f8;font-weight:600}
+  tr:nth-child(even) td{background:#f6f8fb}
+  .tag{display:inline-block;font-size:.72rem;font-weight:700;padding:.12em .55em;border-radius:20px;color:#fff;white-space:nowrap}
+  .t-novel{background:var(--novel)} .t-diff{background:var(--diff)} .t-exist{background:var(--exist)}
+  .t-new{background:#7a3fb0}
+  .card{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--acc);border-radius:8px;padding:1.1em 1.3em;margin:1.1em 0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  .card.rank1{border-left-color:var(--novel)}
+  .pitch{font-size:1.06rem;font-weight:600;margin:.1em 0 .6em}
+  .idlabel{font-size:.82rem;color:var(--mut);font-weight:700;letter-spacing:.05em}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:.3em 1.4em;font-size:.9rem;margin:.6em 0}
+  .grid b{color:var(--mut);font-weight:600}
+  ul{margin:.3em 0 .6em;padding-left:1.3em}
+  li{margin:.15em 0}
+  .banner{background:#eafaf1;border:1px solid #b7e5cd;border-radius:8px;padding:.7em 1em;margin:1em 0;font-weight:600;color:#0a7f52;display:none}
+  .note{background:#fff8e6;border:1px solid #f0dfa8;border-radius:8px;padding:.7em 1em;font-size:.9rem;color:#6b5600;margin:1em 0}
+  .meta{font-size:.85rem;color:var(--mut)}
+  .kill{opacity:.72}
+  small.cw{color:var(--mut)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div id="selbanner" class="banner" style="display:block">✅ 已选定：<b>I1 — 安全冗余 MoE（把拒答摊分到多个专家）</b> &nbsp;·&nbsp; 选定于 2026-07-02（由 I6 改选）&nbsp;·&nbsp; 交接 → <code>/workplan</code></div>
+
+<h1>研究想法报告 — 混合专家（MoE）</h1>
+<p class="sub">
+  研究者：<b>Xiuying Chen</b>（MBZUAI）· 视角：<b>工程</b>（迭代习惯方法、复用现有代码）·
+  方向：<b>MoE 相关</b> · 生成日期：<b>2026-07-02</b> · 第 1 轮（全新想法集）<br>
+  依据：跨 5 个角度<b>调研 65 篇论文</b>（2024–2026）；对抗性排序由第二个模型（codex/GPT-5.2）交叉复核。
+</p>
+
+<!-- ============================= LANDSCAPE ============================= -->
+<h2>1 · 文献全景</h2>
+
+<p>2024–2026 年的 MoE 领域，<b>在架构上趋同、在一个核心问题上分裂</b>。趋同的架构是
+<a href="https://arxiv.org/abs/2401.06066">细粒度专家 + 少量常驻共享专家 + top-k / sigmoid 路由</a>
+（DeepSeekMoE → DeepSeek-V3、<a href="https://arxiv.org/abs/2409.02060">OLMoE</a>、
+<a href="https://arxiv.org/abs/2505.09388">Qwen3-MoE</a>，后者干脆去掉了共享专家）。负载均衡已从
+<a href="https://arxiv.org/abs/2408.15664">辅助损失梯度转向无辅助损失的偏置式均衡</a>，因为均衡损失的梯度会实打实地损害质量——但
+<a href="https://arxiv.org/abs/2501.11873">均衡与专门化之间的张力</a>是根本性的，且对实现细节极其敏感。离散 top-k 依然是痛点，催生了
+<a href="https://arxiv.org/abs/2412.14711">可微路由</a>与<a href="https://arxiv.org/abs/2501.13074">无路由器</a>等多条替代路线，但没有一条在生产环境中真正取代了可学习的 top-k。</p>
+
+<p>分裂之处在于<b>专家到底专门化了什么</b>。一派找到了稳健的细粒度专门化证据——
+<a href="https://arxiv.org/abs/2412.16971">对词性敏感的路由器</a>、
+<a href="https://arxiv.org/abs/2502.10928">线性探针可还原的语义路由</a>、
+<a href="https://arxiv.org/abs/2412.04139">天生单义的专家</a>。而另一派正在崛起，认为这种表面上的专门化只是
+<a href="https://arxiv.org/abs/2604.09780">线性路由器下隐状态几何结构的伪影</a>，真正主导路由的是一大批「领域无关的常驻委员会」式的始终激活专家。这一悬而未决的张力，正是白盒研究者最值得切入的缝隙。</p>
+
+<p>对一位<b>可信 LLM / steering</b> 研究者而言，最可操作的发现集中在<b>安全的定位（localization）</b>上：
+<a href="https://arxiv.org/abs/2509.09660">SteerMoE</a> 表明，仅通过对专家的（去）激活就能在不改动任何权重的情况下引导安全性（+20%）与忠实度（+27%）——但同一个把手也是攻击面。
+<a href="https://arxiv.org/abs/2506.17368">SAFEx</a> 发现拒答行为高度集中、危险地脆弱：在 Qwen3-30B-A3B 上禁用 <b>6144 个专家中的 12 个</b>，拒答率就掉 22%。
+<a href="https://arxiv.org/abs/2509.22745">SafeMoE</a> 通过惩罚路由漂移来防御有害微调——但<i>需要原始的、经过安全对齐的路由权重</i>，而这在大多数部署场景中根本拿不到。攻击一侧（
+<a href="https://arxiv.org/abs/2402.05526">缓冲区溢出</a>、
+<a href="https://arxiv.org/abs/2410.22884">利用平局处理泄露窃取 prompt</a>、
+<a href="https://arxiv.org/abs/2504.18598">BadMoE 的沉睡专家后门</a>、仅靠输入的路由越狱）远比防御一侧成熟，而且<b>反复被攻击的是路由器，而非专家本身</b>。目前仍<b>没有一个贴合真实部署（黑盒、无参考权重）的防御方案</b>，MoE 专属的忠实度 / 信任评测也很薄弱。</p>
+
+<p>还有两条缝隙与你的画像高度相关。其一，<b>跨语种 / 领域知识会定位到具体专家</b>：禁用 6000 个专家中的约 20 个，就能
+<a href="https://arxiv.org/abs/2603.17102">在超过 40% 的样本上抹掉正确答案</a>，而且
+<a href="https://arxiv.org/abs/2604.05267">领域专家确实存在</a>——但大家只做到「定位」，没做到「修复」。其二，<b>MoE 上的 RL 后训练是最不成熟的子方向</b>：GRPO 式 RL 会崩溃，原因是路由器在 rollout 与训练之间行为不一致（<a href="https://arxiv.org/abs/2510.11370">R3</a>、
+<a href="https://arxiv.org/abs/2510.23027">RSPO</a> 都是补丁式修正，而非为 RL 协同设计的路由器）。在低成本构建一侧，
+<a href="https://arxiv.org/abs/2212.05055">稀疏 upcycling</a> 会产出同质化的专家，而
+<a href="https://arxiv.org/abs/2404.15159">把 LoRA 当专家</a>是你在单卡上能搭起来的最省的 MoE。</p>
+
+<p class="meta"><b>结构性缺口 → 想法种子：</b>（1）安全集中有攻击、却没有一个「不依赖参考路由权重」的冗余式防御；（2）知识能按专家 / 语种定位、却无人去<i>修复</i>；（3）upcycling 出的专家同质化 / 沉睡，还没人用小的专才模型去唤醒它们；（4）路由漂移下的 MoE 专属信任 / 忠实度评测缺席；（5）语义 vs 几何的专门化之争尚无定论，且可用因果干预来检验。</p>
+
+<!-- ============================= RANKING ============================= -->
+<h2>2 · 排序后的想法集</h2>
+<p class="sub">共 6 个想法，按 A4 排序（依据魔鬼代言人的裁决，而非第一印象的热情）。每个都以一句话点题开头。
+其中 ≥3 个带 <span class="tag t-novel">novel</span> 判定。稳定 id <code>I1…I8</code> 是下游引用你所选想法的依据
+（<code>I5</code>/<code>I8</code> 已生成但被降级——见下方说明）。</p>
+
+<table>
+<thead><tr><th>排名</th><th>ID</th><th>一句话点题</th><th>判定</th><th>新颖性</th><th>风险</th></tr></thead>
+<tbody>
+<tr>
+  <td><b>1</b></td><td><b>I1</b></td>
+  <td>用一次 LoRA 微调 + 路由正则，把拒答行为重新摊分到许多专家上，使得没有任何一个「可被消融的小专家子集」能被敲掉来越狱模型——这是一个针对 SAFEx/SteerMoE 专家消融攻击、且不需要原始对齐路由权重的防御。</td>
+  <td><span class="tag t-novel">novel</span> <span class="tag t-new">✅ 已选定</span></td><td>7.5/10</td><td>中</td>
+</tr>
+<tr>
+  <td><b>2</b></td><td><b>I3</b></td>
+  <td>用跨语种不一致性定位出「在目标语种上持有错误 / 缺失医学知识」的那批专家，再用针对性的、按专家的 LoRA 只修这几个专家——把已知的「定位」推进成真正的「修复」，跑在你的 CURE-Med 技术栈上。</td>
+  <td><span class="tag t-novel">novel</span></td><td>7.0/10</td><td>中</td>
+</tr>
+<tr>
+  <td><b>3</b></td><td><b>I6</b></td>
+  <td>把你「小模型教大模型」的 KD 反过来用：用小的领域专才模型当老师，去专门化一个低成本 upcycling 出的 MoE 里那些沉睡 / 少用的专家，打破 upcycling 的同质化，让路由器真正把 token 送给它们。</td>
+  <td><span class="tag t-novel">novel</span></td><td>6.5/10</td><td>中</td>
+</tr>
+<tr>
+  <td><b>4</b></td><td><b>I7</b></td>
+  <td>用你的概念表征 + steering 工具做一次因果干预，判定 MoE 专家究竟是语义上专门化、还是仅仅是线性路由器的几何伪影——为「专家专门化的迷思」之争给出裁决。</td>
+  <td><span class="tag t-diff">differentiable</span></td><td>5.5/10</td><td>中</td>
+</tr>
+<tr>
+  <td><b>5</b></td><td><b>I4</b></td>
+  <td>把你的课程式 RL（CURE-Med）搬到 MoE 推理上，加一个路由稳定项，在多语种医学推理上验证。</td>
+  <td><span class="tag t-diff">differentiable</span></td><td>5.0/10</td><td>高</td>
+</tr>
+<tr>
+  <td><b>6</b></td><td><b>I2</b></td>
+  <td>把你「情绪回路」的白盒控制从神经元层面扩展到专家层面，做一个推理期的（去）激活旋钮，实现对安全 / 忠实度 / 偏见的多属性可信 steering。</td>
+  <td><span class="tag t-diff">differentiable</span></td><td>4.0/10</td><td>中</td>
+</tr>
+</tbody>
+</table>
+
+<div class="note">
+<b>已考虑但降级（如实说明，不为凑数）：</b>
+<b>I5</b>——对辩论 agent 做可学习路由（把 MoE↔MoA 桥接进你的假新闻系统）：与 Router-R1 / mixture-of-debaters 这类 agent 路由工作严重撞车，读起来像「agent 选择」而非 MoE 研究（新颖性约 3.5/10）。<b>I8</b>——路由分布外（OOD）下的 MoE 忠实度 / 信任 benchmark：有价值，但纯 benchmark 作为主打贡献偏薄，且本轮视角是工程——<b>建议把它并入 I1 或 I3 当评测套件</b>，而非单独成文。这两个本轮都不是强的工程主线；此处记录是为了下一轮能延续，而非被否决删除。
+</div>
+
+<!-- ============================= CARDS ============================= -->
+<h2>3 · 想法卡片</h2>
+
+<!-- I1 -->
+<div class="card rank1">
+  <div class="idlabel">排名 1 · I1 &nbsp;<span class="tag t-novel">novel</span> <span class="tag t-new">✅ 已选定</span></div>
+  <div class="pitch">用 LoRA + 路由正则把拒答行为重新摊分到许多专家上，使得没有任何一个可被消融的小专家子集能被敲掉来越狱模型——一个不需要原始对齐路由权重的专家消融攻击防御。</div>
+  <div class="grid">
+    <div><b>贡献类型：</b>方法（防御）</div><div><b>契合：</b>可信 / 安全 LLM（自述 #1）+ steering</div>
+    <div><b>可行性：</b>高——在 Qwen3-30B-A3B 或 OLMoE 上做 LoRA 微调；消融评测仅需推理；单卡 A100 配 offloading，或 4090 配更小的 MoE</div>
+    <div><b>风险：</b>中</div>
+    <div><b>粗估工作量：</b>约 5–7 周</div><div><b>审稿人最可能的质疑：</b>「你让 SAFEx 更难了——但在<i>自适应</i>攻击下可部署的安全性真的提升了吗？付出的过度拒答代价又有多大？」</div>
+  </div>
+  <h3>方法步骤</h3>
+  <ul>
+    <li><b>先复现攻击（便宜、先做——W1）：</b>用你的越狱 benchmark 框架，在 Qwen3-30B-A3B（及 OLMoE）上复现 SAFEx/SteerMoE 的最坏情况 k-专家消融；记录拒答率随 k 下降的曲线，作为基线脆弱度。</li>
+    <li><b>再分布目标：</b>用带路由正则的 LoRA 微调，(a) 把与安全相关的路由质量摊分到许多专家上，(b) 在安全关键专家集合上加一个熵 / 反集中项——使拒答在任意小子集被消融后仍然存活。</li>
+    <li><b>自适应再攻击：</b>对加固后的模型重跑最坏情况消融<i>以及</i>仅靠输入的路由越狱（攻击者针对新的路由重新优化 k）——这才是诚实的评测，而非只做静态一次。</li>
+    <li><b>效用与过度拒答护栏：</b>跟踪通用能力 + 良性 prompt 上的过度拒答，为「安全税」设定上界。</li>
+  </ul>
+  <p><b>假设 / 验收：</b>加固后，在 SAFEx 预算（约 12 个专家）下的最坏情况拒答跌幅，从约 22% 降到 &lt;5%，且能扛住自适应再优化，同时通用能力损失 &lt;2%、过度拒答无显著上升。</p>
+  <p><b>MVE（最小可行实验）：</b>先用一个模型（Qwen3-30B-A3B）、一个越狱集，复现出 SAFEx 的跌幅，施加正则，证明消融曲线被压平——再扩到第二个模型 / 自适应攻击者。</p>
+  <p><b>相对你自己工作的新颖性：</b>把<a href="https://arxiv.org/abs/2502.14296">你的可信性</a> / Safety-Boundaries / 越狱 benchmark 这条线，从<i>攻击与评测</i>推进到<i>架构级防御</i>——是新领地，而非旧工作的复述。</p>
+  <p class="meta"><b>最接近的工作与差异化：</b><a href="https://arxiv.org/abs/2506.17368">SAFEx</a> 与 <a href="https://arxiv.org/abs/2509.09660">SteerMoE</a> 揭示了集中 / 消融脆弱性，却没提出再分布式防御；<a href="https://arxiv.org/abs/2509.22745">SafeMoE</a> 能防有害微调，但<i>需要原始对齐路由权重</i>——I1 的再分布不需要它，且针对的是消融攻击而非微调漂移。</p>
+</div>
+
+<!-- I3 -->
+<div class="card">
+  <div class="idlabel">排名 2 · I3 &nbsp;<span class="tag t-novel">novel</span></div>
+  <div class="pitch">用跨语种不一致性定位出在目标语种上持有错误 / 缺失医学知识的那批专家，再用针对性的按专家 LoRA 只修这几个专家——把已知的定位推进成真正的修复，跑在你的 CURE-Med 栈上。</div>
+  <div class="grid">
+    <div><b>贡献类型：</b>方法（修复）</div><div><b>契合：</b>多语种 / 医学 LLM + CURE-Med</div>
+    <div><b>可行性：</b>高——按专家 LoRA 参数很轻；复用 CURE-Med 数据 / 评测；单卡 A100</div>
+    <div><b>风险：</b>中</div>
+    <div><b>粗估工作量：</b>约 6–8 周</div><div><b>审稿人最可能的质疑：</b>「在<i>同等参数预算</i>下，针对性专家修复真的比普通的多语种 / 领域 LoRA 更好吗？」</div>
+  </div>
+  <h3>方法步骤</h3>
+  <ul>
+    <li><b>定位（便宜、先做）：</b>在医学 QA 上按专家计算跨语种答案不一致性（XICI 式），找出那一小撮「一旦禁用、弱语种正确答案就消失」的专家。</li>
+    <li><b>针对性修复：</b>只给被定位的专家挂上按专家 LoRA，在弱语种的医学课程数据上微调，其余全部冻结——即相对「整模型多语种微调」的「外科手术式」替代方案。</li>
+    <li><b>路由使用性核查：</b>验证修复后路由器仍会选中被修的专家（已知的失败模式），而不会绕开它们。</li>
+    <li><b>等预算基线（W7）：</b>在可训练参数预算对齐的前提下，对比标准的整模型 / 随机专家 LoRA——这是回应质疑的关键。</li>
+  </ul>
+  <p><b>假设 / 验收：</b>针对性修复能把弱语种医学准确率恢复到与强语种相差 X% 以内，胜过等预算的非针对性 LoRA，且不损害强语种。</p>
+  <p><b>MVE：</b>先用一个 MoE、一对弱↔强语种、一个医学 QA 集，证明「定位→修复」胜过等预算基线，再加语种 / 领域。</p>
+  <p><b>相对你自己工作的新颖性：</b><a href="#">CURE-Med</a> 是在（隐式稠密的）模型上做多语种医学课程式 RL；I3 把 <i>MoE 结构本身</i>当杠杆——「先定位再修复」是新机制，而非 CURE-Med 的重跑。</p>
+  <p class="meta"><b>最接近的工作与差异化：</b><a href="https://arxiv.org/abs/2603.17102">跨语种知识定位</a> <small class="cw">[2026 预印本——引用前请核对 id]</small> 只做定位、<i>不做修复</i>；<a href="https://arxiv.org/abs/2604.05267">领域专家存在性审计</a> <small class="cw">[2026 预印本——请核对]</small> 确认专家存在，但只提出免训练 steering，而非知识修复。</p>
+</div>
+
+<!-- I6 -->
+<div class="card">
+  <div class="idlabel">排名 3 · I6 &nbsp;<span class="tag t-novel">novel</span></div>
+  <div class="pitch">把你「小模型教大模型」的 KD 反过来用：用小的领域专才模型当老师，去专门化一个低成本 upcycling 出的 MoE 里那些沉睡 / 少用的专家，打破 upcycling 的同质化，让路由器真正用上它们。</div>
+  <div class="grid">
+    <div><b>贡献类型：</b>方法（KD / 专家利用率）</div><div><b>契合：</b>KD（Flipping-KD）+ 低成本 MoE 构建</div>
+    <div><b>可行性：</b>高——LoRA 当专家 / 小型 upcycled MoE；小老师很便宜；单卡 A100/4090</div>
+    <div><b>风险：</b>中</div>
+    <div><b>粗估工作量：</b>约 5–7 周</div><div><b>审稿人最可能的质疑：</b>「说得通——但路由器<i>真的</i>会用被唤醒的专家吗？端到端任务效用真的提升了吗（还是负载均衡在假装专门化）？」</div>
+  </div>
+  <h3>方法步骤</h3>
+  <ul>
+    <li><b>先做小的（W1）：</b>从 Qwen3 稠密 checkpoint 搭一个小型 upcycled MoE（或 LoRA-experts / MixLoRA），测量每个专家的利用率，找出沉睡专家。</li>
+    <li><b>小老师分派：</b>为每个沉睡专家配一个小的领域专才老师，把老师的行为<i>蒸馏进那个专家</i>（即你 Flipping-KD 的方向：小的专长 → 大模型）。</li>
+    <li><b>路由激励：</b>加一个轻量路由项，诱导路由器真的把目标领域路由到被唤醒的专家。</li>
+    <li><b>利用率 + 效用评测：</b>同时报告专家利用率熵的变化<i>和</i>下游任务收益——两者都要，才能证明这不只是表面上的均衡好看。</li>
+  </ul>
+  <p><b>假设 / 验收：</b>小老师唤醒能提升沉睡专家的利用率，并在等算力下相对 (a) 朴素 upcycling 与 (b) 稠密-KD 取得可测的下游收益。</p>
+  <p><b>MVE：</b>一个小型 upcycled MoE、2–3 个领域，先证明「沉睡→激活」+ 相对朴素 upcycling 的任务收益，再扩规模。</p>
+  <p><b>相对你自己工作的新颖性：</b>直接借力你的 <a href="#">Flipping-KD</a> 标签（小模型专长 → LLM），换到一个新对象上——MoE 专家唤醒，而非文本匹配。</p>
+  <p class="meta"><b>最接近的工作与差异化：</b><a href="https://arxiv.org/abs/2502.12947">Every Expert Matters</a> 做的是稠密→MoE 的 KD、聚合所有专家；I6 把方向反过来（小专才老师），并专门针对<i>沉睡</i>专家；<a href="https://arxiv.org/abs/2502.19261">Drop-Upcycling</a> 靠重新初始化打破同质化，而非靠蒸馏出的专门化。</p>
+</div>
+
+<!-- I7 -->
+<div class="card">
+  <div class="idlabel">排名 4 · I7 &nbsp;<span class="tag t-diff">differentiable（需要框定）</span></div>
+  <div class="pitch">用你的概念表征 + steering 工具做一次因果干预，判定 MoE 专家究竟是语义上专门化、还是仅仅是线性路由器的几何伪影——为「专家专门化的迷思」之争给出裁决。</div>
+  <div class="grid">
+    <div><b>贡献类型：</b>诊断 / 实证</div><div><b>契合：</b>可解释性 + 概念表征（偏见探针）工作</div>
+    <div><b>可行性：</b>高（推理期干预）</div><div><b>风险：</b>中（几何与语义可能混淆）</div>
+    <div><b>粗估工作量：</b>约 4–6 周</div><div><b>审稿人最可能的质疑：</b>「这是诊断、不是要的工程论文——而且干预可能把几何和语义混为一谈。」</div>
+  </div>
+  <p><b>为何排在这里：</b>思路很锋利、也正落在你可解释性的主场，但它更像一项<i>测量研究</i>而非工程方法——最佳价值是作为 I1 或 I3 的严谨配套 / 章节，或在附上一个具体控制机制后重新框定为独立工作。</p>
+  <p class="meta"><b>最接近的工作与差异化：</b><a href="https://arxiv.org/abs/2604.09780">Myth of Expert Specialization</a> 和 <a href="https://arxiv.org/abs/2604.02178">Expert Strikes Back</a> <small class="cw">[2026 预印本——请核对 id]</small> 都是从<i>观测</i>上论证两派；I7 通过 steering 补上<i>因果</i>检验，这是两者都没做的。</p>
+</div>
+
+<!-- I4 -->
+<div class="card kill">
+  <div class="idlabel">排名 5 · I4 &nbsp;<span class="tag t-diff">differentiable（拥挤）</span></div>
+  <div class="pitch">把你的课程式 RL（CURE-Med）搬到 MoE 推理上，加一个路由稳定项，在多语种医学推理上验证。</div>
+  <div class="grid">
+    <div><b>贡献类型：</b>方法（RL）</div><div><b>契合：</b>RL 后训练 + 课程 + 医学</div>
+    <div><b>可行性：</b>低–中——RL-on-MoE 基建很重；OOM 是你的头号失败</div><div><b>风险：</b>高</div>
+  </div>
+  <p><b>为何排低：</b>上限很高，但这个子领域推进很快、已被 <a href="https://arxiv.org/abs/2510.11370">R3</a> 和 <a href="https://arxiv.org/abs/2510.23027">RSPO</a> 抢占；「课程 + 正则」的花样相对「为 RL 协同设计路由器」的方法只是增量，而完整的 RL-on-MoE 训练环（TRL + vLLM rollout）在单卡上正好会触发你反复出现的 OOM。除非路由稳定的想法确实是全新的、而不是又一个正则项，否则不建议追。</p>
+</div>
+
+<!-- I2 -->
+<div class="card kill">
+  <div class="idlabel">排名 6 · I2 &nbsp;<span class="tag t-diff">differentiable（接近 SteerMoE）</span></div>
+  <div class="pitch">把你「情绪回路」的白盒控制从神经元扩展到专家，做一个推理期的（去）激活旋钮，实现对安全 / 忠实度 / 偏见的多属性可信 steering。</div>
+  <div class="grid">
+    <div><b>贡献类型：</b>方法（steering）</div><div><b>契合：</b>steering + 可信性</div>
+    <div><b>可行性：</b>高</div><div><b>风险：</b>中（多属性在专家间纠缠）</div>
+  </div>
+  <p><b>为何排低：</b>读起来像「<a href="https://arxiv.org/abs/2509.09660">SteerMoE</a> + 更多属性标签」。单旋钮的前提很脆——安全 / 忠实度 / 偏见的专家彼此纠缠，而且<a href="https://arxiv.org/abs/2605.29708">近期工作</a> <small class="cw">[请核对 id]</small> 发现安全性存在于专家<i>权重</i>里、而非路由路径中，因此（去）激活未必能传导到解码出的生成结果。它最强的活法，是作为 I1 防御<i>内部</i>的 steering 组件，而非独立论文。</p>
+</div>
+
+<!-- ============================= GATE ============================= -->
+<h2>4 · 决策关口 — 研究者是裁判</h2>
+<p>按你的工作流程，我不会替你宣布哪个想法「就是它」。我的跨模型推荐是把 <b>I1 + I3</b> 作为两个要推进的方向
+（最强的安全-MoE 故事 + 最不拥挤的多语种-医学利基），并把 <b>I6</b> 作为低算力的并行 / 备选，借力你的 Flipping-KD 标签。
+但最终由你来选——在下面选择 / 否决 / 改向。你一旦选定，我会在本文件顶部盖上
+<code>Selected: I&lt;k&gt;</code> 横幅，并把所选想法交给 <code>/workplan</code>。</p>
+
+<!-- ============================= APPENDIX ============================= -->
+<h2>附录 · 全部调研论文（65 篇）</h2>
+<div class="note" style="background:#eef2f8;border-color:#c9d6ea;color:#33507a">
+防幻觉说明：<code>2603–2606</code> 区间的 id 是调研 agent 返回的 2026 年新预印本；凡是 agent 只能核对标题（无法核对正文）的，均标注 <small class="cw">[UNVERIFIED]</small>。上文的核心新颖性论证都建立在已核验的 2024–2025 论文上（SAFEx、SteerMoE、SafeMoE、R3/RSPO、Every Expert Matters、upcycling 系列）。任何 2026 年的 id 在进入正式手稿前请务必核对。
+</div>
+<h3>A · 架构、路由与低成本构建 <span class="meta">(18)</span></h3>
+<p class="meta">趋同的配方（细粒度 + 共享专家）、负载均衡、可微 / 无路由器的替代方案，以及靠稀疏 upcycling 的低成本构建。这里 upcycling 的同质化问题正是 <b>I6</b> 的种子。</p>
+<table>
+<thead><tr><th>标题</th><th>年份</th><th>一句话相关性</th></tr></thead>
+<tbody>
+<tr><td><a href="https://arxiv.org/abs/2401.06066">DeepSeekMoE: Ultimate Expert Specialization</a></td><td>2024</td><td>主流配方：细粒度 + 共享专家。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2408.15664">Auxiliary-Loss-Free Load Balancing</a></td><td>2024</td><td>偏置式均衡胜过辅助损失（DeepSeek-V3）。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2412.19437">DeepSeek-V3 Technical Report</a></td><td>2024</td><td>671B/37B-active 生产级 MoE 参照。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2401.04088">Mixtral of Experts</a></td><td>2024</td><td>经典开源粗粒度 SMoE；路由偏句法而非主题。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2409.02060">OLMoE</a></td><td>2024</td><td>完全开源 MoE + 专门化 / 均衡消融。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.09388">Qwen3 Technical Report</a></td><td>2025</td><td>Qwen3-MoE（128 专家、无共享）；你的习惯骨干。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2402.07871">Scaling Laws for Fine-Grained MoE</a></td><td>2024</td><td>把粒度作为一个 scaling 变量。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2212.05055">Sparse Upcycling from Dense Checkpoints</a></td><td>2022</td><td>低成本 MoE 的开山配方；专家同质化。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2502.19261">Drop-Upcycling（部分重初始化）</a></td><td>2025</td><td>靠重初始化打破 upcycling 同质化。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2410.07524">Upcycling LLMs into MoE（Nemotron）</a></td><td>2024</td><td>大规模 upcycling 配方。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2410.01610">Upcycling Instruction Tuning via Param Merging</a></td><td>2024</td><td>最省的搭 MoE 方式（无需重新预训练）。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2412.14711">ReMoE（ReLU 路由）</a></td><td>2024</td><td>完全可微路由。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2606.17952">SoftMoE（LapSum 软 top-k）</a></td><td>2026</td><td>逐层可微专家预算。<small class="cw">[请核对 id]</small></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2501.13074">Autonomy-of-Experts</a></td><td>2025</td><td>无路由器的自选择。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2501.11873">Demons in the Detail（LBL 粒度）</a></td><td>2025</td><td>全局批均衡损失有助专门化。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2407.06204">A Survey on MoE in LLMs</a></td><td>2024</td><td>设计空间地图。<small class="cw">[UNVERIFIED]</small></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2407.00945">Efficient Expert Pruning</a></td><td>2024</td><td>专家冗余 → 剪枝胜过合并。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2202.09368">Expert-Choice Routing</a></td><td>2022</td><td>构造上即均衡的路由。</td></tr>
+</tbody></table>
+<h3>B · 可解释性、专家专门化与 steering <span class="meta">(12)</span></h3>
+<p class="meta">语义 vs 几何的专门化之争、路由探测、知识 / 专家定位，以及专家（去）激活 steering（SteerMoE）。直接喂给 <b>I7</b>，也为 <b>I6</b> 的「沉睡专家」前提提供依据。</p>
+<table>
+<thead><tr><th>标题</th><th>年份</th><th>一句话相关性</th></tr></thead>
+<tbody>
+<tr><td><a href="https://arxiv.org/abs/2412.04139">Monet: Monosemantic Experts</a></td><td>2024</td><td>架构级可解释性（262K 专家）。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2503.07639">MoE-X（内在可解释）</a></td><td>2025</td><td>宽 ReLU 专家降低多义性。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2604.02178">The Expert Strikes Back</a></td><td>2026</td><td>专家比稠密 FFN 更少多义。<small class="cw">[请核对 id]</small></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2502.10928">Probing Semantic Routing</a></td><td>2025</td><td>线性探针发现语义路由。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2412.16971">POS Sensitivity of Routers</a></td><td>2024</td><td>从路由可还原 80–89% 词性。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2604.09780">Myth of Expert Specialization</a></td><td>2026</td><td>路由 = 隐状态几何伪影。<small class="cw">[请核对 id]</small></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2509.09660">SteerMoE（专家去/激活 steering）</a></td><td>2025</td><td>可引导安全 / 忠实度；也是攻击。<b>I1/I2 核心。</b></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2605.29708">Understanding Safety-Sensitive Expert Behavior</a></td><td>2026</td><td>安全在专家权重、不在路由。<small class="cw">[请核对 id]</small></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2603.17102">Knowledge Localization via Cross-Lingual Inconsistency</a></td><td>2026</td><td>约 20/6000 专家可抹掉 &gt;40% 答案。<b>I3 核心。</b><small class="cw">[请核对 id]</small></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2504.12359">Unveiling Hidden Collaboration in MoE</a></td><td>2025</td><td>专家间协作 + 剪枝。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2510.04694">Multilingual Routing in MoE</a></td><td>2025</td><td>语言条件下的专门化。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.24593">Decoding Knowledge Attribution in MoE</a></td><td>2025</td><td>基础+精修的专家协作。</td></tr>
+</tbody></table>
+<h3>C · 安全、攻击与鲁棒性 <span class="meta">(11)</span></h3>
+<p class="meta">路由器作为攻击面（泄露、后门、路由越狱）、安全集中在少数专家，以及为数不多的防御。这是（未选中的）<b>I1</b> 的缝隙。</p>
+<table>
+<thead><tr><th>标题</th><th>年份</th><th>一句话相关性</th></tr></thead>
+<tbody>
+<tr><td><a href="https://arxiv.org/abs/2402.05526">Buffer Overflow in MoE</a></td><td>2024</td><td>跨批次路由攻击面。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2410.22884">Stealing User Prompts from MoE（平局泄露）</a></td><td>2024</td><td>路由确定性泄露约 99.9% 的 prompt。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2502.06094">Fair-MoE（医学 VLM 公平性）</a></td><td>2025</td><td>公平导向专家；仅视觉 / 医学。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2504.18598">BadMoE（沉睡专家后门）</a></td><td>2025</td><td>沉睡专家里的路由触发后门。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.01811">BadPatches（视觉 MoE 后门）</a></td><td>2025</td><td>0.01% 投毒率的路由感知触发。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2506.17368">SAFEx（安全关键专家识别）</a></td><td>2025</td><td>12/6144 专家 → 掉 22% 拒答率。<b>I1 核心。</b></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2509.05086">Robust Experts（对抗训练 + 稀疏 MoE）</a></td><td>2025</td><td>路由坍缩使鲁棒性集中。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2509.22745">SafeMoE（安全路由对齐）</a></td><td>2025</td><td>防有害微调但需对齐路由权重。<b>I1 核心。</b></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2510.13462">BadSwitch（动态路由后门）</a></td><td>2025</td><td>靠路由偏好植入后门。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2510.15333">Graph-MoE 对抗防御</a></td><td>2025</td><td>罕见的 MoE 路由防御用途。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2605.04446">Misrouter（仅输入路由越狱）</a></td><td>2026</td><td>可迁移的黑盒路由引导。<small class="cw">[请核对 id]</small></td></tr>
+</tbody></table>
+<h3>D · 效率：推理 / serving / 压缩 / PEFT-KD <span class="meta">(15)</span></h3>
+<p class="meta">单卡 offloading 与 serving、量化、专家剪枝，外加「LoRA 当专家」（MixLoRA）与 MoE 知识蒸馏（Every Expert Matters）——即低算力构建路线，也是 <b>I6</b> 的直接基线。</p>
+<table>
+<thead><tr><th>标题</th><th>年份</th><th>一句话相关性</th></tr></thead>
+<tbody>
+<tr><td><a href="https://arxiv.org/abs/2312.17238">Mixtral-offloading（LRU 缓存 + 预取）</a></td><td>2023</td><td>把 Mixtral 跑上桌面级 GPU。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2401.14361">MoE-Infinity（激活感知 offloading）</a></td><td>2024</td><td>受限 GPU 上延迟降 4–20×。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2402.07033">Fiddler（CPU-GPU 协同）</a></td><td>2024</td><td>单张 24GB GPU 上 Mixtral &gt;3 tok/s。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2411.01433">HOBBIT（混合精度 offloading）</a></td><td>2024</td><td>边缘端 MoE 推理。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2410.17954">ExpertFlow（预测式专家缓存）</a></td><td>2024</td><td>路由路径预测 + 调度。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2502.05370">FineMoE（细粒度 offloading）</a></td><td>2025</td><td>子专家级 offloading，EuroSys'26。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2503.09716">MoE-Gen（模块级批处理）</a></td><td>2025</td><td>高吞吐单卡 MoE。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2310.02410">MoQE（量化专家）</a></td><td>2023</td><td>仅专家权重的 2-bit 量化。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2511.15015">Dynamic Expert Quantization</a></td><td>2025</td><td>按专家分配位宽。<small class="cw">[UNVERIFIED]</small></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2511.04805">PuzzleMoE（合并 + bit-pack）</a></td><td>2025</td><td>稀疏合并压缩。<small class="cw">[UNVERIFIED]</small></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2402.14800">Not All Experts Are Equal（剪枝+跳过）</a></td><td>2024</td><td>逐层专家剪枝。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2410.12013">MoE-Pruner（路由提示剪枝）</a></td><td>2024</td><td>用路由门显著性一次性剪枝。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2411.01016">MoE-I²（跨/内专家压缩）</a></td><td>2024</td><td>专家剪枝 + 低秩分解。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2404.15159">MixLoRA（LoRA 当专家）</a></td><td>2024</td><td>单卡上最省的 MoE。<b>I6 核心。</b></td></tr>
+<tr><td><a href="https://arxiv.org/abs/2502.12947">Every Expert Matters（MoE-KD）</a></td><td>2025</td><td>聚合所有专家的 KD。<b>I6 核心。</b></td></tr>
+</tbody></table>
+<h3>E · 推理、RL、领域与多智能体 <span class="meta">(9)</span></h3>
+<p class="meta">领域 / 医学 MoE、MoE↔Mixture-of-Agents 桥接，以及尚不成熟的 RL-on-MoE 子方向（路由不稳定）。被降级的 <b>I4</b>/<b>I5</b> 就在这里。</p>
+<table>
+<thead><tr><th>标题</th><th>年份</th><th>一句话相关性</th></tr></thead>
+<tbody>
+<tr><td><a href="https://arxiv.org/abs/2403.07816">Branch-Train-MiX（BTX）</a></td><td>2024</td><td>把领域训练的分支拼进 MoE。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2404.10237">Med-MoE（医学 VLM 领域专家）</a></td><td>2024</td><td>手工分派的医学领域专家。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2406.04692">Mixture-of-Agents（MoA）</a></td><td>2024</td><td>专家即 agent；MoA↔MoE 对照。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2406.12034">Self-MoE（自专门化专家）</a></td><td>2024</td><td>单体 → 模块化自专家。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2502.00674">Rethinking Mixture-of-Agents</a></td><td>2025</td><td>Self-MoA 常胜过混多个模型。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2503.05641">Symbolic-MoE（技能路由）</a></td><td>2025</td><td>按 query 的技能路由；单卡 16 专家。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2510.11370">Rollout Routing Replay（R3）</a></td><td>2025</td><td>修 RL-on-MoE 的路由发散。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2510.23027">RSPO（路由感知 IS 重标定）</a></td><td>2025</td><td>相对 GRPO 崩溃，MoE 上稳定 RL。</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2604.05267">Do Domain-specific Experts Exist in MoE?</a></td><td>2026</td><td>领域专家存在；免训练 steering。<small class="cw">[请核对 id]</small></td></tr>
+</tbody>
+</table>
+
+<p class="meta" style="margin-top:2em">由 <code>/ideagen</code> 生成 · 工程视角 · 65 篇论文 · 跨模型对抗排序（codex/GPT-5.2）。英文正本（canonical）：<a href="01_IDEA_REPORT.html">01_IDEA_REPORT.html</a>。</p>
+
+</div>
+</body>
+</html>

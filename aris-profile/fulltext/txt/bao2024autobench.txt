@@ -1,0 +1,2960 @@
+AutoBench-V: Can Large Vision-Language
+Models Benchmark Themselves?
+Han Bao*1 , Yue Huang*1 , Yanbo Wang‡2 , Jiayi Ye‡2 , Xiangqi Wang2 , Xiuying Chen2 , Yue Zhao3 , Tianyi Zhou4 ,
+Mohamed Elhoseiny5 and Xiangliang Zhang2
+1 University of Notre Dame, 2 MBZUAI, 3 University of Southern California, 4 University of Maryland, College Park, 5 KAUST, ‡ Visiting
+
+arXiv:2410.21259v4 [cs.CV] 6 Mar 2025
+
+students, * Equal contributions
+
+Abstract: Large Vision-Language Models (LVLMs) have become essential for advancing the integration of
+visual and linguistic information. However, the evaluation of LVLMs presents significant challenges as the
+evaluation benchmark always demands lots of human cost for its construction, and remains static, lacking
+flexibility once constructed. Even though automatic evaluation has been explored in textual modality, the visual
+modality remains under-explored. As a result, in this work, we address a question: “Can LVLMs themselves
+be used to benchmark each other in the visual automatically domain?". We introduce Au to Be nc h -V, an
+automated framework for serving evaluation on demand, i.e., benchmarking LVLMs based on specific aspects of
+model capability. Au to Be nc h -V leverages text-to-image models to generate relevant image samples and
+then utilizes LVLMs to orchestrate visual question-answering (VQA) tasks, completing the evaluation process
+efficiently and flexibly. Through an extensive evaluation of nine popular LVLMs across five demanded user
+inputs (i.e., evaluation capabilities), the framework shows effectiveness and reliability.
+
+1. Introduction
+
+Figure 1: An overview of the Au to Be nc h -V pipeline.
+
+In recent years, the rapid development of natural language processing (NLP) has given rise to Large
+Language Models (LLMs) (Zhao et al., 2023), which have revolutionized the field and opened new
+avenues for innovation and practical downstream applications (Liu et al., 2023b,c). As the capabilities
+of LLMs grow, researchers begin to explore the integration of visual information understanding
+capabilities into LLMs, leading to the emergence of Large Vision-Language models (LVLMs) (Liu et al.,
+2024). These models are trained on extensive multi-modal datasets (e.g., image-text data), enabling
+them to perform sophisticated cross-modal perception, understanding, and reasoning by effectively
+integrating visual and textual information (Antol et al., 2015; Zou et al., 2023; Ghandi et al., 2023;
+Chen et al., 2024a).
+With LVLMs becoming more widely adopted, their evaluation has become increasingly important for
+determining their limitations and reliability. Recent research (Xu et al., 2024; Liu et al., 2025; Li et al.,
+2023b,a; Yin et al., 2024; Ying et al., 2024) highlights the need for evaluation standards that cover a
+broad spectrum of multimodal capabilities. Although these benchmarks examine selected dimensions
+of LVLM performance, they lack flexibility for on-demand assessments in different capability areas.
+Recent studies have explored using generative models in automating evaluation, which offers flexibility
+in varying evaluation dimensions and reduces the human cost of benchmark dataset construction (Wu
+et al., 2024; Zhu et al., 2023b; Li et al., 2024). However, most of these efforts concentrate on LLMs
+operating solely on text, leaving the visual aspect under-explored. Motivated by this gap, we ask the
+Corresponding author(s): xzhang33@nd.edu (Xiangliang Zhang)
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+following question: “Can LVLMs themselves be used to automatically benchmark each other in
+the visual domain?” In other words, is it feasible to leverage LVLMs as both question-generators
+and evaluators, with minimal human intervention, to create flexible and reliable tests of multimodal
+understanding?
+Automating LVLM evaluation presents several key challenges. First, the targeted capabilities to be
+evaluated must be identified based on the input demand. This foundation enables the generation
+of relevant images and appropriate VQA tasks to accurately assess the LVLMs’ performance in those
+specific aspects1 . Second, the generated content must be relevant and controllable, so that it accurately
+tests the targeted skills. Third, there is a risk of “answer leakage”: 1) the issue arises when the model
+responsible for generating questions exhibits self-enhancement bias (Zheng et al., 2023; Ye et al.,
+2024)—it can achieve higher performance as it embeds too many “hints” in the generated questions,
+2) the prior work (Chen et al., 2024b) shows that models can achieve high VQA performance using
+text alone.
+To address the above challenges, we propose Au to Be nc h -V, which supports automated LVLM
+evaluation based on user demand for specific evaluation aspects of model capability (e.g., spatial
+understanding). Initially, the input demand (i.e., evaluation aspect) is processed by an examiner LVLM.
+Each aspect is further divided into several fine-grained components, for which image descriptions of
+varying difficulty levels are generated. To ensure that descriptions align with their corresponding
+images, a self-validation mechanism is applied through VQA. Furthermore, an error control mechanism
+is implemented to prevent a negative impact of misalignment between text and image. To avoid
+the potential self-enhancement bias and the situation that LVLMs only utilize textual information to
+guess answers Chen et al. (2024b), we introduce an error-driven option adjustment strategy to reduce
+such bias and “force” model to utilize visual information for answering. Moreover, we also introduce
+multi-examiners to avoid being the player and the referee at the same time. Finally, the generated
+questions and images are then presented to the evaluated LVLM to generate responses, which are
+assessed by reference answers (Liu et al., 2023a). The high-level pipeline of Au to Be nc h -V is
+shown in Figure 1.
+Using AutoBench-V, we conduct an extensive evaluation of nine popular LVLMs in five evaluation
+capabilities requested (see Figure 2). The results show that LVLMs exhibit declining performance as
+task difficulty rises, with varied performances over distinctive LVLMs. While excelling in high-level
+understanding, they struggle with fine-grained reasoning, revealing a key area for improvement in
+future research. Moreover, Some models scored below 25% on medium and hard tasks, performing
+worse than random guessing. To summarize, our key contributions are three-fold:
+◁ An automated LVLM evaluation framework. The proposed AutoBench-V is the first automated
+framework for benchmarking LVLMs’ capability. The framework uses text-to-image models to generate
+images based on textual descriptions, and employs LVLM examiners for VQA evaluations. This
+automation significantly minimizes human involvement, enhancing efficiency and objectivity in the
+evaluation process.
+◁ Extensive experiments to validate the framework’s effectiveness. We conducted comprehensive
+experiments, including main evaluations on multiple models, ablation studies on each module, option
+position bias analyses, and human evaluation. These results confirm the framework’s robustness and
+effectiveness in evaluating LVLMs.
+◁ In-depth analysis of LVLMs’ performance across diverse visual tasks. Through systematic
+evaluation with varied user inputs, we obtained many insightful findings. For instance, LVLMs
+exhibit strong proficiency in abstract conceptual understanding while demonstrating relatively lower
+1
+
+An aspect example would be like “Spatial Understanding” Li et al. (2023b).
+
+2
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Q: where is the cat
+positioned relative
+to the dog lying on
+the couch?
+
+Fo
+r
+B egr
+Dif ackg ound
+fer rou &
+en
+tia nd
+tio
+n
+
+ct s
+je ion
+Ob ract
+te
+In
+
+Q: Which element
+is centrally placed
+and serves as the
+main focus?
+
+A
+Re bst
+as ra
+on ct
+in
+g
+
+Te
+Re mpor
+aso al
+nin
+g
+
+Q: Which element in the
+image indicates the
+progression of time and
+the duration of the
+sapling's growth?
+
+ial
+Soc mics g
+a
+in
+Dyn stand
+der
+n
+U
+Activity
+and
+Motion
+
+Color
+and
+Lighting
+
+En
+vir
+o
+Co nme
+nte nt
+xt al
+Em
+o
+Cu tion
+es al
+
+Spatial
+Understanding
+Objec
+Orienta t
+tion
+
+ne
+Sce text
+n
+Co
+
+Q: which item in the
+image is most indicative
+of the 1940s era?
+
+At
+U nd m o sp
+er s h er i
+c
+tan
+td in
+g
+
+Re
+C a as o n
+p a in
+c it g
+y
+
+l
+tia
+Spa ction
+era
+Int
+
+Q: What is prominently
+displayed in the
+foreground of the
+image?
+
+g
+
+al
+nsion
+Dime sis
+Analy
+
+Q: What is the elderly
+man doing in the
+garden?
+
+ve
+Narrati
+and
+Intent
+
+c
+an ti
+S em a n d i n g
+er s t
+
+Q: Where is the
+bookshelf located in
+the classroom scene?
+
+U
+
+Emot
+ional
+an
+Psych d
+ologic
+al
+
+s ic in
+B a tan d
+s
+er
+nd
+
+U nd
+
+Q: In the hospital scene,
+which visual cue primarily
+indicates the senior
+surgeon's higher status?
+
+Un Sce
+de
+rst ne
+an
+din
+g
+
+xtual
+Conte nsion
+rehe
+Comp
+
+Q: What emotion is
+primarily depicted on
+the parents' faces in the
+living room scene?
+
+ct
+je ion
+Ob ect
+t
+De
+
+Q:What is the position of
+the armchair relative to
+the window in the welllit room?
+
+r
+cte
+ara ion
+Ch gnit
+co
+Re
+
+Q: Which object is the
+main focus in the image?
+
+Q: What is the most
+likely outcome if the
+child successfully kicks
+the soccer ball with force?
+
+Causa
+l
+Infere
+nce
+
+Q: Which activity is the
+child engaged in near the
+woman reading a book?
+
+Q: Which hot air
+balloon appears
+larger in the
+image?
+
+Q: What is the young
+artist's main motivation
+as depicted in the image?
+
+Q: What is the girl doing
+while the boy hands her
+the balloon?
+
+Q: What effect do the late
+afternoon sunlight rays
+have on the appearance of
+the wooden floor in the
+kitchen?
+Q: How does the fog
+influence the visibility of
+the fishing boats in the
+harbor?
+
+Q: What is the woman's
+body posture indicating
+about her emotional state?
+
+Q: Which object is
+positioned closest to the
+couch where the dog
+and cat are sitting?
+
+Figure 2: Five key evaluation dimensions in Au to Be nc h -V—Basic Understanding, Reasoning Capacity,
+Semantic Understanding, Spatial Understanding, and Atmospheric Understanding—and their sub-aspects,
+illustrated by the representative question–image pairs.
+
+performance in concrete visual reasoning tasks. These findings provide insights into the current state
+of LVLMs, highlighting areas with potential for future development and exploration.
+
+2. Related Works
+Benchmark for LVLMs. The emergence of LVLMs greatly promoted the development of multimodal
+models, showcasing exceptional progress in their multimodal perception and reasoning capabilities.
+This makes previous benchmarks, which focused on isolated task performance (Karpathy and Fei-Fei,
+2015; Antol et al., 2015) insufficient to provide a comprehensive evaluation. Subsequent studies
+have introduced various benchmarks to assess LVLMs across a range of multimodal tasks (Goyal
+et al., 2017; Lin et al., 2014; Russakovsky et al., 2015). However, these benchmarks often lack
+fine-grained assessments of capabilities and robust evaluation metrics. Hence, recent works (Liu
+et al., 2025; Ying et al., 2024; Fu et al., 2024; Yu et al., 2023, 2024; Zhou et al., 2024b) underscore
+the critical need for developing advanced, comprehensive benchmarks to more accurately assess
+multimodal understanding and reasoning capabilities of LVLMs. However, these benchmarks still have
+various limitations. For example, LVLM-eHub (Xu et al., 2024) and LAMM (Yin et al., 2024) have
+utilized several classical datasets that are widely recognized but not sufficiently novel for current
+advancements, overlooking the possibility of data leakage during LVLM training. Hence, MMStar
+(Chen et al., 2024b) aims to solve the issure of unnecessary visual content and unintentional data
+leakage in LVLM training by constructing an elite vision-indispensable dataset.
+Automatic benchmarks. The significant early advancements in LLMs have driven the development
+3
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+(a) User-Oriented Aspect Generation
+
+(b) Guided Description Generation
+
+Hierarchical Aspect
+General Aspect
+
+Fined-grained Aspect
+Question
+
+Description Error
+
+Q: What type of vehicle is parked on the asphalt driveway
+A: A red sports convertible B: A blue sedan
+C: A yellow truck
+D: A green van
+Reference Answer: ”A”
+
+Aspect
+
+Examiner
+
+Medium
+
+Hard
+
+Q: What object is directly beneath the teacup in the image?
+A: A fork
+B: A saucer
+C: A wooden coaster D: A napkin
+Reference Answer: “C”
+Model Pool To Be Tested
+
+Q: "What interaction is the child engaged in on the
+beach?"
+A: Playing with a ball B: Building a sandcastle
+C: Flying a kite
+D: Collecting seashellst
+Reference Aanswer: “C”
+Answer: “C” Correct
+Q: In the foreground, which item is placed next to the
+steaming cup of latte?
+A: A leather-bound notebook, B: A plate of cookies
+C: A vase with flowers, D: A smartphone
+Reference Answer: ”A”
+Answer: “D” Wrong
+
+Error-driven option adjustment
+
+A fork
+
+A porcelain saucer
+
+A saucer
+
+A tablecloth
+
+A napkin
+
+A metal tray
+
+Round 1:
+Used word: None Topic word: sunflower
+Keywords: petal, yellow, light red, stalk
+
+Easy
+
+Image Description
+
+E.g., General Aspect:
+Object Positioning
+Fined-grained Aspect:
+Depth Perception, Object
+Overlay, Foreground vs.
+Background, Depth Cues from
+Shadows...
+
+Prompting with difficulty
+
+{User Input}
+e.g. Spatial
+Understanding
+
+Diverse Image Generation Based Semantic Graph
+
+Round 2:
+Used word: sunflower Topic word: petal
+Keywords: blue,magnified,central,rose
+Round 3:
+Used word: petal, sunflower
+Topic word: petal
+Keywords: blue,magnified,central,rose
+
+...
+
+T2I Model
+
+Align?
+
+Question: "What is the color of the ball?"
+Choice: "blue","red", "yellow","green"
+Answer: “blue”
+
+Alignment Score
+saved
+
+Question: “What is dripping from the candle?”
+Choice: "wax","water","oil","paint"
+Answer: “water”
+
+83.3
+saved with an error
+
+Question: “Who is standing under a canopy?”
+Choice: “A man”, “A woman”, “A child”
+Answer: “A man”
+
+< 80
+regenerate
+
+Figure 3: A comprehensive overview of the Au to Be nc h -V framework.
+
+of various benchmarks designed to automate evaluation processes. For example, LMExamQA (Bai
+et al., 2024) employs the concept of a Language-Model-as-an-Examiner to create a comprehensive
+and scalable evaluation framework. In addition, DyVal (Zhu et al., 2023b) and DyVal2 (Zhu et al.,
+2024) both highlight the importance of dynamic assessment, with DyVal focusing on reasoning tasks
+and D y Val 2 adopting a broader psychometric approach. AutoBencher (Li et al., 2024) automates
+the generation of novel, challenging, and salient datasets for evaluating LLMs, further expanding the
+scope of automated benchmarking. Other efforts, such as Un i G e n (Wu et al., 2024) and Task Me
+Anything (Zhang et al., 2024a), focus on developing more customized and relevant benchmarks to
+evaluate LVLM and LLM performance across diverse tasks.
+
+3. The Proposed Au to Be nc h -V Framework
+In this section, we introduce AutoBench-V, a framework for automated benchmarking of LVLMs.
+Au to Be nc h -V makes use of two key components—an LVLM examiner ℳ𝑣 and a text-to-image
+model ℳ𝑑 —to support robust and scalable evaluations. As illustrated in Figure 3, the framework
+consists of four modules: user-oriented aspect generation, guided description generation, image
+generation with self-validation, and test-case generation and evaluation. Au to Be nc h -V aims to
+address three primary challenges:
+• Diverse Evaluation Aspects. To ensure comprehensive benchmarking, Au to Be nc h -V covers
+various capability dimensions, each graded by difficulty. The breadth is achieved via a hierarchical
+aspect-guided strategy enriched by semantic graph-based prompt generation.
+• Truthful Evaluation Cases. The framework includes a self-validation step that detects potential
+errors in generated items. An additional error-control mechanism reinforces factual correctness,
+improving its reliability.
+• Minimized Evaluation Bias. To reduce bias, AutoBench-V maintains a set of LVLM examiners,
+limiting self-enhancement bias (Ye et al., 2024) that can occur if a single model handles both
+question generation and responses. Furthermore, error-driven option adjustment thwarts text-only
+strategies for guessing answers, thereby increasing the difficulty of evaluation items.
+
+4
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+3.1. User-Oriented Aspect Generation
+In this part we detail the implementation of AutoBench-V and for the math notations used below
+are additionally referred to in the Appendix E.
+User input. The user input can specify an evaluation target focused on certain aspects of LVLMs’
+capability. Au to Be nc h -V covers the following key evaluation aspects, which are the most crucial
+for assessing the capabilities of LVLMs: Basic Understanding, Spatial Understanding (Li et al.,
+2023b), Semantic Understanding (Meng et al., 2024), Reasoning Capacity (Liu et al., 2025), and
+Atmospheric Understanding (Geetha et al., 2024). Notably, the user input is not limited to the above
+kinds, and can be customized as needed.
+Hierarchical aspect generation. For each user input, we derive a set of aspects representing specific
+capability items. For example, as shown in Figure 2, contextual comprehension is an aspect under
+Basic Understanding. However, directly generating aspects from user input can lead to excessive
+repetition, reducing both diversity and reliability by overlapping in semantics and repeatedly evaluating the same capability. To mitigate this, we propose hierarchical aspect generation inspired by
+the previous study (Qin et al., 2023) to constrain the aspect generation process. Formally, given
+(𝑔)
+(𝑔)
+the user input 𝑞, we first generate 𝑛 general aspects {𝐴(𝑔)
+1 , 𝐴2 , . . . , 𝐴𝑛 } by ℳ𝑣 , which can be for(𝑔)
+(𝑔)
+(𝑔)
+mulated as: {𝐴1 , 𝐴2 , . . . , 𝐴𝑛 } = ℳ𝑣 (𝑞). These general aspects represent high-level evaluation
+(𝑔)
+dimensions based on 𝑞. Next, for each general aspect 𝐴𝑖 , we further generate 𝑚 fine-grained aspects
+(𝑓 )
+(𝑓 )
+(𝑓 )
+{𝐴𝑖1 , 𝐴𝑖2 , . . . , 𝐴𝑖𝑚 }, where each fine-grained aspect provides more specific criteria related to the
+general aspect. The fine-grained aspects are also generated by ℳ𝑣 and depend on both the user input
+(𝑔)
+𝑞 and the corresponding general aspect 𝐴𝑖 . The fine-grained aspect of generation can be represented
+(𝑓 )
+(𝑓 )
+(𝑓 )
+(𝑔)
+as {𝐴𝑖1 , 𝐴𝑖2 , . . . , 𝐴𝑖𝑚 } = ℳ𝑣 (𝑞, 𝐴𝑖 ). Thus, the hierarchical
+(︁ aspect⋃︀generation)︁yields a structured set
+⋃︀
+(𝑓 )
+𝑚
+of evaluation aspects (i.e., fine-frained aspect) 𝒜 = 𝑛𝑖=1 {𝐴(𝑔)
+𝑖 }∪
+𝑗=1 {𝐴𝑖𝑗 } , where |𝒜| = 𝑚𝑛.
+3.2. Diverse Description Generation
+Image description with difficulty grading. To enable a more comprehensive evaluation, we introduce
+a difficulty-grading mechanism for the image descriptions, which includes the evaluation cases from
+different difficulties. We define three difficulty levels: easy, medium, and hard. We show the
+examples across different difficulties in Figure 9. The difficulty level 𝑑 is determined by key factors
+such as background complexity, element relationships, and the intricacy of textures, which are
+carefully discussed and designed from the perspective of visual perception. The generation of 𝜔
+𝑑 , 𝒯 𝑑 , . . . , 𝒯 𝑑 } for 𝐴(𝑓 ) at a specific difficulty level 𝑑 can be defined as:
+image descriptions {𝒯𝑖𝑗1
+𝑖𝑗2
+𝑖𝑗𝜔
+𝑖𝑗
+⋃︀𝜔
+𝑑 } = ℳ (𝑞, 𝐴(𝑓 ) , 𝑑), where 𝑑 ∈ {easy, medium, hard}. More details about the difficulty
+{𝒯
+𝑣
+𝑘=1 𝑖𝑗𝑘
+𝑖𝑗
+grading are provided in Appendix C.
+Semantic graph-constraint description generation. A key challenge when generating image
+descriptions at the same difficulty level is minimizing repetitive elements and backgrounds, which
+can reduce the diversity and generalization of the evaluation. For example, given a user input 𝑞
+related to spatial understanding, the model ℳ𝑣 might tend to produce descriptions centered around
+urban landscapes, potentially compromising the variety of test cases. To address this, we introduce a
+description optimization strategy using a semantic graph (Quillian, 1966) to enhance the diversity of
+image prompts generated by ℳ𝑣 , with significant results referred to Figure 8 in Appendix A. Moreover,
+we show a visualization of specific words in Figure 10 and Figure 11 in Appendix A. The semantic
+graph is designed to assist Au to Be nc h -V in avoiding the generation of duplicate descriptions by
+serving as an iteratively updated structure tailored to prompts within the specified aspect. To illustrate
+the construction process, without loss of generality. Considering 𝑒′ th iteration of prompt generation,
+
+5
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+a LLM identified topic word 𝑡𝑒 and a set of |𝑐| related keywords 𝐾𝑒 = {𝑘𝑒1 , 𝑘𝑒2 , . . . , 𝑘𝑒𝑐 } are selected.
+These keywords are added as nodes to the semantic graph 𝐺, where nodes are connected by edges
+representing semantic relationships between them.
+Formally, let 𝐺𝑒 = (𝑉𝑒 , 𝐸𝑒 ) be the semantic graph generated at iteration 𝑒, and let 𝑆𝑒 = (𝑉𝑒−1 ∪ {𝑡𝑒 } ∪ 𝐾𝑒 ).
+Then 𝑉𝑒 = 𝑆𝑒 ∖ 𝑓 (𝑆𝑒 ) represents the node set of topic words and keywords, and 𝐸𝑒 is the set of
+edges capturing the relationships between them. After each round of prompt generation, we apply a degree-based exclusion algorithm, where the number of excluded nodes is determined by a
+function 𝑓 (𝑆𝑒 ). This function defines the number of top-degree nodes to be excluded, allowing
+flexibility in adjusting how many frequently used words are removed as the iterations progress.
+Here, the function 𝑓 (𝑆𝑒 ) can
+∑︀ be defined by users’ requirements, and in our experiment we define
+it as 𝑓 (𝑆𝑒 ) = arg max
+𝑣∈𝑉 ′ deg(𝑣), where deg(𝑣) represents the degree of node 𝑣 ∈ 𝑉𝑖 , or it
+𝑉 ′ ⊆𝑆𝑒 ,|𝑉 ′ |=𝑒
+
+could take a more complex form based on specific conditions. We mitigate redundancy and promote
+diversity in the generated prompts by excluding these high-degree nodes, which correspond to the
+most commonly used words. The function 𝑓 (𝑆𝑒 ) offers the flexibility to control how aggressively the
+exclusion process operates based on the round number 𝑒.
+Overall, the generation of an image description 𝒯𝑖𝑗𝑒 can be formalized as follows:
+𝜔
+⋃︁
+
+(𝑓 )
+
+𝑑𝑒
+{𝒯𝑖𝑗𝑘
+} = 𝑀𝑣 (𝑞, 𝐴𝑖𝑗 , 𝑉𝑒 , 𝑑),
+
+𝑘=1
+
+where 𝑉𝑒 represents the refined and diverse set of topic words and keywords after the exclusion
+mechanism has been applied. We show the detailed procedure in Algorithm 1.
+Algorithm 1 Diverse Description Generation Strategy
+Input: User input 𝑞, model ℳ𝑣 , initial set of topic words and keywords 𝑉0 , exclusion function 𝑓 (𝑆𝑒 ), number
+of iterations 𝑁
+Output: Set of diverse image descriptions {𝒯 (1), 𝒯 (2), . . . , 𝒯 (𝑁 )}
+1: Initialize iteration counter 𝑒 ← 1
+2: Initialize the set of topic words and keywords 𝑉1 ← 𝑉0
+3: while 𝑒 ≤ 𝑁 do
+4:
+Select a topic word 𝑡𝑒 and a set of related keywords 𝐾𝑒 = {𝑘𝑒1 , 𝑘𝑒2 , . . . , 𝑘𝑒𝑐 }
+5:
+Form the node set 𝑆𝑒 = 𝑉𝑒−1 ∪ {𝑡𝑒 } ∪ 𝐾𝑒
+6:
+Formulate 𝐸𝑒 , where edges represent semantic relationships.
+7:
+Identify exclusion set
+∑︁
+𝑓 (𝑆𝑒 ) = arg max
+deg(𝑣)
+𝑉 ′ ⊆𝑆𝑒 ,|𝑉 ′ |=𝑒 𝑣∈𝑉 ′
+
+8:
+9:
+10:
+
+Update the node set as 𝑉𝑒 ← 𝑆𝑒 ∖ 𝑓 (𝑆𝑒 )
+Set hyperparameters 𝑑 and 𝜔
+Set
+𝜔
+⋃︁
+(𝑓 )
+𝑑𝑒
+𝒯 (𝑒) =
+{𝒯𝑖𝑗𝑘
+} = ℳ𝑣 (𝑞, 𝐴𝑖𝑗 , 𝒟𝑖𝑗 , 𝑉𝑒 , 𝑑)
+𝑘=1
+
+11:
+Increment the iteration counter: 𝑒 ← 𝑒 + 1
+12: end while
+
+return Set of diverse image descriptions {𝒯 (1), 𝒯 (2), . . . , 𝒯 (𝑁 )}
+
+6
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+w/o adjustment
+
+Easy Difficulty
+
+w/ adjustment
+
+Medium Difficulty
+
+Hard Difficulty
+
+Score
+
+0.6
+0.4
+0.2
+0.0
+
+ini lash -Pro net aiku Plus -VL sion
+-4o
+GPT T-4o-M i-1.5-F ini-1.5 .5-Son e-3-H M-4v- Qwen2 0B-Vi
+GP emin Gem ude-3 Claud GL
+2-9
+a-3.
+G
+Cla
+Llam
+
+ini lash -Pro net aiku Plus -VL sion
+-4o
+GPT T-4o-M i-1.5-F ini-1.5 .5-Son e-3-H M-4v- Qwen2 0B-Vi
+GP emin Gem ude-3 Claud GL
+2-9
+a-3.
+G
+Cla
+Llam
+
+ini lash -Pro net aiku Plus -VL sion
+-4o
+GPT T-4o-M i-1.5-F ini-1.5 .5-Son e-3-H M-4v- Qwen2 0B-Vi
+GP emin Gem ude-3 Claud GL
+2-9
+a-3.
+G
+Cla
+Llam
+
+Figure 4: Models’ accuracy (here we take “basic understanding” as an example) before and after the option
+adjustment, without image input (only guess the answer by textual information).
+
+3.3. Image Generation By Self-Validation
+(𝑓 )
+
+Self-validation. The image descriptions 𝒯𝑖𝑗𝑑 and their corresponding aspects 𝐴𝑖𝑗 are subsequently
+provided to the text-to-image model for image generation. At this stage, a potential issue is the
+𝑑 not aligning with the descriptions, due to hallucinations inherent
+possibility of generated images ℐ𝑖𝑗
+in the text-to-image model (Lee et al., 2023). To tackle this issue, drawing inspiration from TIFA (Hu
+et al., 2023), we employed a self-validation process to evaluate the consistency of images with their
+descriptions via VQA.
+𝑑 , based on its image description, ℳ is asked
+In the self-validation process ℱ, for each image ℐ𝑖𝑗
+𝑣
+𝑑
+𝑑
+𝑑
+𝑑
+to generate a set of simple questions Φ𝑖𝑗 = {𝜑𝑖𝑗1 , 𝜑𝑖𝑗2 , . . . , 𝜑𝑖𝑗𝑝 } (e.g.,“Is there a wooden chair in the
+image?”), where 𝑝 denotes the question number to evaluate alignment. The function ℱ takes the
+𝑑 , its description 𝒯 𝑑 , and the set of questions Φ𝑑 as inputs and outputs an alignment score
+image ℐ𝑖𝑗
+𝑖𝑗
+𝑖𝑗
+𝑑
+𝑆𝑖𝑗 , which is calculated as the ratio of correctly answered questions to the total number of questions,
+𝑑 = ℱ(ℐ 𝑑 , 𝒯 𝑑 , Φ𝑑 ). We set a threshold 𝜁, where: (i) If 𝑆 𝑑 < 𝜁, the image ℐ will
+denoted as 𝑆𝑖𝑗
+𝑖𝑗
+𝑖𝑗 𝑖𝑗
+𝑖𝑗
+𝑖𝑗
+𝑑 < 1,
+be reworked in line with the description until it meets the required standard; (ii) If 𝜁 ≤ 𝑆𝑖𝑗
+the image meets the basic criteria but contains an error ℰ𝑖𝑗𝑑 , which will be documented for further
+𝑑 = 1, the image is considered to fully align
+processing (described in subsection 3.4); and (iii) If 𝑆𝑖𝑗
+with the description and is deemed acceptable.
+
+Table 1: Effectiveness of hierarchical aspect generation under various hyperparameter settings.
+m=3, n=5
+
+m=3, n=6
+
+m=3, n=7
+
+m=4, n=5
+
+m=4, n=6
+
+m=4, n=7
+
+Raw
+
++Hierarchy
+
+Raw
+
++Hierarchy
+
+Raw
+
++Hierarchy
+
+Raw
+
++Hierarchy
+
+Raw
+
++Hierarchy
+
+Raw
+
++Hierarchy
+
+0.767
+
+0.778 (1.4% ↑)
+
+0.773
+
+0.780 (1.0% ↑)
+
+0.779
+
+0.825 (5.9% ↑)
+
+0.780
+
+0.790 (1.3% ↑)
+
+0.786
+
+0.849 (10.2% ↑)
+
+0.798
+
+0.842 (5.5% ↑)
+
+3.4. Test Case Generation & Evaluation
+Q&A generation with error control. To enhance question generation accuracy, especially for
+addressing potential image flaws, we propose an error control mechanism. While self-validation
+helps, not all images can be guaranteed flawless. To mitigate biases from relying on a single examiner
+LVLM (Zhang et al., 2024b), we incorporate a diverse set of examiners, inspired by prior work Bai
+et al. (2024). This approach reduces self-enhancement bias Ye et al. (2024) and promotes greater
+diversity in evaluation.
+When generating questions, we will only include the image description 𝒯𝑖𝑗𝑑 and any identified defects
+ℰ𝑖𝑗𝑑 in the input to the examiners ℳ𝑘𝑣 , where 𝑘 represents the index of the selected examiner from
+the set of available examiners. Each time a question is generated, an examiner ℳ𝑘𝑣 will be randomly
+
+7
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+selected. The function ℳ𝑘𝑣 generates the question 𝑄𝑑𝑖𝑗 based on the image description and errors,
+denoted as 𝑄𝑑𝑖𝑗 = ℳ𝑘𝑣 (𝒯𝑖𝑗𝑑 , ℰ𝑖𝑗𝑑 ).
+Moreover, the options for each question will also be generated by a randomly selected examiner from
+the set. For each image, we will provide a related question 𝑄𝑑𝑖𝑗 (e.g., multiple-choice or true/false).
+These questions, along with the accompanying images, will be presented to the LVLMs under evaluation
+for their response.
+Error-driven option adjustment. A key challenge in evaluating LVLMs is the generation of distractor
+options that are both plausible and challenging. Distractors generated by LVLMs are often trivial,
+leading to inflated performance, even under high-difficulty settings or purely text-based evaluations,
+as models can infer correct answers without relying on visual inputs (Chen et al., 2024b). Attempts
+to directly create harder options often result in low-quality, overly obscure distractors.
+To address this, we propose error-driven option adjustment, a mechanism to improve distractor
+𝑐 and distractors
+difficulty while preserving quality. For a given question 𝑄𝑑𝑖𝑗 , with correct option 𝑂𝑖𝑗
+𝑓
+𝑓
+𝑓
+𝑂𝑖𝑗
+= {𝑂𝑖𝑗,1
+, . . . , 𝑂𝑖𝑗,𝑘
+}. First, the randomly selected LVLM examiner is given 𝑄𝑑𝑖𝑗 and options
+𝑐 } ∪ 𝑂 𝑓 , but the correct option 𝑂 𝑐 is intentionally mislabeled as incorrect. The model generates
+{𝑂𝑖𝑗
+𝑖𝑗
+𝑖𝑗
+𝑓*
+𝑓*
+𝑐 ). This generated 𝑂 𝑓 * replaces one
+a plausible “correct answer” 𝑂𝑖𝑗
+, given by 𝑂𝑖𝑗
+= ℳ𝑘𝑣 (𝑄𝑑𝑖𝑗 , 𝑂𝑖𝑗
+𝑖𝑗
+′
+
+𝑓
+𝑓
+or more original distractors in 𝑂𝑖𝑗
+, resulting in an updated set 𝑂𝑖𝑗
+. This adjustment increases
+′
+
+𝑓
+the difficulty of distinguishing the correct answer from distractors, as 𝑂𝑖𝑗
+now contains plausible
+alternatives generated by the model itself under adversarial conditions. Evaluation. The response 𝒫𝑖𝑗𝑑
+from the tested LVLMs was compared to the reference answer 𝐴𝑑𝑖𝑗 to determine accuracy. The overall
+accuracy was calculated as the percentage of correctly answered questions. By given the reference
+answer, we use LLM-as-a-Judge Zheng et al. (2023) to label the responses.
+
+4. Experiments
+4.1. Experiment Setup
+Models. In evaluating LVLMs, we selected nine representative models: GPT-4o, GPT-4o mini (Achiam
+et al., 2023), Claude-3.5-Sonnet, Claude-3-Haiku (Anthropic, 2024), Gemini-1.5-Flash (DeepMind,
+2024a), Gemini-1.5-Pro (DeepMind, 2024b), GLM-4v-Plus (GLM et al., 2024), and the open-source
+models: Qwen2-VL (Bai et al., 2023), Llama-3.2-90B-Vision (Meta, 2024), detailed in Table 5. These
+advanced models exhibit exceptional image understanding. Some well-known open-source models,
+such as Llava-1.6 (Liu et al., 2024) and MiniGPT-4 (Zhu et al., 2023a), were tested and found to
+perform poorly and exclude finally from the model list. We include GPT-4o, Gemini-1.5-Pro, and
+Claude-3.5-Sonnet in the examiner pool as examiner models for generation due to their strong overall
+performance. The descriptions were then passed to Flux-1.1-Pro (Labs, 2023), a text-to-image model
+known for outstanding image generation. We also experimented with other text-to-image models
+(Rombach et al., 2022; Podell et al., 2023; Betker et al., 2023) but did not include them because of
+their suboptimal performance.
+Hyperparameter Setting. We set 𝑛 = 4 for the number of general aspects and 𝑚 = 6 for the number
+of fine-grained aspects, as this configuration yields the highest diversity in the generated aspects as
+illustrated in Table 1, allowing for a broader range of scenes and elements. We set 𝜔 = 10, namely
+10 pictures for each fine-grained aspect. Therefore, we evaluate 720 images for each user input
+(with each user input having three difficulty levels). For easy difficulty, we set the self-validation
+threshold 𝜁𝑒 = 1 since the scenes are simpler and contain fewer elements, which justifies a higher
+threshold. For the medium and hard difficulty levels, the images contain more elements, so we lower
+8
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Table 2: Performance (accuracy) of all models on five user inputs and three difficulty levels (red and
+blue represent the highest and lowest scores, respectively, in each row). Claude-3.5 is Claude-3.5Sonnet and Llama-3.2-90B is Llama-3.2-90B-Vision.
+Model
+
+User Input Difficulty
+GPT-4o
+
+GPT-4o
+mini
+
+Gemini- Gemini- Claude- Claude- GLM-4v- Qwen2- Llama1.51.5-Pro
+3.5
+3-Haiku
+Plus
+VL
+3.2-90B
+Flash
+
+Bas ic .
+
+Easy
+Medium
+Hard
+
+77.03%
+56.65%
+41.15%
+
+72.73%
+46.35%
+30.53%
+
+78.47%
+44.21%
+34.07%
+
+78.47%
+51.93%
+39.82%
+
+84.69%
+57.51%
+45.58%
+
+70.81%
+44.64%
+31.42%
+
+74.64%
+47.64%
+34.07%
+
+76.56%
+53.88%
+45.58%
+
+50.72%
+32.19%
+29.78%
+
+Spat i al.
+
+Easy
+Medium
+Hard
+
+59.22%
+34.50%
+21.46%
+
+44.69%
+22.71%
+15.14%
+
+60.00%
+29.69%
+23.32%
+
+60.56%
+41.48%
+27.35%
+
+65.00%
+38.86%
+26.01%
+
+42.78%
+25.33%
+15.84%
+
+57.22%
+31.44%
+17.49%
+
+62.78%
+36.68%
+25.91%
+
+36.31%
+24.45%
+14.55%
+
+Seman .
+
+Easy
+Medium
+Hard
+
+73.10%
+61.90%
+43.64%
+
+64.62%
+46.75%
+33.79%
+
+68.53%
+54.11%
+44.55%
+
+70.56%
+58.44%
+47.27%
+
+72.59%
+61.90%
+45.45%
+
+55.84%
+46.75%
+26.36%
+
+62.94%
+51.95%
+36.36%
+
+66.33%
+61.04%
+44.55%
+
+42.64%
+39.57%
+30.14%
+
+Re as on .
+
+Easy
+Medium
+Hard
+
+57.06%
+47.16%
+38.21%
+
+46.20%
+35.22%
+30.66%
+
+56.40%
+40.43%
+21.43%
+
+57.56%
+47.39%
+35.71%
+
+57.00%
+46.09%
+36.59%
+
+36.63%
+25.22%
+14.29%
+
+46.51%
+36.96%
+24.53%
+
+53.49%
+48.03%
+39.15%
+
+36.26%
+26.64%
+25.00%
+
+At mo s.
+
+Easy
+Medium
+Hard
+
+60.20%
+39.73%
+33.79%
+
+55.94%
+30.67%
+18.26%
+
+58.91%
+39.21%
+28.64%
+
+66.83%
+39.65%
+30.45%
+
+60.40%
+44.93%
+34.55%
+
+48.02%
+27.75%
+15.00%
+
+52.48%
+33.48%
+23.18%
+
+56.72%
+39.21%
+31.05%
+
+36.63%
+28.63%
+22.73%
+
+49.65%
+
+39.63%
+
+45.46%
+
+50.23%
+
+51.81%
+
+35.11%
+
+42.06%
+
+49.40%
+
+31.75%
+
+Av e r age
+
+Table 3: Average accuracy for various user inputs at different difficulty levels (red and blue represent
+the highest and lowest scores, respectively, in each column).
+User Input
+
+Easy
+
+Medium
+
+Hard
+
+Average
+
+Bas i c .
+Spat i al .
+Se man .
+Re as on .
+At mo s .
+
+73.79%
+54.28%
+64.13%
+49.67%
+55.12%
+
+48.33%
+31.68%
+53.60%
+39.24%
+35.92%
+
+36.88%
+20.78%
+39.12%
+29.51%
+26.41%
+
+53.00%
+35.58%
+52.28%
+39.47%
+39.15%
+
+the thresholds to 𝜁𝑚 = 𝜁ℎ = 0.8 to avoid compromising efficiency. It balances minimizing errors and
+avoiding excessive image rejection; a smaller threshold risks inaccuracies, while a larger one may
+discard too many images. The error control mechanism ensures high-quality question generation.
+4.2. Main Results
+Performance drops significantly with increasing difficulty. As shown in Table 2 and Table 3, across all
+models and user inputs, scores decrease as the difficulty progresses from easy to medium to hard.
+In the basic understanding, the average score across all models drops from approximately 73.79%
+at easy to 36.88% at hard. This trend is consistent across the Table 2, where the hard is noticeably
+shorter than the easy and medium.
+Basic understanding is the simplest task, while spatial understanding represents the most challenging one:
+Most models perform better in basic understanding compared to spatial understanding. For example,
+
+9
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Table 4: Average performance (Accuracy) of all models at different difficulty levels (red and blue
+represent the highest and lowest scores, respectively, in each column).
+Model
+
+Easy
+
+Medium
+
+Hard
+
+GPT-4o
+GPT-4o mini
+Gemini-1.5-Flash
+Gemini-1.5-Pro
+Claude-3.5-Sonnet
+Claude-3-Haiku
+GLM-4v-Plus
+Qwen2-VL
+Llama-3.2-90B-Vision
+
+65.32%
+56.83%
+64.46%
+66.79%
+67.93%
+50.82%
+58.76%
+63.17%
+40.51%
+
+47.99%
+36.34%
+41.53%
+47.78%
+49.86%
+33.94%
+40.29%
+47.77%
+30.30%
+
+35.65%
+25.68%
+30.40%
+36.12%
+37.63%
+20.58%
+27.13%
+37.25%
+24.44%
+
+0.075
+0.050
+0.025
+0.000
+0.025
+0.050
+0.075
+0.100
+
+easy
+medium
+hard
+
+L
+n
+et
+lus PT-4o -Mini -Flash 5-Pro
+iku
+isio en2-V
+.
+V
+o
+-Ha 5-Sonn -4v-P
+5
+1
+G
+4
+3
+.
+B
+i
+1
+Qw
+-3.
+ude
+GPT emini- Gemin -3.2-90
+GLM
+Cla laude
+a
+G
+C
+Llam
+
+Figure 5: Comparison of answer distribution under position bias conditions. Correct answers at A v.s. correct
+answers are evenly distributed at A,B,C,D.
+
+the average score for basic understanding at easy difficulty is 73.79%, while spatial understanding
+achieves lower averages of 54.28%. This indicates the imbalance of current LVLMs’ capabilities and
+emphasizes the importance of holistic improvement.
+Some models achieve scores below 25% on tasks with medium and hard difficulty, which suggests that
+the model performs worse than random guessing. As shown in Table 2, GPT-4o Mini, Gemini-1.5-Flash,
+Claude-3.5-Haiku, GLM-4v-Plus, and Llama-3.2-90B-Vision achieved scores below 25% on hard tasks
+involving spatial understanding and reasoning capacity. This indicates that AutoBench-V effectively
+challenges the evaluated models, mitigating the answer leakage issue where models rely solely on
+textual information to answer correctly (we will discuss this in detail in subsection 4.3).
+4.3. Exploratory Experiments
+We aim to develop a deeper understanding of the following questions at this section:
+• Q1: What impact does error-driven option adjustment have on visual question answering?
+• Q2: What are the advantages of multi-evaluator assessment compared to single-evaluator evaluation?
+• Q3: Does the position of correct options affect model performance?
+• Q4: Is the ranking of the same model consistent across different user inputs and different levels of
+difficulty?
+
+10
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Basic.
+
+Spatial.
+
+Reasoning.
+
+Semantic.
+
+Atmospheric.
+
+s L .5 -3 .2
+o
+ni h ro
+T-4 o mi i-Flas ini-P v-Plu n2-V de-3 ude a-3
+T-4 in em M-4 we lau Cla Llam
+GP Gem G GL Q C
+
+GP
+
+4 2 3
+5 4 5
+2 3 2
+1 1 5
+3 2 2
+7 6 8
+7 9 8
+7 7 5
+6 7 7
+6 7 8
+2 8 5
+4 6 4
+4 5 8
+4 5 3
+4 4 5
+2 4 4
+3 1 1
+1 2 4
+3 4 1
+1 3 4
+6 5 5
+6 5 6
+6 6 7
+7 6 6
+7 6 6
+5 3 1
+2 3 3
+5 1 1
+5 3 3
+5 4 3
+1 1 1
+1 2 2
+3 4 3
+2 1 2
+2 1 1
+8 7 7
+8 7 7
+8 9 9
+8 7 9
+8 9 9
+9 9 9
+9 8 9
+9 8 6
+9 9 8
+9 8 7
+E M H
+E M H
+E M H
+E M H
+E M H
+Figure 7: The model performance ranking given five user inputs under different difficulty levels.
+
+Unnecessary visual information was significantly reduced after the option adjustment. As illustrated
+in Figure 4, in the absence of image input, the scores of various models before option adjustment
+were concentrated within the range of 40 to 60. Interestingly, without option adjustment, the “guess
+accuracy” significantly increases with the difficulty level. For instance, GPT-4o can guess less than
+40% answers correctly on the easy level while achieving a guessing accuracy of 60% on the hard
+level. After option adjustment, the performance of all models declined significantly, demonstrating
+that error-driven option adjustment effectively mitigates answer leakage in the questions.
+Under the setting of multiple examiners, the performance differences among models become more
+pronounced. As shown in Figure 6, when multiple evaluators are employed, the variance in the
+performance of the three models is significantly
+larger. This suggests that using a single model
+for evaluation may reduce the difference gap between models, leading to an “evaluation bottleneck” while the multi-examiner can mitigate this
+to achieve a more diverse assessment and lead to
+a larger performance gap across models.
+
+Claude-3.5-Sonnet
+Gemini-1.5-Pro
+GPT-4o
+Multi-Examiner
+0.000
+
+0.005
+
+0.010
+
+0.015
+
+0.020
+
+0.025
+
+Figure 6: The score variance of GPT-4o, Gemini-1.5Pro, and Claude-3.5-Sonnet when using different models as examiners.
+
+The position of the correct options can influence model performance. To avoid potential position bias in
+the evaluation process, we ensured an even distribution of correct options. To further explore the
+possible effects of position bias on model performance, we conducted a case study where all correct
+answers were intentionally placed in option A and compared it to the evenly distributed case (25% per
+option) to assess the necessity of maintaining even distribution, as shown in Figure 5. The deviation
+𝑈
+rate was calculated using the formula 𝑅 = 𝑆𝐴𝑆−𝑆
+, where 𝑆𝐴 is the score with correct answers
+𝑈
+concentrated in option A, and 𝑆𝑈 is the score under evenly distributed conditions. As illustrated
+in Figure 5, most models exhibit decreased performance after the answer distribution is balanced,
+indicating a strong preference for selecting option A.
+Different models have distinct performance patterns under various difficulties. As shown in Figure 7,
+Claude-3.5-Sonnet achieves the best performance, consistently ranking highest across most tasks,
+while Llama-3.2-90B-Vision performs the weakest, frequently ranking last. Interestingly, models like
+Qwen2-VL rank higher on hard tasks than on easy ones, whereas models like Gemini-1.5-Pro excel on
+easy tasks but decline slightly on hard ones. These findings highlight the importance of difficultybased evaluation and demonstrate Au to Be nc h -V’s effectiveness in revealing such performance
+imbalances.
+
+11
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+4.4. Human Evaluation
+We conducted human evaluations to assess the alignment between the generated questions and the
+reference answers. The evaluations were performed using a metric we refer to as the alignment rate,
+defined as the proportion of aligned samples out of the total. Detailed procedures for the human
+evaluation can be found in Appendix D.
+The results show that the model achieves high alignment across difficulty levels: 95.20% for Easy
+tasks, 88.13% for Medium, and 84.55% for Hard. This demonstrates the model’s ability to generate
+well-aligned question-answer pairs, excelling in simpler tasks while maintaining strong performance
+under higher complexity, highlighting its effectiveness in producing accurate, contextually appropriate
+outputs for visual tasks.
+
+5. Conclusion
+In this work, we introduce AutoBench-V, an automated framework designed to benchmark LVLM.
+It integrates a series of innovative modules that ensure diversity and reliability in dataset generation
+and evaluation. Extensive experiments demonstrate its robustness and unbiased process, offering a
+solid foundation for future research.
+
+12
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+References
+Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ahmad, Ilge Akkaya, Florencia Leoni Aleman,
+Diogo Almeida, Janko Altenschmidt, Sam Altman, Shyamal Anadkat, et al. Gpt-4 technical report.
+arXiv preprint arXiv:2303.08774, 2023.
+Anthropic. Claude3family. Anthropic News, 2024. URL https://www.anthropic.com/news/
+claude-3-family.
+Stanislaw Antol, Aishwarya Agrawal, Jiasen Lu, Margaret Mitchell, Dhruv Batra, C Lawrence Zitnick,
+and Devi Parikh. Vqa: Visual question answering. In Proceedings of the IEEE international conference
+on computer vision, pages 2425–2433, 2015.
+Jinze Bai, Shuai Bai, Yunfei Chu, Zeyu Cui, Kai Dang, Xiaodong Deng, Yang Fan, Wenbin Ge, Yu Han,
+Fei Huang, et al. Qwen technical report. arXiv preprint arXiv:2309.16609, 2023.
+Yushi Bai, Jiahao Ying, Yixin Cao, Xin Lv, Yuze He, Xiaozhi Wang, Jifan Yu, Kaisheng Zeng, Yijia
+Xiao, Haozhe Lyu, et al. Benchmarking foundation models with language-model-as-an-examiner.
+Advances in Neural Information Processing Systems, 36, 2024.
+James Betker, Gabriel Goh, Li Jing, Tim Brooks, Jianfeng Wang, Linjie Li, Long Ouyang, Juntang
+Zhuang, Joyce Lee, Yufei Guo, et al. Improving image generation with better captions. Computer
+Science. https://cdn. openai. com/papers/dall-e-3. pdf, 2(3):8, 2023.
+Wenxiao Cai, Yaroslav Ponomarenko, Jianhao Yuan, Xiaoqi Li, Wankou Yang, Hao Dong, and
+Bo Zhao. Spatialbot: Precise spatial understanding with vision language models. arXiv preprint
+arXiv:2406.13642, 2024.
+Dongping Chen, Yue Huang, Siyuan Wu, Jingyu Tang, Liuyi Chen, Yilin Bai, Zhigang He, Chenlong
+Wang, Huichi Zhou, Yiqiang Li, et al. Gui-world: A dataset for gui-oriented multimodal llm-based
+agents. arXiv preprint arXiv:2406.10819, 2024a.
+Lin Chen, Jinsong Li, Xiaoyi Dong, Pan Zhang, Yuhang Zang, Zehui Chen, Haodong Duan, Jiaqi Wang,
+Yu Qiao, Dahua Lin, et al. Are we on the right way for evaluating large vision-language models?
+arXiv preprint arXiv:2403.20330, 2024b.
+DeepMind. Gemini-1-5-flash. DeepMind Technologies, 2024a. URL https://deepmind.google/
+technologies/gemini/flash/.
+Google DeepMind. Google gemini 1.5 pro, 2024b. https://deepmind.google/technologies/gemini/pro/.
+Chaoyou Fu, Peixian Chen, Yunhang Shen, Yulei Qin, Mengdan Zhang, Xu Lin, Jinrui Yang, Xiawu
+Zheng, Ke Li, Xing Sun, et al. Mme: A comprehensive evaluation benchmark for multimodal large
+language models. arXiv preprint arXiv:2306.13394, 2024.
+AV Geetha, T Mala, D Priyanka, and E Uma. Multimodal emotion recognition with deep learning:
+advancements, challenges, and future directions. Information Fusion, 105:102218, 2024.
+Taraneh Ghandi, Hamidreza Pourreza, and Hamidreza Mahyar. Deep learning approaches on image
+captioning: A review. ACM Computing Surveys, 56(3):1–39, 2023.
+Team GLM, Aohan Zeng, Bin Xu, Bowen Wang, Chenhui Zhang, Da Yin, Dan Zhang, Diego Rojas,
+Guanyu Feng, et al. Chatglm: A family of large language models from glm-130b to glm-4 all tools.
+arXiv preprint arXiv:2406.12793, 2024.
+
+13
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Yash Goyal, Tejas Khot, Douglas Summers-Stay, Dhruv Batra, and Devi Parikh. Making the v in vqa
+matter: Elevating the role of image understanding in visual question answering. In Proceedings of
+the IEEE conference on computer vision and pattern recognition, pages 6904–6913, 2017.
+Qiushan Guo, Shalini De Mello, Hongxu Yin, Wonmin Byeon, Ka Chun Cheung, Yizhou Yu, Ping Luo,
+and Sifei Liu. Regiongpt: Towards region understanding vision language model. In Proceedings of
+the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages 13796–13806, 2024.
+Yushi Hu, Benlin Liu, Jungo Kasai, Yizhong Wang, Mari Ostendorf, Ranjay Krishna, and Noah A Smith.
+Tifa: Accurate and interpretable text-to-image faithfulness evaluation with question answering.
+In Proceedings of the IEEE/CVF International Conference on Computer Vision, pages 20406–20417,
+2023.
+Yue Huang, Lichao Sun, Haoran Wang, Siyuan Wu, Qihui Zhang, Yuan Li, Chujie Gao, Yixin Huang,
+Wenhan Lyu, Yixuan Zhang, et al. Position: Trustllm: Trustworthiness in large language models.
+pages 20166–20270. PMLR, 2024.
+Andrej Karpathy and Li Fei-Fei. Deep visual-semantic alignments for generating image descriptions.
+In Proceedings of the IEEE conference on computer vision and pattern recognition, pages 3128–3137,
+2015.
+Black Forest Labs. Flux. https://github.com/black-forest-labs/flux, 2023.
+Kimin Lee, Hao Liu, Moonkyung Ryu, Olivia Watkins, Yuqing Du, Craig Boutilier, Pieter Abbeel,
+Mohammad Ghavamzadeh, and Shixiang Shane Gu. Aligning text-to-image models using human
+feedback. arXiv preprint arXiv:2302.12192, 2023.
+Bohao Li, Yuying Ge, Yixiao Ge, Guangzhi Wang, Rui Wang, Ruimao Zhang, and Ying Shan. Seedbench-2: Benchmarking multimodal large language models. arXiv preprint arXiv:2311.17092,
+2023a.
+Bohao Li, Rui Wang, Guangzhi Wang, Yuying Ge, Yixiao Ge, and Ying Shan. Seed-bench: Benchmarking multimodal llms with generative comprehension. arXiv preprint arXiv:2307.16125, 2023b.
+Xiang Lisa Li, Evan Zheran Liu, Percy Liang, and Tatsunori Hashimoto. Autobencher: Creating salient,
+novel, difficult datasets for language models. arXiv preprint arXiv:2407.08351, 2024.
+Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays, Pietro Perona, Deva Ramanan, Piotr Dollár,
+and C Lawrence Zitnick. Microsoft coco: Common objects in context. In Computer Vision–ECCV
+2014: 13th European Conference, Zurich, Switzerland, September 6-12, 2014, Proceedings, Part V 13,
+pages 740–755. Springer, 2014.
+Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee. Visual instruction tuning. Advances in
+neural information processing systems, 36, 2024.
+Xiao Liu, Xuanyu Lei, Shengyuan Wang, Yue Huang, Zhuoer Feng, Bosi Wen, Jiale Cheng, Pei Ke,
+Yifan Xu, Weng Lam Tam, et al. Alignbench: Benchmarking chinese alignment of large language
+models. arXiv preprint arXiv:2311.18743, 2023a.
+Xiao Liu, Hao Yu, Hanchen Zhang, Yifan Xu, Xuanyu Lei, Hanyu Lai, Yu Gu, Hangliang Ding, Kaiwen
+Men, Kejuan Yang, et al. Agentbench: Evaluating llms as agents. In The Twelfth International
+Conference on Learning Representations, 2023b.
+
+14
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Yuan Liu, Haodong Duan, Yuanhan Zhang, Bo Li, Songyang Zhang, Wangbo Zhao, Yike Yuan, Jiaqi
+Wang, Conghui He, Ziwei Liu, et al. Mmbench: Is your multi-modal model an all-around player?
+In European Conference on Computer Vision, pages 216–233. Springer, 2025.
+Zhengliang Liu, Yue Huang, Xiaowei Yu, Lu Zhang, Zihao Wu, Chao Cao, Haixing Dai, Lin Zhao,
+Yiwei Li, Peng Shu, et al. Deid-gpt: Zero-shot medical text de-identification by gpt-4. arXiv preprint
+arXiv:2303.11032, 2023c.
+Fanqing Meng, Jin Wang, Chuanhao Li, Quanfeng Lu, Hao Tian, Jiaqi Liao, Xizhou Zhu, Jifeng Dai,
+Yu Qiao, Ping Luo, and Wenqi Shao. Mmiu: Multimodal multi-image understanding for evaluating
+large vision-language models. arXiv preprint arXiv:2408.02718, 2024.
+Meta. Meta llama3.2, 2024. https://www.llama.com/.
+Dustin Podell, Zion English, Kyle Lacey, Andreas Blattmann, Tim Dockhorn, Jonas Müller, Joe Penna,
+and Robin Rombach. Sdxl: Improving latent diffusion models for high-resolution image synthesis.
+In The Twelfth International Conference on Learning Representations, 2023.
+Yujia Qin, Shihao Liang, Yining Ye, Kunlun Zhu, Lan Yan, Yaxi Lu, Yankai Lin, Xin Cong, Xiangru
+Tang, Bill Qian, et al. Toolllm: Facilitating large language models to master 16000+ real-world
+apis. In The Twelfth International Conference on Learning Representations, 2023.
+M Ross Quillian. Semantic memory. Air Force Cambridge Research Laboratories, Office of Aerospace
+Research . . . , 1966.
+Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Björn Ommer. High-resolution
+image synthesis with latent diffusion models. In Proceedings of the IEEE/CVF conference on computer
+vision and pattern recognition, pages 10684–10695, 2022.
+Olga Russakovsky, Jia Deng, Hao Su, Jonathan Krause, Sanjeev Satheesh, Sean Ma, Zhiheng Huang,
+Andrej Karpathy, Aditya Khosla, Michael Bernstein, et al. Imagenet large scale visual recognition
+challenge. International journal of computer vision, 115:211–252, 2015.
+Laurens Van der Maaten and Geoffrey Hinton. Visualizing data using t-sne. Journal of machine
+learning research, 9(11), 2008.
+Siyuan Wu, Yue Huang, Chujie Gao, Dongping Chen, Qihui Zhang, Yao Wan, Tianyi Zhou, Xiangliang
+Zhang, Jianfeng Gao, Chaowei Xiao, and Lichao Sun. Unigen: A unified framework for textual
+dataset generation using large language models. arXiv preprint arXiv:2406.18966, 2024.
+Yi Wu, Jongwoo Lim, and Ming-Hsuan Yang. Online object tracking: A benchmark. In Proceedings of
+the IEEE conference on computer vision and pattern recognition, pages 2411–2418, 2013.
+Shitao Xiao, Zheng Liu, Peitian Zhang, Niklas Muennighoff, Defu Lian, and Jian-Yun Nie. C-pack:
+Packaged resources to advance general chinese embedding. arXiv preprint arXiv:2309.07597, 2024.
+Peng Xu, Wenqi Shao, Kaipeng Zhang, Peng Gao, Shuo Liu, Meng Lei, Fanqing Meng, Siyuan Huang,
+Yu Qiao, and Ping Luo. Lvlm-ehub: A comprehensive evaluation benchmark for large visionlanguage models. IEEE Transactions on Pattern Analysis and Machine Intelligence, 2024.
+Jian-Ru Xue, Jian-Wu Fang, and Pu Zhang. A survey of scene understanding by event reasoning in
+autonomous driving. International Journal of Automation and Computing, 15(3):249–266, 2018.
+Jiayi Ye, Yanbo Wang, Yue Huang, Dongping Chen, Qihui Zhang, Nuno Moniz, Tian Gao, Werner
+Geyer, Chao Huang, Pin-Yu Chen, et al. Justice or prejudice? quantifying biases in llm-as-a-judge.
+arXiv preprint arXiv:2410.02736, 2024.
+15
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Zhenfei Yin, Jiong Wang, Jianjian Cao, Zhelun Shi, Dingning Liu, Mukai Li, Xiaoshui Huang, Zhiyong
+Wang, Lu Sheng, Lei Bai, et al. Lamm: Language-assisted multi-modal instruction-tuning dataset,
+framework, and benchmark. Advances in Neural Information Processing Systems, 36, 2024.
+Kaining Ying, Fanqing Meng, Jin Wang, Zhiqian Li, Han Lin, Yue Yang, Hao Zhang, Wenbo Zhang,
+Yuqi Lin, Shuo Liu, et al. Mmt-bench: A comprehensive multimodal benchmark for evaluating large
+vision-language models towards multitask agi. In Forty-first International Conference on Machine
+Learning, 2024.
+Haoxuan You, Rui Sun, Zhecan Wang, Long Chen, Gengyu Wang, Hammad A Ayyubi, Kai-Wei Chang,
+and Shih-Fu Chang. Idealgpt: Iteratively decomposing vision and language reasoning via large
+language models. arXiv preprint arXiv:2305.14985, 2023.
+Weihao Yu, Zhengyuan Yang, Linjie Li, Jianfeng Wang, Kevin Lin, Zicheng Liu, Xinchao Wang, and
+Lijuan Wang. Mm-vet: Evaluating large multimodal models for integrated capabilities. In Forty-first
+International Conference on Machine Learning, 2023.
+Weihao Yu, Zhengyuan Yang, Linfeng Ren, Linjie Li, Jianfeng Wang, Kevin Lin, Chung-Ching Lin,
+Zicheng Liu, Lijuan Wang, and Xinchao Wang. Mm-vet v2: A challenging benchmark to evaluate
+large multimodal models for integrated capabilities. arXiv preprint arXiv:2408.00765, 2024.
+Jieyu Zhang, Weikai Huang, Zixian Ma, Oscar Michel, Dong He, Tanmay Gupta, Wei-Chiu Ma,
+Ali Farhadi, Aniruddha Kembhavi, and Ranjay Krishna. Task me anything. arXiv preprint
+arXiv:2406.11775, 2024a.
+Yi-Fan Zhang, Weichen Yu, Qingsong Wen, Xue Wang, Zhang Zhang, Liang Wang, Rong Jin, and
+Tieniu Tan. Debiasing multimodal large language models. arXiv preprint arXiv:2403.05262, 2024b.
+Wayne Xin Zhao, Kun Zhou, Junyi Li, Tianyi Tang, Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen
+Zhang, Junjie Zhang, Zican Dong, et al. A survey of large language models. arXiv preprint
+arXiv:2303.18223, 2023.
+Lianmin Zheng, Wei-Lin Chiang, Ying Sheng, Siyuan Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin,
+Zhuohan Li, Dacheng Li, Eric Xing, et al. Judging llm-as-a-judge with mt-bench and chatbot arena.
+Advances in Neural Information Processing Systems, 36:46595–46623, 2023.
+Gengze Zhou, Yicong Hong, and Qi Wu. Navgpt: Explicit reasoning in vision-and-language navigation
+with large language models. In Proceedings of the AAAI Conference on Artificial Intelligence, volume
+38(7), pages 7641–7649, 2024a.
+Yingjie Zhou, Zicheng Zhang, Jiezhang Cao, Jun Jia, Yanwei Jiang, Farong Wen, Xiaohong Liu,
+Xiongkuo Min, and Guangtao Zhai. Memo-bench: A multiple benchmark for text-to-image and
+multimodal large language models on human emotion analysis. arXiv preprint arXiv:2411.11235,
+2024b.
+Deyao Zhu, Jun Chen, Xiaoqian Shen, Xiang Li, and Mohamed Elhoseiny. Minigpt-4: Enhancing
+vision-language understanding with advanced large language models. In The Twelfth International
+Conference on Learning Representations, 2023a.
+Kaijie Zhu, Jiaao Chen, Jindong Wang, Neil Zhenqiang Gong, Diyi Yang, and Xing Xie. Dyval: Dynamic
+evaluation of large language models for reasoning tasks. In The Twelfth International Conference on
+Learning Representations, 2023b.
+
+16
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Kaijie Zhu, Jindong Wang, Qinlin Zhao, Ruochen Xu, and Xing Xie. Dynamic evaluation of large
+language models by meta probing agents. In Forty-first International Conference on Machine Learning,
+2024. URL https://openreview.net/forum?id=DwTgy1hXXo.
+Zhengxia Zou, Keyan Chen, Zhenwei Shi, Yuhong Guo, and Jieping Ye. Object detection in 20 years:
+A survey. Proceedings of the IEEE, 111(3):257–276, 2023.
+
+17
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+A. Details of Experiment Setting & Result
+Model Selection. The details of models selected in our experiments are shown in Table 5.
+Alignment Evaluation. Inspired by TIFA (Hu et al., 2023), we generated consistency tests for images
+across 12 aspects:object, human, animal, food, activity, attribute, counting, color, material, spatial,
+location, shape, other.
+
+a c
+bd
+
+Figure 8: Visualization of image topic words. Topic words are converted into vectors using bge-large-en-v1.5
+(Xiao et al., 2024), then perform dimensionality reduction via t-SNE (Van der Maaten and Hinton, 2008). Topic
+word distribution without semantic graph (a)(c) and with semantic graph (b)(d). It can be seen that with the
+semantic graph the diversity of topic words increases and the over-reliance on high-degree words is reduced.
+
+18
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Spatial
+
+Basic
+
+Reasoning
+
+Semantic
+
+Atmospheric
+
+Easy
+Medium
+Hard
+
+Figure 9: Images examples corresponding to different user inputs at varying difficulty levels.
+
+trafficfire
+light
+hydrant
+car
+
+easel brushes
+
+detailed boundaries
+streetscape
+dogs
+pedestrians
+rocks
+pine trees
+forest
+stream
+deer
+
+metallic parts
+grassy field
+wildflowers
+motorcycle
+
+grapes
+
+potted plant
+
+pens
+
+desk
+
+outdoor
+scarecrow
+sunflowers
+farmer
+harvest
+
+flowers
+fountain
+
+orange
+
+notebook
+
+sunlight
+
+garden detailed
+
+apple banana
+fruits
+
+coffee mug
+
+canvas artist
+
+laptop
+butterfly
+
+basket
+
+paintings
+artstudiostudio
+
+buildings
+cityscape
+vibrant
+street
+vehicles
+
+pumpkin outdoors
+
+strawberry
+kiwi distinct
+
+Figure 10: Topic words visualization using semantic graph under basic understanding.
+
+puddles city
+
+segmentation
+vibrant
+
+vehicles
+lights
+
+cityscape
+
+umbrellas
+
+boundaries
+vendors lively shoppersstalls
+baskets market
+
+deer
+birds
+
+sunlight
+forest
+
+foliage
+fox
+
+trees
+
+fruit market
+
+fruit
+
+people
+
+flowers
+vegetables street market
+handmade goods
+
+street
+diverse crowd
+fruits
+banana
+closeup
+tropical fruits
+detailed boundaries
+mango
+illustration
+pineapple
+
+Figure 11: Topic words visualization without using semantic graph under basic understanding.
+
+19
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Table 5: Model names, Creators, whether it is open source, and their purpose.
+Model
+GPT-4o
+GPT-4o mini
+
+Creator
+OpenAI
+
+Open-Source
+
+Purpose
+
+○
+
+Examiner&Candidate
+
+○
+
+Candidate
+
+Gemini-1.5-Flash
+
+Google
+
+○
+
+Candidate
+
+Gemini-1.5-Pro
+
+Google
+
+○
+
+Examiner&Candidate
+
+Claude-3.5-sonnet
+Claude-3-haiku
+
+Anthropic
+
+○
+
+Examiner&Candidate
+
+○
+
+Candidate
+
+GLM-4v-Plus
+
+Zhipu AI Inc.
+
+○
+
+Candidate
+
+Llama-3.2-90B-V
+
+Meta AI Inc.
+
+○
+
+Candidate
+
+Qwen2-VL-72B
+
+Alibaba
+
+○
+
+Candidate
+
+Flux-1.1-Pro
+
+Black Forest Labs
+
+○
+
+Image generation
+
+Figure 12: Visualization of image descriptions in Au to Be nc h -V.
+
+20
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+B. Details of User Input
+In this section, we provide a comprehensive overview of the levels at which we categorize user
+inputs based on linguistic aspects. Our goal is to offer a comprehensive and broad representation of
+user requirements for LVLMs. However, as it is challenging to exhaustively cover every aspect, we
+base our categorization on aspects derived from the literature (Li et al., 2023b; Meng et al., 2024;
+Liu et al., 2025). These aspects are considered representative and comprehensive examples of the
+capabilities of LVLMs and other aspects like in (Chen et al., 2024b; Xu et al., 2024) can be handled in
+a similar manner, without requiring additional fine-tuning or adjustments, as our framework is highly
+extensible, allowing users to propose their own aspects as needed.
+B.1. Basic Understanding
+Definition and Goal: Basic Understanding refers to the recognition and identification of individual
+objects, characters, and scenes within an image. The goal is to accurately detect and label relevant elements, providing a foundation for more advanced tasks such as object tracking and scene
+interpretation (Wu et al., 2013; Xue et al., 2018).
+Requirement. This task demands the ability to detect specific objects and differentiate between
+various types of objects. Additionally, it involves understanding the broader context of the scene and
+identifying real-life settings to enable accurate interpretation of the image’s overall content.
+B.2. Spatial Understanding
+Definition and Goal. Spatial Understanding refers to the interpretation of the spatial arrangement and
+positioning of objects within an image (Cai et al., 2024; Guo et al., 2024). The goal is to comprehend
+both two-dimensional and three-dimensional relationships, determining which objects are in the
+foreground or background, assessing their relative sizes and orientations, and understanding how
+they are positioned within the scene.
+Requirement. This task demands the ability to perceive depth, estimate distances between objects,
+and analyze how objects interact within the physical space of the image, providing a more accurate
+understanding of the spatial structure and context.
+B.3. Semantic Understanding
+Definition and Goal. Semantic Understanding involves interpreting the higher-level meaning and
+relationships within an image (Meng et al., 2024). The goal is to move beyond simple object
+identification to understand the roles and interactions between objects, such as recognizing that a
+person is riding a bike or that two people are engaged in conversation. This level of understanding
+aims to capture the context and intent behind the scene, identifying how elements relate to each
+other to form a coherent narrative or message.
+Requirement. This task requires discerning the interactions and relationships between objects,
+understanding their roles within the scene, and interpreting the overall context to accurately derive
+the narrative or intended message conveyed by the image.
+B.4. Atmospheric Understanding
+Definition and Goal. Atmospheric Understanding focuses on grasping the mood, tone, and emotional
+ambiance conveyed by an image. The goal is to interpret not just what is depicted or how elements
+21
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+are arranged, but also how the scene feels and the emotional resonance it conveys to the viewer.
+For instance, an image of children laughing under warm sunlight in a lush park combines their
+expressions, bright colors, and soft lighting to create a joyful and carefree atmosphere.
+Requirement. This task requires the ability to capture and interpret subtle emotional cues and tonal
+qualities of the scene, distinguishing the overall mood and emotional impact of the image from more
+analytical aspects like semantic or spatial understanding.
+B.5. Reasoning Capacity
+Definition and Goal. Reasoning Capacity involves interpreting and analyzing the relationships and
+logical connections between different elements within an image (Zhou et al., 2024a; You et al., 2023).
+The goal is to infer potential outcomes, understand causal relationships, and make predictions about
+what might happen next based on visual cues. For example, if a person is holding an umbrella and
+the sky is dark, reasoning capacity would suggest that it might rain soon. This level also includes
+understanding abstract relationships, such as social dynamics or the intent behind actions, and making
+judgments about what is likely or possible given the visual information.
+Requirement. This task requires the ability to analyze logical connections between elements, infer
+outcomes, and understand causal relationships, as well as to interpret abstract concepts and make
+predictions based on the visual context.
+
+C. Details of Difficulty Grading
+This section describes in detail the difficulty levels for the pictures (subsection C.1) and questions
+(subsection C.2) used in prompts respectively. The following is the instruction guiding the examiner
+model to generate image descriptions and questions of varying difficulty levels. For details, see
+Appendix H. Moreover, the difficulty levels are defined manually and are not fixed, allowing for
+flexible adjustments based on the user’s specific requirements.
+C.1. Image Description
+Easy difficulty. Focus on a single subject but with minor additional complexity to test precision in
+details or context. Establish baseline capability with subtle challenges, such as fine texture, simple
+interactions, or slight variations in lighting. A single object or entity with some basic contextual details
+or additional features, placed against a minimally distracting background. Test finer details (e.g.,
+texture, reflection) while still keeping the composition simple and clear. For examples: "A perfectly
+polished red apple with a small leaf attached, placed on a slightly reflective white surface."
+Medium difficulty. Scenes involve multiple elements or interactive settings that require nuanced
+spatial arrangement and accurate relationships between objects. Evaluate the ability to generate
+cohesive, moderately dynamic scenes with layered realism and a stronger sense of depth. Description
+Requirements: Include multiple objects interacting naturally in a believable environment, with more
+intricate details and subtle light or shadow effects. Incorporate realistic environmental elements
+and ensure spatial coherence, emphasizing interactions and secondary details (e.g., shadows, water
+splashes). For examples: "A golden retriever running on a sandy beach, splashing water as it chases a
+bright orange ball, with distant waves and a partly cloudy sky."
+Hard difficulty. Scenes incorporate high complexity with multiple interdependent elements, challenging perspectives, or dynamic and intricate lighting or textural effects. Push the limits of rendering
+capability to handle advanced relationships, environmental effects, and challenging compositions.
+22
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+The scene must include 3-4 main elements or a combination of dynamic features, such as motion,
+light interplay, or atmospheric conditions, while maintaining clarity and logic. Highlight challenges
+such as complex reflections, dynamic light, or multi-element interactions, ensuring visual harmony
+and detailed textures. For examples: "A raindrop-streaked window reflecting the interior of a cozy
+room, with a black cat sitting on the windowsill and a glowing city skyline visible through the glass,
+all under the warm hues of a sunset."
+C.2. Question
+Easy difficulty. Focus on questions that require identifying simple, prominent, and explicit details
+within the image. These questions should be straightforward, relying solely on basic observation
+without the need for inference or interpretation. For example, you might ask about the color of a
+specific object, the presence of a single item, or the shape of an easily recognizable feature. The key is
+to keep the questions direct and simple, ensuring that the answer is obvious and immediately visible
+in the image.
+Medium difficulty. Design questions that necessitate a moderate level of observation and inference.
+These questions should involve understanding relationships between elements, recognizing interactions, or identifying less prominent features that are still clear but not immediately obvious. Examples
+could include questions about the relative position of objects, identifying an action taking place, or
+understanding the context of a scene. The goal is to require some level of thought beyond basic
+observation, challenging the model to understand the scene’s composition or narrative without being
+overly complex.
+Hard difficulty. Create questions that require the model to notice and interpret more detailed
+aspects of the image. These questions should involve recognizing multiple elements working together,
+understanding more complex interactions, or identifying details that are present but not immediately
+obvious. For example, you might ask about the positioning of objects relative to each other in a more
+crowded scene, subtle changes in lighting or color that affect the appearance of objects, or identifying
+an element that is not the main focus but is still visible in the background. The aim is to challenge the
+model to go beyond surface-level details, but without making the task too abstract or overly difficult.
+
+D. Human Evaluation
+D.1. Details of Human Evaluation
+The evaluation was carried out by a panel of five evaluators: three undergraduate students and two
+PhD students, all possessing professional English skills. Sample annotation screenshots from the
+human evaluation process are presented in Figure 13 and Figure 14. To ensure unbiased results,
+each evaluator independently assessed all samples. A sample was considered aligned if it received a
+majority vote (i.e., more than half of the evaluators agreed on its alignment).
+D.2. Human Evaluation Guidelines
+In this section, we outline the guidelines followed during human evaluations to ensure reliability and
+validity.
+For Description Generation Guideline, the evaluators need to consider the following three points:
+◁ Alignment with Image: The main criterion is how well the generated description reflects the
+visual content. Descriptions must accurately correspond to the image, avoiding vague or abstract
+
+23
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+expressions, as well as hallucination (Huang et al., 2024). Each description should provide clear,
+specific details that align with the image content and the defined fine-grained aspects.
+◁ Specificity and Clarity: Ensure that descriptions are specific, directly related to the image, and
+free from ambiguous or overly generalized language.
+◁ Relevance to Aspects: Assess whether the description aligns with the corresponding themes and
+expected content. Descriptions must clearly communicate the intended visual elements and avoid any
+misalignment between the image and the description.
+For Question-Answer Alignment, there are two points that the evaluators should consider inspired
+by the previous study (Liu et al., 2023a):
+◁ Clarity and Accuracy: Each question must be clear, unambiguous, and directly derived from the
+image. The answers should correspond to observable details or logical inferences from the image, with
+only one correct answer for each question. There should be no irrelevant or misleading information
+in the questions or answers.
+◁ Consistency with Image: Verify that both the question and answer are directly based on the image’s
+content. The evaluation should ensure that there is a logical and clear relationship between the visual
+cues and the generated question-answer pair, particularly for tasks involving higher difficulty.
+
+24
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+E. Notations
+Table 6: Notation used in the methodology description.
+Notation
+
+Description
+
+𝑞
+𝑛
+(𝑔)
+(𝑔)
+(𝑔)
+{𝐴1 , 𝐴2 , . . . , 𝐴𝑛 }
+(𝑔)
+𝐴𝑖
+𝑚
+(𝑓 )
+(𝑓 )
+(𝑓 )
+{𝐴𝑖1 , 𝐴𝑖2 , . . . , 𝐴𝑖𝑚 }
+(𝑓 )
+𝐴𝑖𝑗
+ℳ𝑣
+𝒜
+|𝒜|
+
+User input specifying the evaluation target or focus.
+Number of general aspects.
+Set of 𝑛 general aspects, each representing a high-level capability dimension.
+The 𝑖-th general aspect.
+Number of fine-grained aspects under each general aspect.
+Set of 𝑚 fine-grained aspects under the 𝑖-th general aspect.
+The 𝑗-th fine-grained aspect under the 𝑖-th general aspect.
+The LVLM used for aspect generation, description generation, and self-validation.
+⋃︀𝑛
+(𝑔)
+(𝑓 )
+The complete set of generated aspects, i.e., 𝑖=1 {𝐴𝑖 } ∪ {𝐴𝑖𝑗 }.
+The cardinality of 𝒜, with |𝒜| = 𝑚 × 𝑛.
+
+𝑑 ∈ {easy, medium, hard}
+𝜔
+𝑑
+𝑑
+{𝒯𝑖𝑗1
+, . . . , 𝒯𝑖𝑗𝜔
+}
+𝒯𝑖𝑗𝑑
+
+Difficulty level for image description generation.
+Number of image descriptions generated per aspect at each difficulty level.
+(𝑓 )
+Set of 𝜔 image descriptions for the fine-grained aspect 𝐴𝑖𝑗 at difficulty 𝑑.
+(𝑓 )
+A specific image description for aspect 𝐴𝑖𝑗 at difficulty 𝑑.
+
+𝑡𝑒
+𝐾𝑒 = {𝑘𝑒1 , 𝑘𝑒2 , . . . , 𝑘𝑒𝑐 }
+𝐺𝑒 = (𝑉𝑒 , 𝐸𝑒 )
+𝑆𝑒
+𝑉𝑒
+𝑓 (𝑆𝑒 )
+
+Topic word selected at iteration 𝑒.
+Set of |𝑐| keywords related to the topic word 𝑡𝑒 at iteration 𝑒.
+Semantic graph at iteration 𝑒, whose nodes are topic/keyword sets and edges are semantic relationships.
+Combination of 𝑉𝑒−1 , 𝑡𝑒 , and 𝐾𝑒 before applying the exclusion mechanism.
+Refined node set (topic words/keywords) after excluding high-degree nodes in iteration 𝑒.
+A function that determines how many top-degree nodes to exclude from 𝑆𝑒 .
+
+𝑑
+{ℐ𝑖𝑗
+}
+Φ𝑑𝑖𝑗 = {𝜑𝑑𝑖𝑗1 , . . . , 𝜑𝑑𝑖𝑗𝑝 }
+𝑝
+𝑑
+ℱ(ℐ𝑖𝑗
+, 𝒯𝑖𝑗𝑑 , Φ𝑑𝑖𝑗 )
+𝑑
+𝑆𝑖𝑗
+𝜁
+𝑑
+ℰ𝑖𝑗
+
+Generated images corresponding to the image description(s) 𝒯𝑖𝑗𝑑 .
+𝑑
+Set of 𝑝 simple VQA-style questions for self-validation of ℐ𝑖𝑗
+.
+Number of questions for each image’s self-validation.
+𝑑
+Self-validation function returning the alignment score 𝑆𝑖𝑗
+.
+Alignment score, i.e., the proportion of correctly answered questions among Φ𝑑𝑖𝑗 .
+Threshold for deciding whether to regenerate an image or keep it with recorded errors.
+𝑑
+Noted error(s) if the image partially misaligns with the description (𝑆𝑖𝑗
+< 1).
+
+25
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Figure 13: Screenshot of Human Evaluation (Example 1).
+
+Figure 14: Screenshot of Human Evaluation (Example 2).
+
+26
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+F. Error Study
+Through extensive experimental analysis, we have categorized the common problems encountered by
+LVLMs in VQA tasks into two main types: image comprehension errors and image reasoning errors.
+Regarding the first category, LVLMs often fail to truly understand the details in an image. For instance,
+in Figure 15, the model failed to accurately identify the performer’s attire. In Figure 17, from the
+model’s explanation, it is evident that the focus of its understanding was placed on the text rather
+than the image. Option B mentions a swimming pool, option C references a helipad, and option D
+refers to a health center—none of which are present in the image. In Figure 19, the model failed to
+correctly identify the magician’s facial expression as a smile. Therefore, it cannot be associated with
+calmness or scheming; instead, it represents a confident smile. These errors demonstrate the model’s
+inadequate comprehension of image details.
+Image reasoning errors occur when models accurately perceive the image content but falter in their
+reasoning process, leading to incorrect answers. For instance, in Figure 16, the model correctly
+identified the blue whale and the small boat in the image. However, based on its explanation, it relied
+more on its prior knowledge rather than the image itself, leading to an incorrect answer. In Figure 18,
+model accurately recognized the excitement and joy on the little girl’s face but misinterpreted the
+intent. From the image, it is clear that the woman is holding a complete ice cream cone and is about
+to hand it to the girl, indicating that the girl desires the ice cream.
+
+Basic Understanding
+Aspect: Clothing Detection
+Difficulty Level: Hard
+Question: Which combination of clothing items best describes the street performer's attire,
+considering both the upper and lower body, as well as accessories?
+Choice: "A": "Top hat, tailcoat, bow tie, dress pants, and polished shoes", "B": "Sequined vest over a
+striped shirt, ripped jeans, and mismatched socks", "C": "Colorful, patterned harem pants, a flowing tunic,
+and a beaded necklace. ", "D": "A leather jacket over a graphic T-shirt, black skinny jeans, and a fedora."
+
+Image Description:
+
+A street performer wearing a brightly colored
+feathered headdress, a sequined vest over a
+striped shirt, ripped jeans, and mismatched
+socks, juggling glowing balls in the twilight,
+with the blurred lights of a bustling night
+market in the background.
+
+Selected Model: Llama-3.2-90B-Vision
+Answer: "C"
+Explanation:The description \"Colorful, patterned harem pants, a flowing tunic, and a beaded necklace\" presents an
+
+array of eclectic patterns and a carefree style, reminiscent of a street performer's attire that prioritizes creativity and flexibility.
+This combination is more likely to be seen on someone like a street performer as it embodies a more artistic and unconventional
+approach to fashion."
+
+Ground Truth: "B"
+
+Figure 15: Error study of Llama-3.2-90B-Vision under basic understanding.
+
+27
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Spatial Understanding
+Aspect: Size Judgement
+Difficulty Level: Hard
+Question: Judging by the scale of the water cascading off its body and the relative size of the
+sailboat, approximately how many times longer than the sailboat is the breaching blue whale?
+Choice: "A": "A blue whale breaching next to a typical sailboat would be approximately 4-5 times longer
+than the boat, considering an average blue whale is 80-100 feet long and a typical sailboat is around 20-25
+feet in length.", "B": "Two to three times longer.", "C": "10 times longer", "D": "Approximately 3-4 times
+longer."
+
+Image Description:
+
+A colossal blue whale breaches the ocean surface near
+a small sailboat, water cascading around its massive
+form. Seagulls circle overhead against a backdrop of a
+clear, blue sky, with distant, snow-capped mountains
+on the horizon.
+
+Selected Model: Claude-3-Haiku
+Answer: "A"
+Explanation:The massive size of the breaching blue whale compared to the small sailboat in the image strongly
+
+suggests that the whale is approximately 4-5 times longer than the boat. Blue whales are known to reach lengths of 80-100
+feet, while typical sailboats are around 20-25 feet long. Taking this scale into account, the whale appears to be
+significantly larger than the sailboat, supporting the answer that it is 4-5 times longer
+
+Ground Truth: "C"
+
+Figure 16: Error study of Claude-3-Haiku under spatial understanding.
+
+Semantic Understanding
+Aspect: Social Status Indicators
+Difficulty Level:Hard
+
+Question: Based on the multiple luxury elements in this penthouse scene, which combination of features most comprehensively
+indicates the highest level of social status and wealth through both architectural design and lifestyle choices?
+Choice: "A": "Floor-to-ceiling windows with city views and crystal chandelier, combined with a curated vintage wine collection", "B": "A
+custom infinity pool with panoramic skyline views, paired with museum-quality art installations and bespoke designer furniture handcrafted
+from rare materials.", "C": "A private rooftop helipad, coupled with a dedicated art gallery showcasing rotating exhibits from renowned
+international artists, and a personal staff including a sommelier and private chef.", "D": "A penthouse featuring a luxurious marble staircase,
+extensive use of gold and precious metals in decor, along with an indoor spa and wellness center, and direct access to a personal cinema or
+entertainment area."
+
+Image Description:
+
+please generate a picture from the perspective of an
+observer, A luxurious penthouse living room with
+floor-to-ceiling windows overlooking a glittering city
+skyline at dusk, featuring a crystal chandelier,
+designer leather furniture, and a rare vintage wine
+collection displayed in a temperature-controlled glass
+cabinet, while a well-dressed couple enjoys
+champagne by a marble fireplac
+
+Selected Model: Gemini-1.5-Flash
+Answer: "B"
+Explanation:Option B, featuring a custom infinity pool with panoramic views, museum-quality art, and bespoke furniture, signifies the highest social
+
+status. A private helipad (Option C) is impressive, but the other elements in B are more indicative of refined taste and a curated lifestyle associated with extreme
+wealth. Options A and D showcase luxury, but lack the comprehensive display of artistic investment and bespoke design evident in B. Option B demonstrates not
+only wealth but a sophisticated understanding and appreciation of art and design, suggesting a higher level of social status beyond mere opulence.
+
+Ground Truth: "A"
+
+Figure 17: Error study of Gemini-1.5-Flash under semantic understanding.
+
+28
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Reasoning Capacity
+Aspect: Behavioral Prediction
+Difficulty Level: Medium
+
+Question: Based on the scene depicted, what is the most likely reason the child is running towards the
+woman with a playful expression?
+Choice: A": "The child wants the ice cream cone.", "B": "The child is likely excited to see their mother/caregiver and is rushing
+for a warm welcome or hug after being apart.", "C": "The child wants to play a game.", "D": "The child is probably eager to show
+something to the woman, such as a new toy or accomplishment.
+
+Image Description:
+
+A woman holding a half-eaten ice cream cone,
+looking intently at a child running towards her
+with a playful expression, a colorful
+playground in the background.
+
+Selected Model: Qwen2-VL
+Answer: "B"
+Explanation: The child's joyful expression and the direction of movement towards the woman suggest that the child is
+
+excited to see the woman, likely a parent or caregiver. The context of being outdoors and the presence of an ice cream cone held
+by the woman might also indicate a fun outing or reunion after some time apart.
+
+Ground Truth: "A"
+
+Figure 18: Error study of Qwen2-VL under reasoning capacity.
+
+Atmospheric Understanding
+Aspect: Facial Expression Analysis
+Difficulty Level: Hard
+Question: In this street performance scene, which combination of facial expressions most accurately captures the complex emotional dynamics
+between the magician and their audience, considering the interplay of lighting and atmosphere?
+Choice: "A": "The magician displays confident concentration while the audience shows a mix of skepticism and wonder, with some faces
+betraying analytical observation and others showing childlike amazement", "B": "The magician exhibits a playful smirk while the audience
+members show genuine surprise and delight, with open-mouthed expressions and raised eyebrows illuminated by the warm street lighting.", "C":
+"The magician's intense focus contrasts with the audience's varied reactions: captivated awe, nervous anticipation, and curious amusement.",
+"D": "The magician maintains a calm and mysterious demeanor, while the audience displays a mix of curiosity and cautious intrigue, highlighted
+by the shifting street lighting."
+
+Image Description:
+
+A street magician, face lit by the warm glow of a flickering
+streetlamp, performs a card trick for a small, captivated crowd.
+Their faces, a mixture of awe, suspicion, and amusement, are
+illuminated by the dim light, reflecting in the magician's polished,
+silver-tipped cane leaning against his worn suitcase. The
+cobblestone street glistens from a recent rain.
+
+Selected Model: GLM-4v-Plus
+Answer: "D"
+Explanation: The magician maintains a calm and mysterious demeanor, while the audience displays a mix of
+
+curiosity and cautious intrigue, highlighted by the shifting street lighting. The dim, moody lighting and the rainy
+atmosphere suggest a sense of mystery and intrigue. The magician's posture and the audience's engagement with the
+performance support this interpretation.
+
+Ground Truth: "C"
+
+Figure 19: Error study of GLM-4v-Plus under atmospheric understanding.
+
+29
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+G. Case Study
+Basic Understanding
+Aspect: Animal Detection
+Difficulty Level: Easy
+
+Question: What type of animal is lounging on the rug in the image?
+Choice: "A": "A ginger tabby cat", "B": "A large dog, likely a Golden Retriever or
+Labrador.", "C": "A small dog.", "D": "A Persian cat."
+
+Image Description:
+
+A ginger tabby lounging on a patterned rug,
+with sunlight streaming through a window
+onto its fur, casting a gentle shadow across
+the floor.
+
+Selected Model: Qwen2-VL
+Answer: "A"
+Ground Truth: "A"
+
+Figure 20: Case Study 1.
+
+30
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Basic Understanding
+Aspect: Food Item Recognition
+Difficulty Level: Medium
+
+Question: What type of pasta dish is likely being served in the image, based on its
+appearance and color?
+Choice: "A": "Spaghetti Carbonara", "B": "Pesto Pasta", "C": "Fettuccine Alfredo",
+"D": "Marinara Pasta
+
+Image Description:
+
+A bowl of vibrant green pesto pasta topped
+with freshly grated parmesan cheese and a
+sprig of basil, sitting on a rustic wooden table
+next to a glass of chilled white wine, with a
+checkered tablecloth in the background.
+
+Selected Model: GLM-4v-PLus
+Answer: "B"
+Ground Truth: "B"
+
+Figure 21: Case Study 2.
+
+Basic Understanding
+Aspect: Object Overlap Detection
+Difficulty Level: Hard
+
+Question: In the image of the Siamese cat partially obscured by a sheer, patterned curtain,
+what is the position of the cat relative to the curtain and the window?
+Choice: "A": "The Siamese cat is likely sitting on the windowsill, partially visible through the sheer curtain. Its face and front
+paws are probably pressed against the window glass, with the curtain draping over part of its body.", "B": "The cat is behind the
+curtain, not in contact with the window.", "C": "The cat is in front of the curtain but not touching the window.", "D": "The cat is
+situated behind the curtain, with the window likely behind both.
+
+Image Description:
+
+A Siamese cat partially obscured by a sheer,
+patterned curtain, gazing out a window at a
+bustling street scene with colorful taxis and
+pedestrians. Rain streaks the window,
+distorting the view slightly.
+
+Selected Model: Gemini-1.5-Pro
+Answer: "A"
+Ground Truth: "B"
+
+Figure 22: Case Study 3.
+
+31
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Spatial Understanding
+Aspect: Object Layering
+Difficulty Level: Easy
+
+Question: What object is placed underneath the shiny green apple?
+Choice: "A": "A circular wooden coaster", "B": "A plain white ceramic plate", "C":
+"A checkered tablecloth", "D": "A small black napkin."
+
+Image Description:
+
+A shiny green apple with a stem and a single
+leaf rests on a circular wooden coaster.
+
+Selected Model: Claude-3-Haiku
+Answer: "A"
+Ground Truth: "A"
+
+Figure 23: Case Study 4.
+
+Spatial Understanding
+Aspect: Middle-ground Recognition
+Difficulty Level: Medium
+
+Question: What object is just positioned behind the woman in the red dress in
+the crosswalk?
+Choice: "A": "A yellow taxi cab", "B": "A traffic light pole", "C": "A dark-colored
+SUV", "D": "A city bus
+Image Description:
+
+A woman in a red dress stands in the middle of
+a crosswalk, holding a half-eaten ice cream
+cone. A yellow taxi cab waits behind her, and
+a bus is approaching from the opposite
+direction. Buildings line the street, and a
+pedestrian walks on the sidewalk in the
+distance.
+
+Selected Model: GPT-4o mini
+Answer: "B"
+Ground Truth: "A"
+
+Figure 24: Case Study 5.
+
+32
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Semantic Understanding
+Aspect: Dynamic Action Identification
+Difficulty Level: Easy
+
+Question: What dynamic action is the ballerina performing in the image?
+Choice: "A": "Executing a graceful grand jetu00e9 (split leap) through the air", "B":
+
+"Performing an arabesque.", "C": "Spinning in a twirl", "D": "The ballerina is leaping with
+one leg extended forward and the other backward, known as a saut de chat
+
+Image Description:
+
+A graceful ballerina performing a simple twirl
+on a polished wooden floor, her pink tutu
+creating a gentle circular motion, against a
+plain white wall.
+
+Selected Model: GPT-4o
+Answer: "C"
+Ground Truth: "C"
+
+Figure 25: Case Study 6.
+
+Semantic Understanding
+Aspect: Personality Traits
+Difficulty Level: Medium
+
+Question: Based on the woman's expression and posture in the image, which
+personality trait is she most likely exhibiting?
+Choice: "A": "Timid or shy", "B": "Timid or shy""Confident", "C": "Serene", "D": "Curious"
+
+Image Description:
+
+A woman in a sharp, tailored business suit
+stands with arms crossed, a briefcase at her
+feet, against a backdrop of a bustling city
+street with blurred yellow taxis and
+pedestrians. She wears a serious expression
+and her posture is rigid.
+
+Selected Model: GLM-4v-Plus
+Answer: "B"
+Ground Truth: "B"
+
+Figure 26: Case Study 7.
+
+33
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Semantic Understanding
+Aspect: Cultural Context
+Difficulty Level: Hard
+Question: Based on the depiction of the dragon, costumes, and lanterns, which specific regional Chinese cultural influence is
+most prominently reflected in this Lantern Festival dragon dance celebration?
+Choice: "A": "Southern Chinese traditions, particularly from Guangdong and Hong Kong regions, are evident through the ornate
+dragon design, vibrant colors, and elaborate paper lanterns typical of Cantonese festival celebrations. ", "B": "Northern Chinese
+folk traditions, with the dragon's long, serpentine body and the prevalence of red lanterns suggesting a focus on prosperity and
+good fortune. ", "C": "Hakka Chinese traditions, evident in the dragon's robust build and the use of specific Hakka colors and
+patterns in the costumes and lanterns. ", "D": "Eastern Chinese traditions, particularly from Jiangsu and Zhejiang provinces, are
+evident in the dragon's intricate design and the use of silk and embroidery in the costumes and lanterns
+
+Image Description:
+
+An intricately detailed Chinese dragon dance
+celebration during a vibrant Lantern Festival,
+with several performers in colorful traditional
+costumes maneuvering the dragon puppet,
+surrounded by glowing lanterns floating in the
+night sky, casting dynamic shadows and
+reflections on the ground.
+
+Selected Model: Claude-3.5-Sonnet
+Answer: "A"
+Ground Truth: "B"
+
+Figure 27: Case Study 8.
+
+Reasoning Capacity
+Aspect: Conditions and Outcomes
+Difficulty Level: Easy
+
+Question: What is causing the reflection of light in the image?
+Choice: "A": "A dewdrop on the sunflower petal", "B": "The reflection of light is likely
+caused by the glossy surface of the sunflower petals themselves, which naturally reflect
+sunlight due to their waxy coating.", "C": "A puddle of water.", "D": "A shiny metallic
+surface.
+
+Image Description:
+
+A bright yellow sunflower with a tall, slender
+stem casting a delicate shadow on a smooth,
+white background, with a single dewdrop on a
+petal reflecting the light.
+
+Selected Model: GPT-4o mini
+Answer: "B"
+Ground Truth: "A"
+
+Figure 28: Case Study 9.
+
+34
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Reasoning Capacity
+Aspect: Interpersonal Relationship
+Difficulty Level: Medium
+
+Question: What is the likely emotional tone of the interaction between the two people at the
+cafe table?
+Choice: "A": "Animated and engaging", "B": "Reserved and distant, with minimal
+engagement or interaction between them. ", "C": "Casual and friendly. ", "D": "Tense and
+awkward.
+
+Image Description:
+
+Two people sit at a small cafe table, one
+gesturing emphatically while the other listens
+intently, a half-eaten pastry between them on
+a plate. Sunlight streams through the cafe
+window, illuminating dust motes in the air.
+
+Selected Model: Claude-3-Haiku
+Answer: "A"
+Ground Truth: "A"
+
+Figure 29: Case Study 10.
+
+Reasoning Capacity
+Aspect: Irony and Contradictions
+Difficulty Level: Hard
+Question: What element in the scene highlights the irony between purity and decay in the
+image?
+Choice: "A": "The pristine white wedding dress amidst the broken machinery.", "B": "The contrast
+
+between fresh white lilies blooming among rusted, deteriorating metal structures.", "C": "A delicate,
+untouched bridal veil draped over a decaying, graffiti-covered wall.", "D": "A clean, white dove perched on a
+corroded, neglected iron gate.
+
+Image Description:
+
+A pristine white wedding dress hanging elegantly in a
+dilapidated, abandoned factory, with broken
+machinery covered in rust and cobwebs surrounding it,
+while sunlight streams through shattered windows
+creating dramatic light patterns on the dress and
+dusty floor, and a single red rose lies wilted beneath it.
+
+Selected Model: Llama-3.2-90B-Vision
+Answer: "A"
+Ground Truth: "A"
+
+Figure 30: Case Study 11.
+
+35
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Atmospheric Understanding
+Aspect: Color Psychology
+Difficulty Level: Easy
+Question: Which color combination in this image creates a sense of contrast and visual
+interest through the use of complementary colors?
+Choice: "A": "Purple and yellow, as these colors are opposite each other on the color wheel and create a
+
+strong contrast when used together.", "B": "Red and green, as these colors sit opposite each other on the
+color wheel and create strong visual contrast when paired together.", "C": "Orange and blue.", "D": "Yellow
+banana against blue background"
+
+Image Description:
+
+A single, ripe banana, primarily yellow with hints of
+green at the tip, lying on a vibrant blue background.
+
+Selected Model: Llama-3.2-90B-Vision
+Answer: "D"
+Ground Truth: "D"
+
+Figure 31: Case Study 12.
+
+Atmospheric Understanding
+Aspect: Body Language Interpretation
+Difficulty Level: Hard
+Question: Based on the body positioning and spatial relationship between the dancers, what complex emotional dynamic is most likely being
+conveyed through their choreography?
+Choice: "A": "A moment of collective support and elevation, where the supporting dancers' reaching gestures and the lead dancer's leap create a
+narrative of shared triumph and mutual trust", "B": "The choreography appears to convey inner conflict and tension, with the contrasting
+movements between dancers suggesting emotional struggle and resistance. The spatial arrangement likely depicts power dynamics and
+psychological distance rather than unity.", "C": "The dancers likely portray a dynamic of yearning and dependence, with the central figure
+reaching out for connection while the others remain grounded, perhaps representing unattainable desires or unreciprocated feelings.", "D":
+"The choreography likely portrays harmonious partnership, with synchronized movements emphasizing connection and mutual understanding
+between the dancers.
+
+Image Description:
+
+Three ballet dancers performing in a grand theater,
+the lead dancer executing a perfect leap while two
+supporting dancers reach toward her with graceful,
+elongated arms, their shadows dancing across the
+polished wooden stage floor as stage lights create
+dramatic rim lighting on their flowing costumes
+
+Selected Model: Gemini-1.5-Flash
+Answer: "A"
+Ground Truth: "A"
+
+Figure 32: Case Study 13.
+
+36
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+H. Prompt
+Aspect Generation
+You are an AI assistant specializing in designing prompts to test Large Vision-Language Models
+(LVLMs). Your task is to create meticulously aspect_count fined-grained aspects that evaluate
+LVLMs basic understanding of images.
+Large Vision-Language Models are AI systems capable of understanding and analyzing images.
+Testing these models across various competencies is crucial for assessing their performance,
+limitations, and potential biases. The aspects you create will be used to challenge and evaluate
+LVMs.
+1. Basic Understanding: This involves recognizing and identifying individual objects,
+characters, and scenes within an image. It includes tasks like detecting the presence of
+specific items (e.g., cars, trees, people), distinguishing between different types of objects, and
+understanding the general context of the scene (e.g., a park, a city street). The goal is to
+accurately label all relevant elements in the image, providing a foundation for more advanced
+analysis.
+2. The aspects you generate must test the understanding of a single image, not multiple
+images, e.g. multiple perspectives. 3. Come up with 4 general aspects according to the basic
+understanding.
+4. Then Create 6 fined-grained aspects within the basic understanding for each general aspect,
+do not go beyond. You can consider the definition of the basic understanding above.
+5. List the aspects without using numbered lists.
+6. Let’s think step by step.
+Please strictly respond in the following format:
+General Aspect: [Aspect]
+Fined-grained Aspect: [Aspect]
+Introduction: [Introduction]
+
+37
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Image Description Generation-1
+You are an AI assistant tasked with converting user inputs and their descriptions into suitable
+prompts for a text-to-image model. These prompts will generate images to test the capabilities
+of large vision language models (LVLMs).
+Large Vision Language Models (LVLMs) are AI systems proficient in interpreting and analyzing
+images. Evaluating these models across different competencies is essential to understanding
+their performance, limitations, and potential biases. The prompts you create will be used
+to generate images through text-to-image models, which will then be used to challenge and
+evaluate LVLMs.
+1. Carefully follow the given aspect: aspect, its introduction: introduction.
+2. Generate a suitable prompt based on the provided aspect and introduction for the diffusion
+model to create an image. Ensure that the prompt is composed of simple phrases, avoiding
+overly complex descriptions, and is clear enough. If you deem the description irrelevant to the
+test content, do not generate a related prompt. 3. Consider including elements that might be
+particularly challenging for LVMs, such as unusual combinations, abstract concepts, or subtle
+details.
+4. Details about different difficulty levels:
+- Easy Difficulty - Characteristics: Focus on a single subject but with minor additional complexity
+to test precision in details or context.
+- Purpose: Establish baseline capability with subtle challenges, such as fine texture, simple
+interactions, or slight variations in lighting. - Description Requirements: A single object or
+entity with some basic contextual details or additional features, placed against a minimally
+distracting background. - Examples:- “A perfectly polished red apple with a small leaf attached,
+placed on a slightly reflective white surface.” - “A blue balloon with a slightly wrinkled texture,
+tied to a thin white string, floating against a pale sky with soft clouds.” - Key Points: Test finer
+details (e.g., texture, reflection) while still keeping the composition simple and clear.
+- Medium Difficulty - Characteristics: Scenes involve multiple elements or interactive settings
+that require nuanced spatial arrangement and accurate relationships between objects. - Purpose: Evaluate the ability to generate cohesive, moderately dynamic scenes with layered
+realism and a stronger sense of depth. - Description Requirements: Include multiple objects
+interacting naturally in a believable environment, with more intricate details and subtle light
+or shadow effects. - Examples: - “A steaming cup of coffee on a wooden table, with a halfeaten croissant beside it, morning sunlight casting soft shadows through a lace curtain in the
+background.” - “A golden retriever running on a sandy beach, splashing water as it chases
+a bright orange ball, with distant waves and a partly cloudy sky.” - Key Points: Incorporate
+realistic environmental elements and ensure spatial coherence, emphasizing interactions and
+secondary details (e.g., shadows, water splashes).
+- Hard Difficulty - Characteristics: Scenes incorporate high complexity with multiple interdependent elements, challenging perspectives, or dynamic and intricate lighting or textural
+effects. - Purpose: Push the limits of rendering capability to handle advanced relationships,
+environmental effects, and challenging compositions. - Description Requirements: The scene
+must include 3-4 main elements or a combination of dynamic features, such as motion, light
+interplay, or atmospheric conditions, while maintaining clarity and logic. - Examples: - “A
+raindrop-streaked window reflecting the interior of a cozy room, with a black cat sitting on
+the windowsill and a glowing city skyline visible through the glass, all under the warm hues of
+a sunset.” - “A knight in shining armor standing on a cliff edge, overlooking a stormy sea, with
+bolts of lightning illuminating the dark clouds and waves crashing against jagged rocks below.”
+- Key Points: Highlight challenges such as complex reflections, dynamic light, or multi-element
+interactions, ensuring visual harmony and detailed textures.
+...
+38
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Image Description Generation-2
+...
+5. Provide one overarching topic word that encapsulates the essence of your description.
+6. List 4-6 key words that are closely related to your description and crucial for understanding
+the image.
+7. Avoid using the following words in your new description: used_words_str
+8. The required difficulty level is: level
+9. Please use clear and accurate words, clear logic flow, do not use too abstract words. The
+length of the generated sentences needs to be consistent with the examples.
+10. Just output the image description used to generate the image, don’t mention anything else
+Please strictly respond in the following format:
+Aspect: aspect
+Prompt: [Your detailed image description]
+Topic word: [One word that captures the essence of the description]
+Key word: [Word1, Word2, Word3,...]
+
+39
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Align Question Generation
+Given the image descriptions:description, generate six questions (True/False or Multiple choice)
+with only one correct choice that verifies if the image description is correct.
+Classify each concept into a type (object, human, animal, food, activity, attribute, counting,
+color, material, spatial, location, shape, other), and then generate a question for each type.
+Here’s some examples:
+”’Description: A man posing for a selfie in a jacket and bow tie. Entities: man, selfie, jacket, bow
+tie Activities: posing Colors: Counting: Other attributes: Questions and answers are below:
+About man (human): Q: is this a man? Choices: yes, no A: yes Q: who is posing for a selfie?
+Choices: man, woman, boy, girl A: man About selfie (activity): Q: is the man taking a selfie?
+Choices: yes, no A: yes Q: what type of photo is the person taking? Choices: selfie, landscape,
+sports, portrait A: selfie About jacket (object): Q: is the man wearing a jacket? Choices: yes, no
+A: yes Q: what is the man wearing? Choices:jacket, t-shirt, tuxedo, swearter A: jacket About
+bow tie (object): Q: is the man wearing a bow tie? Choices: yes, no A: yes Q: is the man
+wearing a bow tie or a neck tie? Choices: bow tie, neck tie, cravat, bolo tie A: bow tie About
+posing (activity): Q: is the man posing for the selfie? Choices: yes, no A: yes Q: what is the
+man doing besides taking the selfie? Choices: posing, waving, nothing, shaking A: posing
+Description: A horse and several cows feed on hay. Entities: horse, cows, hay Activities: feed
+on Colors: Counting: several Other attributes: Questions and answers are below: About horse
+(animal): Q: is there a horse? Choices: yes, no A: yes About cows (animal): Q: are there cows?
+Choices: yes, no A: yes About hay (object): Q: is there hay? Choices: yes, no A: yes Q: what
+is the horse and cows feeding on? Choices: hay, grass, leaves, twigs A: hay About feed on
+(activity): Q: are the horse and cows feeding on hay? Choices: yes, no A: yes About several
+(counting): Q: are there several cows? Choices: yes, no A: yes ”’
+And finally respond in the following format:
+{{
+"caption": "description",
+"question": "Your question here",
+"choices": [yes or no], "answer": "give your correct answer",
+"element_type": "Type of the element",
+"element": "Element name"
+}},
+{{
+"caption": "description",
+"question": "Your question here",
+"choices": [yes or no],
+"answer": "give your correct answer",
+"element_type": "Type of the element",
+"element": "Element name"
+}},
+...
+
+40
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Align Answer Generation
+Given the image below, answer the questions: question from the choice: choices based on the
+image.
+And directly give the answer.
+{{
+"answer":"yes or no"
+}}
+
+Question Generation-1
+You are an AI assistant tasked with converting user inputs and their descriptions into suitable
+questions to test the Large Vision Model’s (LVM) abilities in given aspects.
+Large Vision Models (LVMs) are AI systems proficient in interpreting and analyzing images.
+Evaluating these models across different competencies is essential to understanding their
+performance, limitations, and potential biases. We will provide you with a prompt to generate
+an image, which will create a specific image. You can then formulate questions about this
+image based on the prompt. The questions you create will be used to challenge and evaluate
+LVMs based on generated images.
+1. Carefully analyze the given aspect and its Introduction: Aspect:aspect.
+2. Generate a suitable question based on the provided image description to test the LVM’s
+ability in the given aspect.
+3. We categorize the difficulty of questions into easy, medium, and hard:
+- Easy Difficulty:Focus on questions that require the identification of simple, prominent, and
+explicit details within the image. These questions should be straightforward, relying solely on
+basic observation without the need for inference or interpretation. For example, you might
+ask about the color of a specific object, the presence of a single item, or the shape of an easily
+recognizable feature. The key is to keep the questions direct and simple, ensuring that the
+answer is obvious and immediately visible in the image.
+- Medium Difficulty:Design questions that necessitate a moderate level of observation and
+inference. These questions should involve understanding relationships between elements,
+recognizing interactions, or identifying less prominent features that are still clear but not
+immediately obvious. Examples could include questions about the relative position of objects,
+identifying an action taking place, or understanding the context of a scene. The goal is to
+require some level of thought beyond basic observation, challenging the model to understand
+the scene’s composition or narrative without being overly complex.
+- Hard Difficulty:Create questions that require the model to notice and interpret more detailed
+aspects of the image. These questions should involve recognizing multiple elements working
+together, understanding more complex interactions, or identifying details that are present
+but not immediately obvious. For example, you might ask about the positioning of objects
+relative to each other in a more crowded scene, subtle changes in lighting or color that affect
+the appearance of objects, or identifying an element that is not the main focus but still visible
+in the background. The aim is to challenge the model to go beyond surface-level details, but
+without making the task too abstract or overly difficult.
+...
+
+41
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Question Generation-2
+...
+4. Avoid using overly complicated language or details unrelated to the image in the questions.
+5. When generating problems of different difficulty, please combine the current specific aspect.
+6. Due to potential discrepancies in image generation, we have detected the following errors:
+elements. Please avoid referencing these elements in your questions. If the prompt for
+generating the image does not describe in detail what the specific looks like, please do not ask
+related questions. For example, if the prompt mentions a forest with glowing plants but does
+not specify how many there are, please do not ask a question about counting the number of
+glowing plants.
+7. The required difficulty level is: level
+8. Please generate a multiple-choice question, which is four-option single-choice question.
+9. The answers in the options need to be differentiated to a certain extent. There cannot be a
+situation where multiple options meet the requirements of the question. There can only be
+one answer that meets the question.
+Image generation prompt: prompt
+Aspect: aspect
+Please directly output the generated question in the following JSON format: "question": "[your
+question]", "options": "A": "[Option A]", "B": "[Option B]", "C": "[Option C]", "D": "[Option D]"
+"reference_answer": "A or B or C or D" Without any other information and remember only one
+option in the reference answer.
+Option Adjustment
+You are an ai assistant tasked with answering questions based on the given picture description
+without given the image.
+- Answer the questions based on your knowledge.
+- Please note that some incorrect answers are provided below. You must not make the same
+mistakes
+- Your answer needs to be semantically distinct from the given incorrect answer.
+- Don’t say you can’t see the image, just answer based on your knowledge.
+- Don’t generate overly lengthy answers, keep them concise and to the point.
+- The answer you generate needs to be factually different from the given incorrect answer.
+- Try to use straightforward words instead of being too abstract or vague.
+question:question
+wrong answers:wrong_answer
+Directly give you answer, don’t add thinkings or other information.
+
+42
+
+AutoBench-V: Can Large Vision-Language Models Benchmark Themselves?
+
+Answer Generation
+In order to test your ability with pictures, we have a question about aspect area. Please answer
+based on your knowledge in this area and your understanding of pictures. Given the image
+below, answer the questions: question based on the image. Please give the final answer strictly
+follow the format [[A]] (Strictly add [[ ]] to the choice, and the content in the brackets should
+be the choice such as A, B, C, D) and provide a brief explanation of your answer. Directly
+output your answer in this format and give a brief explanation. If you cannot read the picture,
+just answer based on your text ability.
+
+43
+
+

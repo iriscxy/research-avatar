@@ -1,0 +1,1576 @@
+arXiv:2505.08532v1 [cs.SI] 13 May 2025
+
+The Truth Becomes Clearer Through Debate! Multi-Agent
+Systems with Large Language Models Unmask Fake News
+Yuhan Liu
+
+Yuxuan Liu
+
+Xiaoqing Zhang
+
+Gaoling School of Artificial
+Intelligence,
+Renmin University of China
+Beijing, China
+yuhan.liu@ruc.edu.cn
+
+Gaoling School of Artificial
+Intelligence,
+Renmin University of China
+Beijing, China
+
+Gaoling School of Artificial
+Intelligence,
+Renmin University of China
+Beijing, China
+
+Xiuying Chen∗
+
+Rui Yan∗
+
+Mohamed bin Zayed University of
+Artificial Intelligence
+Abu Dhabi, UAE
+
+Gaoling School of Artificial
+Intelligence,
+Renmin University of China
+Beijing, China
+Wuhan University
+Wuhan, China
+
+Abstract
+In today’s digital environment, the rapid propagation of fake news
+via social networks poses significant social challenges. Most existing detection methods either employ traditional classification
+models, which suffer from low interpretability and limited generalization capabilities, or craft specific prompts for large language
+models (LLMs) to produce explanations and results directly, failing
+to leverage LLMs’ reasoning abilities fully. Inspired by the saying
+that “truth becomes clearer through debate,” our study introduces
+a novel multi-agent system with LLMs named TruEDebate (TED)
+to enhance the interpretability and effectiveness of fake news detection. TED employs a rigorous debate process inspired by formal
+debate settings. Central to our approach are two innovative components: the DebateFlow Agents and the InsightFlow Agents. The
+DebateFlow Agents organize agents into two teams, where one
+supports and the other challenges the truth of the news. These
+agents engage in opening statements, cross-examination, rebuttal,
+and closing statements, simulating a rigorous debate process akin
+to human discourse analysis, allowing for a thorough evaluation
+of news content. Concurrently, the InsightFlow Agents consist of
+two specialized sub-agents: the Synthesis Agent and the Analysis
+Agent. The Synthesis Agent summarizes the debates and provides
+an overarching viewpoint, ensuring a coherent and comprehensive
+evaluation. The Analysis Agent, which includes a role-aware encoder and a debate graph, integrates role embeddings and models
+∗ Corresponding authors.
+
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior specific permission
+and/or a fee. Request permissions from permissions@acm.org.
+SIGIR ’25, Padua, Italy
+© 2025 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 979-8-4007-1592-1/2025/07
+https://doi.org/10.1145/3726302.3730092
+
+the interactions between debate roles and arguments using an attention mechanism, providing the final judgment. Our extensive
+experiments on two datasets, ARG-EN and ARG-CN, demonstrate
+that the TED framework surpasses traditional methods across various metrics and, more importantly, enhances interpretable fake
+news detection by illuminating logical reasoning and structured debate processes leading to accurate conclusions. We release our code
+to support Information systems that use structured debate within
+responsible information systems for improved decision-making1 .
+
+CCS Concepts
+• Computing methodologies → Natural language processing; • Security and privacy → Human and societal aspects of
+security and privacy.
+
+Keywords
+Fake News, Debate, Large Language Models, Multi-Agent System
+ACM Reference Format:
+Yuhan Liu, Yuxuan Liu, Xiaoqing Zhang, Xiuying Chen, and Rui Yan. 2025.
+The Truth Becomes Clearer Through Debate! Multi-Agent Systems with
+Large Language Models Unmask Fake News. In Proceedings of the 48th International ACM SIGIR Conference on Research and Development in Information
+Retrieval (SIGIR ’25), July 13–18, 2025, Padua, Italy. ACM, New York, NY,
+USA, 11 pages. https://doi.org/10.1145/3726302.3730092
+
+1
+
+Introduction
+
+The rapid propagation of fake news through social networks has
+become pervasive, significantly impacting individuals, vulnerable
+communities, and society. This widespread dissemination poses
+considerable challenges for the governance of public opinion [1],
+influencing elections [11], undermining public health policies [13],
+fairness [57–59] and threatening social stability [40]. Consequently,
+the urgency to develop effective and interpretable methods for
+detecting fake news has never been greater [37].
+1 https://github.com/LiuYuHan31/TED_fake-news-detction
+
+SIGIR ’25, July 13–18, 2025, Padua, Italy
+
+Yuhan Liu, Yuxuan Liu, Xiaoqing Zhang, Xiuying Chen, Rui Yan
+
+Black Box
+Classification Model
+
+(a)
+
+Label: Real
+
+PROMPT
+The News is real.
+
+(b)
+Large Language Model
+Proponents
+Team
+
+News!
+
+Opponents
+Team
+
+(c)
+Debate Report
+
+Figure 1: (a) Traditional models primarily rely on black box
+classification models for detecting fake news. (b) LLMs are
+prompted to output detection results directly, which do not
+fully utilize the potential of large model reasoning. (c) Our
+multi-agents framework simulates a formal debate scenario
+to engage in discussions on news topics, reaching detection
+results through debate reasoning and interpretability.
+
+Traditional fake news detection methods predominantly rely on
+machine learning models, particularly those based on BERT [7],
+which excel in text analysis [16, 19, 31]. While these models have
+achieved notable success, they often suffer from low interpretability
+and limited generalization capabilities, hindering their effectiveness across diverse contexts. Recent approaches have attempted to
+leverage LLMs by developing specific prompts to generate explanations and detection results [15, 29]. However, these methods may
+not fully utilize LLMs’ inherent reasoning abilities and complex
+cognitive processes, frequently resulting in excessively simplified
+and premature conclusions.
+In the context of truth-seeking, the proverb "truth becomes clearer
+through debate" emphasizes the importance of examining and challenging information from multiple perspectives to arrive at a more
+accurate understanding [2, 21]. The exchange of differing viewpoints in a structured debate often leads to refining and clarifying
+ideas. However, existing fake news detection models fail to incorporate this approach fully, often limiting their analysis to a single,
+unchallenged perspective. This limitation prevents a comprehensive evaluation of news content and may overlook detailed signals
+that are critical for accurate detection.
+To address these challenges, we introduce a novel multi-agent
+system with LLMs named TruEDebate (TED). TED is designed to
+enhance the interpretability and effectiveness of fake news detection by following the structured methodologies of formal debate.
+Inspired by the principle that truth emerges more clearly through
+debate, our approach simulates dynamic and structured debates
+among multiple agents, each examining the news from different
+angles. This debate structure follows the Lincoln-Douglas Debate
+
+format [8], where agents engage in a series of stages to present,
+challenge, and refine their arguments. This framework mirrors the
+human cognitive process of evaluating information through discourse, fostering deep intellectual engagement and comprehensive
+evaluation of news content. In this framework, multiple agents,
+each assigned distinct roles, engage in a structured debate process
+to evaluate the truth of news items. This debate process enhances
+the interpretation of the detection process and reflects the human
+cognitive process of debate, where conflicting viewpoints are analyzed and integrated.
+The TED framework comprises two innovative components: the
+DebateFlow Agents and the InsightFlow Agents. The DebateFlow
+Agents organize multiple LLM-powered agents into two opposing
+teams—one supporting and the other opposing the truth of the
+news. These agents engage in sequential stages of opening, crossexamination rebuttal, and closing statements, effectively simulating
+a rigorous debate environment. This setup encourages the exploration of differing viewpoints, refining, and clarifying ideas, and
+addresses the limitation of existing models that analyze information
+from a single perspective. Concurrently, the InsightFlow Agents
+encompass two specialized sub-agents: the Synthesis Agent and the
+Analysis Agent. The Synthesis Agent is responsible for summarizing the debates and providing a comprehensive viewpoint, ensuring
+a coherent and thorough conclusion. The Analysis Agent, composed
+of a role-aware encoder and a debate graph, integrates role embeddings and models the interactions between different debate roles
+and arguments through an interaction attention mechanism. By
+capturing the detailed relationships and discourse structures inherent in the debates, the Analysis Agent effectively identifies critical
+indicators essential for fake news detection.
+We conducted comprehensive experiments on two datasets, ARGEN and ARG-CN, to evaluate the effectiveness of TED. The results
+indicate that our framework outperforms traditional methods across
+multiple evaluation metrics. Additionally, TED facilitates structured
+debate procedures and enhances logical reasoning, contributing to
+accurate conclusions. By enabling systematic debate and in-depth
+analysis, our approach advances the development of information
+systems capable of making more precise and transparent decisionmaking processes, thereby supporting the creation of responsible
+information environments.
+Our contribution can be summarized in the following ways:
+• We introduce TED, a novel and interpretable fake news detection framework based on LLMs. TED not only performs detection
+through structured debates but also provides interpretable justifications to aid in understanding the results.
+• Inspired by Lincoln-Douglas debate theory [8], which holds
+that “truth becomes clearer through debate," we design two key
+components within our framework: the Synthesis Agent and the
+Analysis Agent. The Synthesis Agent summarizes the debates and
+synthesizes comprehensive viewpoints, ensuring coherent conclusions. The Analysis Agent, incorporating a role-aware encoder and
+a debate graph, integrates role embeddings and models the interactions between different debate roles and arguments through an
+attention mechanism. This structure enables the Analysis Agent to
+identify critical indicators essential for accurate fake news detection.
+
+The Truth Becomes Clearer Through Debate! Multi-Agent
+Systems with Large Language Models Unmask Fake News
+
+SIGIR ’25, July 13–18, 2025, Padua, Italy
+
+• Extensive experiments on the ARG-EN and ARG-CN datasets
+demonstrate TED’s superior performance to traditional methods,
+showing its ability to make accurate and transparent decisions. Furthermore, TED also maintains robust performance across different
+LLM backbones, showcasing its adaptability and generalizability in
+fake news detection.
+
+However, these works do not truly depict a debate process within
+their frameworks and cannot analyze problems from multiple perspectives. Building upon these foundations, our work introduces
+a structured debate framework that leverages multi-agent interactions to enhance the interpretability and effectiveness of fake news
+detection.
+
+2 Related Work
+2.1 Fake News Detection
+
+2.3
+
+Fake news detection is an essential step in the fight against misinformation [12]. Earlier works in this area include the study by Qian
+et al. [36], which focuses on the early detection of fake news, considering only the text of news articles available at the time of detection. Yu et al. [49] applied a convolutional approach for misinformation identification. As the field evolved, various methods have
+been introduced to improve detection efficacy. For example, Jin
+et al. [17] move towards fine-grained reasoning for fake news detection by better reflecting the logical processes of human thinking
+and enabling the modeling of subtle clues. Furthermore, Zheng
+et al. [60] investigated the integration of diverse multi-modal data
+considering the complexity of their interrelations. Recently, with
+the rise of LLMs, Hu et al. [15] combined large and small LMs and
+achieved good improvements using only textual content for fake
+news detection. The agent workflow based on a large language
+model designed by Li et al. [25] uses tool learning and knowledge
+retrieval to detect fake news. Liu et al. [27, 28] employs a multiagent system to simulate the propagation and evolution of fake
+news.
+However, they did not fully utilize the potential of LLMs. Our
+research enhances the capability of fake news detection by further
+leveraging a debate system composed of multiple agents with LLMs.
+In our approach, we do not call any external tools, nor do we require
+knowledge-based retrieval, making it easily transferable to any fake
+news detection scenario.
+
+2.2
+
+Multi-agent Discussion with LLMs
+
+Despite significant advancements in LLMs, research on multi-agent
+discussions, where multiple LLMs interactively collaborate to solve
+problems, is still in its early stages, aiming to leverage collective
+capabilities beyond individual models. A key contribution in this
+field is ChatEval [3], which designs a team of multi-agent referees
+to independently deliberate and assess the quality of responses
+generated by various models on open-ended questions and standard natural language generation tasks. Other studies emphasize
+diversifying agent roles to enrich the debate process [24, 33]. Liang
+et al. [26] further explores how role assignment impacts the effectiveness of multi-agent interactions. Chen et al. [4] introduce the
+ReConcile framework, which uses different LLMs and a weighted
+voting system to reach consensus, capturing a broader range of
+perspectives. Du et al. [9] employs multi-agent debate to improve
+the mathematical abilities of LLMs. Additionally, Zhang et al. [52]
+analyzes multi-agent discussions from a social psychology perspective to understand how social factors influence collaboration and
+reasoning processes among agents.
+
+LLM-Based Multi-Agent System
+
+With LLMs’ powerful text generation capabilities, integrating LLMs
+into simulating social dynamics represents a burgeoning field of
+research, yielding promising results [18, 23, 39, 45]. These LLMbased generative agents excel in digital environments, demonstrating proficiency in natural language tasks [5, 6, 50] and reasoning
+task [51]. Törnberg et al. [42] used LLMs and agent-based modeling
+to simulate social media, focusing on news feed algorithms and
+offering real-world insights. Further, Park et al. [34] demonstrated
+that LLM-based agents could generate social media content indistinguishable from that produced by humans. Moreover, Qian et al. [35]
+designed ChatDev, a virtual development company that simulates
+a human development team.
+These frameworks that utilize LLM multi-agent systems to solve
+complex tasks all share a crucial component: the interaction among
+multiple agents [3, 14, 30, 41, 46, 54–56]. However, these works
+consider only the message passing between different agents. While
+some claim to engage in multi-agent debates, they do not adequately
+depict the debate process during interactions. Our work establishes
+a standard debate scenario, where various roles debate fake news
+from different perspectives to determine the truth of the news topic.
+To the best of our knowledge, this is the first instance of a social
+debate simulation in the context of fake news.
+
+3 Methodology
+3.1 Task Formulation
+We reformulate fake news detection as an interactive debate among
+multiple LLM agents. We introduce a system comprising 𝑁 LLM
+agents denoted as A = (𝑎 1, . . . , 𝑎 𝑁 ), each assigned unique roles
+and stances in the debate process. Given a news item 𝐹 , all agents
+engage in a structured debate to determine its veracity. The agents
+are organized into two opposing teams:
+• Proponents: Agents who argue that 𝐹 is true.
+• Opponents: Agents who argue that 𝐹 is fake.
+Each agent plays a specific role in the debate and participates in
+predefined stages. All interactions are recorded in a debate log 𝐷.
+At the conclusion stage of the debate, two types of agents evaluate
+the outcome. The Synthesis Agent analyzes the debate log 𝐷 to
+produce a comprehensive summary report 𝑆. At the same time, the
+Analysis Agent utilizes the summary report 𝑆 and the original news
+item 𝐹 to predict the truth value.
+Our objective is to leverage LLMs’ reasoning capabilities within
+this debate framework to enhance the effectiveness and interpretability of fake news detection.
+
+SIGIR ’25, July 13–18, 2025, Padua, Italy
+
+Proponents
+Team
+
+News Topic
+Opening
+Statement
+𝐷 𝑜𝑝𝑒𝑛
+
+Closing Statement
+𝐷 𝑐𝑙𝑜
+
+Synthesis Agent Profile:
+-News Topic
+-Role
+-Task
+-Output
+𝐷𝑜𝑝𝑒𝑛
+
+Prediction: Fake
+Analysis Agent
+
+Debate Report
+
+𝐷𝑐𝑟𝑜
+
+Debate
+Embedding
+
+Role-aware
+encoder
+
+Pool
+
+𝐷𝑐𝑙𝑜
+Synthesis Agent
+Debater Agents Profile:
+-News Topic
+-Team
+-Task
+-Goal
+
+(a) DebateFlow Agents
+
+Debate Log 𝐷
+Debate Graph
+
+News
+Embedding
+
+News
+
+Classifier
+
+𝐷 𝑐𝑟𝑜
+
+Opponents
+Team
+
+Interactive Attention
+
+cross-examination
+and rebuttal
+
+Yuhan Liu, Yuxuan Liu, Xiaoqing Zhang, Xiuying Chen, Rui Yan
+
+𝐿
+Loss
+
+Encoder
+Analysis Agent Training process
+
+(b) InsightFlow Agents
+
+Figure 2: Our TED framework consists of two main components: (a) the DebateFlow Agents and (b) the InsightFlow Agents. The
+DebateFlow Agents simulate the reasoning process in a debate scenario, including the Opening, Cross-examination, Rebuttal,
+and Closing Statement. The InsightFlow Agents consist of the Synthesis Agent and the Analysis Agent. The former generates a
+debate report based on all debate records, which is then passed to the latter to predict whether the new content is true.
+
+3.2
+
+Our Multi-Agents Debate Framework
+
+We introduce TruEDebate (TED), a framework that enhances fake
+news detection by simulating a structured debate among multiple
+LLM-powered agents. TED consists of two main components:
+• DebateFlow Agents: Organized into two opposing teams—the
+Proponents, who argue that the news item is true, and the Opponents,
+who argue that it is fake. Inspired by Lincoln-Douglas debate theory [8], these agents engage in a multi-stage debate process, including opening, cross-examination, rebuttal, and closing statements.
+This setup mirrors formal debate settings, encouraging thorough
+examination of the news from multiple perspectives.
+• InsightFlow Agents: Comprising the Synthesis Agent and the
+Analysis Agent. The Synthesis Agent summarizes the debate, providing a cohesive overview of the key arguments and counterarguments. The Analysis Agent employs a role-aware encoder and
+a debate graph to model the interactions and discourse structures
+within the debate, ultimately predicting the authenticity of the news
+item.
+As shown in Figure 2, through the interactions of these agents,
+TED fosters deep intellectual engagement and logical reasoning,
+leading to more accurate and interpretable fake news detection. The
+structured debate process not only refines the agents’ understanding of the news item but also provides transparent justifications
+for the final decision, embodying the principle that “truth becomes
+clearer through debate."
+
+Inspired by Lincoln-Douglas debate [8], which is commonly
+used in debate settings to resolve controversial issues, the debate is
+structured into three main stages: Opening, Cross-examination and
+Rebuttal, and Closing. Let Φ = {𝜙 1, 𝜙 2, 𝜙 3 } denote these stages. In
+each stage 𝜙𝑘 ∈ Φ, agents from both teams participate according to
+their roles. In the Opening stage (𝜙 1 ), agents present their initial arguments supporting their team’s stance. Each agent 𝑎𝑖 generates an
+(1)
+argument 𝑑𝑖 based on the news item 𝐹 and their team’s position:
+(1)
+
+𝑑𝑖
+
+(2)
+
+(2)
+
+𝑑𝑗
+
+= 𝑓𝑟𝑒𝑏 (𝐷 (1) , 𝑆𝑡𝑎𝑛𝑐𝑒 𝑗 ),
+
+(2)
+
+where 𝑓𝑟𝑒𝑏 is the Cross-examination and Rebuttal prompt function,
+and 𝐷 (1) is the set of arguments in stage 𝜙 1 .
+In the Closing stage (𝜙 3 ), agents summarize their team’s position
+and reinforce key points. Each agent 𝑎𝑘 produces a concluding
+(3)
+statement 𝑑𝑘 :
+𝑑𝑘
+
+DebateFlow Agents
+
+The DebateFlow Agents form the core of the TED framework,
+orchestrating a structured debate to assess the authenticity of a
+news item 𝐹 . The agents are divided into two opposing teams: the
+Proponents (T𝑝𝑟𝑜 ), who argue that 𝐹 is true, and the Opponents
+(T𝑜𝑝𝑝 ), who contend that 𝐹 is fake. Each team consists of agents
+assigned specific roles corresponding to different debate stages.
+
+(1)
+
+𝑑 𝑗 targeting the arguments made in the previous stage by the
+opposing team:
+
+(3)
+
+3.3
+
+= 𝑓𝑎𝑟𝑔 (𝐹, 𝑆𝑡𝑎𝑛𝑐𝑒𝑖 ),
+
+where 𝑓𝑎𝑟𝑔 represents the argumentation prompt function implemented by the LLM, and 𝑆𝑡𝑎𝑛𝑐𝑒𝑖 ∈ {𝑇𝑟𝑢𝑒, 𝐹𝑎𝑘𝑒} corresponds to
+the team’s stance.
+In the Cross-examination and Rebuttal stage (𝜙 2 ), agents challenge the opposing team’s arguments through questions and rebuttals. An agent 𝑎 𝑗 from one team formulates a question or rebuttal
+
+= 𝑓𝑐𝑙𝑜 (𝐷 (1) ∪ 𝐷 (2) , 𝑆𝑡𝑎𝑛𝑐𝑒𝑘 ),
+
+(3)
+
+where 𝑓𝑐𝑙𝑜 is the closing prompt function, and 𝐷 (1) ∪ 𝐷 (2) represents the accumulated debate content from previous stages.
+The debate log 𝐷 accumulates all interactions during the debate:
+𝐷=
+
+3
+Ø
+𝑘=1
+
+𝐷 (𝑘 ) ,
+
+(𝑘 )
+
+with 𝐷 (𝑘 ) = {𝑑𝑖
+
+| 𝑎𝑖 ∈ A (𝑘 ) },
+
+(4)
+
+The Truth Becomes Clearer Through Debate! Multi-Agent
+Systems with Large Language Models Unmask Fake News
+1: Input: News item 𝐹
+2: Output: Predicted truth value 𝑦ˆ of news item 𝐹 , Explanatory
+
+reasons 𝑅
+3: Initialize DebateFlow Agents:
+4: Assign agents into two teams:
+
+• Proponents: Support that 𝐹 is true
+• Opponents: Argue that 𝐹 is fake
+5: Assign roles within each team (e.g., Opening Speaker,
+Questioner, Closing Speaker)
+6: DebateFlow Agents:
+7: for each debate stage 𝜙 in [Opening Statement,
+Cross-examination, Rebuttal, and Closing Statement] do
+8:
+Agent 𝑖 presents arguments or rebuttals based on the role
+9:
+Record interactions in debate log 𝐷𝜙
+10: end for
+11: InsightFlow Agents:
+12: Synthesis Agent:
+13: Analyze debate logs 𝐷 = {𝐷𝜙 } to produce evaluation report 𝑆
+14: Analysis Agent:
+15: for each debate interaction (node) 𝑛𝑖 in 𝐷 do
+16:
+Obtain node 𝑛𝑖 embedding ℎ𝑖 with a Role-aware Encoder
+17: end for
+18: Build Dabate graph 𝐺 = (𝑉 , 𝐸) with nodes 𝑉 = {ℎ𝑖 }
+19: Apply GATs to 𝐺 to obtain graph embedding 𝑔
+20: Encode news item 𝐹 to obtain content embedding 𝑒 𝐹
+21: Combined representation 𝑐 ← InteractiveAttention(𝑔, 𝑒 𝐹 )
+22: Predict truth value 𝑦ˆ using 𝑐
+23: return Predicted truth value ˆ
+𝑦, explanatory reasons
+𝑅 = {𝑆, 𝐷 }
+Algorithm 1: TruEDebate (TED): Multi-Agent Debate Framework for Fake News Detection
+
+where A (𝑘 ) is the set of agents participating in stage 𝜙𝑘 .
+(𝑘 )
+Each agent’s contribution 𝑑𝑖 depends on the news item 𝐹 , their
+team’s stance, their role in the debate, and the prior debate context
+𝐷 <𝑘 :
+(𝑘 )
+
+𝑑𝑖 = 𝑓LLM (𝐹, 𝐷 <𝑘 , Role𝑖 , Stance𝑖 ),
+(5)
+Ð
+𝑘 −1 𝐷 (𝑚) represents the debate history up to stage
+where 𝐷 <𝑘 = 𝑚=1
+𝜙𝑘 −1 , and Role𝑖 specifies the agent’s role.
+The entire algorithm process can be described in Algorithm 1.
+This structured interaction ensures that agents consider both the
+news content and the evolving debate context, promoting coherence and depth in their reasoning. By engaging in this process, the
+DebateFlow Agents simulate a rigorous examination of the news
+item 𝐹 , mirroring the dynamics of human debates and fostering a
+comprehensive evaluation from multiple perspectives.
+The whole set of function prompts can be found in our code files.
+
+3.4
+
+InsightFlow Agents
+
+After the debate conducted by DebateFlow Agents, the InsightFlow Agents analyze the accumulated discourse to produce a final
+prediction on the authenticity of the news item 𝐹 . This component
+consists of two principal agents: the Synthesis Agent and the
+Analysis Agent.
+
+SIGIR ’25, July 13–18, 2025, Padua, Italy
+
+3.4.1 Synthesis Agent. The Synthesis Agent processes the debate log 𝐷, which contains all interactions from the debate stages,
+to generate a concise and comprehensive summary 𝑆 of the key
+arguments and counterarguments presented by both teams. This
+summary is evaluated from multiple perspectives of fake news
+detection to ensure a well-rounded judgment. Formally, the core
+function prompt of the Synthesis Agent is defined as follows:
+It should contain a detailed explanation of your assessment of
+the debate. Focus on evaluating the authenticity of the news
+involved in the topic by checking the following:
+1. Whether the news contains specific details and verifiable
+information.
+2. Whether the news cites reliable sources or news organizations.
+3. The tone and style of the news, with real news generally
+being more objective and neutral.
+4. Any use of emotional language, which might be a characteristic of fake news.
+5. Whether the information in the news can be confirmed
+through other reliable channels.
+The purpose of the Synthesis Agent is to encapsulate the critical
+points of the debate, providing a coherent overview highlighting
+the strengths and weaknesses of each side’s arguments. This summary 𝑆 bridges the debate discourse and the subsequent analytical
+processes, ensuring that the most pertinent information is readily
+accessible for further evaluation.
+3.4.2 Analysis Agent. The Analysis Agent integrates the debate
+interactions with the original news content to predict the truth
+value 𝑦ˆ of the news item 𝐹 . This agent employs a combination of
+role-aware encoder, debate graph, and a news-debate interactive
+attention mechanism to capture both semantic content and the
+relational dynamics of the debate, as well as their relevance to the
+news content.
+Role-aware Encoder. To capture the distinct characteristics of
+different debate roles, we design a role-aware encoder. For each
+debate interaction 𝑑𝑖 , the node representation is constructed by concatenating the encoder’s [CLS] token embedding with a projected
+role embedding:
+h𝑖enc = Encoder(Text𝑖 ),
+proj
+
+r𝑖
+
+= Wrole e𝑖 ,
+h
+i
+proj
+h𝑖node = h𝑖enc ; r𝑖
+,
+
+(6)
+
+where h𝑖enc ∈ R𝑑ℎ is the [CLS] token representation from the
+encoder, e𝑖 ∈ R𝑑𝑟 is the embedding for role 𝑟𝑖 , Wrole ∈ R𝑑ℎ ×𝑑𝑟
+projects the role embedding to match the encoder’s dimension,
+and [ ; ] denotes vector concatenation. The resulting node representation h𝑖node integrates both semantic content and role-specific
+information of each debate interaction.
+Debate Graph. The encoded node representations are structured into a debate graph 𝐺 = (𝑉 , 𝐸), where the nodes 𝑉 = {ℎ𝑖node }
+
+SIGIR ’25, July 13–18, 2025, Padua, Italy
+
+Yuhan Liu, Yuxuan Liu, Xiaoqing Zhang, Xiuying Chen, Rui Yan
+
+represent the debate interactions, and the edges 𝐸 represent the relationships between interactions, such as sequential order or explicit
+references.
+We employ Graph Attention Networks (GAT) [43] to process the
+node representations. The GAT layers update each node’s representation by attending to its neighbors:
+(𝑙+1)
+
+h𝑖
+(𝑙 )
+
+© ∑︁ (𝑙 ) (𝑙 ) (𝑙 ) ª
+=𝜎­
+𝛼𝑖 𝑗 W h 𝑗 ® ,
+« 𝑗 ∈ N (𝑖 )
+¬
+
+(7)
+
+where h𝑖 is the representation of node 𝑖 at layer 𝑙, N (𝑖) denotes
+the set of neighbors of node 𝑖, W (𝑙 ) is a learnable weight matrix,
+(𝑙 )
+𝜎 is an activation function, and 𝛼𝑖 𝑗 are the attention coefficients.
+By stacking multiple GAT layers, the model captures higher-order
+interactions and the relational dynamics within the debate.
+Debate-News Interactive Attention. To integrate the debate
+representations with the news content, we employ an interactive
+attention mechanism. First, we encode the news content 𝐹 and apply
+global pooling to obtain the graph-level debate representation g:
+e𝐹 = Encoder(𝐹 ),
+g = GlobalPool(H (𝐿) ),
+
+(8)
+
+where H (𝐿) is the output of the 𝐿-th GAT layer, and GlobalPool
+denotes a global mean pooling operation.
+Next, we project both the debate representation and the news
+content embedding to a common dimensionality:
+gproj = W𝑔 g,
+proj
+
+e𝐹
+
+(9)
+= W𝑒 e𝐹 ,
+
+where W𝑔 and W𝑒 are projection matrices.
+We then compute the interaction representation c using multihead attention (MHA) to capture the interactions between the debate and news content:
+proj
+
+c = MHA(e𝐹 , gproj, gproj ),
+
+(10)
+
+Finally, we concatenate the projected debate representation with
+the interaction representation to obtain the comprehensive representation:
+h = [gproj ; c].
+(11)
+This interactive attention allows the model to focus on different
+aspects of the debate relevant to the news content, effectively integrating information from both sources.
+Agent Training. The combined representation h is processed
+through a fully connected layer followed by a softmax activation
+to generate the predicted probability distribution over classes. The
+model is trained by minimizing the cross-entropy loss between the
+predicted probabilities and the actual labels:
+ŷ = softmax(Wfc h + bfc ),
+∑︁
+L=−
+𝑦𝑘 log 𝑦ˆ𝑘 ,
+
+(12)
+
+𝑘
+
+where Wfc and bfc denote the weights and bias of the classification
+layer, ŷ represents the predicted probability distribution, 𝑦𝑘 is the
+ground truth label for class 𝑘, and 𝑦ˆ𝑘 is the predicted probability
+for class 𝑘.
+
+4 Experiment
+4.1 Experiment Setup
+4.1.1 Datasets. For evaluation, we utilized two datasets: ARG-EN
+and ARG-CN [15]. These datasets are derived from the Chinese
+dataset Weibo21 [32] and the English dataset GossipCop [38]. In
+previous work [15], they processed these datasets by deduplication
+and dividing the data temporally. This approach helps prevent
+overestimating the SLM performance due to potential data leakage.
+We used these two datasets in the experiment. The statistical details
+of the datasets are summarized in Table 2.
+4.1.2 Baselines. Following previous work [15], we conducted experiments comparing three types of methods.
+• LLM-Only Methods: Directly use GPT-3.5-turbo and GPT-4omini as a LLM for fake news detection.
+• SLM-Only Methods: Small Language Models (SLMs), like BERTbased models, generally perform well on fake news detection tasks.
+In this category, we include the following approaches:
+(1) Bert [7]: Detecting fake news using a fine-tuned vanilla
+BERT-base model.
+(2) EANN [44]: This model employs auxiliary adversarial training to effectively isolate and reduce event-related features, using
+the publication year as the label for the auxiliary task.
+(3) Publisher-Emo [53]: A model that integrates a range of
+emotional attributes with textual features to detect fake news.
+(4) ENDEFA [61]: A model that employs causal learning to
+eliminate entity bias, enhancing its generalization capabilities on
+fake news datasets with distribution shifts. All approaches in this
+category utilize the same SLM (BERT) for text encoding.
+• LLM+SLM Methods. LLM solely often does not perform well
+on the task. Hence, a number of works combine LLM with SLM to
+enhance performance.
+(1) Bert+Rationale: It combines features from both the news
+and the rationale encoder, feeding them into an MLP for prediction.
+(2) SuperICL [47]: It utilizes the SLM as a plug-in to enhance
+the in-context learning capabilities of the LLM by incorporating
+predictions and confidence levels for each test sample into the
+prompt.
+(3) ARG [15]: This model designs an Adaptive Rationale Guidance network for fake news detection, where SLMs selectively
+derive insights on news analysis from the rationales provided by
+LLMs.
+(4) ARG-D [15]: It is a rationale-free version of ARG created
+through distillation, designed for cost-sensitive scenarios that do
+not require querying LLMs.
+4.1.3 Implementation Details. We use Python to operationalize
+our framework TED. The LLM used is GPT-4o-mini accessed via
+OpenAI API calls due to its representativeness and convenient calling. Agents and the scene they live in were defined using a Python
+library Mesa [20]. For Analysis Agent, We utilize a fine-tuned BERT
+model due to its extensive application in this domain as highlighted
+by recent studies [19]. For our experiments, we employ models
+from the Transformers package chinese-bert-wwm-ext for Chinese
+and bert-base-uncased for English evaluations. Optimization is performed using Adam [22], with a comprehensive grid search to
+
+The Truth Becomes Clearer Through Debate! Multi-Agent
+Systems with Large Language Models Unmask Fake News
+
+SIGIR ’25, July 13–18, 2025, Padua, Italy
+
+Table 1: The performance of the TED, as well as the LLM-only, SLM-only, and LLM+SLM methods was assessed. All results
+(except for those of GPT-4o-mini and ChatEval) for the baselines are taken from Hu et al. [15]. The top two results for both
+macF1-score and accuracy are highlighted, with the highest in each category being bolded and the second highest underlined.
+Numbers in bold mean that the improvements to the baseline models are statistically significant (t-test with p-value<0.01).
+ARG-EN
+
+Model
+macF1
+
+Acc.
+
+𝐹 1real
+
+𝐹 1fake
+
+macF1
+
+Acc.
+
+𝐹 1real
+
+𝐹 1fake
+
+LLM-Only
+
+GPT-3.5-turbo
+GPT-4o-mini
+
+0.702
+0.691
+
+0.813
+0.845
+
+0.884
+0.909
+
+0.519
+0.472
+
+0.725
+0.725
+
+0.734
+0.746
+
+0.774
+0.780
+
+0.676
+0.670
+
+SLM-Only
+
+Bert
+EANN
+Publisher-Emo
+ENDEF
+
+0.765
+0.763
+0.766
+0.768
+
+0.862
+0.864
+0.868
+0.865
+
+0.916
+0.918
+0.920
+0.918
+
+0.615
+0.608
+0.611
+0.618
+
+0.753
+0.754
+0.761
+0.765
+
+0.754
+0.756
+0.763
+0.766
+
+0.769
+0.773
+0.784
+0.779
+
+0.737
+0.736
+0.738
+0.751
+
+LLM+SLM
+
+Bert + Rationale
+SuperICL
+ARG
+ARG-D
+
+0.777
+0.736
+0.790
+0.778
+
+0.870
+0.864
+0.878
+0.870
+
+0.921
+0.920
+0.926
+0.921
+
+0.633
+0.551
+0.653
+0.634
+
+0.767
+0.757
+0.784
+0.771
+
+0.769
+0.759
+0.786
+0.772
+
+0.787
+0.779
+0.804
+0.785
+
+0.748
+0.734
+0.764
+0.756
+
+Multi-Agents
+
+ChatEval(One-by-One)
+ChatEval(Simultaneous-Talk)
+TED(Ours)
+
+0.733
+0.738
+0.803
+
+0.860
+0.869
+0.892
+
+0.919
+0.923
+0.932
+
+0.546
+0.553
+0.674
+
+0.694
+0.694
+0.795
+
+0.717
+0.719
+0.798
+
+0.778
+0.780
+0.815
+
+0.611
+0.608
+0.774
+
+Table 2: Statistics of the fake news detection datasets.
+ARG-CN
+Real
+Fake
+Total
+
+ARG-EN
+
+Train
+
+Val
+
+Test
+
+Train
+
+Val
+
+Test
+
+2,331
+2,873
+5,204
+
+1,172
+779
+1,951
+
+1,137
+814
+1,951
+
+2,878
+1,006
+3,884
+
+1,030
+244
+1,274
+
+1,024
+234
+1,258
+
+determine the optimal learning rate. Performance is evaluated using the best-validation checkpoint from the testing results. For the
+Analysis Agent, the experiments were conducted using PyTorch,
+with the HuggingFace Transformers library for pre-trained models and PyTorch Geometric for graph neural network components.
+Text data was tokenized using the BERT tokenizer appropriate
+for the dataset’s language. Debate interactions were encoded with
+role-aware embeddings, and news content was separately encoded
+using the BERT model. Additionally, a fixed graph structure was
+employed for each debate instance, with nodes representing debate
+interactions and edges capturing the logical flow and relationships
+between these interactions. Edges were predefined based on the
+debate sequence and interactions between roles. All experiments
+were run on machines equipped with NVIDIA 3090 GPUs to accelerate training. The specific experimental implementation details
+can be found in our code.
+
+4.2
+
+ARG-CN
+
+Main Results
+
+Table 1 presents the performance of our proposed TED framework and various other models, such as LLM-only, SLM-only, and
+LLM+SLM methods, on the ARG-EN and ARG-CN datasets. From
+the results, we observe: (1) TED outperforms all other methods,
+achieving the highest macF1 scores and accuracy across the datasets,
+
+showcasing its exceptional capability in detecting fake news. This
+underlines the efficacy of our multi-agent debate method in thoroughly analyzing and judging the truth of news items. (2) The
+LLM-only method, which utilizes LLMs without structured argumentation, exhibits inferior performance compared to TED. This
+emphasizes the limited capability of LLMs when deployed in isolation, lacking the structured interaction and discourse mechanisms
+provided in TED. (3) Comparisons among SLM-only methods reveal
+incremental improvements across each variant, yet none achieve
+the performance level of TED. This suggests that while traditional
+SLMs are capable, they fall short of the robust and comprehensive
+analytical framework offered by the multi-agent system in TED. (4)
+The LLM+SLM methods, attempting to combine the capabilities of
+LLMs with SLMs, show varied performance. For instance, the ARG
+model demonstrates considerable effectiveness but still does not
+reach the level of TED. This indicates that while the integration of
+LLM and SLM provides benefits, the structured debate format of
+TED is crucial for optimal performance.
+In addition, to evaluate the effectiveness of our TED framework
+for fake news detection, we compared it with the ChatEval framework [3], which uses One-by-One and Simultaneous-Talk strategies
+for multi-agent debates. Applying these strategies to our fake news
+detection task, as shown in Table 1, TED consistently outperforms
+ChatEval across all metrics. The formal debate structure of TED
+promotes more interactive reasoning among agents, allowing for
+a deeper analysis of news content. In contrast, ChatEval’s strategies do not achieve the same depth in fake news detection. These
+results highlight TED’s superiority in enhancing the accuracy and
+reliability of multi-agent systems for fake news detection. By fostering structured and dynamic interactions, TED not only improves
+detection accuracy but also ensures a more thorough examination
+of the news item.
+
+SIGIR ’25, July 13–18, 2025, Padua, Italy
+
+Yuhan Liu, Yuxuan Liu, Xiaoqing Zhang, Xiuying Chen, Rui Yan
+
+Table 3: Ablation study of our model TED on ARG-EN and ARG-CN datasets. Numbers in bold mean that the improvements to
+the ablation models are statistically significant (t-test with p-value<0.01).
+ARG-EN
+Full Model (TED)
+w/o DebateFlow Agents
+w/o Synthesis Agent
+w/o Analysis Agent
+
+Acc.
+
+𝐹 1real
+
+𝐹 1fake
+
+macF1
+
+Acc.
+
+𝐹 1real
+
+𝐹 1fake
+
+0.803
+0.780
+0.792
+0.729
+
+0.892
+0.874
+0.881
+0.856
+
+0.932
+0.918
+0.924
+0.915
+
+0.674
+0.642
+0.660
+0.543
+
+0.795
+0.767
+0.771
+0.737
+
+0.798
+0.781
+0.787
+0.736
+
+0.815
+0.795
+0.801
+0.785
+
+0.774
+0.739
+0.741
+0.689
+
+5 Analysis and Discussion
+5.1 Ablation Study
+We conducted an ablation study to assess the impact of each component in the TED framework. The results indicate that removing the
+DebateFlow Agents reduces macF1 scores by approximately 2.3% on
+ARG-EN and 2.8% on ARG-CN. This decline underscores the importance of the structured debate process in facilitating comprehensive
+multi-perspective analysis, which is essential for accurately determining the authenticity of news items. Removing the Synthesis
+Agent results in a moderate decrease in macF1 scores, dropping by
+1.1% on ARG-EN and 2.4% on ARG-CN. This highlights the critical
+role of the Synthesis Agent in consolidating debate interactions
+into coherent summaries, thereby enhancing the model’s ability
+to integrate diverse arguments effectively for precise classification.
+Omitting the Analysis Agent causes the most significant drop, with
+macF1 scores falling by 8.0% on ARG-EN and 4.5% on ARG-CN,
+emphasizing its crucial function in integrating debate insights with
+the news content. Overall, the ablation results confirm that each
+component of the TED framework is indispensable for achieving
+high performance in fake news detection. The DebateFlow Agents
+enable robust multi-agent interactions; the Synthesis Agent ensures
+effective consolidation of debate outcomes, and the Analysis Agent
+integrates these insights with the news item to get precise results.
+
+5.2
+
+Performance on Different Backbones
+
+Scores
+
+1.0
+0.8
+
+0.81
+
+0.84
+
+0.89 0.89
+
+0.88
+
+0.91
+
+0.88
+
+0.70 0.69
+
+0.93 0.93
+
+0.67 0.67
+
+0.67
+
+0.6
+0.4
+
+0.52
+
+Acc.
+
+macF1
+
+GPT-3.5-turbo-Only
+GPT-4o-mini-Only
+
+namely GPT-4o-mini and Deepseek2 . Figure 3 demonstrates that
+TED consistently enhances performance compared to the baseline
+LLM-Only model across all evaluation metrics, regardless of the specific closed-source model used. This outcome highlights the framework’s adaptability to different large-scale models, showing that
+TED effectively leverages the unique strengths of various closedsource backbones. Additionally, we observed that the performance
+of TED with GPT-4o-mini and TED with Deepseek was comparable,
+with a slight advantage in favor of GPT-4o-mini. This suggests
+that while the two models are competitive, GPT-4o-mini appears
+to have a slight edge in some aspects, particularly in handling complex reasoning tasks. Despite this, the results across both backbones
+emphasize TED’s robustness in boosting fake news detection performance regardless of the specific closed-source model used. These
+findings underline that TED is not limited to a single backbone and
+can effectively enhance performance across different closed-source
+models. The slight superiority of TED with GPT-4o-mini reinforces
+the notion that TED can leverage the inherent strengths of each
+model’s reasoning abilities. This adaptability ensures that TED
+remains effective and reliable in real-world applications.
+Overall, the TED framework proves to be both effective and
+adaptable, maintaining strong performance across a variety of
+closed-source models. These results validate TED’s utility in diverse application scenarios, making it a highly versatile tool for
+fake news detection.
+Table 4: Performance of TED with Qwen2.5 and Llama3.1 family models as backbones, respectively. Numbers with underlined mean the best performance with an open-source model
+and are statistically significant(t-test with p-value<0.01).
+
+0.80 0.80
+
+0.80
+
+ARG-CN
+
+macF1
+
+F1real
+Metrics
+
+Deepseek-Only
+TED with GPT-4o-mini
+
+0.47 0.47
+
+F1fake
+TED with Deepseek
+
+Figure 3: Performance of our framework TED with GPT-4omini and Deepseek as closed-source backbones respectively.
+5.2.1 Performance on closed-source models. To evaluate the robustness and versatility of the TED framework, we conducted experiments on the ARG-EN dataset by replacing the DebateFlow
+Agents and Synthesis Agent with different closed-source models,
+
+Backbones
+
+#Param
+
+macF1
+
+Acc
+
+𝐹 1real
+
+𝐹 1fake
+
+GPT-4o-mini
+
+-
+
+0.803
+
+0.892
+
+0.932
+
+0.674
+
+Qwen 2.5 [48]
+Llama 3.1 [10]
+Llama 3.1 [10]
+
+7B
+8B
+70B
+
+0.794
+0.787
+0.790
+
+0.887
+0.879
+0.884
+
+0.926
+0.920
+0.923
+
+0.661
+0.653
+0.657
+
+5.2.2 Performance on open-source models. To further evaluate the
+adaptability and robustness of the TED framework, we tested its
+performance on the ARG-EN dataset using several open-source
+language models, including Qwen-2.5 [48] and the Llama 3.1 family [10]. As demonstrated in Table 4, TED consistently improves
+2 https://www.deepseek.com/
+
+The Truth Becomes Clearer Through Debate! Multi-Agent
+Systems with Large Language Models Unmask Fake News
+
+performance across all the open-source models, highlighting its
+ability to significantly enhance fake news detection regardless of
+the specific language model used. This shows that TED is not constrained by the availability or type of backbone model, making it a
+versatile and effective tool for various real-world applications. Additionally, TED’s performance with Qwen 2.5 slightly outperforms
+the Llama 3.1 variants. Although the differences in performance
+are minimal, this suggests that Qwen 2.5 is particularly well-suited
+to TED’s debate-driven framework. It may offer a better handling
+of complex argumentation and context, which is essential for the
+structured evaluation TED relies on. On the other hand, TED with
+the Llama 3.1 models also performs admirably, and all configurations lead to better results than the baseline methods, further
+validating TED’s effectiveness across different models. Although
+the performance with open-source models is lower than the results obtained with GPT-4o-mini, this can likely be attributed to
+differences in the underlying reasoning capabilities of the models. Open-source models, while highly capable, may not exhibit
+the same level of nuanced reasoning as closed-source models like
+GPT-4o-mini. Nevertheless, TED continues to produce strong results even with these open-source backbones, demonstrating that
+it can still leverage each model’s strengths to achieve high levels of
+accuracy and reliable detection.
+Overall, the results highlight TED’s robustness and versatility.
+It consistently enhances fake news detection performance. These
+findings suggest that TED is well-suited for deployment in various
+settings, including scenarios where access to specific models may
+be limited or open-source models are preferred.
+
+5.3
+
+Case Study
+News:NOW PLAYING A History Of ‘ SNL ’ Romance Ariana Grande, Scarlett
+Johansson, Emma Stone, Ben Affleck, Carrie Fisher and Elisabeth Moss and are
+just some of the celebrities who found love on the set of “ Saturday Night Live.
+Ladies and gentlemen！Today, we gather here to discuss the authenticity of
+the news topic: “A History Of ‘SNL’ Romance.” Our team takes a positive stance
+on it, …Our key points will revolve around the substantial evidence that exists
+to support this claim. Firstly, … Secondly,…Lastly,…In conclusion, …Thanks!
+Hello, everyone! Today, our team takes a firm stance against the authenticity of
+the news topic that …While it is true …, it is important to critically examine the
+evidence presented and question the validity of these alleged romances.
+Firstly, … Secondly,…Lastly,….Thank you very much!
+1. The negative team mentioned that the nature of celebrity culture …However,
+can‘t we argue that reputable sources, such as …, provide more reliable
+information than mere gossip and speculation? 2. … 3. … 4. … 5. … 6. …
+1. While reputable sources such as …, it is important to recognize that .... The
+media often prioritizes generating attention and ... Therefore, we cannot solely
+rely on these sources as definitive proof of the alleged romances on "Saturday
+Night Live.“ 2. … 3. … 4. … 5. … 6. …
+
+⋮
+In conclusion, the positive team's evidence of …. The negative team's reliance
+on … does not outweigh the overwhelming support …. The positive team's
+position is supported by …, and we stand by our assertion that …. Thank you.
+In conclusion, the negative team's evidence from …. Our research includes ….
+The lack of …, and our team has taken thorough measures to ensure that the
+news is substantiated before presenting it as authentic. Thank you.
+After evaluating the debate records and considering …, it is evident that the
+positive team has presented more reasonable and well-supported arguments.
+The positive team provided specific details and … about history, …to support
+their claims. The tone and style of their arguments were objective and
+neutral,.... Therefore, the positive team wins the debate.
+
+Figure 4: A real debate case study, with its debate report, can
+serve as justification for interpretable fake news detection.
+
+SIGIR ’25, July 13–18, 2025, Padua, Italy
+
+Figure 4 presents a comparative micro-analysis of a debate process on fake news as a case study. Participants are divided into
+pro and con teams in this debate, completing the debate scenario
+through opening, cross-examinations, and closing statements. At
+the beginning of the debate, the pro team clearly stated, “The primary objective of this debate is to discuss the truth of the news," and
+they presented key points as evidence to support their stance. The
+con team adopted a similar approach, presenting their assertions.
+During the Questioning and Rebuttal phase, both sides challenged
+each other’s viewpoints and responded to the queries raised. In
+the Closing Statement phase, the pro team reviewed and summarized the prior debate questioned the con team’s arguments and
+reinforced their own points. Although the con team reiterated their
+position, they did not profoundly challenge the pro team’s viewpoints. Ultimately, based on factors such as the debate’s detail, tone,
+and style, the judges decided to favor the pro team. This entire
+debate process forms a “DebateFlow," clearly demonstrating the reasoning process. The judges’ debate report also serves as a basis for
+determining whether news is fake, thus achieving an interpretable
+fake news detection. Such interpretability is crucial for real-life information verification, representing a significant advantage of the
+TED framework, an aspect that other models struggle to achieve.
+
+6
+
+Conclusion
+
+In conclusion, our study introduces and evaluates the TED framework, a novel approach to fake news detection that incorporates the
+strengths of LLMs within a structured multi-agent debate. Through
+extensive experimental validation on the ARG-EN and ARG-CN
+datasets, TED consistently outperformed traditional machine learning and standalone LLMs across multiple performance metrics.
+Inspired by human debate, the framework’s design leverages diverse perspectives and structured argumentation, providing a robust mechanism for assessing the truth of news items. Our work
+not only advances the field of fake news detection by enhancing
+accuracy and interpretability but also offers valuable insights for
+developing responsible information systems. By enabling more
+reliable and transparent content evaluation, TED contributes to
+creating information retrieval systems that can better support users
+in navigating and assessing the growing complexity of digital information.
+
+A
+
+Appendix
+
+In the experiment using the ARG-CN dataset, the prompt we used
+was the corresponding Chinese version of the aforementioned
+prompt set. And all other function prompts can be found in our code
+files at https://github.com/LiuYuHan31/TED_fake-news-detction.
+
+Acknowledgments
+This work was supported by the Beijing Outstanding Young Scientist Program (NO. BJJWZYJH012019100020098) and the Intelligent
+Social Governance Platform, a Major Innovation & Planning Interdisciplinary Platform for the “Double-First Class” Initiative at
+Renmin University of China. Yuhan Liu is supported by the "Qiushi
+Academic-Dongliang" Project of Renmin University of China (No.
+RUC24QSDL015).
+
+SIGIR ’25, July 13–18, 2025, Padua, Italy
+
+References
+[1] Johan Bollen, Huina Mao, and Xiaojun Zeng. 2011. Twitter mood predicts the
+stock market. Journal of computational science 2, 1 (2011), 1–8.
+[2] Robert James Branham. 2013. Debate and critical analysis: The harmony of conflict.
+Routledge.
+[3] Chi-Min Chan, Weize Chen, Yusheng Su, Jianxuan Yu, Wei Xue, Shanghang
+Zhang, Jie Fu, and Zhiyuan Liu. 2024. ChatEval: Towards Better LLM-based
+Evaluators through Multi-Agent Debate. In The Twelfth International Conference
+on Learning Representations.
+[4] Justin Chih-Yao Chen, Swarnadeep Saha, and Mohit Bansal. 2023. Reconcile:
+Round-table conference improves reasoning via consensus among diverse llms.
+arXiv preprint arXiv:2309.13007 (2023).
+[5] Xiuying Chen, Mingzhe Li, Shen Gao, Xin Cheng, Qiang Yang, Qishen Zhang,
+Xin Gao, and Xiangliang Zhang. 2023. A Topic-aware Summarization Framework
+with Different Modal Side Information. SIGIR (2023).
+[6] Xiuying Chen, Guodong Long, Chongyang Tao, Mingzhe Li, Xin Gao, Chengqi
+Zhang, and Xiangliang Zhang. 2023. Improving the Robustness of Summarization
+Systems with Dual Augmentation. ACL (2023).
+[7] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2019. BERT:
+Pre-training of Deep Bidirectional Transformers for Language Understanding. In
+Proceedings of the 2019 Conference of the North. doi:10.18653/v1/n19-1423
+[8] Marko Djuranovic. 2003. The Ultimate Lincoln-Douglas Debate Handbook.
+Retrieved Sep 16 (2003), 2008.
+[9] Yilun Du, Shuang Li, Antonio Torralba, Joshua B Tenenbaum, and Igor Mordatch.
+2023. Improving factuality and reasoning in language models through multiagent
+debate. arXiv preprint arXiv:2305.14325 (2023).
+[10] Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey, Abhishek Kadian, Ahmad
+Al-Dahle, Aiesha Letman, Akhil Mathur, Alan Schelten, Amy Yang, Angela Fan,
+et al. 2024. The llama 3 herd of models. arXiv preprint arXiv:2407.21783 (2024).
+[11] Nir Grinberg, Kenneth Joseph, Lisa Friedland, Briony Swire-Thompson, and
+David Lazer. 2019. Fake news on Twitter during the 2016 US presidential election.
+Science 363, 6425 (2019), 374–378.
+[12] Mingfei Guo, Xiuying Chen, Juntao Li, Dongyan Zhao, and Rui Yan. 2021. How
+does truth evolve into fake news? an empirical study of fake news evolution. In
+Companion Proceedings of the Web Conference 2021. 407–411.
+[13] Aditi Gupta, Hemank Lamba, Ponnurangam Kumaraguru, and Anupam Joshi.
+2013. Faking sandy: characterizing and identifying fake images on twitter during
+hurricane sandy. In Proceedings of the 22nd international conference on World
+Wide Web. 729–736.
+[14] Sirui Hong, Xiawu Zheng, Jonathan Chen, Yuheng Cheng, Jinlin Wang, Ceyao
+Zhang, Zili Wang, Steven Ka Shing Yau, Zijuan Lin, Liyang Zhou, et al. 2023.
+Metagpt: Meta programming for multi-agent collaborative framework. arXiv
+preprint arXiv:2308.00352 (2023).
+[15] Beizhe Hu, Qiang Sheng, Juan Cao, Yuhui Shi, Yang Li, Danding Wang, and
+Peng Qi. 2024. Bad actor, good advisor: Exploring the role of large language
+models in fake news detection. In Proceedings of the AAAI Conference on Artificial
+Intelligence, Vol. 38. 22105–22113.
+[16] Beizhe Hu, Qiang Sheng, Juan Cao, Yongchun Zhu, Danding Wang, Zhengjia
+Wang, and Zhiwei Jin. 2023. Learn over past, evolve for future: Forecasting
+temporal trends for fake news detection. arXiv preprint arXiv:2306.14728 (2023).
+[17] Yiqiao Jin, Xiting Wang, Ruichao Yang, Yizhou Sun, Wei Wang, Hao Liao, and
+Xing Xie. 2022. Towards fine-grained reasoning for fake news detection. In
+Proceedings of the AAAI Conference on Artificial Intelligence, Vol. 36. 5746–5754.
+[18] Zhao Kaiya, Michelangelo Naim, Jovana Kondic, Manuel Cortes, Jiaxin Ge, Shuying Luo, Guangyu Robert Yang, and Andrew Ahn. 2023. Lyfe Agents: Generative
+agents for low-cost real-time social interactions. arXiv preprint arXiv:2310.02172
+(2023).
+[19] Rohit Kumar Kaliyar, Anurag Goswami, and Pratik Narang. 2021. FakeBERT:
+Fake news detection in social media with a BERT-based deep learning approach.
+Multimedia tools and applications 80, 8 (2021), 11765–11788.
+[20] Jackie Kazil, David Masad, and Andrew Crooks. 2020. Utilizing python for
+agent-based modeling: The mesa framework. In Social, Cultural, and Behavioral
+Modeling: 13th International Conference, SBP-BRiMS 2020, Washington, DC, USA,
+October 18–21, 2020, Proceedings 13. Springer, 308–317.
+[21] Akbir Khan, John Hughes, Dan Valentine, Laura Ruis, Kshitij Sachan, Ansh
+Radhakrishnan, Edward Grefenstette, Samuel R Bowman, Tim Rocktäschel, and
+Ethan Perez. 2024. Debating with More Persuasive LLMs Leads to More Truthful
+Answers. In Forty-first International Conference on Machine Learning.
+[22] Diederik P Kingma and Jimmy Ba. 2014. Adam: A method for stochastic optimization. arXiv preprint arXiv:1412.6980 (2014).
+[23] Chao Li, Xing Su, Chao Fan, Haoying Han, Cong Xue, and Chunmo Zheng. 2023.
+Quantifying the impact of large language models on collective opinion dynamics.
+arXiv preprint arXiv:2308.03313 (2023).
+[24] Guohao Li, Hasan Hammoud, Hani Itani, Dmitrii Khizbullin, and Bernard
+Ghanem. 2023. Camel: Communicative agents for" mind" exploration of large
+language model society. Advances in Neural Information Processing Systems 36
+(2023), 51991–52008.
+
+Yuhan Liu, Yuxuan Liu, Xiaoqing Zhang, Xiuying Chen, Rui Yan
+
+[25] Xinyi Li, Yongfeng Zhang, and Edward C Malthouse. 2024. Large Language
+Model Agent for Fake News Detection. arXiv preprint arXiv:2405.01593 (2024).
+[26] Tian Liang, Zhiwei He, Wenxiang Jiao, Xing Wang, Yan Wang, Rui Wang,
+Yujiu Yang, Shuming Shi, and Zhaopeng Tu. 2023. Encouraging divergent
+thinking in large language models through multi-agent debate. arXiv preprint
+arXiv:2305.19118 (2023).
+[27] Yuhan Liu, Xiuying Chen, Xiaoqing Zhang, Xing Gao, Ji Zhang, and Rui Yan.
+2024. From skepticism to acceptance: simulating the attitude dynamics toward
+fake news. In Proceedings of the Thirty-Third International Joint Conference on
+Artificial Intelligence. 7886–7894.
+[28] Yuhan Liu, Zirui Song, Xiaoqing Zhang, Xiuying Chen, and Rui Yan. 2024. From
+a tiny slip to a giant leap: An llm-based simulation for fake news evolution. arXiv
+preprint arXiv:2410.19064 (2024).
+[29] Yuxuan Liu, Hongda Sun, Wenya Guo, Xinyan Xiao, Cunli Mao, Zhengtao Yu,
+and Rui Yan. 2025. Bidev: Bilateral defusing verification for complex claim factchecking. In Proceedings of the AAAI Conference on Artificial Intelligence, Vol. 39.
+541–549.
+[30] Yuxuan Liu, Hongda Sun, Wei Liu, Jian Luan, Bo Du, and Rui Yan. 2025. MobileSteward: Integrating Multiple App-Oriented Agents with Self-Evolution to
+Automate Cross-App Instructions. In Proceedings of the 31st ACM SIGKDD Conference on Knowledge Discovery and Data Mining V.1 (Toronto ON, Canada)
+(KDD ’25). Association for Computing Machinery, New York, NY, USA, 883–893.
+doi:10.1145/3690624.3709171
+[31] Ahmadreza Mosallanezhad, Mansooreh Karami, Kai Shu, Michelle V Mancenido,
+and Huan Liu. 2022. Domain adaptive fake news detection via reinforcement
+learning. In Proceedings of the ACM Web Conference 2022. 3632–3640.
+[32] Qiong Nan, Juan Cao, Yongchun Zhu, Yanyan Wang, and Jintao Li. 2021. MDFEND: Multi-domain fake news detection. In Proceedings of the 30th ACM International Conference on Information & Knowledge Management. 3343–3347.
+[33] Joon Sung Park, Joseph O’Brien, Carrie Jun Cai, Meredith Ringel Morris, Percy
+Liang, and Michael S Bernstein. 2023. Generative agents: Interactive simulacra
+of human behavior. In Proceedings of the 36th Annual ACM Symposium on User
+Interface Software and Technology. 1–22.
+[34] Joon Sung Park, Lindsay Popowski, Carrie Cai, Meredith Ringel Morris, Percy
+Liang, and Michael S Bernstein. 2022. Social simulacra: Creating populated
+prototypes for social computing systems. In Proceedings of the 35th Annual ACM
+Symposium on User Interface Software and Technology. 1–18.
+[35] Chen Qian, Xin Cong, Cheng Yang, Weize Chen, Yusheng Su, Juyuan Xu, Zhiyuan
+Liu, and Maosong Sun. 2023. Communicative agents for software development.
+arXiv preprint arXiv:2307.07924 6 (2023).
+[36] Feng Qian, Chengyue Gong, Karishma Sharma, and Yan Liu. 2018. Neural User
+Response Generator: Fake News Detection with Collective User Intelligence.. In
+IJCAI, Vol. 18. 3834–3840.
+[37] Yoel Roth. 2022. The vast majority of content we take action on for misinformation
+is identified proactively.
+[38] Kai Shu, Deepak Mahudeswaran, Suhang Wang, Dongwon Lee, and Huan Liu.
+2020. Fakenewsnet: A data repository with news content, social context, and
+spatiotemporal information for studying fake news on social media. Big data 8,
+3 (2020), 171–188.
+[39] Zirui Song, Yaohang Li, Meng Fang, Zhenhao Chen, Zecheng Shi, and Yuan
+Huang. 2024. Mmac-copilot: Multi-modal agent collaboration operating system
+copilot. arXiv e-prints (2024), arXiv–2404.
+[40] Kate Starbird, Jim Maddock, Mania Orand, Peg Achterman, and Robert M Mason.
+2014. Rumors, false flags, and digital vigilantes: Misinformation on twitter after
+the 2013 boston marathon bombing. IConference 2014 proceedings (2014).
+[41] Yashar Talebirad and Amirhossein Nadiri. 2023. Multi-agent collaboration: Harnessing the power of intelligent llm agents. arXiv preprint arXiv:2306.03314
+(2023).
+[42] Petter Törnberg, Diliara Valeeva, Justus Uitermark, and Christopher Bail. 2023.
+Simulating social media using large language models to evaluate alternative news
+feed algorithms. arXiv preprint arXiv:2310.05984 (2023).
+[43] Petar Veličković, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro
+Liò, and Yoshua Bengio. 2018. Graph Attention Networks. In International Conference on Learning Representations.
+[44] Yaqing Wang, Fenglong Ma, Zhiwei Jin, Ye Yuan, Guangxu Xun, Kishlay Jha, Lu
+Su, and Jing Gao. 2018. Eann: Event adversarial neural networks for multi-modal
+fake news detection. In Proceedings of the 24th acm sigkdd international conference
+on knowledge discovery & data mining. 849–857.
+[45] Biao Wu, Yanda Li, Meng Fang, Zirui Song, Zhiwei Zhang, Yunchao Wei, and
+Ling Chen. 2024. Foundations and recent trends in multimodal mobile agents: A
+survey. arXiv preprint arXiv:2411.02006 (2024).
+[46] Qingyun Wu, Gagan Bansal, Jieyu Zhang, Yiran Wu, Shaokun Zhang, Erkang
+Zhu, Beibin Li, Li Jiang, Xiaoyun Zhang, and Chi Wang. 2023. Autogen: Enabling
+next-gen llm applications via multi-agent conversation framework. arXiv preprint
+arXiv:2308.08155 (2023).
+[47] Canwen Xu, Yichong Xu, Shuohang Wang, Yang Liu, Chenguang Zhu, and Julian
+McAuley. 2023. Small models are valuable plug-ins for large language models.
+arXiv preprint arXiv:2305.08848 (2023).
+
+The Truth Becomes Clearer Through Debate! Multi-Agent
+Systems with Large Language Models Unmask Fake News
+[48] An Yang, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu,
+Chengyuan Li, Dayiheng Liu, Fei Huang, Haoran Wei, et al. 2024. Qwen2. 5
+Technical Report. arXiv preprint arXiv:2412.15115 (2024).
+[49] Feng Yu, Qiang Liu, Shu Wu, Liang Wang, Tieniu Tan, et al. 2017. A Convolutional
+Approach for Misinformation Identification.. In IJCAI. 3901–3907.
+[50] Liu Yuhan, Chen Xiuying, and Yan Rui. 2023. Unleashing the power of large
+models: Exploring human-machine conversations. In Proceedings of the 22nd
+Chinese National Conference on Computational Linguistics (Volume 2: Frontier
+Forum). 16–29.
+[51] Juntian Zhang, Chuanqi Cheng, Yuhan Liu, Wei Liu, Jian Luan, and Rui Yan. 2025.
+Weaving Context Across Images: Improving Vision-Language Models through
+Focus-Centric Visual Chains. arXiv preprint arXiv:2504.20199 (2025).
+[52] Jintian Zhang, Xin Xu, Ningyu Zhang, Ruibo Liu, Bryan Hooi, and Shumin Deng.
+2024. Exploring Collaboration Mechanisms for LLM Agents: A Social Psychology
+View. In ICLR 2024 Workshop on Large Language Model (LLM) Agents.
+[53] Xueyao Zhang, Juan Cao, Xirong Li, Qiang Sheng, Lei Zhong, and Kai Shu. 2021.
+Mining dual emotion for fake news detection. In Proceedings of the web conference
+2021. 3465–3476.
+[54] Xiaoqing Zhang, Xiuying Chen, Yuhan Liu, Jianzhou Wang, Zhenxing Hu, and
+Rui Yan. 2024. A large-scale time-aware agents simulation for influencer selection
+in digital advertising campaigns. arXiv preprint arXiv:2411.01143 (2024).
+[55] Xiaoqing Zhang, Xiuying Chen, Yuhan Liu, Jianzhou Wang, Zhenxing Hu, and
+Rui Yan. 2024. SAGraph: A Large-scale Text-Rich Social Graph Dataset for
+
+SIGIR ’25, July 13–18, 2025, Padua, Italy
+Advertising Campaigns. arXiv preprint arXiv:2403.15105 (2024).
+[56] Xiaoqing Zhang, Yuhan Liu, Flood Sung, Xiuying Chen, and Rui Yan. 2024. Thinking Before Running! Efficient Code Generation with Thorough Exploration and
+Optimal Refinement. arXiv preprint arXiv:2502.17442 (2024).
+[57] Zheng Zhang, Qi Liu, Zirui Hu, Yi Zhan, Zhenya Huang, Weibo Gao, and
+Qingyang Mao. 2024. Enhancing fairness in meta-learned user modeling via
+adaptive sampling. In Proceedings of the ACM Web Conference 2024. 3241–3252.
+[58] Zheng Zhang, Qi Liu, Hao Jiang, Fei Wang, Yan Zhuang, Le Wu, Weibo Gao,
+and Enhong Chen. 2023. FairLISA: fair user modeling with limited sensitive
+attributes information. In Proceedings of the 37th International Conference on
+Neural Information Processing Systems. 41432–41450.
+[59] Zheng Zhang, Wei Song, Qi Liu, Qingyang Mao, Yiyan Wang, Weibo Gao, Zhenya
+Huang, Shijin Wang, and Enhong Chen. [n. d.]. Towards Accurate and Fair
+Cognitive Diagnosis via Monotonic Data Augmentation. In The Thirty-eighth
+Annual Conference on Neural Information Processing Systems.
+[60] Jiaqi Zheng, Xi Zhang, Sanchuan Guo, Quan Wang, Wenyu Zang, and Yongdong
+Zhang. 2022. MFAN: Multi-modal Feature-enhanced Attention Networks for
+Rumor Detection. IJCAI.
+[61] Yongchun Zhu, Qiang Sheng, Juan Cao, Shuokai Li, Danding Wang, and Fuzhen
+Zhuang. 2022. Generalizing to the future: Mitigating entity bias in fake news
+detection. In Proceedings of the 45th International ACM SIGIR Conference on
+Research and Development in Information Retrieval. 2120–2125.
+
+

@@ -1,0 +1,1830 @@
+arXiv:2508.09241v1 [cs.CV] 12 Aug 2025
+
+FineState-Bench: A Comprehensive Benchmark for
+Fine-Grained State Control in GUI Agents
+
+Fengxian Ji1∗, Jingpu Yang1∗, Zirui Song2∗, Yuanxi Wang1 , Zhexuan Cui1 ,
+Yuke Li1 , Qian Jiang1 , Miao Fang1 , Xiuying Chen2
+1
+Northeastern University, China
+2
+MBZUAI, United Arab Emirates
+
+Abstract
+With the rapid advancement of generative artificial intelligence technology, Graphical User Interface (GUI) agents have demonstrated tremendous potential for
+autonomously managing daily tasks through natural language instructions. However, current evaluation frameworks for GUI agents suffer from fundamental flaws:
+existing benchmarks overly focus on coarse-grained task completion while neglecting fine-grained control capabilities crucial for real-world applications. To address
+this, we introduce FineState-Bench, the first evaluation and diagnostic standard for
+fine-grained GUI proxy operations, designed to quantify fine-grained control. This
+multi-platform (desktop, Web, mobile) framework includes 2257 task benchmarks
+in four components and uses a four-phase indicator for comprehensive perceptionto-control assessment. To analyze perception and positioning for refined operations,
+we developed the plug-and-play Visual Diagnostic Assistant (VDA), enabling the
+first quantitative decoupling analysis of these capabilities. Experimental results
+on our benchmark show that the most advanced models achieve only 32.8% finegrained interaction accuracy. Using our VDA in controlled experiments, quantifying the impact of visual capabilities, we showed that ideal visual localization boosts
+Gemini-2.5-Flash’s success rate by 14.9%. Our diagnostic framework confirms for
+the first time that the primary bottleneck for current GUI proxies is basic visual positioning capability.All resources are fully open-source. github: https://github.
+com/AnonymousThewarehouse/FineState-Bench huggingface: https://
+huggingface.co/datasets/Willtime2006/Static-FineBench
+
+1
+
+Introduction
+
+Recent advances in Large Vision-Language Models (LVLMs) have enabled a new class of GUI agents
+capable of autonomous operation, representing a key frontier in AI (e.g., GUI GroundingNguyen
+[2024]). By integrating visual understanding with language instructions, these agents can interact
+with complex applications in a human-like manner. Models such as CogAgent Hong et al. [2024]
+and AppAgent Zhang et al. [2025] exemplify this trend, impacting human-computer interaction
+by completing complex tasks across real-world applications. Consequently, to guide and evaluate
+progress in this burgeoning field, benchmarks like AITW Rawles et al. [2023] and ScreenSpot Cheng
+et al. [2024] have been developed. The establishment of these benchmarks provides a standardized
+measure for model performance, accelerating model innovation.
+However, prevailing benchmarks widely adopt coarse-grained success criteria, such as merely determining the correctness of a UI element’s category Rawles et al. [2023], Cheng et al. [2024]. This
+approach systematically overlooks the fine-grained manipulation capabilities essential for real-world
+∗
+
+Equal contribution.
+
+38th Conference on Neural Information Processing Systems (NeurIPS 2024).
+
+applications, for instance, precisely selecting a color value or highlighting a specific sentence. This
+neglect of fine-grained state awareness and precise control leads to an illusion of capability — a
+phenomenon where models achieve inflated scores on benchmarks yet underperform on practical,
+high-precision tasks, We show the difference between general instructions and refined instructions in
+Figure 1.This constitutes the most critical research gap in current evaluation systems.
+
+Lower (Adjust) the phone’s brightness (to 30%)
+
+Click[0.05, 0.18]
+
+Click[0.05, 0.18]
+
+Select the first color
+(second row and fourth column.)
+
+Click[0.15, 0.27]
+
+Click[0.65, 0.62]
+
+Figure 1: Show the difference between our command instructions and the ordinary task-oriented
+instructions.
+The prevailing evaluation gap has resulted in divergent explanations for agent task failures. While
+some research ascribes these failures to poor underlying visual localization abilities Wu et al. [2024b],
+Wei et al. [2022], other work highlights defects in high-level perception. Such contradictory findings
+stem from the absence of a standardized diagnostic framework that can quantitatively disentangle the
+impacts of visual perception errors from those of high-level perception failures on task outcomes. We
+define this challenge in pinpointing the precise cause of failure as the diagnostic gap, as it obstructs a
+deeper comprehension of the model’s performance and the ability to provide targeted feedback.
+To address the Evaluation Gap and Diagnostic Gap, we introduce FineState-Bench, a comprehensive
+framework for both evaluation and diagnostics. First, it fills the evaluation void with fine-grained
+tasks across major platforms, shifting the paradigm from a binary task success metric to a quantitative
+assessment of interaction control precision Lee et al. [2024], Li et al. [2025]. Second, it breaks the
+diagnostic bottleneck with an innovative framework featuring a plug-and-play VDA. Inspired by the
+controlled variable method, it allows researchers to quantitatively isolate and measure the contribution
+of visual grounding failures to task outcomes Zheng et al. [2024a], Chen et al. [2024], Dardouri et al.
+[2024]. Thus, our twofold contribution is a much-needed benchmark for fine-grained control and
+a generalizable diagnostic methodology to pinpoint agent capability bottlenecks. In summary, our
+contributions include:
+• Identify and quantify the evaluation gap in GUI agent benchmarks, and design reproducible
+multi-dimensional metrics that expose the real limitations of high-scoring models on finegrained control tasks.
+• Establish and open-source FineState-Bench, the first benchmark for fine-grained state awareness and control, spanning three platforms and four component types for comprehensive
+evaluation.
+2
+
+• Introduce a plug-and-play VDA to enable quantitative diagnosis of visual grounding bottlenecks, facilitating deeper understanding of capability limitations in GUI agents.
+
+1
+
+Static Data Creation Process
+2
+
+Filtering from
+Dataset
+3
+
+Manual Screenshot
+
+Instruction
+
+Human Annotation
+
+4 LLM Generation
+Pipeline
+
+A-1. Slider
+A-2. Knob
+A-3. Steeper
+A-4. Seek Bar
+
+VDA Improve
+Input
+
+5
+
+Correct Border:
+[0.30, 0.15,0.34,0.22]
+
+Screenshot
+
+Agent
+Model
+
+GUI Element
+B-4. Tabs
+C-2. Color Picker
+B-5. Segmented C-3. Date Picker
+B-6. Accordion
+C-4. Time Picker
+C-1. Rating
+C-5. List Box
+
+D-1. Drag Reorder
+D-2. Zoom Pan
+…
+D-7. Table Column
+
+Correct Border:
+[0.30, 0.15,0.34,0.22]
+
+Correct Border:
+[0.53, 0.31,0.55,0.33]
+
+Output
+Answer
+
+VDA
+Block
+
+Manual Verification
+
+A-5. Chart Point
+B-1. Switch
+B-2. Check Box
+B-3. Radio Group
+
+Predict
+Bounding Box
+
+Visual
+Diagnosis
+
+Correct Border:
+[0.50, 0.45,0.54,0.52]
+
+Category: Range
+
+Category: Option
+
+Category: Specific Data
+
+Category: Table Column
+
+Coordinate: Click[0.29, 0.18]
+
+Coordinate: Click[0.19, 0.15]
+
+Coordinate: Click[0.19, 0.15]
+
+Coordinate: Click[0.49, 0.45]
+
+Figure 2: Types and Construction Process of the FineState-Bench Dataset, along with an
+Introduction to the VDA Module:The figure above shows the data creation process and the VDA
+assistance mechanism, covering data filtering, annotation, and high-precision bounding box prediction.
+The middle figure lists the main GUI elements involved in fine-grained control. The bottom figure
+demonstrates the precise bounding boxes and categories for different types of operations with four
+examples.
+
+2
+
+Related Works
+
+As our work focuses on the fine-grained, diagnostic evaluation of GUI agents, we briefly overview
+two closely related research areas: the evolution of GUI agents themselves and the progression of
+their evaluation methodologies.
+GUI Agents
+The development of GUI agents, a topic of interest as surveyed by Zhang et al. [2024a], Nguyen
+et al. [2024], is concurrent with the rise of Large Multimodal Models (LMMs) Jing-Xiao-Li et al.
+[2024], Yuan-Wang et al. [2024]. Initial studies leveraged general-purpose models like GPT-4V
+for GUI tasks Yang et al. [2023], AI [2024], but their localization accuracy and success rates were
+limited in complex scenarios. To address this, subsequent work shifted to agents designed or finetuned for GUI operations, leading to a new generation of specialized agents with evolving design
+philosophies Qin et al. [2023]. This specialization has manifested across various platforms. For
+instance, a body of research has focused on mobile agents, with models like Mobile-Agent Wang
+et al. [2024a], MobileFlow Nong et al. [2024], and AppAgentX Jiang et al. [2025] demonstrating
+increasingly sophisticated capabilities on smartphones. Similarly, agents such as PC-Agent Liu
+et al. [2025] and Jedi Fu et al. [2024] have been developed to tackle the complexities of desktop
+environments. Models such as CogAgent Hong et al. [2024] and ScreenAgent Wang et al. [2024b]
+improved visual grounding through pre-training on specialized datasets, while ShowUI Lin et al.
+[2024] enhanced generalization with novel UI tokenization and navigation strategies. This evolution
+towards specialized agents, while enhancing their capabilities, has also exposed the inadequacies
+3
+
+of existing evaluation methods, underscoring the urgency of in-depth performance assessment and
+bottleneck analysis.
+GUI Agent Evaluation
+Evaluation methods for GUI agents have also evolvedZheng et al. [2024b], Zhang et al. [2024c], Zhao
+et al. [2024], Xue et al. [2025], Shlomov et al. [2024], shifting focus from success rates to failure
+diagnostics. Early benchmarks like Mind2Web Deng et al. [2023] relied on static screenshots for
+offline evaluation. Later, interactive environments like WebArena Zhou et al. [2023], VisualWebArena
+Koh et al. [2024], AITW Gur et al. [2024], AndroidWorld Rawles et al. [2024], and GAIA Mialon
+et al. [2023] improved realism but suffered from a diagnostic gap, struggling to explain why tasks
+failed. Classifying GUI defects has been a long-standing challenge. Recently, failure analysis has
+gained traction, with frameworks like Microsoft’s taxonomy for general agents and a fine-grained
+classification of localization errors Liu et al. [2024], Levy et al. [2024]. This trend spurred a
+new generation of diagnostic-aware benchmarks: GUI-Robust tests robustness against real-world
+anomalies; WorldGUI assesses adaptability to varied initial states; ScreenSpot-Pro targets fine-grained
+localization in professional software; and various testbeds like A-STAR Zhang et al. [2024e], MobileBench Deng et al. [2024], and LlamaTouch Zhang et al. [2024b] evaluate agents on general desktop
+and mobile applications. While these works advance diagnostics, they often target specific failure
+types. In contrast, our FineState-Bench offers a more universal, structured diagnostic framework. By
+defining fine-grained failure states, it enables root-cause analysis for any error in any task, yielding
+more actionable insights for model optimization.
+
+3
+
+FineState-Bench
+
+Problem Definition
+The core task of FineState-Bench requires a GUI agent to accurately alter the internal state of one or
+more UI elements to achieve a specific goal based on a natural language instruction I. We formally
+define this task as a sequential decision-making problem: in each task scenario τ , the agent starts from
+an initial UI state Winitial with the objective of executing a sequence of actions A = {a1 , a2 , ..., aT }
+to reach a final target state G. A UI state Wt contains structured information Ct of all interactable
+controls on the interface, where each control c ∈ Ct possesses a precise, quantifiable fine-grained
+state value s(c). The goal G is to drive the state value s(c∗ ) of a specific target control c∗ to the
+target state value sgoal required by the instruction.
+For complex long-horizon tasks, the agent must maintain awareness of current progress and contextual
+state throughout task execution, and execute critical operations on the correct UI elements at the
+correct steps.
+Dataset Construction and Annotation
+To ensure systematic and comprehensive evaluation, we conducted large-scale screening of modern
+applications across web, desktop, and mobile platforms, identifying four core interaction categories:
+(1) Numerical and Range Adjustment (sliders, steppers); (2) State Toggling and Option Selection
+(switches, checkboxes); (3) Specific Data-Type Selection (date, color pickers); and (4) Content
+Organization and View Manipulation (drag-and-drop sorting). This taxonomy defines the essential
+challenges for agents in fine-grained control tasks.
+We collected and annotated 2,257 high-quality static samples from the three platforms, each including
+precise bounding boxes, detailed state information, and natural language instructions. The dataset
+covers diverse interaction primitives and UI component types, with annotation quality guaranteed
+through automated pre-filtering and manual verification, providing a solid foundation for fine-grained
+GUI agent capability evaluation.
+For any given component instance i, its geometric information includes two key bounding boxes:
+Locate Bounding Box: The locate bounding box defines the visible area of the entire UI component.
+Specifically, (xl1 , yl1 ) and (xl2 , yl2 ) denote the normalized coordinates of the top-left and bottomright corners of the component area, with values in the range [0, 1]. This bounding box is used
+4
+
+to evaluate whether an agent can correctly identify and locate the overall position of the target
+component.
+(i)
+
+Bloc = [xl1 , yl1 , xl2 , yl2 ]
+
+(1)
+
+Interact Bounding Box: The interact bounding box specifies the core area within the component that
+requires precise clicking or operation. The coordinates (xi1 , yi1 ) and (xi2 , yi2 ) define the range of
+this actual interactable area, which is typically smaller than or equal to the locate bounding box. This
+dual-layer design enables separate evaluation of two aspects of the agent’s capabilities: localization
+ability (seeing the target) and precise control ability (acting accurately).
+(i)
+
+Bint = [xi1 , yi1 , xi2 , yi2 ]
+
+(2)
+
+FineState-Static Benchmark for Static Interactions, FineState-Static benchmark focuses on static
+interaction scenarios, requiring agents to precisely alter UI element states through single operations.
+Its construction process integrates VLM-based pre-filtering with manual curation: initially using a
+VLM to filter examples with complex interactions from the large-scale os-atlas data source, followed
+by human auditing of VLM results and manual collection of typical interaction scenarios absent from
+the source, such as slider dragging and complex date selections. All images are precisely annotated
+using the LabelImg tool and paired with human-refined natural language instructions. The final
+dataset consists of high-quality images from web, mobile, and desktop platforms, stored in JSON
+format as image + localization + instruction entries.
+Multidimensional Evaluation System
+A core advantage of FineState-Bench lies in its multi-dimensional evaluation framework, which
+quantifies an agent’s state perception and fine-grained control on both task completion and execution
+quality levels. Each task is accompanied by rich metadata, allowing us to diagnose whether failures
+stem from perception or execution errors.
+Our evaluation metrics are designed based on the principle of separation of concerns, decomposing
+the evaluation process into distinct stages—such as localization and interaction—mirroring the actual
+workflow of a GUI agent. This hierarchical structure, from basic localization (Loc SR) to precise,
+single-action state manipulation (SA-Int SR), enables fine-grained diagnosis of agent failures.
+This approach provides more scientific and actionable assessment of model capabilities, aligning with
+GUI automation requirements. Our multi-level metric system serves as both a rigorous evaluation
+tool and a diagnostic framework, guiding future research toward targeted improvements.
+To formally define our evaluation metrics, we first introduce the following notation. For a given test
+sample i, let pi be the interaction point coordinates predicted by the agent, Bi be the ground-truth
+bounding box of the target element, Si,pred be the actual state of the element after interaction, and
+Si,goal be the final target state required by the instruction. Let I(·) be the indicator function, which is
+1 if the condition is true, and 0 otherwise.
+For static tasks, we design four core metrics to evaluate fundamental localization and interaction
+capabilities:
+Locate Success Rate (Loc SR): Measures whether the agent’s predicted interaction point accurately
+falls within the bounding box of the target UI element. This is the foundation for all successful
+operations.
+N
+
+Loc SR =
+
+1 X
+I(pi ∈ Bi )
+N i=1
+
+(3)
+
+Interact Success Rate (Int SR): Measures whether the agent’s interaction successfully brings the
+state of the target UI element to the intended target state.
+N
+
+1 X
+Int SR =
+I(pi ∈ Bi ∧ Si,pred = Si,goal )
+N i=1
+5
+
+(4)
+
+Single-Action Locate Success Rate (SA-Locate SR): A stricter version of Locate SR, requiring the
+agent to accurately locate the target in the very first action. Let pi,1 be the interaction point of the
+agent’s first action on sample i.
+N
+
+1 X
+SA-Loc SR =
+I(pi,1 ∈ Bi )
+N i=1
+
+(5)
+
+Single-Action Interact Success Rate (SA-Int SR): The core metric of FineState-Static. It requires
+the agent not only to locate accurately but also to successfully drive the UI element to the target state
+in the first action. Let Si,pred,1 be the state after the first action’s interaction.
+SA-Int SR =
+
+1 XN
+I(pi,1 ∈ Bi ∧ Si,pred,1 = Si,goal )
+i=1
+N
+
+(6)
+
+This metric serves as our primary benchmark because it captures the complete fine-grained control
+pipeline: visual understanding, spatial reasoning, and precise motor execution. Unlike isolated
+metrics that evaluate individual capabilities, SA-Interact SR reflects real-world GUI automation
+requirements where agents must achieve exact state targets through single, accurate interactions.
+FineState-Bench achieves fine-grained evaluation capability through a three-step algorithmic process
+that enforces mathematical precision:
+Algorithm 1: Fine-Grained Evaluation Algorithm
+Require: Task Ti with target state Sgoal , agent prediction pi,1 , ground truth bounding box Bi
+Ensure: Success rate SRi ∈ {0, 1}
+1: Step 1: Spatial Verification
+2: if pi,1 ∈
+/ Bi then
+3:
+return SRi = 0 {Localization failed}
+4: end if
+5: Step 2: State Extraction
+6: Spred ← ExtractState(Ti , pi,1 ) {Get actual state after interaction}
+7: Step 3: Exact State Matching
+8: if Spred = Sgoal then
+9:
+return SRi = 1 {Precise state achieved}
+10: else
+11:
+return SRi = 0 {State mismatch, no approximation allowed}
+12: end if
+
+4
+
+Benchmark Analysis
+
+Statistical Analysis
+The composition and platform distribution of
+FineState–Bench are illustrated in Figure 3(b).
+This benchmark includes a total of 2,257 static
+tasks, distributed across three major platforms:
+desktop (814), web (737), and mobile (706), covering four major categories of interactive components such as numerical range adjustment, option
+switching, specific data operations, and view operations, aiming to systematically measure the
+fundamental fine control ability of the model.
+(a) Instruction Word Cloud (b) Task Type Distribution
+Additionally, to showcase the richness and chal- Figure 3: Visualization of instruction keywords
+lenge of the instructions, we visualized all task and task type composition in FineState-Bench.
+commands. As shown in Figure 3(a), the word
+cloud vividly displays high-frequency core verbs
+Numeric
+Range
+208
+
+Specific
+Data
+153
+
+Toggle
+Option
+214
+
+View
+Manipilation
+148
+
+Web
+737
+
+Mobile
+706
+
+A
+215
+Static
+A
+2257
+215
+
+Numeric
+Range
+222
+
+Specific
+Data
+153
+
+6
+
+View
+Manipilation
+132
+
+View
+Manipilation
+132
+
+Specific
+Data
+180
+
+Desktop
+814
+
+Toggle
+Option
+193
+
+View
+Manipilation
+222
+
+Numeric
+Range
+215
+
+Table 1: Comparison of FineState-Bench with existing GUI agent benchmarks, analyzing them
+across key dimensions such as platform coverage, instruction type, task granularity, and dataset size.
+FineState-Bench is distinguished by its cross-platform nature, its focus on fine-grained interactions,
+and its ability to differentiate between perception and reasoning failures. In this context, Que. stands
+for Question, and Gra. stands for Task Granularity type indicates the type of distinction for the
+dataset. Types refers to the number of different categories of dataset components, websites, or apps.
+Benchmark
+
+Environment (Env.)
+Desktop Mobile Website
+✓
+✓
+
+Mind2Web Deng et al. [2023]
+WebArena Zhou et al. [2023]
+AndroidWorld Rawles et al. [2024]
+VisualWebArena Koh et al. [2024]
+GAIA Mialon et al. [2023]
+WebVoyager He et al. [2024]
+OSWORLD-G Xie et al. [2025]
+
+✓
+
+FineState-Bench (Ours)
+
+✓
+
+Instruction (Ins.)
+Que. Gra. Ins. Level
+✓
+
+✓
+
+✓
+✓
+
+High
+High
+Mid
+High
+High
+Low/Mid
+High
+
+✓
+
+✓
+
+High
+
+✓
+
+✓
+
+✓
+✓
+
+✓
+
+✓
+✓
+✓
+
+✓
+
+Types
+
+Number
+
+31
+4
+20
+3
+5
+15
+32
+
+2350
+812
+116
+910
+279
+643
+564
+
+23
+
+2257
+
+(e.g., slider, select, click, drag, adjust) and key entities (volume, brightness, location, button, time,
+color). This visualization not only highlights the benchmark’s central focus on fine-grained manipulation, but also reveals the diversity and practicality of its instructions in simulating real-world
+tasks.
+Comparative Analysis with Existing Benchmarks
+To highlight the unique contributions of FineState–Bench in the field of GUI-agent evaluation,
+we conduct a systematic, multi-dimensional comparison with mainstream benchmarks. As shown
+in Table 1, we examine platform coverage, environment realism, task and evaluation granularity,
+and—crucially—diagnostic capability, providing an in-depth analysis of FineState-Bench alongside
+representative works such as Mind2Web, WebArena, AndroidWorld, VisualWebArena, GAIA, and
+WebVoyager.
+Existing benchmarks have common limitations: most are confined to a single platform and use a
+coarse, outcome-oriented evaluation, making it difficult to investigate the root causes of task failures
+and creating an evaluation gap. Even advanced dynamic environments offer only indirect diagnostic
+capabilities, lacking the ability to perform fine-grained, attributable analysis of failures. OSWORLDG covers 564 samples and 32 types of UI elements, and includes fine-grained manipulation as one of
+its five major capability dimensions, but its evaluation method still belongs to an integrated capability
+test and does not delve into a deep understanding of fine-grained manipulation.
+In contrast, FineState-Bench provides a solution through its unique design. First, it spans the Web,
+Mobile, and Desktop platforms, shifting the evaluation focus from high-level task success to the
+execution quality of interaction primitives. Second, it establishes a multi-dimensional evaluation
+system covering success, efficiency, and precision. Its core contribution is a VDA that systematically
+distinguishes between perception failures and reasoning failures, shifting the research paradigm from
+"what a model can do" to a root-cause analysis of "why a model fails".
+
+5
+
+VDA: Diagnosing Vision Bottlenecks
+
+To investigate GUI agent task failure, whether due to interaction inference defects or insufficient visual
+perception, we designed a diagnostic experiment using the control variable method with the plug-andplay VDA module, providing target localization information. We compared the standard agent with
+the visual enhanced version equipped with VDA. Since the core inference logic is consistent, the
+performance difference stems from improved visual ability. This method lets us pinpoint the agent’s
+visual bottleneck.
+To delineate whether GUI agent failures stem from deficient interaction reasoning or insufficient
+visual perception, we designed a diagnostic experiment based on the control variable methodology. At
+the core of this experiment is a VDA module, providing the agent with target localization information.
+The experiment compares a standard agent against a vision-enhanced counterpart augmented by the
+7
+
+VDA. Since the core reasoning logic remains identical, the performance disparity can be attributed to
+the enhancement of visual capabilities. This approach enables us to dissect and pinpoint the agent’s
+visual bottlenecks.
+Table 2: Baseline evaluation on ‘FineState-Static‘. We report four metrics: Locate SR / Interact
+SR / SA-Locate SR / SA-Interact SR (%). SA-Interact SR (shown in bold) represents our primary
+evaluation criterion, requiring simultaneous accurate localization and precise state manipulation in a
+single action - the gold standard for fine-grained GUI control assessment.
+Model Category
+
+Model Name
+
+Mobile
+
+Web
+
+Desktop
+
+AVG
+
+Closed-source
+
+GPT-4o
+Claude-3.5-Sonnet
+Gemini-2.5-Flash
+
+31.0/6.2/9.1/6.2
+31.7/11.5/13.7/11.5
+49.4/17.6/21.1/17.6
+
+22.8/4.5/7.0/4.5
+15.2/1.9/4.6/1.9
+47.0/11.8/16.8/11.8
+
+20.6/2.2/4.4/2.2
+22.0/3.4/5.4/3.4
+12.7/0.7/3.8/0.7
+
+24.8/4.3/6.8/4.3
+23.0/5.6/7.9/5.6
+36.4/10.0/13.9/10.0
+
+Open-source
+
+OS-Atlas-7BWu et al. [2024b]
+CogAgent-9BHong et al. [2024]
+UGround-7BGou et al. [2025]
+Jedi-7B-1080pFu et al. [2024]
+ShowUI-2BLin et al. [2024]
+
+47.5/12.8/18.7/12.8
+17.7/1.8/2.5/1.8
+50.7/19.6/22.4/19.6
+13.3/1.6/3.1/1.5
+20.3/5.2/6.7/5.2
+
+33.2/7.5/9.2/7.5
+24.1/6.4/13.7/6.4
+62.0/32.8/62.0/32.8
+12.7/8.3/12.7/8.3
+26.7/5.3/26.7/5.3
+
+45.3/9.8/15.2/9.8
+29.4/2.3/3.5/1.2
+46.3/16.0/25.4/16.0
+12.2/0.8/1.5/0.8
+30.3/3.2/9.1/3.2
+
+42.0/10.0/14.4/10.0
+23.7/3.5/6.6/3.1
+53.0/22.8/36.6/22.8
+12.7/3.6/5.8/3.5
+25.8/4.6/14.2/4.6
+
+Mobile
+
+MobileVLM V2-3B
+MobileVLM V2-7B
+
+16.5/1.6/2.5/1.6
+18.5/1.9/2.9/1.9
+
+16.1/2.6/4.0/2.6
+26.7/2.6/5.9/2.6
+
+22.9/1.9/4.3/1.9
+26.3/3.7/5.2/3.7
+
+18.5/2.0/3.6/2.0
+23.8/2.7/4.7/2.7
+
+Generalist Models
+
+Specialist Models
+
+Web
+
+Holo1-7BSu et al. [2024]
+
+3.5/1.6/2.6/1.6
+
+12.2/1.3/3.8/1.3
+
+7.1/3.6/4.0/2.6
+
+7.6/2.2/3.5/1.8
+
+Desktop
+
+AgentCPM-GUI-8BZhang et al. [2024d]
+
+42.4/18.2/32.4/18.2
+
+30.6/7.9/30.6/7.9
+
+34.6/7.1/9.3/7.1
+
+35.9/11.1/24.1/11.1
+
+As an external visual localization system, VDA uses a describe-then-locate two-stage process. First,
+In the first phase, it finds the target UI element based on the instruction and screenshot, and describes
+the properties of the target UI element, the internal situation of the UI element, and its position
+relative to the image. Second, it integrates all information to predict a high-precision bounding box.
+This chain-of-thought process enhances visual localization robustness through language.
+VDA Implementation Details: The VDA operates through a structured two-stage pipeline:
+Stage 1 - Contextual Description: Given a screenshot and natural language instruction, GPT-4o
+generates a detailed textual description of the target UI element, including: (i) functional purpose
+and current state, (ii) visual characteristics and spatial relationships, (iii) distinguishing features from
+similar elements. This produces rich semantic context that serves as a visual anchor.
+Stage 2 - Precision Localization: Integrating the instruction, screenshot, and Stage 1 description,
+GPT-4o predicts high-precision bounding boxes in normalized coordinates [x1, y1, x2, y2]. These
+coordinates are then provided to the target model as additional input, simulating ideal visual grounding
+capabilities.
+Integration Mechanism: VDA operates as a plug-and-play preprocessor - target models receive
+their standard inputs (screenshot + instruction) plus the VDA-generated coordinates, enabling direct
+performance comparison with baseline conditions while maintaining identical reasoning pathways.
+To systematically evaluate existing GUI agents on fine-grained tasks and diagnose their potential
+performance bottlenecks, a goal shared by other recent benchmarking efforts Bonatti et al. [2024],
+Chen et al. [2025], we designed three interconnected experiments. This section will follow a fourpart structure: Experimental Setup - Baseline Evaluation - Dynamic Evaluation - Diagnostic Study,
+detailing the experimental process, results, and analysis.
+
+6
+
+Experiments and Analysis
+
+Experimental Setup
+To assess the fine-grained control capabilities of contemporary GUI agents, we conduct a comprehensive evaluation of 13 representative models, encompassing both commercial closed-source and
+open-source research systems. Our selection covers three categories: (1) closed-source commercial
+models, including GPT-4oOpenAI [2024], Claude-3.5-SonnetAnthropic [2024], and Gemini-2.5FlashGoogle [2024]; (2) specialized open-source GUI agents, such as UGround Gou et al. [2025],
+OS-Atlas Wu et al. [2024b], and CogAgent Hong et al. [2024]; and (3) platform-specific models,
+including the MobileVLM series Wu et al. [2024a] for mobile scenarios, Holo1-7B for web environments, and AgentCPM-GUI for desktop applications. This stratified selection enables a thorough
+analysis across different capability levels and specialization domains, providing an overview of the
+current state of fine-grained GUI control on desktop, web, and mobile platforms. By evaluating these
+8
+
+models, we aim to elucidate the strengths and limitations of state-of-the-art GUI agents in performing
+precise and complex user interface operations.
+Baseline Deficiencies in Fine-Grained Control
+In order to accurately assess the real capabilities of the most advanced GUI agents in performing
+basic and refined operations, we first conducted a comprehensive baseline evaluation on the FineStateStatic benchmark.As shown in Table 2, the results reveal a common limitation among contemporary
+advanced models: all tested models, whether closed-source general-purpose models or specialized
+platform-specific ones, underperformed on our core metric, SA-Interact SR (Single-Action Interaction
+Success Rate). This finding strongly indicates that current GUI agents generally lack stable and
+precise fine-grained control capabilities, even when handling the seemingly simple static scenarios
+that constitute the basis for complex tasks.
+Cross-Platform Performance Comparison
+Cross-platform analysis reveals striking performance disparities that challenge conventional assumptions about GUI complexity. Contrary to intuitive expectations, performance varies significantly
+across platforms, with some models showing better results on mobile interfaces while others excelt
+on web or desktop environments. For instance, UGround-7B achieves 32.8% success on web, 19.6%
+on mobile, and 16.0% on desktop, while Gemini-2.5-Flash shows the opposite pattern with 17.6% on
+mobile versus 11.8% on web, highlighting platform-specific optimization opportunities and the need
+for platform-aware model development.
+
+7
+
+Diagnostic Study: Pinpointing the Root Cause of Performance Bottlenecks
+
+The results of the first two experiments reveal the widespread failure of existing GUI agents in
+fine-grained control tasks (Table 2) and their performance degradation in dynamic scenarios (Table
+3), thus systematically confirming the existence of an evaluation gap. To bridge this diagnostic gap,
+we designed a third experiment to investigate the root causes of task failure.
+Quantitative Evidence of the Vision Bottleneck
+Methodological Clarification: VDA is designed as a diagnostic tool, not a performance enhancement
+system. By providing models with idealized localization information through GPT-4o, we create
+controlled experimental conditions that isolate visual grounding effects from other cognitive processes.
+The performance improvements observed represent the quantifiable impact of visual limitations on
+overall task success, establishing causal evidence for our core hypothesis.
+To assess the impact of high-fidelity visual grounding on multimodal model performance, we
+employed our VDA framework, which leverages GPT-4o to provide precise localization guidance.
+This setup enables controlled experiments that isolate the effect of visual grounding from other
+cognitive processes. We conducted comparative evaluations on three representative models: Gemini2.5-Flash, ShowUI-2B, and OS-Atlas-7B.
+As shown in Table 4, VDA intervention yields dramatic performance stratification: Gemini-2.5-Flash
+demonstrates substantial improvements (14.9% average gain), while ShowUI-2B shows minimal
+enhancement (3.7% gain). This disparity reveals a critical insight—visual grounding improvements
+are ultimately bounded by models’ intrinsic reasoning and execution capabilities. Superior visual
+input cannot compensate for fundamental deficiencies in logical processing or motor control precision.
+Ablation Study of VDA
+To validate the effectiveness of the two-stage describe-and-locate design in our VDA framework, we
+conducted an ablation study (see Table 4) comparing two configurations: using only the coordinate
+prediction stage, and employing the full pipeline with both description and localization.
+The results show that coordinate prediction alone yields a substantial performance boost, confirming
+that precise localization is key to VDA’s success. However, the best results are achieved when both
+stages are combined, as the initial description provides essential context for accurate localization.
+9
+
+Table 3: Overall impact of the VDA on ‘SA-Interact SR‘ (%). ‘Gain ∆‘ quantifies the performance
+improVDAent from enhanced visual capabilities.
+
+Model
+
+Mobile
+
+Web
+
+Desktop
+
+Gemini-2.5-Flash
+ShowUI-2B
+OS-Atlas-7B
+
+17.6
+5.2
+12.8
+
+11.8
+5.3
+7.5
+
+0.7
+3.2
+9.8
+
+Gemini-2.5-Flash(VDA-Gemini-2.5-Flash)
+ShowUI-2B(VDA-Gemini-2.5-Flash)
+OS-Atlas-7B(VDA-Gemini-2.5-Flash)
+
+29.8
+5.8
+18.9
+
+27.2
+12.3
+18.2
+
+15.4
+7.5
+19.1
+
+Gemini-2.5-Flash(VDA-GPT4o)
+ShowUI-2B(VDA-GPT4o)
+OS-Atlas-7B(VDA-GPT4o)
+
+29.8
+7.3
+15.9
+
+26.6
+7.2
+14.2
+
+20.9
+9.5
+13.1
+
+This demonstrates that the two-stage process—first describing, then locating—offers complementary
+benefits and is critical for optimal fine-grained control.
+Table 4: Ablation study of VDA-Flash’s internal components on Gemini 2.5 Flash. We measure the
+contribution of each stage to the final ‘SA-Interact SR‘ (%).
+
+VDA Configuration
+
+Mobile
+
+Web
+
+Desktop
+
+Baseline (No VDA)
+Stage Two Only (Description)
+Stage Two Only (Coordinate Prediction)
+Full Two-Stage (Description + Coordinate)
+
+17.6
+17.9
+26.1
+29.8
+
+11.8
+11.9
+24.7
+27.2
+
+0.7
+0.8
+13.1
+15.4
+
+To complement the quantitative results, we conducted a qualitative analysis of failure modes and their
+VDA remediation effectiveness. Our analysis identifies four primary failure categories: Localization
+Ambiguity (85% error reduction with VDA), Visual Feature Confusion (72%), Fine-Grained State
+Perception Failure (45%), and Interaction Context Ignorance (23%). This hierarchy reveals that
+while spatial reasoning deficits are largely addressable via enhanced visual grounding, higher-order
+contextual understanding remains a persistent architectural challenge requiring innovations beyond
+improved visual input processing. Detailed case studies and failure mode analysis are provided in the
+Supplementary materials.
+
+8
+
+Conclusion
+
+Our work identifies a fundamental limitation in current GUI agent evaluation: mainstream benchmarks
+rely on coarse-grained criteria, overlooking the need for fine-grained state awareness and precise
+control, which results in an overestimation of model capabilities. To bridge this evaluation gap, we
+present FineState-Bench, the first open-source benchmark and diagnostic framework designed for
+comprehensive, fine-grained assessment across desktop, web, and mobile platforms. FineState-Bench
+introduces multi-level evaluation metrics and a dual-bounding-box annotation scheme, enabling
+detailed analysis of both localization and control abilities. Furthermore, we propose a plug-and-play
+VDA that facilitates quantitative diagnosis of visual grounding bottlenecks. Our findings reveal
+that the primary challenge for current GUI agents lies in low-level visual localization, rather than
+high-level planning. By shifting the focus from task completion to the underlying causes of failure,
+FineState-Bench establishes a new standard for realistic and actionable evaluation and highlights the
+importance of foundational visual capabilities for advancing next-generation GUI agents.
+10
+
+9
+
+Acknowledgement
+
+Thanks to Xie Yu, Yuheng Song, Jinghang Zhong, Yuxin Ye, and Mengran Liu for their help with
+annotating the data for our project.
+
+References
+References
+Adept AI. Apt: A general-purpose multimodal agent for vision-language-action tasks, 2024.
+Anthropic. Introducing claude 3.5 sonnet. Web Page, June 2024. URL https://www.anthropic.
+com/news/claude-3-5-sonnet. Accessed: 2024-07-31.
+Rogerio Bonatti, Dan Zhao, Francesco Bonacci, Dillon Dupont, Sara Abdali, Yinheng Li, Yadong Lu,
+Justin Wagle, Kazuhito Koishida, Arthur Bucker, Lawrence Jang, and Zack Hui. Windows agent
+arena: Evaluating multi-modal os agents at scale. Technical report, Microsoft, September 2024.
+Jingxuan Chen, Derek Yuen, Bin Xie, Yuhao Yang, Gongwei Chen, Zhihao Wu, Li Yixing, Xurui
+Zhou, Weiwen Liu, Shuai Wang, Kaiwen Zhou, Rui Shao, Liqiang Nie, Yasheng Wang, Jianye
+HAO, Jun Wang, and Kun Shao. Spa-bench: A comprehensive benchmark for smartphone agent
+evaluation. In The Thirteenth International Conference on Learning Representations, 2025.
+Xuetian Chen, Hangcheng Li, Jiaqing Liang, Sihang Jiang, and Deqing Yang. EDGE: Enhanced
+grounded GUI understanding with enriched multi-granularity synthetic data. arxiv, nov 2024.
+Kanzhi Cheng, Qiushi Sun, Yougang Chu, Fangzhi Xu, Yantao Li, Jianbing Zhang, and Zhiyong Wu.
+Seeclick: Harnessing gui grounding for advanced visual gui agents, 2024.
+Tassnim Dardouri, Laura Minkova, Jessica López Espejel, Walid Dahhane, and El Hassane Ettifouri.
+Visual grounding for desktop graphical user interfaces. arXiv preprint arXiv:2407.01558, 2024.
+Shihan Deng, Weikai Xu, Hongda Sun, Wei Liu, Tao Tan, Jianfeng Liu, Ang Li, Jian Luan, Bin
+Wang, Rui Yan, et al. Mobile-bench: An evaluation benchmark for llm-based mobile agents. arXiv
+preprint arXiv:2407.00993, 2024.
+Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen, Sam Stevens, Boshi Wang, Huan Sun,
+and Yu Su. Mind2web: Towards a generalist agent for the web. In A. Oh, T. Naumann, A. Globerson, K. Saenko, M. Hardt, and S. Levine, editors, Advances in Neural Information Processing Systems, volume 36, pages 28091–28114. Curran Associates,
+Inc., 2023. URL https://proceedings.neurips.cc/paper_files/paper/2023/file/
+5950bf290a1570ea401bf98882128160-Paper-Datasets_and_Benchmarks.pdf.
+Bin Fu, Chen Wang, Xin Chen, Yucheng Han, Chi Zhang, Zebiao Huang, Yanda Li, Jiaxuan Liu,
+Zhao Yang, Furu Wei, and Gang Yu. Jedi: A generalist agent for desktop interface, 2024.
+Google. Highlights from google i/o 2024. Blog Post, May 2024. URL https://blog.google/
+technology/ai/google-io-2024-gemini-era/. Accessed: 2024-07-31.
+Boyu Gou, Ruohan Wang, Boyuan Zheng, Yanan Xie, Cheng Chang, Yiheng Shu, Huan Sun,
+and Yu Su. Navigating the digital world as humans do: Universal visual grounding for GUI
+agents. In The Thirteenth International Conference on Learning Representations, 2025. URL
+https://openreview.net/forum?id=kxnoqaisCT.
+Izzeddin Gur, Hao Zhu, Frank F. Xu, Shuyan Zhou, Hiroki Furuta, Po-Yu Huang, Yonatan Bisk,
+Daniel Fried, Ruslan Salakhutdinov, and Graham Neubig. Aitw: A large-scale, time-aware, and
+real-world benchmark for web agents, 2024. URL https://arxiv.org/abs/2406.13465.
+Hongliang He, Wenlin Yao, Kaixin Ma, Wenhao Yu, Yong Dai, Hongming Zhang, Zhenzhong
+Lan, and Dong Yu. Webvoyager: Building an end-to-end web agent with large multimodal
+models. In Lun-Wei Ku, Andre Martins, and Vivek Srikumar, editors, Proceedings of the 62nd
+Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pages
+6864–6890, Bangkok, Thailand, August 2024. Association for Computational Linguistics. doi:
+10.18653/v1/2024.acl-long.371. URL https://aclanthology.org/2024.acl-long.371/.
+11
+
+Wenyi Hong, Weihan Wang, Qingsong Lv, Jiazheng Xu, Wenmeng Yu, Junhui Ji, Yan Wang, Zihan
+Wang, Yuxiao Dong, Ming Ding, et al. Cogagent: A visual language model for gui agents. In
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, pages
+14281–14290, 2024.
+Wenjia Jiang, Yangyang Zhuang, Chenxi Song, Xu Yang, and Chi Zhang. Appagentx: Evolving gui
+agents as proficient smartphone users, 2025. URL https://arxiv.org/abs/2503.02268.
+Jing-Xiao-Li, Hao-Fei-Zheng, Ya-Fei-Zhang, Jia-Bin-Huang, and Meng-Liu. Octopus: Embodied
+vision-language programmer from human instructions, 2024. URL https://arxiv.org/abs/
+2402.16729.
+Jing Yu Koh, Robert Lo, Lawrence Jang, Vikram Duvvur, Ming Lim, Po-Yu Huang, Graham Neubig,
+Shuyan Zhou, Russ Salakhutdinov, and Daniel Fried. Visualwebarena: Evaluating multimodal
+agents on realistic visual web tasks. In Lun-Wei Ku, Andre Martins, and Vivek Srikumar, editors,
+Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume
+1: Long Papers), pages 881–905, Bangkok, Thailand, August 2024. Association for Computational
+Linguistics. doi: 10.18653/v1/2024.acl-long.50. URL https://aclanthology.org/2024.
+acl-long.50/.
+Juyong Lee, Taywon Min, Minyong An, Dongyoon Hahm, Haeone Lee, Changyeon Kim, and Kimin
+Lee. Benchmarking mobile device control agents across diverse configurations. arXiv preprint
+arXiv:2404.16660, 2024.
+Ido Levy, Ben Wiesel, Sami Marreed, Alon Oved, Avi Yaeli, and Segev Shlomov. Stwebagentbench: A benchmark for evaluating safety and trustworthiness in web agents. arXiv
+preprint arXiv:2410.06703, 2024.
+Zhangheng Li, Keen You, Haotian Zhang, Di Feng, Harsh Agrawal, Xiujun Li, Mohana Prasad
+Sathya Moorthy, Jeff Nichols, Yinfei Yang, and Zhe Gan. Ferret-UI 2: Mastering universal
+user interface understanding across platforms. In Proceedings of the International Conference
+on Learning Representations (ICLR), 2025. doi: 10.48550/arXiv.2410.18967. URL https:
+//arxiv.org/abs/2410.18967. Accepted paper; arXiv:2410.18967v2.
+Kevin Qinghong Lin, Linjie Li, Difei Gao, Zhengyuan Yang, Shiwei Wu, Zechen Bai, Weixian Lei,
+Lijuan Wang, and Mike Zheng Shou. Showui: One vision-language-action model for gui visual
+agent, 2024. URL https://arxiv.org/abs/2411.17465.
+Haowei Liu, Xi Zhang, Haiyang Xu, Yuyang Wanyan, Junyang Wang, Ming Yan, Ji Zhang, Chunfeng
+Yuan, Changsheng Xu, Weiming Hu, and Fei Huang. Pc-agent: A hierarchical multi-agent
+collaboration framework for complex task automation on pc. arXiv preprint arXiv:2502.14282,
+2025.
+Xingwei Liu, Zihan Ye, Jingfeng Zhang, Tianlin Li, Haoming Lu, Yuchen Zhou, Yuji Gao, Dongfang
+Liu, and DaCheng Tao. Agent-smith: A black-box attack on llm-based agents, 2024. URL
+https://arxiv.org/abs/2405.01957.
+Grégoire Mialon, Clémentine Fourrier, Craig Swift, Thomas Wolf, Yann LeCun, and Thomas Scialom.
+Gaia: a benchmark for general ai assistants, 2023.
+Anthony Nguyen. Improved gui grounding via iterative narrowing, 2024. URL https://arxiv.
+org/abs/2411.13591.
+Dang Nguyen et al. Gui agents: A survey, 2024.
+Songqin Nong, Jiali Zhu, Rui Wu, Jiongchao Jin, Shuo Shan, Xiutian Huang, and Wenhao Xu.
+MobileFlow: A multimodal LLM for mobile GUI agent, 2024.
+OpenAI. Gpt-4o. Technical report, OpenAI, May 2024. URL https://openai.com/index/
+hello-gpt-4o/. Accessed: 2024-07-31.
+Yujia Qin, Yining Ye, Junjie Fang, Haoming Wang, Shihao Liang, Shizuo Tian, Junda Zhang, Jiahao
+Li, Yunxin Li, Shu-Tao Xia, Yong-Dong Zhang, and Jie Tang. Rethinking agent design: From
+top-down workflows to bottom-up skill evolution, 2023.
+12
+
+Christopher Rawles, Alice Li, Daniel Rodriguez, Oriana Riva, and Timothy Lillicrap. Android in
+the wild: A large-scale dataset for android device control. In Advances in Neural Information
+Processing Systems, volume 36, pages 59708–59728, 2023.
+Christopher Rawles, Sarah Clinckemaillie, Yifan Chang, Jonathan Waltz, Gabrielle Lau, Marybeth
+Fair, Alice Li, William Bishop, Wei Li, Folawiyo Campbell-Ajala, Daniel Toyama, Timothy
+Lillicrap, and Oriana Riva. Androidworld: A dynamic benchmarking environment for autonomous
+agents, 2024.
+Segev Shlomov, Ben Wiesel, Aviad Sela, Ido Levy, Liane Galanti, and Roy Abitbol. From grounding
+to planning: Benchmarking bottlenecks in web agents, sep 2024. URL https://arxiv.org/
+abs/2409.01927. arXiv preprint.
+Jia Su, Yutong Shen, Ge Yi, Yian Wang, Li Liu, Zhipeng Yuan, Peng Gao, Tian-Chu Gao, Hongsheng
+Li, Yu Qiao, and Wen Gao. Holo-1: A universal open-source human-centric multimodal agent,
+2024.
+Junyang Wang, Haiyang Xu, Jiabo Ye, Ming Yan, Weizhou Shen, Ji Zhang, Fei Huang, and Jitao
+Sang. Mobile-agent: Autonomous multi-modal mobile device agent with visual perception. arXiv
+preprint arXiv:2401.16158, 2024a.
+Philipp Wang, Mandi Wang, Yifan Jiang, Ari Holtzman, Caiming Xiong, and Victor Zhong. Screenagent: A vision-language model-based agent for human-computer interaction, 2024b.
+Jason Wei, Xuezhi Wang, Dale Schuurmans, Maarten Bosma, Brian Ichter, Fei Xia, Ed Chi, Quoc
+Le, and Denny Zhou. Chain-of-thought prompting elicits reasoning in large language models. In
+Advances in Neural Information Processing Systems, volume 35, pages 24824–24837. Curran Associates, Inc., 2022. URL https://proceedings.neurips.cc/paper_files/paper/2022/
+file/9d5609613524ecf4f15af0f7b31abca4-Paper-Conference.pdf.
+Qinzhuo Wu, Weikai Zhang, Tao Huang, Jingyi Su, Liang Li, Lu Liu, Xiao Chen, Lei Zhang,
+Jingyu He, Bin Wang, et al. Mobilevlm: A vision-language model for better intra- and inter-UI
+understanding. In Findings of the Association for Computational Linguistics: EMNLP 2024, pages
+10231–10251. Association for Computational Linguistics, 2024a.
+Zhiwei Wu, Zekun Qi, Zhaofeng He, Yushi Hu, Junkai Wang, Zhaoyang Zhang, Yining-Gu,
+Hongcheng-Guo, Hangyu-Li, Zixuan-Chen, Yao-Mu, Yuzhong-Chen, Jiacheng-Liu, Wen-Guang,
+Chen, Yujia-Qin, Zhoujun-Cheng, Yidong-Wang, Jindong-Wang, Gang-Wang, Ruoyu-Sun, TaroWatanabe, Wei-Xue, Yutaka-Sasaki, Xing-Xie, Rui-Zhao, and Tat-Seng-Chua. Os-atlas: A foundation action model for generalist gui agents, 2024b.
+Tianbao Xie, Jiaqi Deng, Xiaochuan Li, Junlin Yang, Haoyuan Wu, Jixuan Chen, Wenjing Hu,
+Xinyuan Wang, Yuhui Xu, Zekun Wang, Yiheng Xu, Junli Wang, Doyen Sahoo, Tao Yu, and
+Caiming Xiong. Scaling computer-use grounding via user interface decomposition and synthesis,
+2025. URL https://arxiv.org/abs/2505.13227.
+Tianci Xue, Weijian Qi, Tianneng Shi, Chan Hee Song, Boyu Gou, Dawn Song, Huan Sun, and
+Yu Su. An illusion of progress? assessing the current state of web agents, 2025. URL https:
+//arxiv.org/abs/2504.01382.
+Jianwei Yang, Hao Zhang, Feng Li, Xueyan Zou, Chunyuan Li, and Jianfeng Gao. Set-of-mark
+prompting unleashes extraordinary visual grounding in gpt-4v, 2023. URL https://arxiv.org/
+abs/2310.11441.
+Yuan-Wang, Zhe-Gan, Jian-Feng-Gao, Li-Jia-Li, and Li-Jia-Li. V-agi: A general-purpose visuallanguage agent for vision-centric embodied ai, 2024. URL https://arxiv.org/abs/2403.
+01227.
+Chaoyun Zhang, Shilin He, Jiaxu Qian, Bowen Li, Liqun Li, Si Qin, Yu Kang, Minghua Ma, Guyue
+Liu, Qingwei Lin, et al. Large language model-brained gui agents: A survey. arXiv preprint
+arXiv:2411.18279, 2024a.
+13
+
+Chi Zhang, Zhao Yang, Jiaxuan Liu, Yanda Li, Yucheng Han, Xin Chen, Zebiao Huang, Bin Fu, and
+Gang Yu. Appagent: Multimodal agents as smartphone users. In Proceedings of the 2025 CHI
+Conference on Human Factors in Computing Systems, pages 1–20, 2025.
+Li Zhang, Shihe Wang, Xianqing Jia, Zhihan Zheng, Yunhe Yan, Longxi Gao, Yuanchun Li, and
+Mengwei Xu. Llamatouch: A faithful and scalable testbed for mobile ui task automation, 2024b.
+URL https://arxiv.org/abs/2404.16054.
+Yushi Zhang, Zhiwei Zhang, Zekun Qi, Yining Gu, Yining Li, Hongcheng Guo, Yujia Qin, Zhaofeng
+He, Yidong Wang, Zhoujun Cheng, Jindong Wang, Taro Watanabe, Yutaka Sasaki, Ruoyu Sun,
+Wei Xue, Tat-Seng Chua, and Xing Xie. Worldgui: A benchmark for evaluating generalist gui
+agents on real-world and unseen tasks, 2024c. URL https://arxiv.org/abs/2407.13329.
+Zhengyu Zhang, Zhaoyang Wang, Chenglei Wang, Weizhen Zhang, Ruosong Song, Wayne Xin Zhao,
+and Ji-Rong Wen. Agentcpm: A generalist agent system with large language models, 2024d.
+Zhiwei Zhang, Zekun Qi, Yining Gu, Zhaofeng He, Yushi Hu, Yining Li, Hongcheng Guo, Jiacheng
+Liu, Yujia Qin, Yidong Wang, Zhoujun Cheng, Jindong Wang, Gang Wang, Yutaka Sasaki, Taro
+Watanabe, Ruoyu Sun, Wei Xue, Tat-Seng Chua, Rui Zhao, and Xing Xie. A-star: A benchmark
+for any-scale task automation on real-world software, 2024e. URL https://arxiv.org/abs/
+2407.14725.
+Jing-Yi Zhao, Hong-Quankreston Tran, Yining Li, Tianbao Xie, Zixuan Li, Jia-Qi Li, Xin-Yu
+Dai, Yujia Qin, Rui-Zhao, and Zhiyong-Wu. Screenspot-pro: A benchmark for fine-grained gui
+grounding in professional software, 2024. URL https://arxiv.org/abs/2407.02078.
+Boyuan Zheng, Boyu Gou, Jinyi Zheng, Huan Wang, Cheng Wang, Weixin Yao, Mengjiao Wang,
+Kaixin Zheng, Huan Sun, and Yu Su. GPT-4V(ision) is a generalist web agent, if grounded. In
+Proceedings of the 41st International Conference on Machine Learning, pages 61015–61035.
+PMLR, 2024a.
+Yatong Zheng, Zixuan Li, Ruixiang Zhang, Hong-Quankreston Tran, Haoxuan You, Xiao-Yong
+Wei, Yujia Qin, Xin-Yu Dai, Shwai He, Rui-Zhao, Yidong-Wang, Xing-Xie, and Zhiyong-Wu.
+Gui-robust: A benchmark for evaluating gui agents’ robustness, 2024b. URL https://arxiv.
+org/abs/2407.03901.
+Shuyan Zhou, Frank F Xu, Hao Zhu, Xuhui Zhou, Robert Lo, Abishek Sridhar, Xianyi Cheng,
+Yonatan Bisk, Daniel Fried, Uri Alon, et al. Webarena: A realistic web environment for building
+autonomous agents. arXiv preprint arXiv:2307.13854, 2023.
+
+A
+
+Appendix
+
+A.1 Dataset Architecture and Content Showcase
+This section presents a comprehensive overview of the FineState-Bench dataset architecture and
+showcases representative examples from our multi-platform, multi-task dataset collection.
+A.1.1 Dataset Overall Architecture
+The FineState-Bench dataset adopts a multi-platform, multi-task, multi-component hierarchical
+structure design:
+Platform Dimension: The dataset spans three major platforms - Web, Mobile, and Desktop - ensuring
+comprehensive coverage of modern GUI environments.
+Task Dimension: We organize the dataset into four main task categories:
+1. Numeric Range Adjustment (A): Controls that manipulate continuous numerical values
+including Sliders, Knobs, Steppers, Seek Bars, and Chart Points. These components require
+precise value manipulation and state awareness.
+14
+
+2. Toggle Option Selection (B): Binary or multi-option selection controls including Switches,
+Checkboxes, Radio Groups, Tabs, Segmented Controls, and Accordions. These components
+focus on discrete state transitions.
+3. Specific Data Selection (C): Specialized input controls for specific data types including
+Rating components, Color Pickers, Date Pickers, Time Pickers, and Listbox/Dropdown
+menus. These require domain-specific understanding and precise interaction.
+4. View Manipulation (D): Controls that modify the visual layout or organization including
+Drag & Reorder, Zoom & Pan, Resizable Panes, Carousels, Tree Views, Splitters, and Table
+Columns. These components require spatial reasoning and complex interaction sequences.
+A.1.2 Data Scale Statistics
+Based on our comprehensive analysis of the English JSON files across all platforms, the FineStateBench dataset contains:
+Overall Data Volume:
+• Total Samples: 2,257 high-quality annotated instances
+• Platform Coverage: 3 major platforms with balanced distribution
+• Task Categories: 4 main categories with 23 distinct component types
+Platform-wise Distribution:
+• Desktop: 814 samples (36.1%)
+• Web: 737 samples (32.7%)
+• Mobile: 706 samples (31.3%)
+Task Category Distribution by Platform:
+Table 5: Platform × Task Category Distribution
+
+Category
+
+Desktop
+
+Mobile
+
+Web
+
+Total
+
+Numeric Range Adjustment
+Toggle Option Selection
+Specific Data Selection
+View Manipulation
+
+219
+198
+197
+200
+
+213
+191
+130
+172
+
+221
+186
+155
+175
+
+653 (28.9%)
+575 (25.5%)
+482 (21.4%)
+547 (24.2%)
+
+Total
+
+814
+
+706
+
+737
+
+2,257
+
+A.1.3 Representative Data Content Examples
+To demonstrate the diversity and complexity of our dataset, we present representative examples
+from each major task category. Each example includes the original screenshot, component metadata,
+natural language instructions, and precise state transition requirements.
+Numeric Range Adjustment Examples:
+Toggle Option Selection Examples:
+Specific Data Selection Examples:
+View Manipulation Examples:
+A.1.4 Precise Action Design with Bounding Box Annotations
+Our dataset features dual-level bounding box annotations that enable precise evaluation of both
+localization and interaction capabilities. The following examples showcase the six key UI components
+with their precise bounding box annotations:
+15
+
+Knob (Web)
+
+Seek Bar (Web)
+
+Slider (Desktop)
+
+Switch (Desktop)
+
+Checkbox (Web)
+Radio Group (Desktop)
+
+Date Picker (Web)
+
+Drag & Reorder (Desktop)
+
+Splitter (Web)
+
+Table Column (Desktop)
+
+Knob with Bounding Box
+Slider with Bounding Box
+
+Chart Point with Bounding
+Box
+
+16
+
+Rating with Bounding Box
+
+Color Picker with Bounding
+Box
+
+Splitter with Bounding Box
+
+Table Column with Bounding
+Box
+Each annotation includes both locate bounding boxes (for component identification) and interact
+bounding boxes (for precise interaction points), enabling fine-grained evaluation of agent capabilities.
+This dual-level annotation system allows researchers to separately assess visual localization abilities
+and precise motor control execution, providing detailed diagnostic insights into model performance
+bottlenecks.
+
+17
+
+B.1 Basic Experiment Model Prompts
+This section presents the standardized prompts used for all basic experiment models in our evaluation
+framework. These prompts are designed to ensure consistent evaluation across different model
+architectures while maintaining the specific requirements for GUI interaction tasks.
+B.1.1 Base Prompt Template
+The core prompt template used across all basic experiment models:
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+
+Please analyze the UI element in the image based on the given
+instruction .
+Task Requirements :
+1. Locate the target UI element ( could be a button , slider , switch
+, etc .)
+2. Determine the precise interaction point with the element
+CRITICAL OUTPUT FORMAT REQUIREMENTS :
+- You MUST provide coordinates in EXACTLY this format : [x , y ]
+- Coordinates MUST be decimals between 0 and 1 ( e . g . , [0.237 ,
+0.456])
+- (0 ,0) represents the top - left corner , (1 ,1) represents the
+bottom - right corner
+- NO EXCEPTIONS : Always include numerical coordinates , even if
+uncertain
+- If you cannot determine exact coordinates , provide your best
+estimate as [x , y ]
+MANDATORY RESPONSE FORMAT ( follow exactly ) :
+1. Component Description : [ Brief description of the target UI
+element ]
+2. Interaction Coordinates : [0. XXX , 0. YYY ]
+3. Reasoning : [ Explain why you chose this location ]
+EXAMPLE RESPONSE :
+1. Component Description : A horizontal slider with a movable
+handle
+2. Interaction Coordinates : [0.443 , 0.483]
+3. Reasoning : This is the center point of the slider control
+CRITICAL : You MUST replace [0. XXX , 0. YYY ] with actual decimal
+numbers .
+Do NOT use descriptive text for coordinates . Do NOT write " The
+element is
+located at ..." - write the numbers directly like [0.443 , 0.483].
+Instruction : { task_instruction }
+
+B.1.2 Enhanced Prompt with Component Information
+When component detection information is available, the base prompt is enhanced with additional
+context:
+1
+2
+3
+4
+5
+6
+7
+8
+9
+
+[ Base prompt as above ]
+ADDITIONAL COMPONENT INFORMATION :
+The following components have been detected in the image :
+- Component Type : { component_type }
+- Component Name : { component_name }
+- Bounding Box : [{ x1 } , { y1 } , { x2 } , { y2 }]
+- Confidence : { confidence }
+
+18
+
+10
+
+Use this information to improve your localization accuracy .
+
+B.1.3 Model-Specific Adaptations
+Different models in our evaluation suite receive variations of the base prompt optimized for their
+specific architectures:
+Online Models: Google Gemini 2.5, Qwen2.5-VL, Claude Sonnet 4
+Offline Models: GUI-R1-7B, Jedi-7B-1080p, OS-Atlas-Base-7B, UGround-V1-7B, AgentCPMGUI, CogAgent-9B, GUIExplorer, Holo1-7B, MobileVLM_V2, ShowUI-2B, SpiritSight-Agent-8B,
+UI-TARS-1.5-7B
+Each model client implements prompt variations while maintaining the core structure and output
+format requirements.
+B.2 VDA Model Prompts
+This section presents the prompts used by our Visual Diagnostic Assistant (VDA) component, which
+implements a two-stage "describe-then-locate" process for enhanced visual grounding.
+B.2.1 VDA Component Detection Prompt
+The VDA system uses the following prompt for UI component detection and bounding box prediction:
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+
+Please analyze this UI interface image and identify the UI
+components within it .
+Please provide the following information :
+1. Component type ( such as button , slider , checkbox , etc .)
+2. Component name ( if available )
+3. Component bounding box coordinates [ x1 , y1 , x2 , y2 ]
+4. Confidence level ( decimal between 0 -1)
+Please return results in JSON format with the following fields :
+{
+" components ": [
+{
+" type ": " component_type " ,
+" name ": " component_name " ,
+" bbox ": [ x1 , y1 , x2 , y2 ] ,
+" confidence ": 0.95
+}
+]
+}
+
+English Translation:
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+
+Please analyze this UI interface image and identify the UI
+components within it .
+Please provide the following information :
+1. Component type ( such as button , slider , checkbox , etc .)
+2. Component name ( if available )
+3. Component bounding box coordinates [ x1 , y1 , x2 , y2 ]
+4. Confidence level ( decimal between 0 -1)
+Please return results in JSON format with the following fields :
+{
+" components ": [
+{
+" type ": " component_type " ,
+" name ": " component_name " ,
+" bbox ": [ x1 , y1 , x2 , y2 ] ,
+" confidence ": 0.95
+}
+
+19
+
+17
+18
+
+]
+}
+
+B.2.2 VDA Integration Process
+The VDA system operates as a plug-and-play component that enhances existing models through:
+1. Component Detection Stage: Using the above prompt to identify and localize UI components
+2. Information Integration Stage: Feeding detected component information back into the
+base model’s prompt
+3. Enhanced Localization Stage: The base model uses both visual input and component
+information for improved accuracy
+This two-stage process addresses the vision bottleneck identified in our analysis, where models
+struggle with precise visual localization of GUI elements. The VDA provides structured component
+information that helps models better understand the spatial layout and semantic meaning of interface
+elements.
+
+20
+
+C.1 Normal Model Output Examples
+This section presents actual model responses from three representative models across two different
+task types, demonstrating the variety in model reasoning and prediction accuracy without VDA
+enhancement.
+C.1.1 Chart Point Localization Task
+Task: "Give the number two position in class 3."
+Claude-3.5-Sonnet Response:
+1. Component Description: A data point on a line graph showing the value 45 in class/group
+3 (Class 3)
+2. Interaction Coordinates: [0.652, 0.382]
+3. Reasoning: Looking at the graph, the target point is located at the peak of the green line
+in the third class group (Class 3) position on the x-axis, where the y-value shows 45. This
+point appears to be positioned approximately 65% across the width of the graph horizontally
+and 38% down from the top of the graph vertically, considering the y-axis scale from 0 to
+50. Prediction: [0.652, 0.382] | Accuracy: 1 (Successful)
+
+GPT-4o Response:
+1. Component Description: The number two position in class 3 on the line graph.
+2. Interaction Coordinates: [0.525, 0.565]
+3. Reasoning: The number two position in class 3 corresponds to the point where the green
+line intersects the vertical axis labeled "Class 3" (class 3). The coordinates were estimated
+based on the relative position of this point within the graph area. Prediction: [0.525, 0.565]
+| Accuracy: 1 (Successful)
+
+ShowUI-2B Response:
+’Component Description’: ’The element is located at’,
+’Interaction Coordinates’: [0.49, 0.49],
+’Reasoning’: ’The element is located at the center of the graph, which is the second data
+point on the third bar, labeled "Class 3". The x-coordinate is 0.5, and the y-coordinate is
+0.49, so the number two position in class 3 is at [0.5, 0.49].’ Prediction: [0.49, 0.49] |
+Accuracy: 1 (Successful)
+
+C.1.2 Slider Positioning Task
+Task: "Position Scale Slider"
+Claude-3.5-Sonnet Response:
+1. Component Description: A horizontal scale/zoom slider located in the bottom toolbar,
+showing "1002. Interaction Coordinates: [0.950, 0.970]
+3. Reasoning: The scale slider is positioned in the bottom-right corner of the interface, near
+the time/date display. The coordinates target the center of the zoom control area, which
+appears to be approximately 95Prediction: [0.950, 0.970] | Accuracy: 0 (Failed)
+
+GPT-4o Response:
+1. Component Description: A horizontal scale slider located at the bottom-right corner of
+the screen.
+2. Interaction Coordinates: [0.975, 0.975]
+3. Reasoning: The slider is positioned in the bottom-right corner of the screen, and the
+interaction point is estimated to be near the center of the slider handle. Prediction: [0.975,
+0.975] | Accuracy: 0 (Failed)
+
+ShowUI-2B Response:
+’Component Description’: ’a horizontal slider with a movable handle’,
+’Interaction Coordinates’: [0.443, 0.483],
+’Reasoning’: ’This is the center point of the slider control, so it can be used to set the slider
+to 10 vertical axes.’ Prediction: [0.443, 0.483] | Accuracy: 0 (Failed)
+
+21
+
+C.2 VDA-Enhanced Model Output Examples
+This section demonstrates the same models’ performance when enhanced with VDA component
+detection information, showing improved spatial awareness and reasoning.
+C.2.1 VDA-Enhanced Chart Point Localization
+Task: "Give the number two position in class 3."
+VDA Component Information Provided:
+COMPONENT INFORMATION:
+- Bounding Box: [0.310, 0.286, 0.669, 0.714]
+(coordinates are normalized to 0-1 range, where (0,0) is top-left and (1,1) is bottom-right)
+- Component Center: (0.489, 0.500)
+Please use this information to assist your analysis. Focus on the component described above
+when responding to the instruction.
+
+OS-Atlas-Base-7B Enhanced Response:
+1. Component Description: A line chart with data points.
+2. Interaction Coordinates: [0.489, 0.500]
+3. Reasoning: This is the center point of the line chart, which is the target position for the
+number two in class 3. Prediction: [0.489, 0.500] | Accuracy: 1 (Successful)
+
+C.2.2 VDA-Enhanced Knob Positioning
+Task: "Positioning 6th knob from left to right"
+VDA Component Information Provided:
+COMPONENT INFORMATION:
+- Bounding Box: [0.202, 0.273, 0.224, 0.347]
+(coordinates are normalized to 0-1 range, where (0,0) is top-left and (1,1) is bottom-right)
+- Component Center: (0.213, 0.310)
+Please use this information to assist your analysis. Focus on the component described above
+when responding to the instruction.
+
+ShowUI-2B Enhanced Response:
+1. Component Description: A horizontal slider with a movable handle
+2. Interaction Coordinates: [0.443, 0.483]
+3. Reasoning: This is the center point of the slider control Prediction: [0.443, 0.483] |
+Accuracy: 0 (Failed)
+
+C.2.3 VDA Performance Impact Analysis
+Key Observations from VDA Enhancement:
+1. Improved Spatial Reasoning: VDA-enhanced models demonstrate better understanding of
+component boundaries and precise positioning within the interface.
+2. Consistent Coordinate Reference: Models with VDA information show more reliable use
+of the provided bounding box and center coordinates in their reasoning process.
+3. Enhanced Component Recognition: The structured component information helps models
+better identify and describe UI elements, leading to more accurate spatial localization.
+4. Reduced Localization Errors: While not eliminating all errors, VDA enhancement shows
+measurable improvement in target identification accuracy, particularly for complex graphical
+elements.
+The examples demonstrate that VDA serves as an effective "plug-and-play" enhancement mechanism,
+providing models with crucial spatial context that addresses fundamental visual grounding challenges
+in GUI interaction tasks.
+
+22
+
+D.1 Typical Error Examples
+This section presents representative error cases that demonstrate common failure patterns across
+different models and task types, providing insights into the systematic challenges in GUI automation.
+D.1.1 Spatial Localization Error - Chart Component Misidentification
+Task: "Give the number two position in class 3."
+Model: GPT-4o
+Model Response:
+1
+2
+3
+
+1. Component Description : The number two position in class 3 on
+the line graph .
+2. Interaction Coordinates : [0.525 , 0.565]
+3. Reasoning : The number two position in class 3 corresponds to
+the point where the green line intersects the vertical axis
+labeled " Class 3" ( class 3) . The coordinates were estimated
+based on the relative position of this point within the graph
+area .
+
+Ground Truth: Component should be located at [0.523, 0.558]
+Error Analysis: While the model correctly identified the chart component and provided reasonable
+reasoning, the spatial localization was imprecise. The model achieved location accuracy (1) but failed
+interaction accuracy (0), indicating successful component identification but inadequate precision for
+interaction.
+D.1.2 Component Type Confusion - Slider vs. Zoom Control
+Task: "Position Scale Slider"
+Model: Claude-3.5-Sonnet
+Model Response:
+1
+2
+3
+
+1. Component Description : A horizontal scale / zoom slider located
+in the bottom toolbar , showing "100%" with a + and - control on
+either side
+2. Interaction Coordinates : [0.950 , 0.970]
+3. Reasoning : The scale slider is positioned in the bottom - right
+corner of the interface , near the time / date display . The
+coordinates target the center of the zoom control area ...
+
+Ground Truth: Target slider located at [0.891, 0.930]
+Error Analysis: The model correctly identified a scale-related component but focused on the wrong
+UI element (zoom control instead of the actual scale slider). This represents a semantic confusion
+between functionally similar but spatially distinct components.
+D.1.3 Context Misinterpretation - Chart Interaction Error
+Task: "Drag it to about 10 vertical axes."
+Model: GPT-4o
+Model Response:
+1
+2
+3
+
+1. Component Description : A line graph with a data point at the
+intersection of " Class 4" and the value "28".
+2. Interaction Coordinates : [0.815 , 0.625]
+3. Reasoning : The red arrow points to the data point on the graph
+corresponding to the value "28" on the vertical axis and " Class
+4" on the horizontal axis .
+
+23
+
+Ground Truth: Target should be at [0.522, 0.610]
+Error Analysis: The model misinterpreted the task context, focusing on a specific data point
+rather than understanding the instruction to manipulate the chart to show "10 vertical axes." This
+demonstrates difficulty in understanding complex task semantics.
+D.1.4 Component Detection Failure - Mobile Interface
+Task: "Locate the color picker below the image"
+Model: Claude-3.5-Sonnet (Mobile)
+Model Response:
+1
+2
+3
+
+1. Component Description : A color selection interface or color
+picker located below the main image area
+2. Interaction Coordinates : [0.5 , 0.75]
+3. Reasoning : Based on the instruction to locate the color picker
+below the image , I ’ ve estimated the coordinates to be roughly
+centered horizontally and positioned in the lower portion of
+the interface .
+
+Error Analysis: The model provided generic coordinate estimates without precise component
+detection. The response lacks specific visual grounding, indicating challenges with mobile interface
+complexity and component boundary identification.
+D.1.5 Format Compliance Error - Offline Model
+Task: "Positioning 6th knob from left to right"
+Model: ShowUI-2B
+Model Response:
+1
+2
+3
+
+’ Component Description ’: ’ The element is located at ’ ,
+’ Interaction Coordinates ’: [0.443 , 0.483] ,
+’ Reasoning ’: ’ This is the center point of the slider control ’
+
+Error Analysis: The model failed to follow the required response format and provided inconsistent component identification (describing a slider instead of a knob). This represents both format
+compliance issues and component type confusion.
+D.1.6 Complete Task Misunderstanding
+Task: "Positioning second knob from left to right"
+Model: AgentCPM-GUI
+Model Response:
+1
+
+The image does not include a second knob as mentioned in the
+instruction
+
+Ground Truth: Target knob exists at [0.618, 0.523]
+Error Analysis: Complete failure to detect the target component, resulting in task abandonment.
+This represents the most severe error type where models cannot identify the required UI element.
+D.2 Detailed Error Statistics Table
+This section presents comprehensive error statistics across all evaluated models, platforms, and task
+categories, based on analysis of 24,630 total test cases.
+24
+
+D.2.1 Overall Performance Summary
+Metric
+Locate Task Success
+Interact Task Success
+Complete Task Success
+
+Success Rate
+27.3%
+6.9%
+6.8%
+
+Failure Rate
+72.7%
+93.1%
+93.2%
+
+Total Cases
+24,630
+24,630
+24,630
+
+D.2.2 Top and Bottom Performing Models
+Top 5 Performing Models (by Complete Success Rate):
+Model
+UGround-7B
+UGround-7B
+AgentCPM-GUI-8B
+Gemini-2.5-Flash
+UGround-7B
+
+Platform
+Web
+Mobile
+Mobile
+Mobile
+Desktop
+
+Complete Success Rate
+32.8%
+19.6%
+18.2%
+17.6%
+16.0%
+
+Models with Highest Error Rates:
+Model
+Gemini-2.5-Flash
+Jedi-7B-1080p
+CogAgent-9B
+Holo1-7B
+Jedi-7B-1080p
+
+Platform
+Desktop
+Desktop
+Desktop
+Web
+Mobile
+
+Error Rate
+99.3%
+99.2%
+98.8%
+98.7%
+98.5%
+
+D.2.3 Error Distribution by Task Category
+Task Category
+Numeric Range Controls
+Toggle Option Controls
+View Manipulation
+Specific Data Selection
+
+Error Percentage
+95.2%
+94.2%
+93.2%
+91.2%
+
+Difficulty Ranking
+Highest
+Second
+Third
+Lowest
+
+D.2.4 Platform-Specific Error Analysis
+Platform
+Desktop
+Mobile
+Web
+
+Locate Error Rate
+74.2%
+71.5%
+72.6%
+
+Interact Error Rate
+95.4%
+91.7%
+92.3%
+
+Complete Error Rate
+95.6%
+91.7%
+92.3%
+
+D.3 VDA Error Reduction Effects
+This section analyzes the impact of Visual Diagnostic Assistant (VDA) enhancement on reducing
+various types of errors across different models and task categories.
+D.3.1 VDA Enhancement Coverage
+Based on our analysis of VDA-enhanced results, we found that VDA enhancement shows significant
+potential for error reduction, though comprehensive evaluation data is limited in the current dataset.
+The VDA system addresses key error patterns through:
+1. Spatial Localization Enhancement: VDA provides precise bounding box information that
+helps models overcome spatial reasoning failures
+2. Component Identification Support: Structured component information reduces misidentification errors
+3. Context Disambiguation: Component metadata helps resolve semantic confusion between
+similar UI elements
+25
+
+D.3.2 Theoretical Error Reduction Analysis
+Based on our error pattern analysis and VDA enhancement mechanism, we project the following
+error reduction potential:
+Error Type
+Spatial Localization Errors
+Component Misidentification
+Context Misinterpretation
+Format Compliance Issues
+
+Current Rate
+58.3%
+25.4%
+11.5%
+4.8%
+
+Projected Reduction
+10-20%
+15-25%
+5-15%
+2-8%
+
+D.3.3 VDA Impact on High-Error Models
+For models with error rates above 90%, VDA enhancement offers the most significant improvement
+potential:
+• Holo1-7B: Current 98.7% error rate could potentially reduce to 85-95% with VDA spatial
+guidance
+• CogAgent-9B: Component detection improvements could reduce the 99.9% error rate by
+20-30%
+• UI-TARS-1.5-7B: VDA’s structured output format could address format compliance issues
+
+26
+
+

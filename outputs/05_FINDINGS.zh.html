@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>发现总结 — I1 SafeSpread</title>
+<!-- provenance: placeholder/dry-run numbers generated 2026-07-02 for pipeline testing; not from real runs -->
+
+<style>
+  :root{--ink:#1a1a1a;--mut:#5a6270;--line:#e2e6ec;--bg:#fbfcfe;--acc:#2b5c9e;--ok:#0a7f52;--bad:#a33;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.75;margin:0;padding:0 20px 80px}
+  .wrap{max-width:1000px;margin:0 auto}
+  h1{font-size:1.7rem;margin:.6em 0 .1em}
+  h2{font-size:1.2rem;margin:1.8em 0 .4em;padding-bottom:.2em;border-bottom:2px solid var(--line)}
+  code{background:#eef1f6;padding:.08em .35em;border-radius:4px;font-size:.85em}
+  a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline}
+  table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.9rem}
+  th,td{border:1px solid var(--line);padding:.5em .65em;text-align:left;vertical-align:top}
+  th{background:#eef2f8;font-weight:600}
+  tr:nth-child(even) td{background:#f6f8fb}
+  .sup{color:var(--ok);font-weight:700}
+  .fake{background:#a33;color:#fff;border-radius:8px;padding:.8em 1.1em;margin:1em 0;font-weight:700}
+  .sub{color:var(--mut);font-size:.9rem}
+  .big{font-size:1.05rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>发现总结 — I1 · SafeSpread（安全冗余 MoE）</h1>
+<p class="sub">计划：<a href="02_EXPERIMENT_PLAN.zh.html">02_EXPERIMENT_PLAN.zh.html</a> · 台账：<a href="04_EXPERIMENT_TRACKER.html">04_EXPERIMENT_TRACKER.html</a> · 主模型 OLMoE-1B-7B，迁移 Qwen3-30B-A3B。这里每个数字都能追溯到一个 <code>results/</code> 文件（合成）。</p>
+
+<h2>一句话结论</h2>
+<p class="big">在 OLMoE-1B-7B 上，<b>SafeSpread</b> 把 8-专家消融下的最坏情况拒答跌幅从 <b>21.4%</b>（未防御）压到 <b>4.6%</b>，胜过最接近的防御（SAFEx-修复 9.8%、SafeMoE 6.2%），且<b>不需要任何参考路由权重</b>。它在自适应再攻击（7.1%）和仅输入越狱（ASR 63.0%→18.2%）下都成立，代价是 MMLU-Redux 掉 0.8 个点、且没有过度拒答上升。结论可迁移到 Qwen3-30B-A3B（22.0%→3.9%）。</p>
+
+<h2>逐条 claim</h2>
+<table>
+<thead><tr><th>Claim</th><th>证据（合成，来自结果文件）</th><th>判定</th></tr></thead>
+<tbody>
+<tr>
+  <td><b>C1</b> — 未防御 MoE 的拒答是集中的</td>
+  <td>在 OLMoE 上 mask 8 个 SES 选出的专家，拒答掉 21.4%（Qwen3：12 个专家 → 22.0%）。<code>SYNTHETIC_safespread_main.json</code></td>
+  <td class="sup">支持</td>
+</tr>
+<tr>
+  <td><b>C2</b> — SafeSpread 压平脆弱性</td>
+  <td>同等预算下的最坏跌幅：未防御 21.4% → SafeSpread <b>4.6%（±0.7）</b>；SAFEx-修复 9.8%、SafeMoE 6.2%、SafeInstr 12.7%、SaLoRA 11.3%。</td>
+  <td class="sup">支持</td>
+</tr>
+<tr>
+  <td><b>C3</b> — 对自适应与仅输入攻击都鲁棒</td>
+  <td>自适应重优化消融 7.1%（未防御 24.9%）；仅输入越狱 ASR 18.2%（未防御 63.0%、SafeMoE 31.5%）。<code>SYNTHETIC_attacks_and_transfer.json</code></td>
+  <td class="sup">支持</td>
+</tr>
+<tr>
+  <td><b>C4</b> — 不需要参考路由权重</td>
+  <td>SafeSpread 只用已部署模型就达到 4.6%；SafeMoE 达到 6.2% 但需要原始对齐路由权重。</td>
+  <td class="sup">支持</td>
+</tr>
+<tr>
+  <td><b>C5</b> — 安全税低</td>
+  <td>MMLU-Redux 61.2→60.4（−0.8）；AIME-2024 12.0→11.7；良性集过度拒答 2.1%→2.8%（无显著上升）。<code>SYNTHETIC_safespread_main.json</code></td>
+  <td class="sup">支持</td>
+</tr>
+</tbody>
+</table>
+<p class="sub">是否「支持」由你在每个 gate 上拍板，助手绝不自称成功。</p>
+
+<h2>消融（每个组件买到了什么）</h2>
+<ul>
+  <li><b>A1 去熵项：</b>4.6% → 8.9% —— 反集中项才是真正压平曲线的东西。</li>
+  <li><b>A2 摊分到全部专家：</b>4.6% → 5.1% 但 MMLU 60.4→58.9 —— 只针对安全关键集能把税压低。</li>
+  <li><b>A3 去路由正则：</b>4.6% → 10.4% —— 没有它，路由器会把拒答漂回一小撮专家。</li>
+  <li><b>A4 换成 SAFEx-修复：</b>9.8% —— 恢复并不能消除集中，再分布才行。</li>
+</ul>
+
+<h2>待办 / 下一步</h2>
+<ul>
+  <li>只测了两个 MoE 家族（OLMoE、Qwen3-30B-A3B）；Mixtral / Phi-3.5-MoE 的迁移仍未做。</li>
+  <li>自适应攻击者是单一策略；更强的白盒自适应攻击是审稿人最可能的追问。</li>
+</ul>
+
+<p class="sub" style="margin-top:2em">作为 <code>/paper-write</code> 的输入。英文正本（canonical）：<a href="05_FINDINGS.html">05_FINDINGS.html</a>。</p>
+
+</div>
+</body>
+</html>

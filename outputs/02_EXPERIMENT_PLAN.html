@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Experiment Plan — I1 Safety-Redundant MoE (SafeSpread)</title>
+<style>
+  :root{--ink:#1a1a1a;--mut:#5a6270;--line:#e2e6ec;--bg:#fbfcfe;--acc:#2b5c9e;--ok:#0a7f52;--warn:#b5820a;--card:#fff;}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.65;margin:0;padding:0 20px 80px}
+  .wrap{max-width:1040px;margin:0 auto}
+  h1{font-size:1.8rem;margin:.6em 0 .1em;letter-spacing:-.01em}
+  h2{font-size:1.3rem;margin:2em 0 .5em;padding-bottom:.25em;border-bottom:2px solid var(--line)}
+  h3{font-size:1.05rem;margin:1.3em 0 .3em}
+  .sub{color:var(--mut);font-size:.95rem;margin:.2em 0 1.4em}
+  code{background:#eef1f6;padding:.08em .35em;border-radius:4px;font-size:.9em}
+  a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline}
+  table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.9rem}
+  th,td{border:1px solid var(--line);padding:.5em .65em;text-align:left;vertical-align:top}
+  th{background:#eef2f8;font-weight:600}
+  tr:nth-child(even) td{background:#f6f8fb}
+  ul{margin:.3em 0 .6em;padding-left:1.3em} li{margin:.2em 0}
+  .abs{background:#fff;border:1px solid var(--line);border-left:5px solid var(--warn);border-radius:8px;padding:1em 1.3em;margin:1em 0}
+  .proj{display:inline-block;background:var(--warn);color:#fff;font-size:.72rem;font-weight:700;padding:.12em .6em;border-radius:20px}
+  .ph{background:#fff3cf;padding:0 .25em;border-radius:3px;font-weight:600}
+  .note{background:#fff8e6;border:1px solid #f0dfa8;border-radius:8px;padding:.7em 1em;font-size:.9rem;color:#6b5600;margin:1em 0}
+  .meta{font-size:.85rem;color:var(--mut)}
+  .pill{display:inline-block;font-size:.72rem;font-weight:700;padding:.1em .5em;border-radius:5px;background:#eef2f8;color:var(--acc)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Experiment Plan — I1 · Safety-Redundant MoE (SafeSpread)</h1>
+<p class="sub">
+  Idea (from <a href="01_IDEA_REPORT.html">01_IDEA_REPORT.html</a>, <b>SELECTED I1</b>): via a LoRA fine-tune plus a routing
+  regularizer, <b>redistribute refusal behavior across many experts</b> so no small ablatable expert subset can be knocked out to
+  jailbreak the model — a defense against SAFEx/SteerMoE expert-ablation attacks that needs no original aligned routing weights. ·
+  Researcher: <b>Xiuying Chen</b> · Lens: engineering · Generated <b>2026-07-02</b> ·
+  <span class="pill">claim-driven, written backward from the abstract</span>
+</p>
+
+<div class="note">
+<b>Feasibility.</b> Single A100 80GB is enough: <a href="https://arxiv.org/abs/2509.22745">SafeMoE</a> ran its full MoE-defense
+study on 1× A100 80GB with <b>OLMoE-1B-7B</b> as the primary model. We adopt OLMoE-1B-7B-0924-Instruct as the primary target and
+<b>Qwen3-30B-A3B</b> (the SAFEx headline model, 6,144 experts) as a transfer check. Everything is LoRA + inference-time attack eval,
+so no multi-GPU training. Safety judged by an off-the-shelf Llama-Guard classifier as in SteerMoE/SafeMoE.
+</div>
+
+<!-- ===================== PROJECTED ABSTRACT ===================== -->
+<h2>0 · Projected Abstract &nbsp;<span class="proj">PROJECTED — not results</span></h2>
+<div class="abs">
+<p>Mixture-of-experts language models are aligned to refuse harmful requests, but recent work shows their refusal behavior
+concentrates in a few safety-critical experts, so disabling a small set of experts removes the safety guardrail. Existing defenses
+either restore refusal after an attack or require the original safety-aligned routing weights, which a deployed model does not have.
+We present <b>SafeSpread</b>, a method that spreads refusal behavior across many experts so that no small ablatable subset carries it.
+We first locate the safety-critical experts from routing statistics, then run a light LoRA fine-tune with a routing regularizer and an
+anti-concentration term that push refusal-relevant routing mass onto many experts, using only the deployed model. On standard harmful
+and jailbreak sets, SafeSpread lowers the worst-case refusal drop under expert ablation from <span class="ph">[X%]</span> to
+<span class="ph">[X%]</span>, and keeps it below <span class="ph">[X%]</span> even when the attacker re-optimizes the ablation against
+the hardened model. It costs <span class="ph">[X%]</span> capability loss and adds no measurable over-refusal. These results give a
+deployable way to remove the expert-ablation vulnerability of aligned mixture-of-experts models.</p>
+</div>
+<p class="meta"><b>Structure:</b> background (MoE aligned to refuse) → problem (refusal concentrates in few experts, ablation breaks it, existing defenses need reference weights) → method (SafeSpread: locate + redistribute via routing regularizer, deployed model only) → results (placeholders) → conclusion. <b>abstract↔claim self-check:</b> concentration → C1; worst-case drop reduced → C2; robust to adaptive re-attack → C3; no reference weights → C4; low capability/over-refusal cost → C5. All numbers are placeholders.</p>
+
+<!-- ===================== PAPER SKELETON ===================== -->
+<h2>0.5 · Projected Paper Skeleton &nbsp;<span class="proj">PROJECTED</span></h2>
+<p class="sub">Structure modeled on <a href="https://arxiv.org/abs/2509.22745">SafeMoE</a> (the closest MoE safety-defense paper): Intro (4 para) · Threat Model · Method (modules) · Experiments (5.1–5.n) · Related Work · Conclusion. §1–§5 below are the concrete experiment plan that fills its Experiments section.</p>
+
+<h3>Introduction — one topic sentence per paragraph (4, gap-first, her style)</h3>
+<ol>
+  <li><b>P1 (landscape → gap):</b> MoE LLMs are aligned to refuse harmful requests, but safety in a sparse model is not spread evenly across experts.</li>
+  <li><b>P2 (sharpen the gap):</b> Refusal concentrates in a few safety-critical experts, so an attacker who disables a small expert subset (or steers routing away from them) removes the guardrail, and current defenses either only restore refusal after the attack or need the original aligned routing weights.</li>
+  <li><b>P3 (contribution):</b> We present SafeSpread, which redistributes refusal across many experts with a routing regularizer and an anti-concentration term in a light LoRA fine-tune, using only the deployed model, so no small ablatable subset carries the guardrail.</li>
+  <li><b>P4 (contributions):</b> We (i) quantify the concentration vulnerability across MoE families; (ii) propose SafeSpread, a reference-free redistribution defense; (iii) evaluate it under static, adaptive, and input-only routing attacks; (iv) show the worst-case refusal drop falls from <span class="ph">[X%]</span> to <span class="ph">[X%]</span> at <span class="ph">[X%]</span> capability cost.</li>
+</ol>
+
+<h3>Related Work — sections (mirrors the MoE-safety literature, each paper a real link)</h3>
+<ul>
+  <li><b>Vulnerabilities of MoE routing</b> — safety concentration &amp; expert ablation (<a href="https://arxiv.org/abs/2506.17368">SAFEx</a>), expert (de)activation steering (<a href="https://arxiv.org/abs/2509.09660">SteerMoE</a>), routing/backdoor attacks. <i>Position:</i> we defend the concentration they expose.</li>
+  <li><b>Defenses for MoE / safety fine-tuning</b> — routing alignment (<a href="https://arxiv.org/abs/2509.22745">SafeMoE</a>), SafeInstr, SaLoRA. <i>Position:</i> we need no reference aligned routing weights and target ablation, not fine-tuning drift.</li>
+  <li><b>Safety alignment &amp; jailbreaks broadly</b> — her <a href="https://arxiv.org/abs/2502.14296">trustworthiness</a> / Safety-Boundaries / jailbreak-benchmark line. <i>Position:</i> we move it from attack/eval to architectural defense.</li>
+</ul>
+
+<h3>Method — modules (each a titled subsection)</h3>
+<ul>
+  <li><b>§ Safety-Critical Expert Localization</b> — reproduce SAFEx stability-based selection (SES) to find the experts whose ablation drops refusal.</li>
+  <li><b>§ Redistribution Objective</b> — LoRA fine-tune with a routing regularizer that spreads refusal-relevant routing mass across many experts, plus an anti-concentration (entropy) term on the safety-critical set.</li>
+  <li><b>§ Router-Logit Regularization</b> — a term so the router does not re-concentrate refusal onto a small subset after fine-tuning.</li>
+</ul>
+
+<h3>Experiments — planned subsections (each row = the concrete experiment in §1–§3 below)</h3>
+<table>
+<thead><tr><th>Paper subsection</th><th>Planned experiment</th><th>Claim / metric</th></tr></thead>
+<tbody>
+<tr><td>5.1 Concentration audit</td><td>Reproduce SAFEx k-expert ablation curve on undefended MoE</td><td>C1 · refusal-drop vs k</td></tr>
+<tr><td>5.2 Main defense</td><td>SafeSpread vs undefended + SAFEx-repair + SafeMoE</td><td>C2 · worst-case refusal drop</td></tr>
+<tr><td>5.3 Adaptive robustness</td><td>Attacker re-optimizes ablation on hardened model; input-only jailbreak (SteerMoE unsafe-steer + AIM)</td><td>C3 · refusal drop / ASR</td></tr>
+<tr><td>5.4 Reference-free check</td><td>SafeSpread (no aligned weights) vs SafeMoE (needs them)</td><td>C4 · defense w/o reference weights</td></tr>
+<tr><td>5.5 Ablations</td><td>A1 (no entropy) · A2 (all vs critical set) · A3 (no router reg)</td><td>method attribution</td></tr>
+<tr><td>5.6 Safety tax</td><td>Capability (AIME-2024, MMLU-Redux) + over-refusal on benign set</td><td>C5 · &lt;[X%] loss</td></tr>
+<tr><td>5.7 Transfer</td><td>OLMoE-1B-7B → Qwen3-30B-A3B</td><td>generality</td></tr>
+</tbody>
+</table>
+
+<h3>Discussion / Conclusion — topic sentences</h3>
+<ul>
+  <li><b>Discussion:</b> spreading a safety behavior across experts trades a little capacity for robustness the concentrated design cannot offer, and it needs nothing beyond the deployed model.</li>
+  <li><b>Conclusion:</b> a reference-free redistribution defense that removes the expert-ablation vulnerability of aligned MoE models, with a reusable concentration metric.</li>
+</ul>
+
+<!-- ===================== CLAIMS ===================== -->
+<h2>1 · Claims → Evidence &nbsp;<span class="meta">(the concrete Experiment Plan — fills the paper's Experiments section)</span></h2>
+<table>
+<thead><tr><th>#</th><th>Claim (if the idea succeeds)</th><th>Experiment that supports it</th></tr></thead>
+<tbody>
+<tr><td><b>C1</b></td><td>Undefended MoE concentrates refusal — a few experts carry the guardrail.</td><td>Reproduce SAFEx SES + k-expert ablation curve (refusal drop vs k) on OLMoE &amp; Qwen3-30B-A3B.</td></tr>
+<tr><td><b>C2</b></td><td>SafeSpread flattens the vulnerability — worst-case k-ablation drop at the SAFEx budget falls to &lt;5%.</td><td>Refusal drop under worst-case k-expert ablation, SafeSpread vs undefended, SAFEx-repair, SafeMoE.</td></tr>
+<tr><td><b>C3</b></td><td>Robust to adaptive and input-only attacks, not just the static ablation.</td><td>Attacker re-optimizes ablation on the hardened model; SteerMoE-style unsafe steering + AIM jailbreak; report refusal drop + ASR.</td></tr>
+<tr><td><b>C4</b></td><td>Works from the deployed model alone — no original aligned routing weights needed.</td><td>SafeSpread vs SafeMoE (which requires reference routing weights) at matched budget.</td></tr>
+<tr><td><b>C5</b></td><td>Low safety tax — small capability loss, no over-refusal rise.</td><td>AIME-2024 + MMLU-Redux capability; over-refusal on the 500 benign prompts.</td></tr>
+</tbody>
+</table>
+
+<!-- ===================== SYSTEMS ===================== -->
+<h2>2 · Systems — method + must-beat baselines</h2>
+<h3>Method: <b>SafeSpread</b></h3>
+<ul>
+  <li><b>Locate</b> safety-critical experts via SAFEx stability-based selection (SES).</li>
+  <li><b>Redistribute</b> with a LoRA fine-tune: routing regularizer spreading refusal-relevant routing mass across many experts + anti-concentration entropy term on the critical set.</li>
+  <li><b>Regularize the router</b> so it does not re-concentrate refusal after fine-tuning.</li>
+  <li><b>Attack-evaluate</b>: worst-case k-expert ablation (static + adaptive) and input-only routing jailbreak.</li>
+</ul>
+<h3>Baselines it must beat (all from the grounding table, real)</h3>
+<table>
+<thead><tr><th>Baseline</th><th>Role / what it isolates</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>Undefended aligned MoE</td><td>The vulnerable reference (C1/C2 target).</td><td>OLMoE-1B-7B · Qwen3-30B-A3B</td></tr>
+<tr><td>SAFEx HRCG-targeted LoRA repair</td><td>Closest MoE defense — restores refusal but does not redistribute.</td><td><a href="https://arxiv.org/abs/2506.17368">SAFEx</a></td></tr>
+<tr><td>SafeMoE (routing alignment)</td><td>Defense that needs reference aligned routing weights — the C4 contrast.</td><td><a href="https://arxiv.org/abs/2509.22745">SafeMoE</a></td></tr>
+<tr><td>SafeInstr · SaLoRA</td><td>General safety fine-tuning defenses (not MoE-aware).</td><td><a href="https://arxiv.org/abs/2509.22745">via SafeMoE</a></td></tr>
+</tbody>
+</table>
+<h3>Datasets &amp; metrics (explicit up front — W7)</h3>
+<ul>
+  <li><b>Attack / safety data:</b> SAFEx-style 500 harmful · 500 jailbreak · 500 benign; <a href="https://arxiv.org/abs/2509.09660">AdvBench</a> · JailbreakBench · HEx-PHI; SteerMoE unsafe-steer + AIM jailbreak.</li>
+  <li><b>Metrics:</b> (1) <b>refusal rate</b> &amp; worst-case refusal drop under k-expert ablation (SAFEx); (2) <b>Harmfulness Score</b> via Llama-Guard + <b>Attack Success Rate</b> (SteerMoE/SafeMoE); (3) <b>capability</b> AIME-2024 + MMLU-Redux; (4) <b>over-refusal</b> on benign prompts.</li>
+</ul>
+
+<!-- ===================== ABLATION ===================== -->
+<h2>3 · Ablation Matrix — one variable per row</h2>
+<table>
+<thead><tr><th>ID</th><th>Ablated component (vs full SafeSpread)</th><th>Isolates</th><th>Expected</th></tr></thead>
+<tbody>
+<tr><td>A1</td><td>Remove the <b>anti-concentration entropy</b> term (redistribution loss only)</td><td>Value of anti-concentration</td><td>Refusal re-concentrates, curve less flat</td></tr>
+<tr><td>A2</td><td>Redistribute across <b>all</b> experts vs only the located <b>safety-critical</b> set</td><td>Value of targeting</td><td>Targeting the critical set is more efficient / less tax</td></tr>
+<tr><td>A3</td><td>Remove <b>router-logit regularization</b> (LoRA only)</td><td>Whether the router re-concentrates</td><td>Router drifts refusal back onto a small subset</td></tr>
+<tr><td>A4</td><td>Swap SafeSpread for <b>SAFEx HRCG-repair</b></td><td>Redistribution vs restoration</td><td>SafeSpread flatter worst-case curve at equal budget</td></tr>
+<tr><td>A5</td><td><b>Attack strength</b>: static k-ablation vs adaptive re-optimized vs input-only jailbreak</td><td>Robustness envelope</td><td>Defense holds across all three, not just static</td></tr>
+</tbody>
+</table>
+<p class="meta">Each row changes exactly one thing vs the full method; no row confounds two changes.</p>
+
+<!-- ===================== RUN ORDER ===================== -->
+<h2>4 · Run Order &nbsp;<span class="pill">smoke → baseline → main → ablation → polish</span></h2>
+<ol>
+  <li><b>Smoke (W1, cheap/deterministic first):</b> OLMoE-1B-7B, 50 harmful + 50 benign prompts — verify SES localization, the ablation-attack harness, and the Llama-Guard judge run end-to-end and produce a refusal number.</li>
+  <li><b>Baseline / audit:</b> reproduce the SAFEx concentration curve on the undefended OLMoE (C1); run SAFEx-repair and SafeMoE baselines.</li>
+  <li><b>Main:</b> SafeSpread fine-tune + re-measure the worst-case ablation curve (C2).</li>
+  <li><b>Adaptive:</b> attacker re-optimizes ablation on the hardened model + input-only jailbreak (C3).</li>
+  <li><b>Ablations:</b> A1–A5, one variable each.</li>
+  <li><b>Polish:</b> transfer to Qwen3-30B-A3B; 3-seed repeats; capability + over-refusal tables.</li>
+</ol>
+
+<!-- ===================== BUDGET ===================== -->
+<h2>5 · Budget (single A100 80GB)</h2>
+<table>
+<thead><tr><th>Block</th><th>Runs</th><th>Est. GPU-hours</th></tr></thead>
+<tbody>
+<tr><td>Smoke</td><td>1 tiny</td><td>&lt; 0.5</td></tr>
+<tr><td>Audit + baselines (SAFEx-repair, SafeMoE, SafeInstr, SaLoRA)</td><td>~5 configs</td><td>~25</td></tr>
+<tr><td>Main SafeSpread (train + attack eval)</td><td>1 config</td><td>~6</td></tr>
+<tr><td>Adaptive + input-only attacks</td><td>2 attack suites</td><td>~10</td></tr>
+<tr><td>Ablations A1–A5</td><td>5 configs</td><td>~20</td></tr>
+<tr><td>Polish: Qwen3-30B-A3B transfer + 3-seed</td><td>~6 extra runs</td><td>~30</td></tr>
+<tr><td colspan="2"><b>Total</b></td><td><b>~90 GPU-h (≈ 4–5 days on 1 GPU)</b></td></tr>
+</tbody>
+</table>
+<div class="note">Fits one A100 80GB. <b>Flag for sign-off (&gt;1 day):</b> the Qwen3-30B-A3B transfer + 3-seed polish — confirm the effect on OLMoE first.</div>
+
+<!-- ===================== GROUNDING (APPENDIX) ===================== -->
+<h2>Appendix · Grounding Table — real setups of the closest papers</h2>
+<p class="sub">Read from the papers' actual Experiments sections (full text fetched), not from memory. The baselines/datasets/metrics in §2 draw from here.</p>
+<table>
+<thead><tr><th>Paper</th><th>Baselines / attacks</th><th>Datasets</th><th>Metrics</th><th>Models / GPU</th></tr></thead>
+<tbody>
+<tr>
+  <td><a href="https://arxiv.org/abs/2506.17368">SAFEx</a> (vulnerability + repair)</td>
+  <td>Dense-model contrast; defense = HRCG-targeted LoRA subtractive merging</td>
+  <td>500 harmful · 500 jailbreak · 500 benign · AIME-2024 (capability)</td>
+  <td>Refusal rate; probe F1; AIME score</td>
+  <td>Mixtral-8x7B · Qwen1.5-MoE · Qwen3-30B-A3B (6144 experts) · deepseek-moe-16b · OLMoE-1B-7B. <b>Headline: mask 12 experts → 22% refusal drop (48.4% under jailbreak).</b></td>
+</tr>
+<tr>
+  <td><a href="https://arxiv.org/abs/2509.09660">SteerMoE</a> (steering / attack)</td>
+  <td>Jailbreaks: GCG · ArtPrompt · FFA · AIM</td>
+  <td>AdvBench · TDC2023 · MaliciousInstruct · StrongREJECT+AIM · MultiJail; FaithEval (faithfulness)</td>
+  <td>Safety via Llama-Guard-3-8B; ASR; fluency (Gemma-3-27B)</td>
+  <td>OLMoE · Qwen3-30B-A3B · Mixtral · Phi-3.5-MoE · GPT-OSS. <b>Unsafe steering -41%; +AIM -100%.</b></td>
+</tr>
+<tr>
+  <td><a href="https://arxiv.org/abs/2509.22745">SafeMoE</a> (defense)</td>
+  <td>SafeInstr · SaLoRA · Antidote · SafeDelta</td>
+  <td>BeaverTails (harmful) + SAMSum/SQL; eval JailbreakBench · HEx-PHI; MMLU-Redux</td>
+  <td>Harmfulness Score (Llama-Guard-4-12B); utility (Rouge/EM); routing KL</td>
+  <td>OLMoE-1B-7B (primary) · Qwen3-30B-A3B · … · Mixtral-8x22B. <b>1× A100 80GB. Needs reference aligned routing weights. Headline 62.0 → 5.0 harmfulness, ~1% utility loss.</b></td>
+</tr>
+</tbody>
+</table>
+<p class="meta"><b>Takeaways that shape the plan:</b> (1) OLMoE-1B-7B on one A100 80GB is the proven, feasible target. (2) SAFEx supplies the attack (SES + k-ablation curve) and a repair-style defense to beat; SafeMoE supplies defense baselines and the reference-weight limitation SafeSpread avoids; SteerMoE supplies the input-only attack and the Llama-Guard/ASR eval protocol.</p>
+
+<!-- ===================== GATE ===================== -->
+<h2>Approval Gate — the researcher is the judge</h2>
+<p>This is a plan, not results — every number is a placeholder. Nothing runs until you approve. Confirm or adjust:
+<b>(a)</b> primary model OLMoE-1B-7B (+ Qwen3-30B-A3B transfer), <b>(b)</b> the attack/eval protocol (SAFEx k-ablation + SteerMoE input-only),
+<b>(c)</b> the baseline set (SAFEx-repair, SafeMoE, SafeInstr, SaLoRA), <b>(d)</b> the budget. On approval → <code>/run-plan</code>.</p>
+
+<p class="meta" style="margin-top:2em">Generated by <code>/workplan</code> · seed idea I1 · grounded on SAFEx / SteerMoE / SafeMoE. Chinese mirror: <a href="02_EXPERIMENT_PLAN.zh.html">02_EXPERIMENT_PLAN.zh.html</a>.</p>
+
+</div>
+</body>
+</html>

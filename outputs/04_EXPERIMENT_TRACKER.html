@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Experiment Tracker — I1 SafeSpread [SYNTHETIC]</title>
+<style>
+  :root{--ink:#1a1a1a;--mut:#5a6270;--line:#e2e6ec;--bg:#fbfcfe;--acc:#2b5c9e;--ok:#0a7f52;--warn:#b5820a;--bad:#a33;}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.55;margin:0;padding:0 20px 80px}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:1.7rem;margin:.6em 0 .1em}
+  h2{font-size:1.2rem;margin:1.8em 0 .4em;padding-bottom:.2em;border-bottom:2px solid var(--line)}
+  code{background:#eef1f6;padding:.08em .35em;border-radius:4px;font-size:.85em}
+  a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline}
+  table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.88rem}
+  th,td{border:1px solid var(--line);padding:.45em .6em;text-align:left;vertical-align:top}
+  th{background:#eef2f8;font-weight:600}
+  tr:nth-child(even) td{background:#f6f8fb}
+  .done{color:var(--ok);font-weight:700}
+  .fake{background:#a33;color:#fff;border-radius:8px;padding:.8em 1.1em;margin:1em 0;font-weight:700}
+  .sub{color:var(--mut);font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="fake">⚠ SYNTHETIC / FABRICATED DATA — this tracker was generated on 2026-07-02 to test the <code>/paper-write</code> skill. No experiments were run. Every number below is made up and traces to a <code>results/SYNTHETIC_*.json</code> placeholder, NOT a real run. Do not cite or publish.</div>
+
+<h1>Experiment Tracker — I1 · SafeSpread</h1>
+<p class="sub">Plan: <a href="02_EXPERIMENT_PLAN.html">02_EXPERIMENT_PLAN.html</a> · Primary model OLMoE-1B-7B-0924-Instruct · Judge Llama-Guard-3-8B (nominal) · single A100 80GB (nominal). Metric key: <b>worst-case refusal drop %</b> under k-expert ablation (lower is better).</p>
+
+<h2>Run ledger</h2>
+<table>
+<thead><tr><th>#</th><th>Run</th><th>Block</th><th>Status</th><th>Key number (as read from file)</th><th>Result file</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>Smoke (OLMoE, 50+50 prompts)</td><td>smoke</td><td class="done">done</td><td>pipeline OK; refusal 96% clean</td><td><code>SYNTHETIC_safespread_main.json</code></td></tr>
+<tr><td>1</td><td>Concentration audit — OLMoE (SES + k-ablation)</td><td>audit / C1</td><td class="done">done</td><td>mask 8 experts → −21.4%</td><td><code>SYNTHETIC_safespread_main.json</code></td></tr>
+<tr><td>2</td><td>Baseline SAFEx HRCG-repair</td><td>baseline</td><td class="done">done</td><td>worst-case −9.8%</td><td><code>SYNTHETIC_safespread_main.json</code></td></tr>
+<tr><td>3</td><td>Baseline SafeMoE (routing alignment)</td><td>baseline</td><td class="done">done</td><td>worst-case −6.2% (needs ref weights)</td><td><code>SYNTHETIC_safespread_main.json</code></td></tr>
+<tr><td>4</td><td>Baseline SafeInstr / SaLoRA</td><td>baseline</td><td class="done">done</td><td>−12.7% / −11.3%</td><td><code>SYNTHETIC_safespread_main.json</code></td></tr>
+<tr><td>5</td><td><b>Main — SafeSpread (OLMoE)</b></td><td>main / C2</td><td class="done">done</td><td><b>worst-case −4.6% (±0.7)</b></td><td><code>SYNTHETIC_safespread_main.json</code></td></tr>
+<tr><td>6</td><td>Adaptive re-attack (re-optimized ablation)</td><td>adaptive / C3</td><td class="done">done</td><td>−7.1% (vs undefended −24.9%)</td><td><code>SYNTHETIC_attacks_and_transfer.json</code></td></tr>
+<tr><td>7</td><td>Input-only jailbreak (SteerMoE-steer + AIM)</td><td>adaptive / C3</td><td class="done">done</td><td>ASR 18.2% (vs undefended 63.0%)</td><td><code>SYNTHETIC_attacks_and_transfer.json</code></td></tr>
+<tr><td>8</td><td>Reference-free check vs SafeMoE</td><td>C4</td><td class="done">done</td><td>SafeSpread −4.6% w/o ref weights vs SafeMoE −6.2% w/ ref weights</td><td><code>SYNTHETIC_attacks_and_transfer.json</code></td></tr>
+<tr><td>9</td><td>A1 — no entropy term</td><td>ablation</td><td class="done">done</td><td>−8.9% (re-concentrates)</td><td><code>SYNTHETIC_ablation.json</code></td></tr>
+<tr><td>10</td><td>A2 — redistribute all experts</td><td>ablation</td><td class="done">done</td><td>−5.1%, MMLU 58.9 (higher tax)</td><td><code>SYNTHETIC_ablation.json</code></td></tr>
+<tr><td>11</td><td>A3 — no router regularization</td><td>ablation</td><td class="done">done</td><td>−10.4% (router drifts back)</td><td><code>SYNTHETIC_ablation.json</code></td></tr>
+<tr><td>12</td><td>A4 — SAFEx-repair instead</td><td>ablation</td><td class="done">done</td><td>−9.8% (restoration ≠ redistribution)</td><td><code>SYNTHETIC_ablation.json</code></td></tr>
+<tr><td>13</td><td>A5 — attack-strength sweep</td><td>ablation</td><td class="done">done</td><td>static −4.6 / adaptive −7.1 / ASR 18.2</td><td><code>SYNTHETIC_ablation.json</code></td></tr>
+<tr><td>14</td><td>Safety tax — capability + over-refusal</td><td>C5</td><td class="done">done</td><td>MMLU 61.2→60.4; AIME 12.0→11.7; over-refusal 2.1→2.8%</td><td><code>SYNTHETIC_safespread_main.json</code></td></tr>
+<tr><td>15</td><td>Transfer — Qwen3-30B-A3B</td><td>polish / 5.7</td><td class="done">done</td><td>mask 12 → −22.0% undef vs −3.9% SafeSpread</td><td><code>SYNTHETIC_attacks_and_transfer.json</code></td></tr>
+</tbody>
+</table>
+<p class="sub">All 16 rows marked <span class="done">done</span> only because this is a synthetic fixture. In a real <code>/run-plan</code>, rows would fill in over time and any missing value would read <code>MISSING</code>, never a guess.</p>
+
+</div>
+</body>
+</html>

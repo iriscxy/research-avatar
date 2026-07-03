@@ -1,0 +1,24 @@
+{
+  "__WARNING__": "SYNTHETIC / FABRICATED DATA — generated 2026-07-02 to test the /paper-write skill only. NOT real results.",
+  "experiment": "I1 SafeSpread — adaptive/input-only attacks (C3, C4) + Qwen3 transfer (5.7)",
+  "status": "synthetic",
+  "adaptive_robustness_C3": {
+    "OLMoE-1B-7B": {
+      "static_ablation_drop_pct": {"undefended": 21.4, "SafeSpread": 4.6},
+      "adaptive_reoptimized_drop_pct": {"undefended": 24.9, "SafeSpread": 7.1},
+      "input_only_jailbreak_ASR_pct": {"undefended": 63.0, "SafeMoE": 31.5, "SafeSpread": 18.2}
+    }
+  },
+  "reference_free_C4": {
+    "SafeSpread_requires_reference_routing_weights": false,
+    "SafeMoE_requires_reference_routing_weights": true,
+    "matched_budget_worst_case_drop_pct": {"SafeMoE": 6.2, "SafeSpread": 4.6}
+  },
+  "transfer_5_7": {
+    "Qwen3-30B-A3B": {
+      "ablation_budget_experts": 12,
+      "worst_case_refusal_drop_pct": {"undefended": 22.0, "SafeSpread": 3.9},
+      "MMLU_Redux": {"undefended": 74.5, "SafeSpread": 73.8}
+    }
+  }
+}

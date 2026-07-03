@@ -1,0 +1,2393 @@
+arXiv:2011.03322v1 [cs.CL] 5 Nov 2020
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+SHEN GAO, Wangxuan Institute of Computer Technology, Peking University
+XIUYING CHEN, Wangxuan Institute of Computer Technology, Peking University
+LI LIU, Inception Institute of Artificial Intelligence
+DONGYAN ZHAO, Wangxuan Institute of Computer Technology, Peking University
+RUI YAN∗ , 1 Gaoling School of Artificial Intelligence, Renmin University of China; 2 Wangxuan Institute of Computer
+Technology, Peking University
+Stickers with vivid and engaging expressions are becoming increasingly popular in online messaging apps, and some works are
+dedicated to automatically select sticker response by matching the stickers image with previous utterances. However, existing methods
+usually focus on measuring the matching degree between the dialog context and sticker image, which ignores the user preference
+of using stickers. Hence, in this paper, we propose to recommend an appropriate sticker to user based on multi-turn dialog context
+and sticker using history of user. Two main challenges are confronted in this task. One is to model the sticker preference of user
+based on the previous sticker selection history. Another challenge is to jointly fuse the user preference and the matching between
+dialog context and candidate sticker into final prediction making. To tackle these challenges, we propose a Preference Enhanced Sticker
+Response Selector (PESRS) model. Specifically, PESRS first employs a convolutional based sticker image encoder and a self-attention
+based multi-turn dialog encoder to obtain the representation of stickers and utterances. Next, deep interaction network is proposed to
+conduct deep matching between the sticker and each utterance. Then, we model the user preference by using the recently selected
+stickers as input, and use a key-value memory network to store the preference representation. PESRS then learns the short-term and
+long-term dependency between all interaction results by a fusion network, and dynamically fuse the user preference representation
+into the final sticker selection prediction. Extensive experiments conducted on a large-scale real-world dialog dataset show that our
+model achieves the state-of-the-art performance for all commonly-used metrics. Experiments also verify the effectiveness of each
+component of PESRS.
+CCS Concepts: • Information systems → Multimedia content creation; Retrieval models and ranking.
+Additional Key Words and Phrases: sticker selection, user modeling, multi-turn dialog
+∗ Corresponding Author: Rui Yan (ruiyan@pku.edu.cn)
+
+Authors’ addresses: Shen Gao, Wangxuan Institute of Computer Technology, Peking University, shengao@pku.edu.cn; Xiuying Chen, Wangxuan Institute
+of Computer Technology, Peking University, xy-chen@pku.edu.cn; Li Liu, Inception Institute of Artificial Intelligence, liuli1213@gmail.com; Dongyan
+Zhao, Wangxuan Institute of Computer Technology, Peking University, zhaody@pku.edu.cn; Rui Yan, 1 Gaoling School of Artificial Intelligence, Renmin
+University of China; 2 Wangxuan Institute of Computer Technology, Peking University, ruiyan@pku.edu.cn.
+
+Permission to make digital or hard copies of all or part of this work for personal or classroom use is granted without fee provided that copies are not
+made or distributed for profit or commercial advantage and that copies bear this notice and the full citation on the first page. Copyrights for components
+of this work owned by others than ACM must be honored. Abstracting with credit is permitted. To copy otherwise, or republish, to post on servers or to
+redistribute to lists, requires prior specific permission and/or a fee. Request permissions from permissions@acm.org.
+© 2020 Association for Computing Machinery.
+Manuscript submitted to ACM
+Manuscript submitted to ACM
+
+1
+
+2
+
+Shen Gao, et al.
+
+Fig. 1. An example of stickers in a multi-turn dialog. Sticker response selector automatically selects the proper sticker based on
+multi-turn dialog history.
+
+ACM Reference Format:
+Shen Gao, Xiuying Chen, Li Liu, Dongyan Zhao, and Rui Yan. 2020. Learning to Respond with Your Favorite Stickers: A Framework
+of Unifying Multi-Modality and User Preference in Multi-Turn Dialog. ACM Transactions on Information Systems 1, 1, Article 1
+(January 2020), 33 pages. https://doi.org/10.1145/1122445.1122456
+
+1
+
+INTRODUCTION
+
+Images (a.k.a.,graphicon) are another important approach for expressing feelings and emotions in addition to using text
+in communication. In mobile messaging apps, these images can generally be classified into emojis and stickers. Emoji is
+a kind of small picture which is already stored in most of the keyboard of the mobile operational systems, i.e.,iOS or
+Android. Emojis are pre-designed by the mobile phone vendor (now it is managed by standards organization) and the
+number of emoji is limited, and users can not design emoji by themselves. Different with the inflexible emojis, sticker
+is image or graphicon essentially [14, 25, 33], which users can draw or modify images as a sticker and upload to the
+chatting app by themselves. The using of stickers on online chatting usually brings diversity of expressing emotion.
+Since emojis are sometimes used to help reinforce simple emotions in a text message due to their small size, and their
+variety is limited. Stickers, on the other hand, can be regarded as an alternative for text messages, which usually include
+cartoon characters and are of high definition. They can express much more complex and vivid emotion than emojis.
+Most messaging apps, such as WeChat, Telegram, WhatsApp, and Slack provide convenient ways for users to download
+stickers for free, or even share self-designed ones. We show a chat window including stickers in Figure 1.
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+3
+
+Stickers are becoming more and more popular in online chat. First, sending a sticker with a single click is much more
+convenient than typing text on the 26-letter keyboard of a small mobile phone screen. Second, there are many implicit
+or strong emotions that are difficult to express in words but can be captured by stickers with vivid facial expressions
+and body language. However, the large scale use of stickers means that it is not always straightforward to think of the
+sticker that best expresses one’s feeling according to the current chatting context. Users need to recall all the stickers
+they have collected and selected the appropriate one, which is both difficult and time-consuming.
+Consequently, much research has focused on recommending appropriate emojis to users according to the chatting
+context. Existing works such as [80], are mostly based on emoji recommendation, where they predict the probable emoji
+given the contextual information from multi-turn dialog systems. In contrast, other works [6, 7] recommend emojis
+based on the text and images posted by a user. As for sticker recommendation, existing works such as [42] and apps
+like Hike or QQ directly match the text typed by the user to the short text tag assigned to each sticker. However, since
+there are lots of ways of expressing the same emotion, it is very hard to capture all variants of an utterance as tags.
+To overcome the drawbacks, we propose a sticker response selector (SRS) for sticker selection in our early work [22],
+where we address the task of sticker response selection in multi-turn dialog. We focus on the two main challenges in
+this work: (1) Since existing image recognition methods are mostly built with real-world images, and how to capture
+the semantic meaning of sticker is challenging. (2) Understanding multi-turn dialog history information is crucial for
+sticker recommendation, and jointly modeling the candidate sticker with multi-turn dialog is challenging. Herein, we
+propose a novel sticker recommendation model, namely sticker response selector (SRS), for sticker response selection in
+multi-turn dialog. Specifically, SRS first learns representations of dialog context history using a self-attention mechanism
+and learns the sticker representation by a convolutional neural network (CNN). Next, SRS conducts deep matching
+between the sticker and each utterance and produces the interaction results for every utterance. Finally, SRS employs a
+fusion network which consists of a sub-network fusion RNN and fusion transformer to learn the short and long term
+dependency of the utterance interaction results. The final matching score is calculated by an interaction function. To
+evaluate the performance of our model, we propose a large number of multi-turn dialog dataset associated with stickers
+from one of the popular messaging apps. Extensive experiments conducted on this dataset show that SRS significantly
+outperforms the state-of-the-art baseline methods in commonly-used metrics.
+However, the user’s sticker selection does not only depend on the matching degree between dialog context and
+candidate sticker image, but also depends on the user’s preference of using sticker. When users decide to use a sticker
+as their response in multi-turn dialog, they may choose their favorite one from all appropriate stickers as the final
+response. We assume that user tends to use the recently used sticker in their dialog history, and the recently-used-sticker
+can represent the user’s preference of sticker selection. An example is shown in Figure 2. To verify this assumption,
+we retrieve 10 recently-used-stickers of each user and calculate the proportion of whether the currently used sticker
+appeared in these 10 stickers. The result shows that 54.09% of the stickers exist in the 10 recently used sticker set. Hence,
+we reach to the conclusion that users have strong personal preference when selecting the sticker as their response for
+the current dialog context. However, in some cases, this also indicates a tendency to re-use stickers, but not necessarily
+a preference.
+Motivated by this observation, in this work, we take one step further and improve our previously proposed SRS
+framework with user preference modeling. Overall, we propose a novel sticker recommendation model which considers
+the user preference, namely Preference Enhanced Sticker Response Selector (PESRS). Specifically, PESRS first employs
+a convolutional network to extract features from the candidate stickers. Then, we retrieve the recent user sticker
+selections then a user preference modeling module is employed to obtain a user preference representation. Next, we
+Manuscript submitted to ACM
+
+4
+
+Shen Gao, et al.
+
+conduct the deep matching between the candidate sticker and each utterance as the same as SRS. Finally, we use a
+gated fusion method to combine the deep matching result and user preference into final sticker prediction.
+
+Fig. 2. User’s history dialog context and the selected sticker. Four figures in the left history dialog context and the selected sticker,
+and the right one the current dialog context with the user selected sticker. User tends to use the same sticker when the dialog context
+is semantically similar.
+
+The key to the success of PESRS lies in how to design the user preference modeling module, which should not only
+identify the user’s favorite sticker and but also consider the current dialog context. Motivated by this, we first propose
+a recurrent neural network (RNN) based position-aware sticker modeling module which encodes the recently used
+stickers in chronological order. Then, we employ a key-value memory network to store these sticker representations as
+values and the corresponding dialog context as keys. Finally, we use the current dialog context to query the key-value
+memory and obtain the dynamic user preference of the current dialog context.
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+5
+
+We empirically compare PESRS and SRS on the public dataset1 proposed by our early work [22]. This is a large-scale
+real-world Chinese multi-turn dialog dataset, which dialog context is multiple text utterances and the response is
+a sticker image. Experimental results show that on this dataset, our newly proposed PESRS model can significantly
+outperform the existing methods. Particularly, PESRS yields 4.8% and 7.1% percentage point improvement in terms of
+𝑀𝐴𝑃 and 𝑅10 @1 compared with our early work SRS. In addition to the comprehensive evaluation, we also evaluate our
+proposed user preference memory by a fine-grained analysis. The analysis reveals how the model leverages the user’s
+recent sticker selection history and provides us insights on why they can achieve big improvement over state-of-the-art
+methods.
+This work is a substantial extension of our previous work reported at WWW 2020. The extension in this article
+includes the user preference modeling framework for the existing methods, a proposal of a new framework for sticker
+selection in the multi-turn dialog. Specifically, the contributions of this work include the following:
+• We propose a position-aware sticker modeling module which can model the user’s sticker selection history.
+• We propose a key-value memory network to store the user’s recently used stickers and its corresponding dialog
+context.
+• Finally, we use the current dialog context to query the key-value memory and obtain a user preference representation, and then fuse the user preference representation into final sticker prediction dynamically.
+• Experiments conducted on a large-scale real-world dataset show that our model outperforms all baselines,
+including state-of-the-art models. Experiments also verify the effectiveness of each module in PESRS as well as
+its interpretability.
+The rest of the paper is organized as follows: We summarize related work in §2. §3 introduces the data collection
+method and some statistics of our proposed multi-turn dialog sticker selection dataset. We then formulate our research
+problem in §4 and elaborate our approach in §5. §6 gives the details of our experimental setup and §7 presents the
+experimental results. Finally, §8 concludes the paper.
+2
+
+RELATED WORK
+
+We outline related work on sticker recommendation, user modeling, visual question answering, visual dialog, and
+multi-turn response selection.
+2.1
+
+Sticker and Emoji Recommendation
+
+Most of the previous works emphasize the use of emojis instead of stickers. For example, [6, 7] use a multimodal approach
+to recommend emojis based on the text and images in an Instagram post. [28] propose a MultiLabel-RandomForest
+algorithm to predict emojis based on the private instant messages. [88] conduct emoji prediction on social media
+text (e.g.,Sina Weibo and Twitter), and they tackle this task as ranking among all emojis. The total number of unique
+emojis in their dataset is 50, which is much smaller than the number of stickers. What is more, emojis are limited in
+variety, while there exists an abundance of different stickers. [92] incorporates the emoji information into the dialog
+generation task, and they use the emoji classification as an auxiliary task to facilitate the dialog generation to produce
+utterance with proper emotion. The most similar work to ours is [42], where they generate recommended stickers by
+first predicting the next message the user is likely to send in the chat, and then substituting it with an appropriate
+sticker.
+1 https://github.com/gsh199449/stickerchat
+
+Manuscript submitted to ACM
+
+6
+
+Shen Gao, et al.
+However, more often than not the implication of the stickers cannot be fully conveyed by text and, in this paper, we
+
+focus on directly generating sticker recommendations from dialog history.
+2.2
+
+User Modeling
+
+User modeling [36, 58, 86, 94, 95] is a hot research topic especially in recommendation task, which models the preference
+of user based on the user history interaction data. Specifically, in the e-commerce recommendation task [35, 43, 59], the
+user modeling systems use the purchase history or click records to model the user’s intrinsic interest and temporal
+interest [57, 87]. Most of the research typically utilize user-item binary relations, and assume a flat preference distribution
+over items for each user. They neglect the hierarchical discrimination between user intentions and user preferences.
+Zhu et al. [93] propose a novel key-array memory network with user-intention-item triadic relations, which takes both
+user intentions and preferences into account for the next-item recommendation. As for the user modeling in the news
+recommendation task, there are much side information can be used to obtain better user preference representation. Wu
+et al. [75] propose a neural news recommendation approach which can exploit heterogeneous user behaviors, including
+the search queries and the browsed webpages of the user.
+However, to model the user preference of sticker selection, we should not only model the sticker selection history,
+and the dialog context of each selected sticker should also be considered when modeling the user preference.
+2.3
+
+Memory Networks
+
+The memory network proposed by Sukhbaatar et al. [62] generally consists of two components. The first one is a
+memory matrix to save information (i.e.,memory slots) and the second one is a neural network to read/write the memory
+slots. The memory network has shown better performance than traditional long-short term memory network in several
+tasks, such as question answering [18, 49, 56, 62], machine translation [51], text summarization [9, 23, 39], dialog
+system [11, 76] and recommendation [15, 70, 91]. The reason is that the memory network can store the information in
+a long time range and has more memory storage units than LSTM which has the single hidden state. Follow memory
+network, there are many variations of memory network have been proposed, i.e.,key-value memory network [52]
+and dynamic memory network [41, 81]. Our method is mainly based on the key-value memory network [52], which
+employs the user history dialog contexts as the memory keys and the corresponding selected stickers the memory
+values. However, there are two main differences between our PESRS model and the previous key-value memory network.
+First, the user history data is in chronological order, we should consider the time information when storing them into
+the memory. To recommend more accurate stickers, the model should not only consider the user preference information
+stored in the memory, but also incorporates the matching result between current dialog context and candidate stickers.
+The second difference lies in that we propose a dynamic fusion layer that considers both the memory read output and
+the matching result of the current context. Compared with these methods, we not only implement a key-value memory
+network, but also provide a sticker selection framework that could incorporate the user’s preference.
+2.4
+
+Visual Question Answering
+
+Sticker recommendation involves the representation of and interaction between images and text, which is related to the
+Visual Question Answering (VQA) task [19, 26, 47, 55, 60, 61, 69]. Specifically, VQA takes an image and a corresponding
+natural language question as input and outputs the answer. It is a classification problem in which candidate answers
+are restricted to the most common answers appearing in the dataset and requires deep analysis and understanding of
+images and questions such as image recognition and object localization [27, 50, 77, 82]. Current models can be classified
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+7
+
+into three main categories: early fusion models, later fusion models, and external knowledge-based models. One
+state-of-the-art VQA model is [46], which proposes an architecture, positional self-attention with co-attention, that does
+not require a recurrent neural network (RNN) for video question answering. [30] proposes an image-question-answer
+synergistic network, where candidate answers are coarsely scored according to their relevance to the image and question
+pair in the first stage. Then, answers with a high probability of being correct are re-ranked by synergizing with images
+and questions.
+The difference between sticker selection and VQA task is that the sticker selection task focus more on multi-turn
+multimodal interaction between stickers and utterances.
+2.5
+
+Visual Dialog
+
+Visual dialog extends the single turn dialog task [29, 53, 64] in VQA to a multi-turn one, where later questions may be
+related to former question-answer pairs. To solve this task, [48] transfers knowledge from a pre-trained discriminative
+network to a generative network with an RNN encoder, using a perceptual loss. [78] combines reinforcement learning
+and generative adversarial networks (GANs) to generate more human-like responses to questions, where the GAN helps
+overcome the relative paucity of training data, and the tendency of the typical maximum-likelihood-estimation-based
+approach to generate overly terse answers. [37] demonstrates a simple symmetric discriminative baseline that can be
+applied to both predicting an answer as well as predicting a question in the visual dialog.
+Unlike visual dialog tasks, in a sticker recommendation system, the candidates are stickers rather than text.
+2.6
+
+Multi-turn Response Selection
+
+Multi-turn response selection [8, 17, 45, 66, 83–85] takes a message and utterances in its previous turns as input and
+selects a response that is natural and relevant to the whole context. In our task, we also need to take previous multi-turn
+dialog into consideration. Previous works include [89], which uses an RNN to represent context and response, and
+measure their relevance. More recently, [79] matches a response with each utterance in the context on multiple levels of
+granularity, and the vectors are then combined through an RNN. The final matching score is calculated by the hidden
+states of the RNN. [90] extends this work by considering the matching with dependency information. More recently,
+[65] proposes a multi-representation fusion network where the representations can be fused into matching at an early
+stage, an intermediate stage, or at the last stage.
+Traditional multi-turn response selection deals with pure natural language processing, while in our task, we also
+need to obtain a deep understanding of images.
+3
+
+DATASET
+
+In this section, we introduce our multi-turn dialog dataset with sticker as response in detail.
+3.1
+
+Data Collection
+
+We collect the large-scale multi-turn dialog dataset with stickers from one of the most popular messaging apps,
+Telegram2 . In this app, a large amount of sticker sets are published, and everyone can use the sticker when chatting
+with a friend or in a chat group. Specifically, we select 20 public chat groups consisting of active members, which are all
+open groups that everyone can join it without any authorities. The chat history of these groups is collected along with
+2 https://telegram.org/
+
+Manuscript submitted to ACM
+
+8
+
+Shen Gao, et al.
+Table 1. Statistics of Response Selection Dataset.
+
+# context-stickers pairs
+Avg. words of context utterance
+Avg. users participate
+
+Train
+
+Valid
+
+Test
+
+320,168
+7.54
+5.81
+
+10,000
+7.50
+5.81
+
+10,000
+7.42
+5.79
+
+(0.2,0.4]
+
+(0.4,0.6]
+
+      
+      
+
+4000
+
+Count
+
+   R I  V D P S O H V
+
+      
+      
+      
+
+2000
+
+     
+     
+     
+
+0
+
+ 
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 
+
+ 8 V H U  K L V W R U \  O H Q J W K
+
+(a) The distribution of history length in training dataset.
+
+(0,0.2]
+
+(0.6,0.8]
+
+Sticker Similarity
+
+(0.8,1.0]
+
+(b) Similarity distribution among all stickers in test dataset.
+
+Fig. 3. Statistics of dataset.
+
+the complete sticker sets. These sticker sets include stickers with similar style. All stickers are resized to a uniform
+size of 128 × 128 pixels. We use 20 utterances before the sticker response as the dialog context, and then we filter out
+irrelevant utterance sentences, such as URL links and attached files. Due to privacy concern, we also filter out user
+information and anonymize user IDs. To construct negative samples, 9 stickers other than the ground truth sticker are
+randomly sampled from the sticker set. After pre-processing, there are 320,168 context-sticker pairs in the training
+dataset, 10,000 pairs in the validation, and 10,000 pairs in test datasets respectively. We make sure that there is no
+overlap between these three datasets, there is no the same dialog context in any two datasets. Two examples are shown
+in Figure 4. We publish this dataset to communities to facilitate further research on dialog response selection task.
+3.2
+
+Statistics and Analysis
+
+In total, there are 3,516 sets of sticker which contain 174,695 stickers. The average number of stickers in a sticker set is
+49.64. Each context includes 15.5 utterances on average. The average number of users who participate in the dialog
+context over each dataset is shown in the third row of Table 1.
+Since not all the users have history dialog data, we calculate the percentage of how many data samples in our dataset
+have history data. There are 290939 data samples in our training dataset which have at lease one history sticker selection
+history, and the percentage is 88.12%. We set the maximum of retrieved history data pair (consisting of dialog context
+and selected sticker) for one data sample to 10, and the average of history length in our training dataset is 6.82. We also
+plot the distribution of history length in Figure 3(a).
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+Case 1 (AVG. 0.125)
+
+9
+Case 2 (AVG. 0.702)
+
+你好像挺喜欢⽤这个表情包的呀
+You seem to like using this sticker set very much.
+是的，app官⽅的表情包做得很好，深得我⼼
+
+Yes, the ofﬁcial sticker set of this app is designed very well
+and win my heart.
+app
+I like the ofﬁcial sticker sets too.
+
+我也挺喜欢 官⽅的表情包
+
+⾥的
+参数是什么意思？怎么⽤？
+指的是 的那个吧
+呃呃呃 ，是的 感谢
+哈哈，成功了？
+Haha, have you succeeded?
+恩恩
+
+wsSettings
+Header
+What is the Header parameter in wsSettings? how to use?
+http
+It probably means the parameter of HTTP.
+...
+Ummm, yes, thanks.
+
+Yes.
+
+Fig. 4. Example cases in the dataset with different similarity scores.
+
+3.3
+
+Sticker Similarity
+
+Stickers in the same set always share a same style or contain the same cartoon characters. Intuitively, the more similar
+the candidate stickers are, the more difficult it is to choose the correct sticker from candidates. In other words, the
+similarity between candidate stickers determines the difficulty of the sticker selection task. To investigate the difficulty
+of this task, we calculate the average similarity of all the stickers in a specific sticker set by the Structural Similarity
+Index (SSIM) metric [3, 72]. We first calculate the similarity between the ground truth sticker and each negative sample,
+then average the similarity scores. The similarity distribution among test data is shown in Figure 3(b), where the average
+similarity is 0.258. The examples in Figure 4 are also used to illustrate the similarity of stickers more intuitively, where
+the left one has a relatively low similarity score, and the right one has a high similarity score.
+4
+
+PROBLEM FORMULATION
+
+Before presenting our approach for sticker response selection in multi-turn dialog, we first introduce our notations and
+key concepts. Table 2 lists the main notations we use.
+Similar to the multi-turn dialog response selection [79, 90], we assume that there is a multi-turn dialog context
+𝑠 = {𝑢 1, . . . , 𝑢𝑇𝑢 } and a candidate sticker set 𝐶 = {𝑐 1, ...𝑐𝑇𝑐 }, where 𝑢𝑖 represents the 𝑖-th utterance in the multi-turn
+dialog. In the 𝑖-th utterance 𝑢𝑖 = {𝑥 1𝑖 , . . . , 𝑥 𝑖 𝑖 }, 𝑥 𝑖𝑗 represents the 𝑗-th word in 𝑢𝑖 , and 𝑇𝑥𝑖 represents the total number of
+𝑇𝑥
+
+words in 𝑢𝑖 utterance. In dialog context 𝑠, 𝑐𝑖 represents a sticker image with a binary label 𝑦𝑖 , indicating whether 𝑐𝑖 is
+an appropriate response for 𝑠. 𝑇𝑢 is the number of utterance in the dialog context and 𝑇𝑐 is the number of candidate
+stickers. For each candidate set, there is only one ground truth sticker, and the remaining ones are negative samples.
+To model the user preference, we use 𝑇ℎ history dialog contexts with user selected sticker {(𝑠ˆ1, 𝑐ˆ1 ), . . . , (𝑠ˆ𝑇ℎ , 𝑐ˆ𝑇ℎ )},
+where 𝑠ˆ𝑖 denotes the 𝑖-th history dialog context and 𝑐ˆ𝑖 denotes the user selected sticker at 𝑖-th history dialog context. In
+the remaining of the paper, we use the word current to denotes the dialog context 𝑠 and sticker 𝑐𝑖 which the model
+needs to predict the sticker selection, and we use the word history to denote the dialog context and sticker which
+user has generated before. In the 𝑘-th history, there is a dialog context 𝑠ˆ𝑘 = {𝑢ˆ𝑖𝑘 , . . . , 𝑢ˆ𝑇𝑘 } which contains up to 𝑇𝑢
+𝑢
+
+utterances as the same as current dialog context 𝑠, and a user selected sticker 𝑐ˆ𝑘 . For each dialog history, we pad the
+Manuscript submitted to ACM
+
+10
+
+Shen Gao, et al.
+Table 2. Glossary.
+
+Symbol
+
+Description
+
+𝑠
+𝑢𝑖
+𝑇𝑢
+𝑥 𝑖𝑗
+𝑇𝑥𝑖
+𝐶
+𝑐𝑖
+𝑇𝑐
+𝑦𝑖
+𝑠ˆ𝑘
+𝑢ˆ𝑖𝑘
+𝑥ˆ𝑘,𝑖
+𝑗
+𝑐ˆ𝑘
+𝑇ℎ
+
+multi-turn dialog context
+𝑖-th utterance in 𝑠
+number of utterances in dialog context
+𝑗-th word in 𝑖-th utterance 𝑢𝑖
+number of words in the 𝑖-th utterance
+candidate sticker set
+𝑖-th candidate sticker in 𝑐
+number of stickers in candidate sticker set 𝑐
+the selection label of 𝑖-th sticker 𝑐𝑖
+𝑘-th multi-turn dialog context in history
+𝑖-th utterance in 𝑘-th history context 𝑠ˆ𝑘
+𝑗-th word in 𝑖-th utterance 𝑢ˆ𝑖𝑘 of 𝑘-th history context
+user selected sticker of 𝑘-th history
+number of history dialog context and selected sticker
+
+dialog context which number of utterances is less than 𝑇𝑢 to 𝑇𝑢 . Our goal is to learn a ranking model that can produce
+the correct ranking for each candidate sticker 𝑐𝑖 ; that is, can select the correct sticker among all the other candidates.
+For the rest of the paper, we take the 𝑖-th candidate sticker 𝑐𝑖 as an example to illustrate the details of our model and
+omit the candidate index 𝑖 for brevity. In some of the sticker selection scenarios, the stickers in the preceding dialog
+context may affect the current decision of sticker selection. But in most cases, the sticker selection is influenced by a
+few utterances before. Thus, in this paper, we focus on modeling the text utterances in dialog context. And we will
+consider the information provided by the stickers in the preceding context in our future work.
+5
+
+PESRS MODEL
+
+5.1
+
+Overview
+
+In this section, we propose our preference enhanced sticker response selector, abbreviated as PESRS. An overview of
+PESRS is shown in Figure 5, which can be split into five main parts:
+• Sticker encoder is a convolutional neural network (CNN) based image encoding module that learns a sticker
+representation.
+• Utterance encoder is a self-attention mechanism-based module encoding each utterance 𝑢𝑖 in the multi-turn
+dialog context 𝑠.
+• User preference modeling module is a key-value memory network that stores the representation of history dialog
+context and corresponding selected sticker.
+• Deep interaction network module conducts deep matching between each sticker representation and each utterance,
+and outputs each interaction result.
+• Fusion network learns the short-term dependency by the fusion RNN and the long-term dependency by the
+fusion Transformer, and finally outputs the matching score by combining the current interaction results with
+user preference representation using a gated fusion layer.
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+Utterance1
+
+(4) Deep interaction
+network
+
+Fusion
+RNN
+
+(2) Utterance Encoder
+
+RNN
+
+(4) Deep interaction
+network
+
+Great! I love
+shopping.
+
+Utterance3
+
+(5) Fusion Network
+
+(2) Utterance Encoder
+
+What about we
+go shopping?
+
+Utterance2
+
+11
+
+Fusion
+Transformer
+
+(2) Utterance Encoder
+
+(4) Deep interaction
+network
+
+What about
+you, Lisa?
+
+(1) Sticker Encoder
+Sticker
+Selection
+
+Sticker
+
+History
+Dialog
+Context 1
+
+Utterance Encoder
+
+History
+Dialog
+Context 2
+
+Utterance Encoder
+
+History
+Dialog
+Context 3
+
+Utterance Encoder
+
+Dynamic
+Fusion
+
+User Preference
+Memory
+(1) Sticker Encoder
+
+(1) Sticker Encoder
+
+(1) Sticker Encoder
+
+(3) User Preference Modeling Module
+
+Fig. 5. Overview of PESRS. We divide our model into five ingredients: (1) Sticker encoder learns sticker representation by a convolutional
+neural network; (2) Utterance encoder learns representation of each utterance by self-attention based Transformer; (3) User preference
+modeling module obtains the position-aware history representations and store them into a key-value memory network; (4) Deep
+interaction network conducts deep matching interaction between sticker representation and utterance representation in different
+levels of granularity; (5) Fusion network combines the long-term and short-term dependency feature between interaction results
+produced by (4) and the user preference representation produced by (3) into final sticker prediction layer.
+
+5.2
+
+Sticker Encoder
+
+Much research has been conducted to alleviate gradient vanishing [32] and reduce computational costs [31] in image
+modeling tasks. We utilize one of these models, i.e.,the Inception-v3 [63] model rather than plain CNN to encode sticker
+image:
+𝑂, 𝑂 flat = Inception-v3(𝑐),
+
+(1)
+
+where 𝑐 is the sticker image. The sticker representation is 𝑂 ∈ R𝑝×𝑝×𝑑 which conserves the two-dimensional information
+of the sticker, and will be used when associating stickers and utterances in §5.4. We use the original image representation
+output of Inception-v3 𝑂 flat ∈ R𝑑 as another sticker representation. Most imaging grounded tasks [38, 73, 74] employ the
+pre-trained image encoding model to produce the image representation. However, existing pre-trained CNN networks
+Manuscript submitted to ACM
+
+12
+
+Shen Gao, et al.
+
+including Inception-v3 are mostly built on real-world photos. Thus, directly applying the pre-trained networks on
+stickers cannot speed up the training process. In this dataset, sticker author give each sticker 𝑐 an emoji tag which
+denotes the general emotion of the sticker. Hereby, we propose an auxiliary sticker classification task to help the model
+converge quickly, which uses 𝑂 flat to predict which emoji is attached to the corresponding sticker. More specifically, we
+feed 𝑂 flat into a linear classification layer and then use the cross-entropy loss L𝑠 as the loss function of this classification
+task.
+5.3
+
+Utterance Encoder
+
+To model the semantic meaning of the dialog context, we learn the representation of each utterance 𝑢𝑖 . First, we use
+an embedding matrix 𝑒 to map a one-hot representation of each word in each utterance 𝑢𝑖 to a high-dimensional
+vector space. We also add the positional embedding to the original word embedding, and we use the 𝑒 (𝑥 𝑖𝑗 ) to denote
+the embedding representation of word 𝑥 𝑖𝑗 . The positional embedding is the same as Transformer [68]. From these
+embedding representations, we use the attentive module with positional encoding from Transformer [68] to model the
+interactions between the words in an utterance. Attention mechanisms have become an integral part of compelling
+sequence modeling in various tasks [5, 16, 21, 46]. In our sticker selection task, we also need to let words fully interact
+with each other words to model the dependencies of words in the input sentence. The self attentive module in the
+Transformer requires three inputs: the query 𝑄, the key 𝐾 and the value 𝑉 . To obtain these three inputs, we use three
+linear layers with different parameters to project the embedding of dialog context 𝑒 (𝑥 𝑖𝑗 ) into three spaces:
+𝑄 𝑖𝑗 = 𝐹𝐶 (𝑒 (𝑥 𝑖𝑗 )),
+
+(2)
+
+𝐾 𝑖𝑗 = 𝐹𝐶 (𝑒 (𝑥 𝑖𝑗 )),
+𝑉 𝑗𝑖 = 𝐹𝐶 (𝑒 (𝑥 𝑖𝑗 )).
+
+(3)
+(4)
+𝑖
+
+The self attentive module then takes each 𝑄 𝑖𝑗 to attend to 𝐾 𝑖· , and uses these attention distribution 𝛼 𝑖𝑗,· ∈ R𝑇𝑥 as weights
+to gain the weighted sum of 𝑉 𝑗𝑖 , as shown in Equation 6.
+
+
+exp 𝑄 𝑖𝑗 · 𝐾𝑘𝑖
+𝛼 𝑖𝑗,𝑘 = Í 𝑖
+
+,
+𝑇𝑥
+𝑖
+𝑖
+𝑛=1 exp 𝑄 𝑗 · 𝐾𝑛
+𝛽 𝑖𝑗 =
+
+𝑖
+𝑇
+𝑥
+∑︁
+
+𝛼 𝑖𝑗,𝑘 · 𝑉𝑘𝑖 ,
+
+(5)
+
+(6)
+
+𝑘=1
+
+Next, we add the original word embedding 𝑒 (𝑥 𝑖𝑗 ) on 𝛽 𝑖𝑗 as the residential connection layer, shown in Equation 7:
+
+
+ℎˆ𝑖𝑗 = Dropout 𝑒 (𝑥 𝑖𝑗 ) + 𝛽 𝑖𝑗 ,
+
+(7)
+
+where 𝛼 𝑖𝑗,𝑘 denotes the attention weight between 𝑗-th word to 𝑘-th word in 𝑖-th utterance. To prevent vanishing or
+exploding of gradients, a layer normalization operation [44] is also applied on the output of the feed-forward layers
+with ReLU activation as shown in Equation 8:
+
+
+ℎ𝑖𝑗 = norm 𝑚𝑎𝑥 (0, ℎˆ𝑖𝑗 · 𝑊1 + 𝑏 1 ) · 𝑊2 + 𝑏 2 + ℎˆ𝑖𝑗 ,
+
+(8)
+
+where 𝑊1,𝑊2, 𝑏 1, 𝑏 2 are all trainable parameters of the feed-forward layer. ℎ𝑖𝑗 denotes the hidden state of 𝑗-th word for
+the 𝑖-th utterance in the Transformer. We also employ the multi-head attention is our model which conducts these
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+13
+
+(4) Deep interatction network
+Co-attention
+
+Relation Matrix
+
+utterance-aware
+sticker
+representation
+
+Utterance 1
+
+Integrate
+Function
+
+FC
+
+Fusion
+Network
+
+sticker-aware
+utterance
+representation
+
+Fig. 6. Framework of deep interaction network.
+
+operation multiple times and then concatenate the outputs as the final representation. For brevity, we omit these
+multi-head operation in our equations.
+5.4
+
+Deep Interaction Network
+
+Now that we obtain the representation of the sticker and each utterance, we can conduct a deep matching between
+these components to model the bi-directional relationship between the words in dialog context and the sticker patches.
+On one hand, there are some emotional words in dialog context history that match the expression of the stickers such
+as “happy” or “sad”. On the other hand, specific parts of the sticker can also match these corresponding words such as
+dancing limbs or streaming eyes. Hence, we employ a bi-directional attention mechanism between a sticker and each
+utterance, that is, from utterance to sticker and from sticker to utterance, to analyze the cross-dependency between the
+two components. The interaction is illustrated in Figure 6.
+We take the 𝑖-th utterance as an example and omit the index 𝑖 for brevity. The two directed attentions are derived from
+2
+
+a shared relation matrix, 𝑀 ∈ R (𝑝 )×𝑇𝑢 , calculated by sticker representation 𝑂 ∈ R𝑝×𝑝×𝑑 and utterance representation
+ℎ ∈ R𝑇𝑢 ×𝑑 . The score 𝑀𝑘 𝑗 ∈ R in the relation matrix 𝑀 indicates the relation between the 𝑘-th sticker representation
+unit 𝑂𝑘 , 𝑘 ∈ [1, 𝑝 2 ] and the 𝑗-th word ℎ 𝑗 , 𝑗 ∈ [1,𝑇𝑢 ] and is computed as:
+𝑀𝑘 𝑗 = 𝜎 (𝑂𝑘 , ℎ 𝑗 ),
+
+(9)
+
+⊺
+
+(10)
+
+𝜎 (𝑥, 𝑦) = 𝑤 [𝑥 ⊕ 𝑦 ⊕ (𝑥 ⊗ 𝑦)],
+
+where 𝜎 is a trainable scalar function that encodes the relation between two input vectors. ⊕ denotes a concatenation
+operation and ⊗ is the element-wise multiplication.
+Next, a two-way max pooling operation is conducted on 𝑀, i.e.,let 𝜏 𝑢𝑗 = max(𝑀:𝑗 ) ∈ R represent the attention weight
+on the 𝑗-th utterance word by the sticker representation, corresponding to the “utterance-wise attention”. This attention
+learns to assign high weights to the important words that are closely related to sticker. We then obtain the weighted
+Manuscript submitted to ACM
+
+14
+
+Shen Gao, et al.
+
+sum of hidden states as “sticker-aware utterance representation” 𝑙:
+𝑙=
+
+𝑇𝑢
+∑︁
+
+𝜏 𝑢𝑗 ℎ 𝑗 .
+
+(11)
+
+𝑗
+
+Similarly, sticker-wise attention learns which part of a sticker is most relevant to the utterance. Let 𝜏𝑘𝑠 = max(𝑀𝑘: ) ∈ R
+represent the attention weight on the 𝑘-th unit of the sticker representation. We use this to obtain the weighted sum of
+𝑂𝑘 , i.e.,the “utterance-aware sticker representation” 𝑟 :
+𝑟=
+
+2
+𝑝
+∑︁
+
+𝜏𝑘𝑠 𝑂𝑘 .
+
+(12)
+
+𝑘
+
+After obtaining the two outputs from the co-attention module, we combine the sticker and utterance representations
+and finally get the ranking result. We first integrate the utterance-aware sticker representation 𝑟 with the original
+sticker representation 𝑂 flat using an integrate function, named 𝐼 𝐹 :
+𝑄 1 = IF (𝑂 flat, 𝑟 ) ,
+IF(𝑥, 𝑦) = FC (𝑥 ⊕ 𝑦 ⊕ (𝑥 ⊗ 𝑦) ⊕ (𝑥 + 𝑦)) ,
+
+(13)
+(14)
+
+where FC denotes the fully-connected (FC) layer and we use the ReLU [54] as the activation function, ⊕ represents the
+vector concatenation along the final dimension of the vector and ⊗ denotes the elementwise product operation. We
+add the sticker-aware utterance representation 𝑙 into 𝑄 1 together and then apply a fully-connected layer with ReLU
+activation:
+𝑄 2 = FC(𝑄 1 ⊕ 𝑙).
+5.5
+
+(15)
+
+User Preference Modeling Module
+
+Users have their preference when selecting the sticker as the response of the multi-turn dialog context. Hence, to
+recommend the sticker more accurately, our model should consider the user’s preference when giving the final sticker
+recommendation. Intuitively, the sticker that selected by the user recently contains the user’s preference, and these
+history data can help our model to build the preference representation. As for constructing the preference modeling
+module, our motivation is to find the semantically similar dialog contexts in the history data, and then use the
+corresponding selected stickers of these dialog contexts to facilitate the final sticker prediction of the current dialog
+context. Hence, we propose the user preference memory and the architecture of this module as shown in Figure 7. The
+proposed user preference memory unit inherits from memory networks [10, 24, 67, 70], and generally has two steps: (1)
+memory addressing and (2) memory reading. The user preference memory consists of a set of history multi-turn dialog
+contexts and selected stickers. Though one action is corresponding to a dialog context, it should attend to the different
+history contexts (i.e.,memory slots) upon the current dialog context. Thus, we address and read the memory unit as
+follows.
+5.5.1 History Encoding. To store the history dialog contexts and selected stickers, we encode them into vector spaces
+using the same method as used when encoding current dialog context and candidate stickers. Concretely, first, attentive
+module is employed to encode all the dialog contexts {ˆ𝑠 1, . . . , 𝑠ˆ𝑇ℎ }:
+𝑘
+
+ℎ𝑖 = mean-pooling(Transformer(𝑢ˆ𝑖𝑘 )),
+Manuscript submitted to ACM
+
+(16)
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+Memory Key
+
+History
+Dialog
+Context
+
+15
+Memory Value
+
+Memory
+Addressing
+...
+
+...
+
+...
+
+Position-aware
+RNN
+
+Memory
+Reading
+
+...
+
+...
+
+History
+Selected
+Sticker
+
+Position-aware
+RNN
+
+Query
+
+Memory
+Read Out
+
+Reading
+Weights
+
+Fig. 7. Framework of user preference modeling module which consists a position-aware RNN and a key-value memory network. We
+use the history dialog contexts as the keys and the history selected stickers as the values. Finally, we use the representation of the
+current dialog context as the query the user preference memory.
+𝑘
+
+where ℎ𝑖 is the vector representation of the 𝑖-th utterance in the 𝑘-th history, the Transformer is the same operation
+as shown in Equation 2-Equation 8. Different with the Transformer used in Equation 2, the query, key and value in
+Equation 16 are all 𝑢ˆ𝑖𝑘 , where we conduct self-attention over all history dialog contexts. Then, we use a max-pooling
+𝑘
+
+layer to obtain the vector representation ℎ of the 𝑘-th dialog context in history:
+𝑘
+
+𝑘
+
+𝑘
+
+ℎ = max({ℎ 1 , . . . , ℎ𝑇ℎ }).
+
+(17)
+
+Next, we use the same image encoder Inception-v3 in § 5.2 to encode all the stickers {𝑐ˆ1, . . . , 𝑐ˆ𝑇ℎ } of each history
+dialog context into vector representations {𝑂 1, . . . , 𝑂𝑇ℎ }:
+𝑂 𝑘 = Inception-v3(𝑐ˆ𝑘 ),
+
+(18)
+
+where sticker representation 𝑂 𝑘 ∈ R𝑑 is a one-dimensional vector, we drop the output 𝑂 and use the output 𝑂 𝑓 𝑙𝑎𝑡 as
+the 𝑂 𝑘 .
+Intuitively, it is much easier for the user to recall their recently used stickers than the stickers they used a long time
+ago. Thus, we propose a recurrent neural network (RNN) based position-aware user history modeling layer which
+𝑘
+
+incorporates the position feature into the history data representation, e.g.,history dialog context representation ℎ and
+history selected sticker representation 𝑂 𝑘 . We first concatenate the position of history dialog context as an additional
+𝑘
+
+feature to the vector representation of dialog representation ℎ and sticker representation 𝑂 𝑘 . Then, we employ an
+RNN to encode these representations in chronological order:
+𝑘
+ℎˆ𝑘 = RNN(𝑡𝑘 ⊕ ℎ , ℎˆ𝑘−1 ),
+
+(19)
+
+𝑂ˆ 𝑘 = RNN(𝑡𝑘 ⊕ 𝑂 𝑘 , 𝑂ˆ 𝑘−1 ).
+
+(20)
+
+Finally, we obtain the position-aware history data representations {ℎˆ1, . . . , ℎˆ𝑇ℎ } and {𝑂ˆ 1, . . . , 𝑂ˆ𝑇ℎ } and we will introduce
+how to store them into user preference memory.
+Manuscript submitted to ACM
+
+16
+
+Shen Gao, et al.
+
+Fusion Network
+Fusion RNN
+
+Add & Norm
+
+Feed
+Forward
+
+Add & Norm
+
+Multi-Head
+Attention
+
+Interaction
+&
+Gated Fusion
+
+Prediction
+Layer
+
+Fusion Transformer
+
+Fig. 8. Framework of fusion network. The black circle in the right of the figure indicates the interaction combination and gated fusion.
+
+5.5.2 Memory Addressing. After obtaining all the vector representations of history sticker and dialog context, we
+employ a key-value memory network and store them into each key-value slot, as shown in Figure 7. In this memory
+network, we use the dialog contexts as the keys and use the corresponding selected stickers as the values.
+First, we construct the query from the current dialog context, which will be used to retrieve the user preference
+representation from the memory network. We apply a max-pooling layer on the representations of each utterance in
+the current dialog context:
+𝑖
+ℎ𝑚
+= mean-pooling({ℎ𝑖1, . . . , ℎ𝑇𝑖 𝑥 }),
+1
+ℎ = max{ℎ𝑚
+, . . . , ℎ𝑇𝑚𝑢 },
+
+(21)
+(22)
+
+𝑖 is the representation of 𝑖-th utterance in the current dialog context, ℎ ∈ R𝑑 is used as the query and it
+where ℎ𝑚
+
+represents the overall information of the current dialog context. Next, we use ℎ to calculate the read weights over each
+memory slot:
+𝛿𝑘 = softmax(ℎ𝑊𝛿 ℎˆ𝑘 ),
+
+(23)
+
+where 𝛿𝑘 ∈ [0, 1] is the read weight for the 𝑘-th memory slot and 𝑊𝛿 is a trainable parameter.
+5.5.3 Memory Reading. After obtaining the read weights {𝛿 1, . . . , 𝛿𝑇ℎ } for all the memory slots, we can write the
+semantic output for preference memory by:
+𝑟=
+
+𝑇
+ℎ
+∑︁
+
+𝛿𝑘 𝑂ˆ 𝑘 ,
+
+(24)
+
+𝑘
+
+where 𝑟 in essence represents a semantic preference representation and will be used when predicting the sticker in
+current dialog context.
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+5.6
+
+17
+
+Fusion Network
+
+Up till now, we have obtained the user preference representation and interaction result between each utterance and the
+candidate sticker. Here we again include the utterance index 𝑖 which has been omitted in previous subsections, and 𝑄 2
+now becomes 𝑄 𝑖2 . Since the utterances in a multi-turn dialog context are in chronological order, we employ a Fusion
+RNN and a Fusion Transformer to model the short-term and long-term interaction between utterance {𝑄 21, . . . , 𝑄𝑇2𝑢 }.
+Fusion RNN (shown in the top part of Figure 8) is based on the recurrent network which can capture short-term
+dependency over each utterance interaction result. Fusion Transformer (shown in the bottom part of Figure 8) is based
+on the self-attention mechanism which is designed for capturing the important elements and the long-term dependency
+among all the interaction results.
+5.6.1 Fusion RNN. Fusion RNN first reads the interaction results for each utterance {𝑄 21, . . . , 𝑄𝑇2𝑢 } and then transforms
+into a sequence of hidden states. In this paper, we employ the gated recurrent unit (GRU) [12] as the cell of fusion RNN,
+which is popular in sequential modeling [20, 65, 79]:
+
+
+𝑔𝑖 = RNN 𝑄 𝑖2, 𝑔𝑖−1 ,
+
+(25)
+
+where 𝑔𝑖 is the hidden state of the fusion RNN and 𝑔0 is the initial state of RNN which is initialized randomly. Finally,
+we obtain the sequence of hidden states {𝑔1, . . . , 𝑔𝑇𝑢 }. One can replace GRU with similar algorithms such as Long-Short
+Term Memory network (LSTM) [34]. We leave the study as future work.
+5.6.2 Fusion Transformer. To model the long-term dependency and capture the salience utterance from the context,
+we employ the self-attention mechanism introduced in Equation 5-8. Concretely, given {𝑄 21, . . . , 𝑄𝑇2𝑢 }, we first employ
+three linear projection layers with different parameters to project the input sequence into three different spaces:
+Q𝑖 = FC(𝑄 𝑖2 ),
+
+(26)
+
+K 𝑖 = FC(𝑄 𝑖2 ),
+
+(27)
+
+V
+
+𝑖
+
+= FC(𝑄 𝑖2 ).
+
+(28)
+
+Then we feed these three matrices into the self-attention algorithm illustrated in Equation 5-8. Finally, we obtain the
+long-term interaction result {𝑔ˆ1, . . . , 𝑔ˆ𝑇𝑢 }.
+5.6.3 Long Short Interaction Combination. To combine the interaction representation generated by fusion RNN and
+fusion Transformer, we employ the SUMULTI function proposed by [71] to combine these representations, which has
+been proven effective in various tasks:
+"
+𝑔𝑖 = ReLU(W
+
+𝑠
+
+(𝑔ˆ𝑖 − 𝑔𝑖 ) ⊗ (𝑔ˆ𝑖 − 𝑔𝑖 )
+𝑔ˆ𝑖 ⊗ 𝑔𝑖
+
+#
++ b𝑠 ),
+
+(29)
+
+where ⊗ is the element-wise product. The new interaction sequence {𝑔1, . . . , 𝑔𝑇𝑢 } is then boiled down to a matching
+vector 𝑔˜𝑇𝑢 by another GRU-based RNN:
+𝑔˜𝑖 = RNN(𝑔˜𝑖−1, 𝑔𝑖 ).
+
+(30)
+
+We use the final hidden state 𝑔˜𝑇𝑢 as the representation of the overall interaction result between the whole utterance
+context and the candidate sticker.
+Manuscript submitted to ACM
+
+18
+
+Shen Gao, et al.
+
+5.6.4 Gated Fusion. In the final prediction, our model combines the current dialog context interaction result and user
+preference representation to predict the final result. However, in each case, the information required for current dialog
+context interaction and user preference representation is not necessarily the same. If the current dialog context is very
+similar to the history dialog context, the historical information should play a greater role in prediction. To incorporate
+the user preference information into final sticker prediction, we employ a gated fusion which dynamically fuses the
+current context interaction result and user preference representation together by using a gate 𝑓𝑔 . To dynamically fuse
+these two information sources, we calculate a gate 𝑓𝑔 ∈ [0, 1] which decide which part should the model concentrates
+on when making the final sticker selection decision:
+𝑓𝑔 = 𝜎 (FC([𝑟 ⊕ 𝑔˜𝑇𝑢 ])),
+
+(31)
+
+where 𝜎 is the sigmoid function and ⊕ denotes the vector concatenation operation. Next, we apply a weighted sum
+operation using the gate 𝑓𝑔 on current context interaction result 𝑔˜𝑇𝑢 and user preference representation 𝑟 , as shown in
+Equation 32. Finally, we apply a fully-connected layer to produce the matching score 𝑦ˆ of the candidate sticker:
+𝑦ˆ = 𝜎 (FC(𝑓𝑔 ∗ 𝑔˜𝑇𝑢 + (1 − 𝑓𝑔 ) ∗ 𝑟 )),
+
+(32)
+
+where 𝑦ˆ ∈ (0, 1) is the matching score of the candidate sticker.
+5.7
+
+Learning
+
+Recall that we have a candidate sticker set 𝐶 = {𝑐 1, ...𝑐𝑇𝑐 } which contains multiple negative samples and one ground
+truth sticker. We use hinge loss as our objective function:
+L=
+
+𝑁
+∑︁
+
+
+
+max 0, 𝑦ˆnegative − 𝑦ˆpositive + margin ,
+
+(33)
+
+where 𝑦ˆnegative and 𝑦ˆpositive corresponds to the predicted labels of the negative sample and ground truth sticker,
+respectively. The margin is the margin rescaling in hinge loss. The gradient descent method is employed to update all
+the parameters in our model to minimize this loss function.
+6
+
+EXPERIMENTAL SETUP
+
+6.1
+
+Research Questions
+
+We list nine research questions that guide the experiments:
+• RQ1 (See § 7.1): What is the overall performance of PESRS compared with all baselines?
+• RQ2 (See § 7.2): What is the effect of each module in PESRS?
+• RQ3 (See § 7.3): How does the performance change when the number of utterances changes?
+• RQ4 (See § 7.4): Can co-attention mechanism successfully capture the salient part on the sticker image and the
+important words in dialog context?
+• RQ5 (See § 7.5): What is the influence of the similarity between candidate stickers?
+• RQ6 (See § 7.6): What is the influence of the parameter settings?
+• RQ7 (See § 7.7): What is the influence of the user history length?
+• RQ8 (See § 7.8): What is the performance of using the user’s most selected sticker as the response?
+• RQ9 (See § 7.9): Can sticker encoder capture the semantic meaning of sticker?
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+19
+
+Table 3. Ablation models for comparison.
+
+Acronym
+
+Gloss
+
+PESRS w/o Classify
+PESRS w/o DIN
+PESRS w/o FR
+PESRS FR2T
+
+PESRS w/o emoji classification task
+PESRS w/o Deep Interaction Network
+PESRS w/o Fusion RNN
+Change the Fusion RNN in PESRS to Transformer with positional
+encoding
+PESRS w/o User Preference Memory
+PESRS w/o Time-Aware RNN
+
+PESRS w/o UPM
+PESRS w/o TAR
+
+6.2
+
+Comparison Methods
+
+We first conduct an ablation study to prove the effectiveness of each component in PESRS as shown in Table 3.
+Specifically, we remove each key part of our PESRS to create ablation models and then evaluate the performance of
+these models.
+Next, to evaluate the performance of our model, we compare it with the following baselines. Note that, we adapt VQA
+and multi-turn response selection models to the sticker response selection task by changing their input text encoder to
+image encoder. Since we incorporate the user history data into our model, we also compare with the user modeling
+method which has been widely used in the recommendation tasks.
+(1) SMN: [79] proposes a sequential matching network to address response selection for the multi-turn conversation
+problem. SMN first matches a response with each utterance in the context. Then vectors are accumulated in chronological
+order through an RNN. The final matching score is calculated with RNN.
+(2) DAM: [90] extends the transformer model [68] to the multi-turn response selection task, where representations of
+text segments are constructed using stacked self-attention. Then, truly matched segment pairs are extracted across
+context and response.
+(3) MRFN: [65] proposes a multi-representation fusion network which consists of multiple dialog utterance representation methods and generates multiple fine-grained utterance representations. Next, they argue that these representations
+can be fused into final response candidate matching at an early stage, at the intermediate stage or the last stage. They
+evaluate all stages and find fusion at the last stage yields the best performance. This is the state-of-the-art model on the
+multi-turn response selection task.
+(4) Synergistic: [30] devises a novel synergistic network on VQA task. First, candidate answers are coarsely scored
+according to their relevance to the image-question pair. Afterward, answers with high probabilities of being correct are
+re-ranked by synergizing with image and question. This model achieves the state-of-the-art performance on the Visual
+Dialog v1.0 dataset [13].
+(5) PSAC: [46] proposes the positional self-attention with co-attention architecture on VQA task, which does not require
+RNNs for video question answering. We replace the output probability on the vocabulary size with the probability on
+candidate sticker set.
+(6) SRS: We propose the first sticker selection method consists of the sticker and dialog context encoding module, deep
+matching network and information fusion layer in our previous work [22]. This method achieves the state-of-the-art
+performance on the multi-turn dialog-based sticker selection dataset.
+Manuscript submitted to ACM
+
+20
+
+Shen Gao, et al.
+
+(7) LSTUR: [2] proposes a long- and short-term user modeling method to represent the long- and short-term user
+preference and then apply this method to the news recommendation task. Experiments on a real-world dataset
+demonstrate their approach can effectively improve the performance of neural news recommendation method. To adapt
+this method on our sticker selection task, we replace their news encoding network with the sticker image encoding
+network, Inception-v3, as the same as we used in our model. Since there are countless users in our task, we can not
+obtain a static user embedding as they used in their model. For fair, comparison, we replace the user embedding in their
+model to current dialog context.
+For the first three multi-turn response selection baselines, we replace the candidate utterance embedding RNN or
+Transformer network with the image encoding CNN network Inception-v3, which is the same as used in our proposed
+model. This Inception-v3 network is initialized using a pre-trained model3 for all baselines and PESRS.
+6.3
+
+Evaluation Metrics
+
+Following [65, 90], we employ recall at position 𝑘 in 𝑛 candidates 𝑅𝑛 @𝑘 as an evaluation metric, which measures if the
+positive response is ranked in the top 𝑘 positions of 𝑛 candidates. Following [90], we also employ mean average precision
+(MAP) [4] as an evaluation metric. The statistical significance of differences observed between the performance of two
+runs is tested using a two-tailed paired t-test and is denoted using ▲ (or ▼ ) for strong significance at 𝛼 = 0.01.
+6.4
+
+Implementation Details
+
+We implement our experiments using TensorFlow [1] on an NVIDIA GTX 2080Ti GPU. If the number of words in an
+utterance is less than 30, we pad zeros, otherwise, the first 30 words are kept. The word embedding dimension is set to
+100 and the number of hidden units is 100. The batch size is set to 32. 9 negative samples are randomly sampled from
+the sticker set containing the ground truth sticker, and we finally obtain 10 candidate stickers for the model to select.
+We initialize all the parameters randomly using a Gaussian distribution in [-0.02, 0.02]. We use Adam optimizer [40] as
+our optimizing algorithm, and the learning rate is 1 × 10−4 .
+7
+
+EXPERIMENTAL RESULT
+
+7.1
+
+Overall Performance
+
+For research question RQ1, we examine the performance of our model and baselines in terms of each evaluation metric,
+as shown in Table 4. First, the performance of the multi-turn response selection models is generally consistent with
+their performances on text response selection datasets. SMN [79], an earlier work on multi-turn response selection task
+with a simple structure, obtains the worst performance on both sticker response and text response selection. DAM [90]
+improves the SMN model and gets better performance. MRFN [65] is the state-of-the-art text response selection model
+and achieves the best performance among baselines in our task as well. Second, VQA models perform generally worse
+than multi-turn response selection models, since the interaction between multi-turn utterances and sticker is important,
+which is not taken into account by VQA models. Third, our previously proposed SRS achieves better performance with
+3.36%, 5.92% and 3.72% improvements in MAP, 𝑅10 @1 and 𝑅10 @2 respectively, over the state-of-the-art multi-turn
+selection model, i.e.,MRFN, and with 6.80%, 10.69% and 8.74% significant increases (with p-value < 0.05) over the
+state-of-the-art visual dialog model, PSAC. Finally, comparing with our previously proposed sticker selection method
+SRS, our newly proposed model PESRS which incorporates the user preference information achieves the state-of-the-art
+3 https://github.com/tensorflow/models/tree/master/research/slim
+
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+21
+
+Table 4. RQ1: Automatic evaluation comparison. Significant differences are with respect to MRFN.
+
+MAP
+
+𝑅10 @1
+
+𝑅10 @2
+
+𝑅10 @5
+
+Visual Q&A methods
+Synergistic 0.593
+PSAC
+0.662
+
+0.438
+0.533
+
+0.569
+0.641
+
+0.798
+0.836
+
+Multi-turn response selection methods
+SMN
+0.524
+0.357
+0.488
+DAM
+0.620
+0.474
+0.601
+MRFN
+0.684
+0.557
+0.672
+LSTUR
+0.689
+0.558
+0.68
+
+0.737
+0.813
+0.853
+0.874
+
+SRS
+PESRS
+
+0.872
+0.897
+
+0.709
+0.743
+
+0.590
+0.632▲
+
+0.703
+0.740▲
+
+     
+
+     
+
+     
+     
+     
+
+R10@1
+
+ 0 $ 3
+
+     
+     
+
+     
+     
+
+     
+
+     
+
+     
+
+     
+ 
+
+ 
+
+ 
+
+  
+
+  
+
+     
+
+  
+
+ 
+
+ 
+
+ 8 W W H U D Q F H  1 X P E H U
+
+ 
+
+  
+
+  
+
+  
+
+  
+
+  
+
+ 8 W W H U D Q F H  1 X P E H U
+
+(b) 𝑅10 @1 score
+
+(a) 𝑀𝐴𝑃 score
+     
+     
+     
+     
+
+     
+
+R10@5
+
+R10@2
+
+     
+
+     
+     
+
+     
+     
+     
+
+     
+     
+     
+
+ 
+
+ 
+
+ 
+
+  
+
+ 8 W W H U D Q F H  1 X P E H U
+
+(c) 𝑅10 @2 score
+
+  
+
+  
+
+ 
+
+ 
+
+ 
+
+  
+
+ 8 W W H U D Q F H  1 X P E H U
+
+(d) 𝑅10 @5 score
+
+Fig. 9. RQ3: Performance of PRSRS on all metrics when reading different number of utterances.
+
+performance with 4.8%, 7.1% and 5.3% improvements in 𝑀𝐴𝑃, 𝑅10 @1 and 𝑅10 @2 respectively, over our previous method
+Manuscript submitted to ACM
+
+22
+
+Shen Gao, et al.
+Table 5. RQ2: Evaluation of different ablation models.
+
+PESRS w/o Classify
+PESRS w/o DIN
+PESRS w/o FR
+PESRS FR2T
+PESRS w/o UPM
+PESRS w/o TAR
+PESRS
+
+MAP
+
+𝑅10 @1
+
+𝑅10 @2
+
+𝑅10 @5
+
+0.714
+0.728
+0.727
+0.725
+0.709
+0.710
+0.743
+
+0.598
+0.612
+0.609
+0.610
+0.590
+0.589
+0.632▲
+
+0.707
+0.725
+0.725
+0.719
+0.703
+0.706
+0.740▲
+
+0.866
+0.888
+0.886
+0.881
+0.872
+0.873
+0.897
+
+SRS which is just based on the multi-modal matching between utterance and sticker image. That demonstrates the
+superiority of incorporating the user preference information into sticker selection model.
+7.2
+
+Ablation Study
+
+For research question RQ2, we conduct ablation tests on the use of the sticker classification loss (introduced in § 5.2),
+the deep interaction network (introduced in § 5.4), the fusion RNN (introduced in § 5.6.1), the user preference memory
+without position aware RNN (introduced in § 5.5) and the full user preference memory (introduced in § 5.5.1) respectively.
+The evaluation results are shown in Table 5. The performances of all ablation models are worse than that of PESRS under
+all metrics, which demonstrates the necessity of each component in PESRS. We also find that the sticker classification
+makes contribution to the overall performance. And this additional task can also speed up the training process, and
+help our model to converge quickly. We use 21 hours to train the PESRS until convergence, and we use 35 hours
+for training PESRS w/o Classify. The fusion RNN brings a significant contribution (with p-value < 0.05), improving
+the 𝑀𝐴𝑃 and 𝑅10 @1 scores by 2.2% and 3.8%, respectively. We also change the fusion RNN to a Transformer with
+positional encoding, which leads to a decrease of the performance that verifies the effectiveness of fusion RNN. The
+deep interaction network also plays an important part. Without this module, the interaction between the sticker and
+utterance are hindered, leading to a 3.3% drop in 𝑅10 @1. Particularly, since the user preference memory capture the
+preference of user’s sticker selection, we can see that when the user preference memory is removed from the model, the
+model suffers from dramatic performance drop in terms of all metrics. And the position-aware user history encoding
+RNN also makes contribution to the PESRS model, improving the 𝑀𝐴𝑃 and 𝑅10 @1 scores by 4.6% and 7.3%, respectively.
+7.3
+
+Analysis of Number of Utterances
+
+For research question RQ3, in addition to comparing with various baselines, we also evaluate our model when reading
+different number of utterances to study how the performance relates to number of context turns.
+Figure 9 shows how the performance of the PESRS changes with respect to different numbers of utterances turns. In
+this experiment, we change the numbers of utterances turns in both current dialog context and history dialog contexts.
+We observe a similar trend for PESRS on the first three evaluation metrics 𝑀𝐴𝑃, 𝑅10 @1 and 𝑅10 @2: they first increase
+until the utterance number reaches 15, and then fluctuate as the utterance number continues to increase. There are two
+possible reasons for this phenomena. The first reason might be that, when the information in the utterances is limited,
+the model can capture the features well, and thus when the amount of information increases, the performance gets
+better. However, the capacity of the model is limited, and when the amount of information reaches its upper bound, it
+gets confused by this overwhelming information. The second reason might be of the usefulness of the utterance context.
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+23
+
+Utterances that occur too early before the sticker response may be irrelevant to the sticker and bring unnecessary noise.
+As for the last metric, the above observations do not preserve. The 𝑅10 @5 scores fluctuate when the utterance number
+is below 15, and drop when the utterance number increases. The reason might be that 𝑅10 @5 is not a strict metric, and
+it is easy to collect this right sticker in the set of half of the whole candidates. Thus, the growth of the information given
+to PESRS does not help it perform better but the noise it brings harms the performance. On the other hand, though the
+number of utterances changes from 3 to 18, the overall performance of PESRS generally remains at a high level, which
+proves the robustness of our model.
+
+话说。。为什么有些⼈可以说出让我不知
+道怎么接的话。
+Case 1
+
+Why do some people always say sth I
+don't know how to pick up?
+
+我⼀个朋友的朋友，最近⽼问我在⼲嘛，
+吃饭了吗。。
+I have a friend's friend, who always ask
+me what am I doing, have I eaten.
+
+然后我说我没吃
+Then I said that I haven't eaten.
+对⽅ 就会。。。
+Then he will reply with ...
+我实在不知道下⼀句怎么接
+I really don't know what to say next.
+求吧
+Ask him to beg you to eat.
+不跪下来求都不吃
+
+Unless he begs you to eat, you won't
+eat.
+
+Case 2
+
+你认为是机器⼈就是机器⼈
+If you think it is a chatbot, it is.
+你认为是真⼈就是真⼈
+If you think it is a real person, it is.
+就是机器⼈没跑了
+It is a chatbot, deﬁnitely.
+哈哈
+Haha
+不能 太较真
+Don't be too serious.
+太较真就⽆聊了
+
+It becomes boring if you are taking it too
+seriously.
+1+
+7
+If you don't believe it is a chatbot, you
+can ask him the question "what is the
+answer of 1+ﬁve times by 7 divided by
+three"
+
+不信你告诉我 五乘以 除以三等于多少
+
+Case 3
+
+要怎么样才能连上啊
+我连不上
+I can't connect to it.
+不会⽤⼲什么买nat啊
+NAT
+How to connect to NAT?
+
+If you don't know how to use NAT,
+why did you buy it?
+, IDC
+BTW, does IDC make money?
+66666
+good question
+150w
+150%
+You give me 1.5 million, and I will
+give you a 150% return.
+
+话说 开 赚钱吗？
+投我
+
+给你
+
+的回报率
+
+Fig. 10. RQ4: Examples of sticker selection results produced by SRS. We show the selected sticker and three random selected candidate
+stickers with the attention heat map. The lighter the area on image is, the higher attention weight it gets. The first two cases are
+collected from a chitchat group, and the third one is collected from a VPN custom service group.
+
+7.4
+
+Analysis of Attention Distribution in Interaction Process
+
+Next, we turn to address RQ4. We also show three cases with the dialog context in Figure 10. There are four stickers
+under each dialog context, one is the selected sticker by our model and other three stickers are random selected
+candidate stickers. As a main component, the deep interaction network comprises a bi-directional attention mechanism
+between the utterance and the sticker, where each word in the utterance and each unit in the sticker representation
+have a similarity score in the co-attention matrix. To visualize the sticker selection process and to demonstrate the
+interpretability of deep interaction network, we visualize the sticker-wise attention 𝜏 𝑠 (Equation 12) on the original
+sticker image and show some examples in Figure 10. The lighter the area is, the higher attention it gets.
+Facial expressions are an important part in sticker images. Hence, we select several stickers with vivid facial expression
+in Figure 10. Take forth sticker in Case 1 for example where the character has a wink eye and a smiling mouth. The
+highlights are accurately placed on the character’s eye, indicating that the representation of this sticker is highly
+Manuscript submitted to ACM
+
+24
+
+Shen Gao, et al.
+
+h
+
+ul
+
+og
+
+M
+
+-
+
+t
+si
+
+So
+
+-
+
+y
+la
+
+-
+
+s
+ea
+
+on
+
+yo
+
+te
+
+y
+
+e
+
+u
+
+ac
+
+I
+
+p
+
+en
+th
+
+ee
+sl
+
+hy
+
+w
+
+ill
+
+st
+
+e
+ak
+
+n
+
+ca
+
+m
+
+e
+
+us
+
+d
+
+ho
+
+-
+
+f
+
+to
+
+a
+
+lo
+
+na
+hi le
+C obi
+M
+
+et
+m
+
+ey
+
+-
+
+on
+m
+
+M
+SI rd
+ca
+
+Fig. 11. RQ4: Examples of the attention weights of the dialog utterance. We translate Chinese to English word by word. The darker
+the area is, the higher weight the word gets.
+
+dependent on this part. Another example is the last sticker of Case 3, there is two question marks on the top right
+corner of the sticker image which indicates that the girl is very suspicious of this. In addition to facial expression, the
+characters gestures can also represent emotions. Take the third sticker in Case 2 for example, the character in this
+sticker gives a thumbs up representing support and we can find that the attention lies on his hand, indicating that the
+model learns the key point of his body language.
+Furthermore, we randomly select three utterances from the test dataset, and we also visualize the attention distribution
+over the words in an utterance, as shown in Figure 11. We use the weight 𝜏 𝑢𝑗 for the 𝑗-th word (calculated in Equation 11)
+as the attention weight. We can find that the attention module always gives a higher attention weight on the salience
+word, such as the “easy method”, “make a lot of money” and “use Chine Mobile”.
+7.5
+
+Influence of Similarity between Candidates
+
+In this section, we turn to RQ5 to investigate the influence of the similarities between candidates. The candidate stickers
+are sampled from the same set, and stickers in a set usually have a similar style. Thus, it is natural to ask: Can our model
+identify the correct sticker from a set of similar candidates? What is the influence of the similarity between candidate
+stickers? Hence, we use the Structural Similarity Index (SSIM) metric [3, 72] to calculate the average similarity among
+all candidates in a test sample and then aggregate all test samples into five groups according to their average similarities.
+We calculate the 𝑅10 @1 of each group of samples, as shown in Figure 12. The x-axis is the average similarity between
+candidate stickers and the y-axis is the 𝑅10 @1 score.
+Not surprisingly, our model gains the best performance when the average similarity of the candidate group is low and
+its performance drops as similarity increases. However, we can also see that, though similarity varies from minimum to
+maximum, the overall performance can overall stay at high level. 𝑅10 @1 scores of all five groups are above 0.42, and
+the highest score reaches 0.59. That is, our model is highly robust and can keep giving reasonable sticker responses.
+7.6
+
+Robustness of Parameter Setting
+
+In this section, we turn to address RQ6 to investigate the robustness of parameter setting. We train PESRS model in
+different parameter setting as shown in Figure 13. The hidden size of the RNN, CNN and the dense layer in our model is
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+25
+
+Fig. 12. RQ5: Performance of SRS on groups of different candidate similarity.
+
+    
+ 0 $ 3
+
+    
+
+R10@1
+R10@2
+R10@5
+
+    
+    
+    
+    
+    
+    
+
+  
+
+   
+
+   
+
+   
+
+ + L G G H Q  6 L ] H
+Fig. 13. RQ6: Performance of PESRS with different parameter settings.
+
+tuned from 50 to 200, and we use the MAP and 𝑅𝑛 @𝑘 to evaluate each model. As the hidden size grows larger from 50
+to 100, the performance rises too. The increment of hidden size improves the MAP and 𝑅10 @1 scores by 1.1% and 1.9%.
+When the hidden size continuously goes larger from 100 to 200, the performance is declined slightly. The increment of
+hidden size leads to a 3.9% and 5.3% drop in terms of MAP and 𝑅10 @1 respectively. Nonetheless, we can find that each
+metric maintained at a stable interval, which demonstrates that our PESRS is robust in terms of the parameter size.
+Manuscript submitted to ACM
+
+26
+
+Shen Gao, et al.
+
+     
+     
+     
+     
+
+R10@1
+
+ 0 $ 3
+
+     
+
+     
+
+     
+     
+
+     
+     
+     
+
+     
+
+     
+     
+ 
+
+ 
+
+ 
+
+ 
+
+  
+
+ 
+
+ 
+
+ + L V W R U \  / H Q J W K
+
+ 
+
+ 
+
+  
+
+ 
+
+  
+
+ + L V W R U \  / H Q J W K
+
+(b) 𝑅10 @1 score
+
+(a) 𝑀𝐴𝑃 score
+     
+     
+
+     
+
+     
+
+R10@5
+
+R10@2
+
+     
+
+     
+
+     
+
+     
+
+     
+     
+     
+     
+ 
+
+ 
+
+ 
+
+ 
+
+  
+
+ + L V W R U \  / H Q J W K
+
+(c) 𝑅10 @2 score
+
+ 
+
+ 
+
+ 
+
+ + L V W R U \  / H Q J W K
+
+(d) 𝑅10 @5 score
+
+Fig. 14. RQ7: Performance of PESRS with different user history length.
+
+7.7
+
+Influence of User History Length
+
+Next, we address RQ7 which focuses on the influence of using different lengths of user history. We feed different
+lengths of user sticker selection history to the model, and we show the model performance of different lengths in
+Figure 14. From this figure, we can find that the model performs worse when we just feed only 2 user sticker selection
+history. The sticker selection prediction performance of the model rises sharply as the history length increases. This
+indicates that it requires large amount of user behavior patterns for modeling the preference of the user. And the growth
+of user behavior sequence helps PESRS to better capture sticker selection patterns according to the dialog context.
+7.8
+
+Analysis of User Preference Memory
+
+Next, we turn to RQ8 to investigate the effectiveness of user preference modeling module. We propose a simple heuristic
+method and two variations of our user preference memory module.
+To verify the necessity of using user preference modeling network, we use a simple heuristic method (MostSelected)
+which just use the most selected sticker by user as the sticker prediction of current dialog context. This method does
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+27
+
+Table 6. RQ8: Performance of two variations user preference memory module.
+
+SRS
+MostSelected
+AverageMem
+WeightedMem
+PESRS
+
+MAP
+
+𝑅10 @1
+
+𝑅10 @2
+
+𝑅10 @5
+
+0.709
+0.545
+0.701
+0.694
+0.743
+
+0.590
+0.419
+0.573
+0.565
+0.632▲
+
+0.703
+0.490
+0.701
+0.689
+0.740▲
+
+0.872
+0.679
+0.870
+0.866
+0.897
+
+not consider the semantic matching degree of previous dialog context and current dialog context. Consequently, the
+predicted sticker of this heuristic method is not flexible.
+The first variation (AverageMem) is to simply apply an average-pooling layer on all the previous selected sticker
+representations by the corresponding user:
+𝑟=
+
+𝑇ℎ
+∑︁
+
+𝑂ˆ 𝑘 .
+
+(34)
+
+𝑘
+
+Then we use this as the user preference representation and feed 𝑟 to the final gated fusion layer, as shown in Equation 31.
+The second variation (WeightedMem) is to remove the key addressing process, and directly apply an attention-thenweighted method on all the user previous selected stickers. This variation can be split into two steps: (1) calculate
+attention weights and (2) weighted sum stickers. We use the query vector ℎ (shown in Equation 22) to calculate attention
+weights of each user previously selected stickers {𝑂ˆ 1, . . . , 𝑂ˆ𝑇 }, and the query vector ℎ is the same as used in our
+ℎ
+
+proposed user preference memory module:
+𝛿𝑘 = softmax(ℎ𝑊𝛿 𝑂ˆ 𝑘 ),
+
+(35)
+
+where 𝛿𝑘 ∈ [0, 1] is the attention weight for the 𝑘-th selected sticker. Then we apply the weighted-sum on all the user
+previously selected sticker representations:
+𝑟=
+
+𝑇ℎ
+∑︁
+
+𝛿𝑘 𝑂ˆ 𝑘 .
+
+(36)
+
+𝑘
+
+Finally, we feed this preference representation 𝑟 into final gated fusion layer (Equation 31). Note that, the above two
+variations exclude the histories of dialogue contexts, and we employ these experiments to verify the effectiveness of
+incorporating histories of dialogue contexts.
+We conduct the experiments on these variations and compare with our proposed PESRS and SRS, as shown in
+Table 6. From this table, we can find that MostSelected performs the worst among all the methods. That demonstrates the
+necessity of exploring a learning-based method to leverage the user history data to recommend the proper sticker. By
+comparing AverageMem with the SRS which does not incorporate the user’s history, we find that although AverageMem
+and WeightedMem leverages the user’s history information, it can not take advantages from these data to boost the
+performance of sticker selection. The reason is that these methods can not model the relationship between current
+dialog context and previous history data, thus it can not determine which history data may be helpful for the current
+context.
+Manuscript submitted to ACM
+
+28
+
+Shen Gao, et al.
+
+17500
+
+15000
+
+12500
+
+10000
+
+7500
+
+5000
+
+2500
+
+0
+
+Fig. 15. RQ9: Number of the used emoji labels over stickers in training dataset (top 50 emojis of 893 unique emojis in total).
+
+7.9
+
+Sticker Classification and Emotion Diversity
+
+Finally, we turn to RQ9. In this dataset, the sticker authors give each sticker an emoji label that indicates the approximate
+emotion of the sticker. However, this label is not a mandatory field when creating a sticker set in this online chatting
+platform. Some authors use random emoji or one emoji label for all the stickers in the sticker set. Thus, we cannot
+incorporate the emoji label and tackle the sticker selection task as an emoji classification task. We randomly sample
+20 sticker sets and employ human annotators to check whether the emoji label in sticker set is correct, and we find
+that there are 2 sticker set of them have wrong emoji labels for the stickers. Since we introduce the auxiliary sticker
+classification (introduced in § 5.2) to help the model for accelerating convergence of the model training, we also report
+the sticker classification performance in this paper. Note that, since the emoji label of the sticker may not be correct,
+therefore, the classification performance is not accurate, the results are for reference only. The results of the sticker
+classification are 65.74%, 50.75%, 47.02%, 61.20% for accuracy, F1, recall and precision, respectively. These results indicate
+the sticker encoder can capture the semantic meanings of the sticker image.
+To illustrate the diversity of the emotion expressed by the stickers, we use the emoji label as the indicator of the
+emotion and plot the distribution of the emoji label of stickers. In Figure 15, we only show the top 50 emoji labels used
+in all the sticker set in our training dataset and the total number of unique emoji label is 893. From Figure 15, we can
+find that there are many stickers with the emoji label
+or
+
+and
+
+. The reason is that some of the sticker authors assign
+
+as the emoji label to all the stickers in their sticker set, as we mentioned before (some authors use random
+
+emoji or one emoji label for all the stickers in the sticker set).
+8
+
+CONCLUSION
+
+In our previous work, we propose the task of multi-turn sticker response selection, which recommends an appropriate
+sticker based on multi-turn dialog context history without relying on external knowledge. However, this method only
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+29
+
+focuses on measuring the matching degree between the dialog context and sticker image, which ignores the user
+preference of using stickers. Hence, in this paper, we propose the Preference Enhanced Sticker Response Selector (PESRS)
+to recommend an appropriate sticker to user based on multi-turn dialog context and sticker using history of user.
+Specifically, PESRS first learns the representation of each utterance using a self-attention mechanism, and learns sticker
+representation by CNN. Second, a deep interaction network is employed to fully model the dependency between the
+sticker and utterances. The deep interaction network consists of a co-attention matrix that calculates the attention
+between each word in an utterance and each unit in a sticker representation. Third, a bi-directional attention is used to
+obtain utterance-aware sticker representation and sticker-aware utterance representations. Next, we retrieve the recent
+user sticker selections, and then propose a user preference modeling module which consists a position-aware history
+encoding network and a key-value based memory network to generate the user preference representation dynamically
+according to current dialog context. Then, a fusion network models the short-term and long-term relationship between
+interaction results, and a gated fusion layer is applied to fuse the current dialog interaction results and user preference
+representation dynamically. Finally, a fully-connected layer is applied to obtain the final sticker prediction using the
+output of gated fusion layer. Our model outperforms state-of-the-art methods including our previous method SRS in all
+metrics and the experimental results also demonstrate the effectiveness of each module in our model. In the near future,
+we aim to propose a personalized sticker response selection system.
+ACKNOWLEDGMENTS
+We would like to thank the anonymous reviewers for their constructive comments. We would also like to thank
+Anna Hennig in Inception Institute of Artificial Intelligence for her help on this paper. This work was supported
+by the National Science Foundation of China (NSFC No. 61876196) and the National Key R&D Program of China
+(2020AAA0105200). Rui Yan is supported as a Young Fellow of Beijing Institute of Artificial Intelligence (BAAI).
+
+Manuscript submitted to ACM
+
+30
+
+Shen Gao, et al.
+
+REFERENCES
+[1] Martín Abadi, Paul Barham, Jianmin Chen, Zhifeng Chen, Andy Davis, Jeffrey Dean, Matthieu Devin, Sanjay Ghemawat, Geoffrey Irving, Michael
+Isard, et al. 2016. Tensorflow: a system for large-scale machine learning.. In OSDI, Vol. 16. 265–283.
+[2] Mingxiao An, Fangzhao Wu, Chuhan Wu, Kun Zhang, Zheng Liu, and Xing Xie. 2019. Neural News Recommendation with Long- and Short-term
+User Representations. In ACL.
+[3] Alireza Avanaki. 2008. Exact histogram specification optimized for structural similarity. arXiv preprint arXiv:0901.0065 (2008).
+[4] Ricardo Baeza-Yates, Berthier de Araújo Neto Ribeiro, et al. 2011. Modern information retrieval. New York: ACM Press; Harlow, England: AddisonWesley,.
+[5] Dzmitry Bahdanau, Kyunghyun Cho, and Yoshua Bengio. 2015. Neural machine translation by jointly learning to align and translate. In ICLR.
+[6] Francesco Barbieri, Miguel Ballesteros, Francesco Ronzano, and Horacio Saggion. 2018. Multimodal Emoji Prediction. In NAACL. Association for
+Computational Linguistics, New Orleans, Louisiana, 679–686.
+[7] Francesco Barbieri, Miguel Ballesteros, and Horacio Saggion. 2017. Are Emojis Predictable?. In Proceedings of the 15th Conference of the European
+Chapter of the Association for Computational Linguistics: Volume 2, Short Papers. Association for Computational Linguistics, Valencia, Spain, 105–111.
+[8] Zhangming Chan, Juntao Li, Xiaopeng Yang, Xiuying Chen, Wenpeng Hu, Dongyan Zhao, and Rui Yan. 2019. Modeling Personalization in Continuous
+Space for Response Generation via Augmented Wasserstein Autoencoders. In EMNLP.
+[9] Xiuying Chen, Zhangming Chan, Shen Gao, Meng-Hsuan Yu, Dongyan Zhao, and Rui Yan. 2019. Learning towards Abstractive Timeline Summarization. In IJCAI.
+[10] Xu Chen, Hongteng Xu, Yongfeng Zhang, Jiaxi Tang, Yixin Cao, Zheng Qin, and Hongyuan Zha. 2018. Sequential Recommendation with User
+Memory Networks. In WSDM.
+[11] Eric Chu, Prashanth Vijayaraghavan, and Deb Roy. 2018. Learning Personas from Dialogue with Attentive Memory Networks. In EMNLP.
+[12] Junyoung Chung, Çaglar Gülçehre, Kyunghyun Cho, and Yoshua Bengio. 2014. Empirical Evaluation of Gated Recurrent Neural Networks on
+Sequence Modeling. In NIPS Workshop.
+[13] A. Das, S. Kottur, K. Gupta, A. Singh, D. Yadav, J. M. F. Moura, D. Parikh, and D. Batra. 2017. Visual Dialog. In CVPR. 1080–1089.
+[14] Gabriele de Seta. 2018. Biaoqing: The circulation of emoticons, emoji, stickers, and custom images on Chinese digital media platforms. First Monday
+23 (2018).
+[15] Travis Ebesu, Bin Shen, and Yi Fang. 2018. Collaborative Memory Network for Recommendation Systems. In SIGIR.
+[16] Angela Fan, Mike Lewis, and Yann Dauphin. 2018. Hierarchical Neural Story Generation. In Proceedings of the 56th Annual Meeting of the Association
+for Computational Linguistics (Volume 1: Long Papers). Association for Computational Linguistics, Melbourne, Australia, 889–898.
+[17] Jiazhan Feng, Chongyang Tao, Wei Wu, Yansong Feng, Dongyan Zhao, and Rui Yan. 2019. Learning a Matching Model with Co-teaching for
+Multi-turn Response Selection in Retrieval-based Dialogue Systems. In Proceedings of the 57th Annual Meeting of the Association for Computational
+Linguistics. Association for Computational Linguistics, Florence, Italy, 3805–3815.
+[18] Jiyang Gao, Runzhou Ge, Kan Chen, and Ram Nevatia. 2018. Motion-Appearance Co-Memory Networks for Video Question Answering. In CVPR.
+[19] Peng Gao, Haoxuan You, Zhanpeng Zhang, Xiaogang Wang, and Hongsheng Li. 2019. Multi-Modality Latent Interaction Network for Visual
+Question Answering. In ICCV.
+[20] Shen Gao, Xiuying Chen, Piji Li, Zhangming Chan, Dongyan Zhao, and Rui Yan. 2019. How to Write Summaries with Patterns? Learning towards
+Abstractive Summarization through Prototype Editing. In Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing
+and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP). Association for Computational Linguistics, Hong Kong,
+China, 3741–3751.
+[21] Shen Gao, Xiuying Chen, Piji Li, Zhaochun Ren, Lidong Bing, Dongyan Zhao, and Rui Yan. 2019. Abstractive Text Summarization by Incorporating
+Reader Comments. In AAAI. 6399–6406.
+[22] Shen Gao, Xiuying Chen, Chang Liu, Li Liu, Dongyan Zhao, and Rui Yan. 2020. Learning to Respond with Stickers: A Framework of Unifying
+Multi-Modality in Multi-Turn Dialog. In The World Wide Web Conference (WWW ’20). Association for Computing Machinery, New York, NY, USA.
+[23] Shen Gao, Xiuying Chen, Zhaochun Ren, Dongyan Zhao, and Rui Yan. 2020. From Standard Summarization to New Tasks and Beyond: Summarization
+with Manifold Information. In IJCAI.
+[24] Shen Gao, Zhaochun Ren, Yihong Zhao, Dongyan Zhao, Dawei Yin, and Rui Yan. 2019. Product-Aware Answer Generation in E-Commerce
+Question-Answering. In Proceedings of the Twelfth ACM International Conference on Web Search and Data Mining (Melbourne VIC, Australia) (WSDM
+’19). Association for Computing Machinery, New York, NY, USA, 429–437.
+[25] Jing Ge and Susan C. Herring. 2018. Communicative functions of emoji sequences on Sina Weibo. First Monday 23 (2018).
+[26] Ankit Goyal, Jian Wang, and Jia Deng. 2018. Think Visually: Question Answering through Virtual Imagery. In Proceedings of the 56th Annual
+Meeting of the Association for Computational Linguistics (Volume 1: Long Papers). Association for Computational Linguistics, Melbourne, Australia,
+2598–2608.
+[27] Yash Goyal, Tejas Khot, Douglas Summers-Stay, Dhruv Batra, and Devi Parikh. 2017. Making the V in VQA matter: Elevating the role of image
+understanding in Visual Question Answering. In CVPR. 6904–6913.
+[28] Gaël Guibon, Magalie Ochs, and Patrice Bellot. 2018. Emoji recommendation in private instant messages. Proceedings of the 33rd Annual ACM
+Symposium on Applied Computing (2018).
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+31
+
+[29] Dan Guo, Hui Wang, and Meng Wang. 2019. Dual Visual Attention Network for Visual Dialog. In IJCAI.
+[30] D. Guo, C. Xu, and D. Tao. 2019. Image-Question-Answer Synergistic Network for Visual Dialog. In CVPR ’19. 10426–10435.
+[31] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. 2015. Delving deep into rectifiers: Surpassing human-level performance on imagenet
+classification. In ICCV. 1026–1034.
+[32] Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian Sun. 2016. Deep residual learning for image recognition. In CVPR. 770–778.
+[33] Susan C. Herring and Ashley Dainas. 2017. "Nice Picture Comment!" Graphicons in Facebook Comment Threads. In HICSS.
+[34] Sepp Hochreiter and Jürgen Schmidhuber. 1997. Long short-term memory. Neural computation 9, 8 (1997), 1735–1780.
+[35] Jin Huang, Zhaochun Ren, Wayne Xin Zhao, Gaole He, Ji-Rong Wen, and Daxiang Dong. 2019. Taxonomy-Aware Multi-Hop Reasoning Networks
+for Sequential Recommendation. In WSDM.
+[36] Xiaowen Huang, Quan Fang, Shengsheng Qian, Jitao Sang, Yan Li, and Changsheng Xu. 2019. Explainable Interaction-driven User Modeling over
+Knowledge Graph for Sequential Recommendation. In MM.
+[37] Unnat Jain, Svetlana Lazebnik, and Alexander G Schwing. 2018. Two can play this game: visual dialog with discriminative question generation and
+answering. In ICCV. 5754–5763.
+[38] Baoyu Jing, Pengtao Xie, and Eric Xing. 2018. On the Automatic Generation of Medical Imaging Reports. In ACL ’18. Association for Computational
+Linguistics, Melbourne, Australia, 2577–2586.
+[39] Byeongchang Kim, Hyunwoo Kim, and Gunhee Kim. 2019. Abstractive Summarization of Reddit Posts with Multi-level Memory Networks. In
+NAACL.
+[40] Diederik P. Kingma and Jimmy Ba. 2015. Adam: A Method for Stochastic Optimization. In ICLR, Vol. abs/1412.6980.
+[41] Ankit Kumar, Ozan Irsoy, Peter Ondruska, Mohit Iyyer, James Bradbury, Ishaan Gulrajani, Victor Zhong, Romain Paulus, and Richard Socher. 2016.
+Ask Me Anything: Dynamic Memory Networks for Natural Language Processing. ArXiv abs/1506.07285 (2016).
+[42] Abhishek Laddha, Mohamed Hanoosh, and Debdoot Mukherjee. 2019. Understanding Chat Messages for Sticker Recommendation in Hike Messenger.
+arXiv:1902.02704 (2019).
+[43] Chenyi Lei, Shouling Ji, and Zhao Li. 2019. TiSSA: A Time Slice Self-Attention Approach for Modeling Sequential User Behaviors. In WWW.
+[44] Jimmy Lei Ba, Jamie Ryan Kiros, and Geoffrey E Hinton. 2016. Layer normalization. arXiv preprint arXiv:1607.06450 (2016).
+[45] Juntao Li, Lisong Qiu, Bo Tang, Dongmin Chen, Dongyan Zhao, and Rui Yan. 2019. Insufficient Data Can Also Rock! Learning to Converse Using
+Smaller Data with Augmentation. In AAAI.
+[46] Xiangpeng Li, Jingkuan Song, Lianli Gao, Xianglong Liu, Wenbing Huang, Xiangnan He, and Chuang Gan. 2019. Beyond RNNs: Positional
+Self-Attention with Co-Attention for Video Question Answering. In AAAI.
+[47] Yikang Li, Nan Duan, Bolei Zhou, Xiao Chu, Wanli Ouyang, Xiaogang Wang, and Ming Zhou. 2018. Visual Question Generation as Dual Task of
+Visual Question Answering. In CVPR.
+[48] Jiasen Lu, Anitha Kannan, Jianwei Yang, Devi Parikh, and Dhruv Batra. 2017. Best of both worlds: Transferring knowledge from discriminative
+learning to a generative visual dialog model. In NIPS. 314–324.
+[49] Chao Ma, Chunhua Shen, Anthony Dick, Qi Wu, Peng Wang, Anton van den Hengel, and Ian Reid. 2018. Visual Question Answering With
+Memory-Augmented Networks. In CVPR.
+[50] Mateusz Malinowski, Marcus Rohrbach, and Mario Fritz. 2015. Ask your neurons: A neural-based approach to answering questions about images. In
+ICCV. 1–9.
+[51] Sameen Maruf and Gholamreza Haffari. 2018. Document Context Neural Machine Translation with Memory Networks. In ACL.
+[52] Alexander H. Miller, Adam Fisch, Jesse Dodge, Amir-Hossein Karimi, Antoine Bordes, and Jason Weston. 2016. Key-Value Memory Networks for
+Directly Reading Documents. ArXiv abs/1606.03126 (2016).
+[53] Vishvak Murahari, Prithvijit Chattopadhyay, Dhruv Batra, Devi Parikh, and Abhishek Das. 2019. Improving Generative Visual Dialog by Answering
+Diverse Questions. In EMNLP.
+[54] Vinod Nair and Geoffrey E. Hinton. 2010. Rectified Linear Units Improve Restricted Boltzmann Machines. In ICML.
+[55] H. Noh, T. Kim, J. Mun, and B. Han. 2019. Transfer Learning via Unsupervised Task Discovery for Visual Question Answering. In 2019 IEEE/CVF
+Conference on Computer Vision and Pattern Recognition (CVPR). 8377–8386.
+[56] Juan Pavez, Héctor Allende, and Héctor Allende-Cid. 2018. Working Memory Networks: Augmenting Memory Networks with a Relational Reasoning
+Module. In ACL.
+[57] Qi Pi, Weijie Bian, Guorui Zhou, Xiaoqiang Zhu, and Kun Gai. 2019. Practice on Long Sequential User Behavior Modeling for Click-Through Rate
+Prediction. In KDD.
+[58] Kan Ren, Jiarui Qin, Yuchen Fang, Weinan Zhang, Lei Zheng, Weijie Bian, Guorui Zhou, Jian Xu, Yong Yu, Xiaoqiang Zhu, and Kun Gai. 2019.
+Lifelong Sequential Modeling with Personalized Memorization for User Response Prediction. In SIGIR.
+[59] Pengjie Ren, Zhumin Chen, Jing Li, Zhaochun Ren, Jun Ma, and Maarten de Rijke. 2019. RepeatNet: A Repeat Aware Neural Recommendation
+Machine for Session-Based Recommendation. In AAAI.
+[60] F. Sha, H. Hu, and W. Chao. 2018. Cross-Dataset Adaptation for Visual Question Answering. In 2018 IEEE/CVF Conference on Computer Vision and
+Pattern Recognition. 5716–5725.
+[61] Zhou Su, Chen Zhu, Yinpeng Dong, Dongqi Cai, Yurong Chen, and Jianguo Li. 2018. Learning Visual Knowledge Memory Networks for Visual
+Question Answering. In CVPR.
+Manuscript submitted to ACM
+
+32
+
+Shen Gao, et al.
+
+[62] Sainbayar Sukhbaatar, Arthur Szlam, Jason Weston, and Rob Fergus. 2015. End-To-End Memory Networks. In NIPS.
+[63] Christian Szegedy, Vincent Vanhoucke, Sergey Ioffe, Jon Shlens, and Zbigniew Wojna. 2016. Rethinking the inception architecture for computer
+vision. In CVPR. 2818–2826.
+[64] Chongyang Tao, Shen Gao, Mingyue Shang, Wei Wu, Dongyan Zhao, and Rui Yan. 2018. Get The Point of My Utterance! Learning Towards Effective
+Responses with Multi-Head Attention Mechanism. In IJCAI.
+[65] Chongyang Tao, Wei Wu, Can Xu, Wenpeng Hu, Dongyan Zhao, and Rui Yan. 2019. Multi-Representation Fusion Network for Multi-Turn Response
+Selection in Retrieval-Based Chatbots. In WSDM. ACM, 267–275.
+[66] Chongyang Tao, Wei Wu, Can Xu, Wenpeng Hu, Dongyan Zhao, and Rui Yan. 2019. One Time of Interaction May Not Be Enough: Go Deep with
+an Interaction-over-Interaction Network for Response Selection in Dialogues. In Proceedings of the 57th Annual Meeting of the Association for
+Computational Linguistics. Association for Computational Linguistics, Florence, Italy, 1–11.
+[67] Zhiqiang Tao, Sheng Li, Zhaowen Wang, Chen Fang, Longqi Yang, Handong Zhao, and Yun Fu. 2019. Log2Intent: Towards Interpretable User
+Modeling via Recurrent Semantics Memory Unit. In KDD.
+[68] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz Kaiser, and Illia Polosukhin. 2017. Attention is
+all you need. In NIPS. 5998–6008.
+[69] Peng Wang, Qi Wu, Chunhua Shen, Anthony Dick, and Anton van den Hengel. 2017. Explicit Knowledge-based Reasoning for Visual Question
+Answering. In Proceedings of the Twenty-Sixth International Joint Conference on Artificial Intelligence, IJCAI-17. 1290–1296.
+[70] Qinyong Wang, Hongzhi Yin, Zhiting Hu, Defu Lian, Hao Wang, and Zi Huang. 2018. Neural Memory Streaming Recommender Networks with
+Adversarial Training. In KDD.
+[71] Shuohang Wang and Jing Jiang. 2017. A Compare-Aggregate Model for Matching Text Sequences. ICLR (2017).
+[72] Zhou Wang, Alan C Bovik, Hamid R Sheikh, Eero P Simoncelli, et al. 2004. Image quality assessment: from error visibility to structural similarity.
+IEEE transactions on image processing 13, 4 (2004), 600–612.
+[73] Chenfei Wu, Jinlai Liu, Xiaojie Wang, and Xuan Dong. 2018. Chain of Reasoning for Visual Question Answering. In Advances in Neural Information
+Processing Systems 31, S. Bengio, H. Wallach, H. Larochelle, K. Grauman, N. Cesa-Bianchi, and R. Garnett (Eds.). Curran Associates, Inc., 275–285.
+[74] Chenfei Wu, Jinlai Liu, Xiaojie Wang, and Xuan Dong. 2018. Object-Difference Attention: A Simple Relational Attention for Visual Question
+Answering. In Proceedings of the 26th ACM International Conference on Multimedia (Seoul, Republic of Korea) (MM ’18). Association for Computing
+Machinery, New York, NY, USA, 519–527.
+[75] Chuhan Wu, Fangzhao Wu, Mingxiao An, Tao Qi, Jianqiang Huang, Yongfeng Huang, and Xing Xie. 2019. Neural News Recommendation with
+Heterogeneous User Behavior. In EMNLP.
+[76] Chien-Sheng Wu, Richard Socher, and Caiming Xiong. 2019. Global-to-local Memory Pointer Networks for Task-Oriented Dialogue. In ICLR.
+[77] Qi Wu, Peng Wang, Chunhua Shen, Anthony Dick, and Anton van den Hengel. 2016. Ask me anything: Free-form visual question answering based
+on knowledge from external sources. In CVPR. 4622–4630.
+[78] Qi Wu, Peng Wang, Chunhua Shen, Ian Reid, and Anton van den Hengel. 2018. Are you talking to me? reasoned visual dialog generation through
+adversarial learning. In ICCV. 6106–6115.
+[79] Yu Wu, Wei Wu, Chen Xing, Ming Zhou, and Zhoujun Li. 2017. Sequential Matching Network: A New Architecture for Multi-turn Response
+Selection in Retrieval-Based Chatbots. In ACL. Association for Computational Linguistics, Vancouver, Canada, 496–505.
+[80] Ruobing Xie, Zhiyuan Liu, Rui Yan, and Maosong Sun. 2016. Neural emoji recommendation in dialogue systems. arXiv preprint arXiv:1612.04609
+(2016).
+[81] Caiming Xiong, Stephen Merity, and Richard Socher. 2016. Dynamic Memory Networks for Visual and Textual Question Answering. ArXiv
+abs/1603.01417 (2016).
+[82] Caiming Xiong, Stephen Merity, and Richard Socher. 2016. Dynamic memory networks for visual and textual question answering. In ICML.
+2397–2406.
+[83] Rui Yan, Yiping Song, and Hua Wu. 2016. Learning to Respond with Deep Neural Networks for Retrieval-Based Human-Computer Conversation
+System. In Proceedings of the 39th International ACM SIGIR Conference on Research and Development in Information Retrieval (Pisa, Italy) (SIGIR ’16).
+Association for Computing Machinery, New York, NY, USA, 55–64.
+[84] Rui Yan and Dongyan Zhao. 2018. Coupled Context Modeling for Deep Chit-Chat: Towards Conversations between Human and Computer. In
+Proceedings of the 24th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining (London, United Kingdom) (KDD ’18).
+Association for Computing Machinery, New York, NY, USA, 2574–2583.
+[85] Rui Yan, Dongyan Zhao, and Weinan E. 2017. Joint Learning of Response Ranking and Next Utterance Suggestion in Human-Computer Conversation
+System. In Proceedings of the 40th International ACM SIGIR Conference on Research and Development in Information Retrieval (Shinjuku, Tokyo, Japan)
+(SIGIR ’17). Association for Computing Machinery, New York, NY, USA, 685–694.
+[86] Chunfeng Yang, Huan Yan, Donghan Yu, Yong Li, and Dah Ming Chiu. 2017. Multi-site User Behavior Modeling and Its Application in Video
+Recommendation. In SIGIR.
+[87] Zeping Yu, Jianxun Lian, Ahmad Mahmoody, Gongshen Liu, and Xing Xie. 2019. Adaptive User Modeling with Long and Short-Term Preferences for
+Personalized Recommendation. In IJCAI.
+[88] Guoshuai Zhao, Zhidan Liu, Yulu Chao, and Xueming Qian. 2020. CAPER: Context-Aware Personalized Emoji Recommendation. IEEE Transactions
+on Knowledge and Data Engineering (2020), 1–1.
+Manuscript submitted to ACM
+
+Learning to Respond with Your Favorite Stickers: A Framework of
+Unifying Multi-Modality and User Preference in Multi-Turn Dialog
+
+33
+
+[89] Xiangyang Zhou, Daxiang Dong, Hua Wu, Shiqi Zhao, Dianhai Yu, Hao Tian, Xuan Liu, and Rui Yan. 2016. Multi-view Response Selection for
+Human-Computer Conversation. In EMNLP ’16. Association for Computational Linguistics, Austin, Texas, 372–381.
+[90] Xiangyang Zhou, Lu Li, Daxiang Dong, Yi Liu, Ying Chen, Wayne Xin Zhao, Dianhai Yu, and Hua Wu. 2018. Multi-turn response selection for
+chatbots with deep attention matching network. In ACL, Vol. 1. 1118–1127.
+[91] Xiao Zhou, Cecilia Mascolo, and Zhongxiang Zhao. 2019. Topic-Enhanced Memory Networks for Personalised Point-of-Interest Recommendation.
+In KDD.
+[92] Xianda Zhou and William Yang Wang. 2018. MojiTalk: Generating Emotional Responses at Scale. In ACL.
+[93] Nengjun Zhu, Jian Cao, Yanchi Liu, Yang Yang, Haochao Ying, and Hui Xiong. 2020. Sequential Modeling of Hierarchical User Intention and
+Preference for Next-item Recommendation. In WSDM.
+[94] Yu Zhu, Hao Li, Yikang Liao, Beidou Wang, Ziyu Guan, Haifeng Liu, and Deng Cai. 2017. What to Do Next: Modeling User Behaviors by Time-LSTM.
+In IJCAI.
+[95] Konrad Żołna and Bartłomiej Romański. 2017. User Modeling Using LSTM Networks. In AAAI.
+
+Manuscript submitted to ACM
+
+

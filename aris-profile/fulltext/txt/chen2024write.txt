@@ -1,0 +1,1492 @@
+IEEE/ACM TRANSACTIONS ON AUDIO SPEECH AND LANGUAGE PROCESSING, MANUSCRIPT
+
+1
+
+Write Summary Step-by-Step:
+A Pilot Study of Stepwise Summarization
+
+arXiv:2406.05361v1 [cs.CL] 8 Jun 2024
+
+Xiuying Chen∗ , Shen Gao∗ , Mingzhe Li, Qingqing Zhu, Xin Gao† , Xiangliang Zhang†
+
+Abstract—Nowadays, neural text generation has made tremendous progress in abstractive summarization tasks. However,
+most of the existing summarization models take in the whole
+document all at once, which sometimes cannot meet the needs
+in practice. Practically, social text streams such as news events
+and tweets keep growing from time to time, and can only be
+fed to the summarization system step by step. Hence, in this
+paper, we propose the task of Stepwise Summarization, which
+aims to generate a new appended summary each time a new
+document is proposed. The appended summary should not only
+summarizes the newly added content but is also coherent with
+the previous summary, to form an up-to-date complete summary.
+To tackle this challenge, we design an adversarial learning
+model, named Stepwise Summary Generator (SSG). First, SSG
+selectively processes the new document under the guidance of
+the previous summary, obtaining polished document representation. Next, SSG generates the summary considering both the
+previous summary and the document. Finally, a convolutionalbased discriminator is employed to determine whether the newly
+generated summary is coherent with the previous summary.
+For the experiment, we extend the traditional two-step update
+summarization setting to multi-step stepwise setting, and repropose a large-scale stepwise summarization dataset based on
+a public story generation dataset. Extensive experiments on this
+dataset show that SSG achieves state-of-the-art performance in
+terms of both automatic metrics and human evaluations. Ablation
+studies demonstrate the effectiveness of each module in our
+framework. We also discuss the benefits and limitations of recent
+large language models on this task.
+Index Terms—Text generation, abstraction summarization,
+neural networks.
+
+I. I NTRODUCTION
+First, we will answer three possible questions to illustrate
+the main contributions of this paper.
+A. What is stepwise summarization?
+Nowadays, social text streams such as news events and
+tweets spread throughout the Internet, and summarization is
+an ideal solution to provide a condensed, informative document reorganization for faster and better representation of
+information evolution [1]. Most of the existing summarization
+Xiuying Chen and Xin Gao are with the Computer, Electrical and Mathematical Sciences and Engineering division at KAUST, Saudi Arabia, (email:
+xiuying.chen@kaust.edu.sa,xin.gao@kaust.edu.sa).
+Shen Gao is with the University of Electronic Science and Technology of
+China, China (email: shengao@sdu.edu.cn. Mingzhe Li is with Ant Group,
+China (email: limingzhe.lmz@antgroup.com). Qingqing Zhu is with Peking
+university, China (email: zhuqingqing@pku.edu.cn.).
+Xiangliang Zhang is with University of Notre Dame, America and secondly
+affiliated with KAUST (email: xzhang33@nd.edu.)
+*These authors contributed equally to this work.
+†Corresponding authors.
+
+TABLE I
+E XAMPLE OF NEW DOCUMENT- SUMMARY PAIR FROM OUR DATASET. I N
+THE PREVIOUS SUMMARY, THE CHARACTER S TEPHANIE CLAIMS THAT
+SHE CAN CONTINUE TO WORK , BUT IN THE NEW DOCUMENT, SHE CANNOT
+FOCUS ON HER WORK .
+Previous Summary: Stephanie concedes that perhaps she did have
+a little stroke, but she is fine, still a force to be reckoned with.
+Nick calls for a meeting and Stephanie tells Pam that she will be
+there despite her protests. She needs to prove she can still do what
+she does. Nothing will change that. Nick calls her a one woman
+dynamo.
+Newly added document: ... Marcus says they were good people
+but “finding mom was the greatest thing that could have happened.” Marcus asks if he has any other kids. Justin says he tried
+and breaks down as he says Marcus is there before him. Everyone
+looks at numbers as Nick says they need to hire a third shift.
+Bridget says the Economy still has not recovered. They leave the
+decision to Stephanie and tell her to look at page 20. She says
+she does not need to look at a page she knows what is best for
+the company and will go with her instincts. She says “if there is
+a problem with that, there’s the door.” Nick throws Jackie a look
+of confusion.
+New Summary: However, during the meeting Stephanie can not
+concentrate on the figures and offers that she will do what she
+always has done on instinct and it’s that or show her the door.
+Marcus wants his question answered.
+
+approaches take in the whole document and generate the
+corresponding summary all at once. However, in practice, text
+streams come in sequence instead of simultaneously, and it is
+important for readers to get the most up-to-date information
+each time a new event occurs. Hence, we propose the task of
+stepwise summarization task, which aims to generate a new
+appended summary each time a new document is proposed.
+The appended summary should not only summarize the newly
+added content but also be coherent with the previous summary,
+so as to form an up-to-date complete summary.
+In such a scenario, the previous summary, i.e., summary of
+previous documents in the stream, is important in two ways.
+On one hand, the newly generated summary must be coherent
+with the previous summary. Considering Table I which is
+an episode recap collected from a fan-contributed website,
+the new document introduces that the character Stephanie
+cannot concentrate on her work, while the previous summary
+describes that she says she is able to work despite her protests.
+Hence, the appended new summary summarizes the new status
+of Stephanie with a turning sentence. On the other hand,
+the previous summary helps capture the salient part of the
+new document. To this end, in this paper, we propose a
+Stepwise Summary Generator (SSG) which incorporates both
+the previous summary and newly added document to generate
+a more coherent appended summary, so as to obtain the whole
+
+IEEE/ACM TRANSACTIONS ON AUDIO SPEECH AND LANGUAGE PROCESSING, MANUSCRIPT
+
+Stream Summarization
+
+Update Summarization
+
+Memorize
+
+Extract
+
+Forget
+
+! + 2 time
+Summarize
+
+Read
+
+Read
+
+! + 1 time
+Summarize
+
+Read
+
+Summarize
+
+Stepwise Summarization
+Summarize
+
+Read
+
+! + 1 time
+
+!…! + # time
+
+! time
+
+! time
+
+Summarize
+
+2
+
+Read
+
+! + 2 time
+Summarize
+
+Read
+
+Read
+
+New reader
+
+New reader
+
+Read
+
+Fig. 1. Comparison between stream summarization, update summarization, and stepwise summarization. Stream summarization [2]: a large number documents
+are taken as input, and some of the documents are selected as summary. Update summarization [3]: the task is to summarize the new document, assuming
+the reader already knows about previous documents. Stepwise summarization: This setting does not require the reader to have any prior knowledge about
+the text stream. The generated summary contains all the information about the text stream, and is kept fluent all the time steps.
+
+summary of a text stream. We show an example in Figure 1
+to illustrate the task definition of stepwise summarization.
+B. Why not traditional abstractive summarization?
+On one hand, if traditional summarization models only take
+the current newly added document as input to generate the
+corresponding summary, they will lose the information from
+previous documents that is helpful for current summarization.
+The generated summaries may also be incoherent with each
+other. On the other hand, if traditional models take all existing
+documents as input, it is easy to confuse information between
+events and provide inaccurate period division for readers. It is
+also redundant to repeatedly generate the same summary for
+previous documents. The stepwise summarization is related to
+stream summarization and update summarization, where we
+give the comparison in Figure I and the related work section.
+C. How to conduct stepwise summarization?
+To begin with, SSG captures the main points in the document with the help of the previous summary. Concretely, after
+processing the document and previous summary through selfattention, we propose a selective recurrent unit to selectively
+processes document representation under the guidance from
+the previous summary, so that document representation is
+further polished. Second, a decoder is used to generate a
+new summary, incorporating both the polished representations
+of documents and the summary. Finally, the training of our
+framework is conducted in an adversarial way, where we
+employ a convolutional discriminator to distinguish whether
+the generated summary is coherent with the previous summary.
+Extensive experiments demonstrate that SSG significantly
+outperforms the state-of-the-art summarization baselines in
+ROUGE metrics and human evaluations.
+Our contributions can be summarized as follows:
+• We propose the task of stepwise summarization, which
+generates an appended summary each time a new document
+is generated, considering previous information.
+• To address this task, we introduce a paradigm that
+leverages the previous summary to enhance the current one,
+using an interaction and coherence discriminator.
+
+• We release a large-scale stepwise summarization dataset.
+Experimental results on this dataset demonstrate the effectiveness of our proposed framework.
+II. R ELATED W ORK
+A. Text summarization.
+Text summarization can be classified into extractive and abstractive methods. Extractive methods [4]–[8] directly extract
+the sentences or text span from the input document as the
+summary. Specifically, [9] proposed the joint sentence scoring
+and selection framework which directly predicts the relative
+sentence importance score according to both sentence content
+and previously selected sentences. However, summaries generated by extractive methods always suffer from redundancy
+problems and are not as flexible as abstractive methods.
+Recently, with the emergence of neural network models for
+text generation, a vast majority of efforts have been dedicated
+to abstractive summarization [10]–[14]. For example, [15]
+used sentence-level attention to modulate word-level attention
+such that words in less attended sentences are less likely to
+be generated. [16] used a data-efficient content selector to
+emphasize phrases in a source document that should be part
+of the summary. To tackle the out-of-vocabulary problem in
+abstractive summarization models, some researchers employ
+a copy mechanism to copy certain words from the input
+document to the summary [17], [18].
+B. Timeline summarization.
+Timeline summarization was firstly proposed by [23], and
+it involves extracting a single sentence from each event
+within a news topic. Since the original work, a series of
+works [24]–[26] further investigate this task. [24] aimed to
+return the evolution trajectory along the timeline, emphasizing
+relevance, coverage, coherence, and cross-date diversity. [27],
+[28] followed the style of abstractive timeline summarization.
+More recently, [29] examined both the general approaches
+to this task and its current state of resolution, and [30]
+suggested enhancing timeline summarization by generating
+multiple summaries.
+
+IEEE/ACM TRANSACTIONS ON AUDIO SPEECH AND LANGUAGE PROCESSING, MANUSCRIPT
+
+3
+
+TABLE II
+C ORPUS BIAS TOWARDS EXTRACTIVE METHODS IN THE CNN/DAILY M AIL [19], N EWSROOM [20], XS UM [21], R EDDIT [22] AND SSD DATASETS . W E
+SHOW THE PROPORTION OF NOVEL n- GRAMS IN GOLD SUMMARIES . W E ALSO REPORT ROUGE SCORES FOR THE EXTRACTIVE L E A D AND
+ABSTRACTIVE PG BASELINE . R ESULTS ARE COMPUTED ON THE TEST SET.
+Datasets
+CNN/DailyMail
+Newsroom
+XSum
+Reddit
+SSD
+
+% of novel n-grams in gold summary
+unigrams
+bigrams
+trigrams
+4-grams
+19.50
+19.53
+35.76
+48.97
+38.31
+
+56.88
+48.39
+83.45
+84.45
+85.35
+
+74.41
+59.38
+95.50
+94.50
+97.20
+
+82.8
+64.06
+98.49
+97.82
+98.86
+
+However, timeline summarization also belongs to the classic
+static summarization framework, dealing with a static corpus
+instead of a dynamic, continuously growing stream.
+C. Streaming summarization.
+Stepwise summarization is also similar to the streaming
+summarization task, which summarizes a stream of documents
+aligned on the timeline. Initial works include [31], where
+they aim to deal with dynamic, quickly arriving, and largescale tweet streams. They proposed a prototype called Sumblr
+(SUMmarization By stream cLusteRing) for tweet streams.
+Following their work, [32] improved the efficiency of this
+process. Processing is done in a single pass, removing the need
+to save any input data and improving the running time. [33]
+further focused on time-aware multi-viewpoint summarization
+of multilingual social text streams. Both of timeline and
+streaming summarization tasks take stream documents all at
+once, while in our stepwise summarization task, the input
+documents come in sequence.
+D. Update summarization.
+Our task shares some common features with the update
+summarization task, which also aims to summarize key information from documents arriving in a sequence. Concretely,
+the setting typically includes two document sets A and B,
+and the task is to summarize B assuming the reader already
+knows about A [3]. The challenge in update summarization is
+to deal with multi-document summarization, handling redundancy between multiple documents, as well as the redundancy
+between A and B. This task differs from ours because its
+generated summaries do not form a coherent text sequence.
+This series of update summarization works mainly focus on
+TAC dataset [3], where the task is to extract a summary of
+a subsequent set of newswire articles for the same topic,
+under the assumption that the reader has already read the
+previous documents. This dataset contains only 48 topics
+with 960 documents. Initial works include [34], which is a
+scalable sentence scoring method for query-oriented update
+summarization. [35] presented an unsupervised probabilistic
+approach to model novelty in a document collection and apply
+it to the generation of update summaries. MCL [36] is the
+state-of-the-art extractive work on this dataset, which examines
+how integrating a semantic sentence similarity into an update
+summarization system can improve its results.
+
+R1
+
+lead
+R2
+
+RL
+
+R1
+
+PG
+R2
+
+RL
+
+PG/lead
+Ratio (R-L)
+
+39.6
+30.5
+16.3
+3.4
+26.31
+
+17.7
+21.3
+1.6
+0.0
+4.79
+
+36.2
+28.4
+11.9
+3.3
+23.56
+
+36.4
+26.0
+29.7
+18.3
+36.83
+
+15.7
+13.3
+8.8
+6.5
+9.07
+
+33.4
+22.4
+22.6
+17.9
+34.37
+
+0.92x
+0.78x
+1.89x
+5.42x
+1.45x
+
+III. S TEPWISE S UMMARIZATION DATASET
+Existing large-scale summarization datasets cannot be used
+for stepwise summarization, since they only contain information about a single event. In contrast, a TV show episode
+recaps usually records the developments of events over time.
+Thus, our dataset, named Stepwise Summarization Dataset
+(SSD), is re-collected from a public story generation dataset
+TVMegaSite [37]. As illustrated in Figure 2, each case in our
+dataset contains a document stream and the corresponding
+streaming summary. Each document stream contains several
+documents, and each summary stream contains the corresponding summaries. For each doc-summ pair in doc-summ stream,
+we name all summaries and all documents before this pair as
+previous summary and previous document, and document in
+this pair as new document.
+A. Dataset collection.
+In each case in the story generation dataset TVMegaSite,
+there is a detailed TV show episode recaps and a brief
+summary of the episode. Since the episode recap is mostly
+arranged according to the sequence of events, there is a strict
+logic in it. Consequently, the summary often follows the same
+logical order as a good-quality summary does. Hence, an
+episode recap can be regarded as the streaming data source,
+and the summary summarizes the stream in order. To select
+document-summary pairs that establish such correspondences,
+we first use the text segmentation technique to split the
+summary stream into segments. The episode recap is separated
+into paragraphs in the original dataset. Then, we calculate
+the mean of ROUGE-1, ROUGE-2, and ROUGE-L scores
+between each summary segment and document paragraphs.
+We choose the section with the highest ROUGE-L score as
+the corresponding source document for the summary segment.
+For each source paragraph, the summary segment that has the
+highest ROUGE score with it is selected as its corresponding
+summary. A document stream with less than two paragraphs
+will also be filtered. Overall, SSD consists of 29,376 docsumm pair samples, 5,208 validation samples, and 5,718 test
+samples. A document consists of 610 words, and a summary
+contains 87 words on average. Document streams containing
+2,3,4, and 5 documents make up 35%, 22%, 18%, and 5% of
+the total respectively.
+Our dataset is notably the first large-scale stepwise summarization dataset and will be released for further research.
+Detailed statistics for SSD and a comparison with other
+popular text summarization datasets are listed in Table II.
+
+IEEE/ACM TRANSACTIONS ON AUDIO SPEECH AND LANGUAGE PROCESSING, MANUSCRIPT
+
+arriving in sequence
+
+Document
+Stream
+
+Streaming
+Summary
+
+Document1
+Summary
+Sentence1
+Document2
+
+Summary
+Sentence2
+Summary
+Sentence3
+...
+
+Document3
+...
+
+4
+
+n-grams cannot be generated by extractive models. What is
+more, SSD has a weak lead bias. The Lead baseline is to
+select the first three sentences in the document as a summary,
+and the PG baseline corresponds to the strong abstractive
+summarization baseline [18]. The higher the PG/Lead score,
+the weaker the lead bias of the dataset. News datasets such
+as CNN/DailyMail and Newsroom always have a strong lead
+bias, with a PG/Lead ratio of less than one. Datasets such
+as XSum and Reddit overcome this problem. Our dataset also
+has a weak lead bias, where the PG/Lead ratio is larger than
+one.
+
+Fig. 2. Illustration of a sample in the stepwise summarization dataset.
+
+IV. P ROBLEM F ORMULATION
+Lead selects the first sentence for Reddit dataset, and the first
+three sentences for others. Next, we demonstrate the quality
+of the dataset and then discuss some abstractive characteristics
+of SSD compared to existing summarization datasets.
+B. Stepwise summarization characteristics.
+Human evaluation. We assess the quality of our stepwise
+summarization data from two aspects: whether the source
+summary corresponds to the document, and whether the previous summary relates to the new document. The first aspect
+reflects the quality of the summarization attribute and the
+second reflects the stream attribute. Summarization attribute
+here means whether the summary can correctly summarize
+important information from document, and stream attribute
+means whether the previous information relates to current
+document. We randomly sample 100 cases from SSD and
+perform Amazon’s Mechanical Turk tests, where three annotators are asked to assess the aforementioned aspects for
+each selection, i.e., with “yes” and “no”. The result shows that
+“yes” accounts for 94.3% and 95.0% of the answers for the
+summarization attribute and stream attribute, while “no” only
+takes up 5.7%, and 5.0%, respectively. This demonstrates that
+the dataset does indeed have good summarization and stream
+attributes. The kappa statistic is 0.57, which demonstrates
+moderate agreement between turkers.
+Automatic evaluation. We also propose an automatic
+method to evaluate the dataset, since the original TVMegaSite
+dataset provides all the mentioned character names. Ideally,
+if a character exists in a summary, he/she should also be
+included in the source paragraph, and vice versa. Hence, we
+calculate the percentage of cases when a character name exists
+in the paired document and summary (good case), and the
+cases when it only exists in the summary (bad case). The
+result shows that 89% of cases are good cases. This again
+demonstrates the good quality of the dataset.
+C. Abstractive characteristics.
+SSD has various abstractive characteristics, including strong
+abstractness and weak lead bias, as shown in Table II. About
+38.31% unigrams and 96.68% 4-grams in the gold summary
+are novel n-grams that do not exist in the input document,
+indicating strong abstractness in the dataset. This leads to a
+necessity for abstractive summarization methods since these
+
+Before presenting our approach for the stepwise summarization, we first introduce our notations and key concepts.
+To begin with, for a document X d = {xd1 , xd2 , . . . , xdT d }, we
+assume there is a previous document-summary pair, where the
+previous summary is X s = {xs1 , xs2 , . . . , xsT s }. xdi denotes the
+i-th word in document X d , and xsi denotes the i-th word in
+previous summary X s . Given the document X d and previous
+summary X s , the summary generator generates a summary
+Ŷ = {ŷ1 , ŷ2 , . . . , ŷT Ŷ }. Finally, we use the difference between
+the generated summary Ŷ and the ground truth summary Y =
+{y1 , y2 , . . . , yT Y } as the training signal to optimize the model
+parameters.
+V. T HE P ROPOSED SSG M ODEL
+A. Overview
+In this section, we propose the Stepwise Summary Generator, abbreviated as SSG. An overview of SSG is shown in
+Figure 3, which can be split into three main parts:
+• Stream-aware encoder incorporates the previous summary
+to calculate the selective reading gate in the gated recurrent
+unit, further polishing the document representation.
+• Summary generator generates a summary taking both the
+polished document and previous summary into consideration.
+• Coherence discriminator uses a convolutional neural
+network (CNN) to identify whether the generated summary
+is coherent with the previous summary.
+B. Stream-aware Encoder
+We first use an embedding matrix e to map a one-hot
+representation of each word in X d and X s into a highdimensional vector space. We then employ the Transformer
+encoder [38] initialized by BART [39] to model the temporal
+interactions between words, and obtain hdt and hst , denoting
+the hidden state of the t-th word in X d , X s respectively.
+To further model the interaction between a document and
+previous summary, we propose to utilize the previous summary
+to selectively read and process the document, in order to
+emphasize the words that are related to the previous summary.
+This is achieved by an RNN made up of Selective Reading
+Unit (SRU). Our inspiration comes from [40], which iteratively
+polished the document representation using document words.
+However, in SSG, we use the previous summary representation
+to polish the word representations in the document.
+
+IEEE/ACM TRANSACTIONS ON AUDIO SPEECH AND LANGUAGE PROCESSING, MANUSCRIPT
+
+5
+
+(2) Summary Generator
+
+(1) Stream-aware Encoder
+Polished
+document
+
+Generated Summary
+
+Selective
+Reading
+
+Document
+Representation
+
+Add & Normalization
+
+Summary
+Representation
+
+Previous
+Summary
+Attention
+
+(3) Coherence Discriminator
+
+Polished
+Document
+Attention
+
+Add & Normalization
+BART Encoder
+
+Document
+
+Masked Self-Attention
+
+Previous Summary
+
+Gold Summary
+
+Fig. 3. Overview of SSG. We divide our model into three parts: (1) Stream-aware Encoder (left) selectively processes document under guidance from the
+previous summary. (2) Summary generator (middle) generates a summary taking both factors above into consideration. (3) Coherence discriminator (right)
+determines whether the generated summary is coherent with the previous one.
+
+We begin by introducing the original GRU cell, which
+consists of an update gate vector ugt and a reset gate vector
+rtg . In our case, the output is the polished representation of hdt ,
+which is also the hidden state in the SRU cell, and we denoted
+as hgt . For each time step t with the document representation
+hdt and the previous hidden state hgt−1 , the updated hidden
+state hgt = GRU(hdt , hgt−1 ) is computed by:
+
+(3)
+
+employ the classic Transformer architecture as the decoder.
+Generally, each layer in the decoder consists of three parts:
+a multi-head self-attention mechanism, a multi-head crossattention mechanism, and a fully connected feed-forward
+network.
+For each layer, at the t-th decoding step, we first apply the
+self-attention on the masked summary embeddings, denoted as
+gt . The self-attention sub-layer with a masking mechanism is
+used to encode the decoded information. The masking mechanism ensures that the prediction of the position t depends only
+on the known output of the position before t.
+
+(4)
+
+g̃t = LN (gt + MSAttn (g<t , g<t )) ,
+
+ugt = σ(W1 hdt + U1 hgt−1 + b1 ),
+
+(1)
+
+rtg = σ(W2 hdt + U2 hgt−1 + b2 ),
+h̃gt = tanh(W3 hdt + rtg ◦ U3 hgt−1 + b3 ),
+hgt = ugt ◦ h˜gt + (1 − ugt ) ◦ hgt−1 ,
+
+(2)
+
+where W and b are trainable parameters, σ is the sigmoid
+activation function, and ◦ is element-wise multiplication. Here,
+due to the way ugt is calculated, it is sensitive to the position
+and order of the current input document, but loses information
+from the previous summary. In SRU, we propose to take the
+previous summary into consideration when calculating ugt :
+ft = [hdt ◦ q; hdt ; q],
+
+(5)
+
+Ft = W4 tanh(W5 ft + b5 ) + b4 ,
+exp(Ft )
+,
+u′t = PT d
+j=1 exp(Fj )
+
+(6)
+(7)
+
+where [; ] denotes concatenation,
+is the t-th word representation, and q is the average of the previous summary
+representations hs· . Equation 4 now becomes:
+hgt = u′t ◦ h̃gt + (1 − u′t ) ◦ hgt−1 .
+
+where LN is the layer normalization operation; MSAttn is
+the masked multi-head attention operation. Based on g̃t we
+compute the cross-attention scores over polished document:
+za,t = ReLU([g̃t Wa (hg Wb )T ]),
+
+(8)
+
+In this way, SSG automatically decides the extent to which
+the information of each word should be updated based on its
+relationship with the previous summary.
+
+C. Summary Generator
+The summary generator aims to generate a summary based
+on the input document and the previous summary. We also
+
+(10)
+
+where Wa , Wb ∈ Rd×d , d is the hidden dimension, hg is
+d
+the concatenation of all hgi for i ∈ [1, Td ], and za,t ∈ RT .
+Similarly, we also calculate the cross-attention scores over the
+previous summary:
+zb,t = ReLU([g̃t Wc (hs Wd )T ]),
+
+hdt
+
+(9)
+
+(11)
+
+s
+
+where zb,t ∈ RT .
+The attention weights za,t and zb,t are then used to obtain
+the context vectors ca,t and cb,t , respectively. Take the document context vector as an example:
+ca,t = za,t hg .
+
+(12)
+
+These context vectors, treated as salient contents summarized from various sources, are concatenated with the decoder
+hidden state g̃t to produce the distribution over the target
+vocabulary:
+Ptvocab = Softmax (Wo [g̃t ; ca,t ; cb,t ]) .
+
+(13)
+
+IEEE/ACM TRANSACTIONS ON AUDIO SPEECH AND LANGUAGE PROCESSING, MANUSCRIPT
+
+6
+
+All the learnable parameters are updated by optimizing the
+negative log likelihood objective function of predicting the
+target words:
+PT y
+Ls = − t=1 log Ptvocab (yt ) .
+(14)
+
+fluency. We then use BERTScore [42] to calculate a similarity
+score between the summaries based on their BERT embeddings. Since only using automatic evaluation metrics can be
+misleading [43], we also conduct the human evaluation.
+
+D. Coherence Discriminator
+
+B. Comparison Methods
+
+Previous work [41] has found that using a cross-entropy loss
+alone is not enough for generating coherent text. Hence, we
+employ a discriminator to provide additional training signals
+for the summary generator. The goal of this discriminator is
+to determine whether the new summary is coherent with the
+previous one. The generated summary is treated as the negative
+sample and the ground truth answer as the positive one.
+Similar to before, we use the same embedding matrix and
+another attention mechanism to process ŷ as hyt . Since the
+ground truth is encoded by a transformer that is different
+from the decoder transformer, we use a linear projection to
+transform the high-dimensional space of hyt to the same space
+as the decoder hidden state gt :
+
+To evaluate the performance of our proposed model, we
+compare it with the following baselines:
+Lead3 selects the first three sentences of a document as
+the summary. TextRank: [44] proposes to build a graph,
+then adds each sentence as a vertex and uses links to
+represent semantic similarity. MCL: [36] integrates semantic sentence similarity into an update summarization system. The proposed model is based on ILP [45], and is
+easily adapted to a single-document summarization setting.
+Transformer is based on attention mechanism proposed
+in [38]. PG combines the sequence-to-sequence framework
+with the copy mechanism from [18]. SAGCopy: a model proposed by [46], which augments Transformer with self-attention
+guided copy mechanism. BART: a denoising autoencoder for
+pretraining sequence-to-sequence models [39]. PEGASUS: a
+model pre-trained with extracted gap-sentences for abstractive
+summarization [47]. Our model is implemented based on
+PEGASUS and BART due to their better performance. We
+also propose two simple but intuitive models based on BART
+and PEGASUS model, i.e., Concat-prev-summ (CPS),
+which concatenates a new document with its previous summary, and Concat-prev-doc (CPD) which concatenates
+new document with the previous document. For human evaluation, we also add the performance of the latest large language
+model, GPT-3.5.
+
+dyt = Wz hyt + bz .
+
+(15)
+
+We model the interaction between the previous summary
+and generated one by concatenating them as dˆyt = [hst ; dyt ],
+and the previous summary and ground truth summary as dˆgt =
+[hst ; gt ]. Then, a convolutional layer convolves dˆ∗t with multiple
+convolutional kernels of different widths, obtaining a sequence
+of new features n∗t :
+n∗t = relu(dˆ∗t ⊙ Wc + bc ),
+
+(16)
+
+where ⊙ denotes the convolution operation. For each convolutional filter, the max-pooling layer takes the maximal
+value among the generated convolutional features ny and
+ng , respectively, resulting in a fixed-size vector N y and N g .
+Finally, we obtain the classification result D(dˆ∗ ):
+D(dˆ∗ ) = σ(Wh relu(N ∗ ) + bh ).
+
+(17)
+
+The training objective of the discriminator is to maximize
+the log-likelihood for classification, while the generator aims
+to maximize the probability of assigning the correct label to
+the generated summary:
+
+
+Ld = − log(D(dˆy )) + log(1 − D(dˆg )) ,
+(18)
+Lg = log(1 − D(dˆg )).
+
+(19)
+
+Overall, the parameters in the convolutional discriminator
+are optimized by the loss function Ld , while other parameters
+are optimized by Lg .
+
+C. Implementation Details
+We implement our experiments in PyTorch on an NVIDIA
+A100 GPU. The model is finetuned based on BART-base. The
+encoding step is 1000 for a document and 300 for a previous
+summary. We chose 1000 as our truncation size as we did not
+find significant improvement when increasing the input length
+from 1000 to 1500 tokens. The minimum decoding step is
+100, and the maximum step is 300. The batch size is set to
+32. We use Adam optimizer [48] as our optimizing algorithm.
+We also apply gradient clipping [49] with a range of [−2, 2]
+during training. For the test, we employ beam search with a
+beam size of 4 to generate more fluent summaries.
+
+VII. E XPERIMENTAL R ESULTS
+VI. E XPERIMENTAL S ETUP
+A. Evaluation Metrics
+
+A. Overall Performance
+
+For evaluation, we adopt ROUGE scores [?] which are
+widely applied to assess summarization quality [5], [15]. The
+ROUGE metrics compare a generated summary with a reference summary by computing overlapping lexical units. We
+report unigram and bigram overlap (ROUGE-1 and ROUGE-2)
+as a means of assessing the informativeness and the longest
+common subsequence (ROUGE-L) as a means of assessing
+
+We first examine whether our stepwise summarization
+model outperforms traditional summarization models. In this
+setting, performances are evaluated in doc-summ pair level
+(in contrast to doc-summ stream level). Table III lists the
+performances of all comparison methods in terms of ROUGE
+scores. Firstly, extractive methods are competitive with abstractive baselines in terms of ROUGE score but underperform
+
+IEEE/ACM TRANSACTIONS ON AUDIO SPEECH AND LANGUAGE PROCESSING, MANUSCRIPT
+
+TABLE III
+ROUGE SCORE COMPARISONS BETWEEN BASELINES IN DOC - SUMM PAIR
+LEVEL . A LL OUR ROUGE SCORES HAVE A 95% CONFIDENCE INTERVAL
+OF AT MOST ±0.23 AS REPORTED BY THE OFFICIAL ROUGE SCRIPT.
+RG-1
+
+RG-2
+
+RG-L
+
+BS
+
+Sentence extraction methods
+Lead3
+26.31
+TextRank
+32.71
+MCL
+33.57
+
+4.79
+6.49
+6.73
+
+23.56
+29.06
+29.96
+
+86.01
+85.90
+85.88
+
+Other previous information utilization methods
+CPD
+33.67
+7.89
+30.60
+CPS
+33.97
+7.94
+30.75
+
+86.57
+86.65
+
+Text generation methods
+Transformer
+26.24
+PG
+27.18
+SAGCopy
+28.72
+BART
+33.30
+PEGASUS
+32.35
+GPT3.5
+33.67
+SSG (PEGASUS)
+34.23
+SSG (BART)
+34.92
+
+86.04
+86.12
+86.39
+86.42
+86.10
+86.23
+86.54
+86.96
+
+5.56
+5.82
+6.44
+7.55
+6.91
+6.39
+8.08
+8.65
+
+24.79
+25.01
+25.82
+30.18
+29.78
+31.03
+31.24
+31.68
+
+TABLE IV
+ROUGE SCORES OF DIFFERENT ABLATION MODELS .
+ROUGE-1
+
+ROUGE-2
+
+ROUGE-L
+
+BS
+
+SSG w/o SR
+SSG w/o GAN
+
+34.01
+34.38
+
+8.20
+8.41
+
+31.04
+31.28
+
+86.57
+86.86
+
+SSG
+
+34.92
+
+8.65
+
+31.68
+
+86.96
+
+in BERTScore. This indicates that the extracted summaries
+have lower semantic similarity compared with abstractive
+summaries. Secondly, abstractive models equipped with pretrained language models outperform traditional summarization
+models. GPT-3.5 is competitive in a text-pair setting. Finally,
+SSG achieves consistently better performance, with 4.86% and
+4.97% improvements over BART in ROUGE-1 and ROUGE-L.
+We next examine how effective is previous information
+in stepwise summarization. Performances of these CPS and
+CPD are relatively higher than BART but worse than SSG,
+demonstrating that previous information is indeed helpful for
+summary generation even by simple concatenation methods,
+but this additional information is not the only reason why
+SSG can achieve good performance. CPS gives better results
+than CPD, which proves the superiority of using the previous
+summary over using previous documents.
+B. Ablation Study
+Next, we conduct ablation tests to assess the importance
+of the selective reading module (w/o SR), as well as the
+discriminator (w/o GAN), and the ROUGE score results are
+shown in Table IV. The discriminator provides the scalar training signal Ld for generator training. Consequently, there is an
+increase in performance of 1.27% from SSG w/o GAN to SSG
+in terms of ROUGE-L, which demonstrates the effectiveness
+of the discriminator. As for the selective reading module, it
+improves performance by 2.06% compared with SSG w/o SR,
+in terms of ROUGE-L, indicating that a deeper interaction
+between the previous summary and document further helps
+
+7
+
+summarization.
+C. Performance on Text Stream
+Note that previous experiments are based on generating a
+single summary, whereas previous summaries are ground truth
+summaries. To fully simulate a real text stream scene, we also
+conduct experiments where the target is to generate the whole
+summary stream, as shown in Figure 2. The difference lies
+in that SSG now takes a previously generated summary as
+the previous summary rather than the ground truth summary.
+We select several strong abstractive models in Table III as
+baselines. As stated in the introduction, there are two ways
+of generating a summary stream for traditional abstractive
+models. The first involves taking all documents and generating
+all summaries together, while the second generates a summary
+step-by-step. We denote the variations following the first
+fashion as *-Together, and the second as *-Split.
+The comparison results are listed in Table VII-D. We can
+see that overall, the performance of each model under the
+stepwise summarization setting is similar to its performance
+under the original setting. *-Split methods are better than
+*-Together, which may be because *-Together tend
+to mix the information between documents, while *-Split
+models can accurately utilize current document information,
+even when they do not have access to knowledge from
+previous documents. However, none of these models perform
+as well as SSG, since it can utilize current document information, while also capturing the relationship between the
+current and previous summary. GPT-3.5 falls behind in a textstream setting, likely due to difficulty in handling sequential
+information. Note that in this setting, the ROUGE score is
+calculated in terms of text stream level, thus the results are
+not directly comparable to results in Table III.
+D. Human Evaluation and Case Study
+We also assessed system performance on the streaming
+text by human judgments on 30 randomly selected instances
+following [50]. Our first evaluation study quantified the degree to which summarization models retain key information
+from the documents following a question-answering (QA)
+paradigm. The evaluation size is 1.5 times larger than the
+original setting [50]. We created a set of questions based on
+the multiple gold ground summaries and examined whether
+participants were able to answer these questions by reading
+system summaries alone. We created 61 questions in total.
+Examples of questions and their answers are given in Table VII. We adopted the same scoring mechanism used in
+[51], i.e., correct answers are marked with 1, and 0 otherwise.
+Our second evaluation assessed the overall quality of the
+summaries by asking participants to rate them taking into
+account the following criteria: Informativeness, Consistency,
+and Succinctness. The rating score of each system ranges from
+1 (worst) to 5 (best).
+Both evaluations were conducted by three Ph.D.
+students. Participants evaluated summaries produced by
+SAGCopy-Split, BART-Split, GPT-3.5, and our
+SSG. All evaluated systems were variants that achieved high
+performance in automatic evaluations. As shown in Table VI,
+
+IEEE/ACM TRANSACTIONS ON AUDIO SPEECH AND LANGUAGE PROCESSING, MANUSCRIPT
+
+TABLE V
+ROUGE SCORE COMPARISONS ON TEXT STREAM . ROUGE SCORE
+COMPARISONS BETWEEN BASELINES . A LL SCORES HAVE A 95%
+CONFIDENCE INTERVAL OF AT MOST ±0.28.
+RG-1
+
+RG-2
+
+RG-L
+
+BS
+
+*-Together methods
+Transformer-Together
+PG-Together
+SAGCopy-Together
+PEGASUS-Together
+BART-Together
+
+36.17
+36.36
+37.89
+45.05
+45.36
+
+8.76
+8.79
+9.50
+10.76
+11.15
+
+33.45
+33.95
+35.54
+42.74
+43.14
+
+82.29
+82.41
+82.74
+84.22
+85.34
+
+*-Split methods
+Transformer-Split
+PG-Split
+SAGCopy-Split
+PEGASUS-Split
+GPT-3.5
+BART-Split
+SSG
+
+36.30
+36.83
+38.44
+45.19
+34.20
+45.94
+47.00
+
+8.93
+9.07
+9.24
+10.79
+7.11
+11.28
+12.46
+
+33.74
+34.37
+34.99
+43.16
+30.85
+43.96
+44.77
+
+82.31
+83.50
+83.81
+84.77
+80.06
+84.69
+85.86
+
+TABLE VI
+S YSTEM SCORES BASED ON QUESTIONS ANSWERED BY HUMAN
+ANNOTATORS AND SUMMARY QUALITY RATING .
+
+SAGCopy-Split
+BART-Split
+SSG
+GPT-3.5
+
+QA(%)
+
+Rating
+
+34.42
+40.98
+45.90
+48.39
+
+3.26
+3.56
+3.81
+4.03
+
+on both evaluations, participants overwhelmingly prefer our
+model compared with baselines of similar scales. All pairwise
+comparisons among systems are statistically significant using
+the paired student t-test for significance at α = 0.01.
+We give two examples of system outputs in Table VII. In
+the first case, we can see that our proposed model SSG can
+generate a coherent, informative, and accurate summary. Both
+baselines make some mistakes or miss important information.
+In the second case, all baselines and our model make some
+mistakes. BART-Split confuses the father and son, and our
+SSG introduces “the son goes to the dad” while the fact is
+“the dad goes to the son”. It’s evident that GPT-3.5 generally
+performs comparably to our model, with the exception being
+its misinterpretation of “leave Nikolas a widower” as “causing
+Nikolas’s death”.
+
+E. Influence of Previous Information
+Since our stepwise summarization takes the previous information as input, we conduct an experiment to see the influence
+of the relatedness between the previous and current information. Concretely, we calculate the ROUGE score between the
+document and generated summary (DS score), and the score
+between the document with previous summary (DP score).
+The result is shown in Figure 4(a). It can be seen that the two
+scores have a positive correlation with each other, which means
+that a closer relationship between the previous and current
+information can help improve summarization performance.
+However, the DS scores are substantially higher than DP
+scores, which means that the good performance of our model
+
+8
+
+TABLE VII
+G OLD HUMAN AUTHORED SUMMARIES AND AUTOMATIC SUMMARIES
+PRODUCED BY SEVERAL BASELINES AND OUR SSG.
+
+Ground Truth Summary: Back at home, the not-so-happy newlyweds get into an argument which prompts Lydia to pick up the
+phone and call a lawyer so she can have the marriage annulled.
+However, Stefan catches her and hangs up the phone, telling her
+that the only way she’ll get out of the marriage is by leaving
+Nikolas a widower.
+QA: Question: Who stops Lydia from calling a lawyer? Answer:
+Stefan.
+SAGCopy-Split: Emily and Stefan get into an argument which
+prompts Lydia to call a lawyer so she can have the marriage
+annulled. Stefan catches her and hangs up the phone, telling her
+that the only way she’ll get out of the marriage is by leaving
+Nikolas a widower.
+BART-Split: Lydia and Stefan get into an argument which prompts
+Lydia to pick up the phone and call a lawyer so she can have the
+marriage annulled. However, Stefan catches her and hangs up.
+GPT-3.5: Lydia and Nikolas have a heated argument,
+leading Lydia to seek an annulment through a
+lawyer. Stefan intervenes, insisting that the only way
+she can escape the marriage is by causing Nikolas’s death.
+SSG: Lydia and Stefan get into an argument which prompts Lydia
+to call a lawyer so she can have the marriage annulled. However,
+Stefan catches her and hangs up the phone, telling her that the only
+way she’ll get out of the marriage is to leave Nikolas a widower.
+Ground Truth Summary: Sonny goes to intervene in what could
+have been an escalated situation involving Morgan’s confrontation
+with a guy at the coffee shop. When it appears his son handled
+the situation and nothing got out of hand, Sonny commends and
+praises him, tells Morgan how proud he is of him and assures his
+son all will be well as long as he takes the correct meds that have
+proven successful.
+QA: Question: Who is the father? Answer: Sonny.
+SAGCopy-Split: Sonny talks to Morgan who encourages his son
+to know that he did the right thing, reminding him he protected
+Kiki without losing control. He tells Morgan he needs to keep
+doing what he is doing and continue taking his meds and he will
+be all right.
+BART-Split:At the coffee shop, Sonny talks to his dad who encourages his son to know that he did the right thing by protecting
+Kiki without losing control. He assures his son that the behavior
+of the guy and the situation was enough to reasonably provoke
+and piss anybody off. Sonny assures Morgan he merely needs to
+keep doing what he is doing and will be all right.
+GPT-3.5: In the article, Sonny advises Morgan to believe he did
+the right thing by protecting Kiki from a provoking individual.
+Sonny reassures Morgan that as long as he continues taking his
+medication and stays on the right path, he will be fine.
+SSG: Morgan goes to talk to his dad who encourages his son to
+know that he did the right thing by protecting Kiki from the guy
+who provoked him. They both affirm that Morgan is successfully
+fighting his illness and getting his life back on track.
+
+does not solely rely on the previous information, but also on
+the modeling of the two information sources.
+F. Error Accumulation Analysis
+As the text stream gets longer, the errors in the summarization process get accumulated. Hence, we are interested
+to see whether the benefits of stepwise summarization will
+be diminished as the stream grows. We conduct experiments
+to investigate the ROUGE performance on text stream with
+
+IEEE/ACM TRANSACTIONS ON AUDIO SPEECH AND LANGUAGE PROCESSING, MANUSCRIPT
+
+(b) 30
+
+30.0
+27.5
+25.0
+22.5
+20.0
+17.5
+15.0
+
+Mean ROUGE Score
+
+DS score
+
+(a) 32.5
+
+(0,5)
+
+(5,10)
+
+(10,15)
+
+DP score
+
+(15,20)
+
+(20,25)
+
+outperformed the state-of-the-art summarization models on our
+large-scale stepwise summarization dataset in terms of both
+human and automatic metrics. In the near future, we will
+employ large language models to enhance the performance
+of the stepwise summarization models.
+
+SSG
+BART-Split
+
+29
+28
+27
+26
+25
+24
+23
+2
+
+3
+
+9
+
+4
+
+Text Stream Length
+
+5
+
+Fig. 4. (a) Influence of previous information (DP score) on summarization
+performance (DS score). (b) Error accumulation analysis when the text stream
+gets longer.
+
+different lengths, i.e., document-summary pair number, as
+shown Figure 4(b). The result shows that the ROUGE score
+of SSG increases with the number of input documents to
+begin with, which demonstrates that our proposed model is
+more and more effective when the text stream begins to grow
+larger. It can also be seen that, as the stream gets longer, the
+improvement of our model compared with BART-Split is
+generally consistent. Regardless of the different lengths of the
+text stream, our SSG consistently outperforms BART-Split,
+which is a strong baseline that achieves good performance in
+all metrics. The above result demonstrates that the previous
+summary is always useful, and our model can successfully
+utilize it.
+G. Efficiency and Scale Analysis
+From parameter view, both PEGASUS (223M) and our
+model (149M) introduce more parameters compared to the
+baseline BART, leading to increased computational resources.
+Secondly, a larger model introduces more training time and
+inference time. Hence, it takes a bit longer for our model to
+decode compared with BART (5s). Finally, the integration of
+the GAN mechanism in SSG, despite adding a modest increase
+in parameters (3.11M), significantly accelerates network convergence, and does not introduce more inference time.
+Based on the findings in Tables VII-D and VI, it is evident
+that an increase in the number of parameters leads to improved
+model performance. For instance, GPT-3.5, with its larger
+parameter scale, achieves a human evaluation rating of 4.03.
+At the same time, it is important to note that within the same
+parameter range, the design of the model significantly affects
+its performance. As an example, our model, which has only 6%
+more parameters compared to BART-base, surpasses BART’s
+performance by 12%. Similarly, it surpasses PEGASUS by 4%
+while having 40% fewer parameters.
+VIII. C ONCLUSION
+In this paper, we have proposed a model named Stepwise
+Summary Generator (SSG) which aims to generate summaries
+for stream document data. Since previous information is also
+important when summarizing a current document, our model
+used a previous summary to selectively read the current
+document and obtained its polished representation, both were
+combined to generate the summary. In addition, a convolutional discriminator was employed to provide a coherence
+signal to the generator, so as to enhance the coherence between
+the previous summary and the newly generated one. SSG
+
+ACKNOWLEDGMENTS
+We would like to thank the anonymous reviewers for their
+constructive comments. The work was supported by King
+Abdullah University of Science and Technology (KAUST)
+through grant awards FCC/1/1976-44-01, FCC/1/1976-4501, REI/1/5234-01-01, RGC/3/4816-01-01, REI/1/5414-01-01,
+REI/1/5289-01-01, and REI/1/5404-01-01.
+R EFERENCES
+[1] Alexios Gidiotis and Grigorios Tsoumakas. A divide-and-conquer
+approach to the summarization of long documents. IEEE/ACM Transactions on Audio, Speech, and Language Processing, 2020.
+[2] Tao Ge, Lei Cui, Baobao Chang, Sujian Li, Ming Zhou, and Zhifang
+Sui. News stream summarization using burst information networks. In
+Proc. of EMNLP, 2016.
+[3] Hoa Trang Dang and Karolina Owczarzak. Overview of the tac 2008
+update summarization task. In TAC, 2008.
+[4] Aishwarya Jadhav and Vaibhav Rajan. Extractive summarization with
+swap-net: Sentences and words from alternating pointer networks. In
+Proc. of ACL, 2018.
+[5] Shashi Narayan, Shay B. Cohen, and Mirella Lapata. Ranking sentences
+for extractive summarization with reinforcement learning. In Proc. of
+AACL, 2018.
+[6] Jiacheng Xu, Zhe Gan, Yu Cheng, and Jingjing Liu. Discourse-aware
+neural extractive text summarization. In Proc. of ACL, 2020.
+[7] Yue Dong, Yikang Shen, Eric Crawford, Herke van Hoof, and Jackie
+Chi Kit Cheung. Banditsum: Extractive summarization as a contextual
+bandit. In Proc. of EMNLP, 2018.
+[8] Ming Zhong, Pengfei Liu, Yiran Chen, Danqing Wang, Xipeng Qiu, and
+Xuanjing Huang. Extractive summarization as text matching. In Proc.
+of ACL, 2020.
+[9] Qingyu Zhou, Nan Yang, Furu Wei, Shaohan Huang, Ming Zhou, and
+Tiejun Zhao. A joint sentence scoring and selection framework for
+neural extractive document summarization. IEEE/ACM Transactions on
+Audio, Speech, and Language Processing, 2020.
+[10] Jiajun Zhang, Yu Zhou, and Chengqing Zong. Abstractive crosslanguage summarization via translation model enhanced predicate argument structure fusing. IEEE/ACM Transactions on Audio, Speech,
+and Language Processing, 2016.
+[11] Jiajun Zhang, Yang Zhao, Haoran Li, and Chengqing Zong. Attention
+with sparsity regularization for neural machine translation and summarization. IEEE/ACM Transactions on Audio, Speech, and Language
+Processing, 2018.
+[12] Asli Celikyilmaz, Antoine Bosselut, Xiaodong He, and Yejin Choi. Deep
+communicating agents for abstractive summarization. In Proc. of AACL,
+2018.
+[13] Kai Wang, Xiaojun Quan, and Rui Wang. Biset: Bi-directional selective
+encoding with template for abstractive summarization. In Proc. of ACL,
+2019.
+[14] Ming-Hsiang Su, Chung-Hsien Wu, and Hao-Tse Cheng. A twostage transformer-based approach for variable-length abstractive summarization. IEEE/ACM Transactions on Audio, Speech, and Language
+Processing, 2020.
+[15] Wan Ting Hsu, Chieh-Kai Lin, Ming-Ying Lee, Kerui Min, Jing Tang,
+and Min Sun. A unified model for extractive and abstractive summarization using inconsistency loss. In Proc. of ACL, 2018.
+[16] Sebastian Gehrmann, Yuntian Deng, and Alexander M. Rush. Bottomup abstractive summarization. Empirical Methods in Natural Language
+Processing, 2018.
+[17] Jiatao Gu, Zhengdong Lu, Hang Li, and Victor O. K. Li. Incorporating
+copying mechanism in sequence-to-sequence learning. Proceedings of
+Annual Meeting of the Association for Computational Linguistics, 2016.
+[18] Abigail See, Peter J. Liu, and Christopher D. Manning. Get to the point:
+Summarization with pointer-generator networks. In Proc. of ACL, 2017.
+
+IEEE/ACM TRANSACTIONS ON AUDIO SPEECH AND LANGUAGE PROCESSING, MANUSCRIPT
+
+[19] Karl Moritz Hermann, Tomás Kociský, Edward Grefenstette, Lasse
+Espeholt, Will Kay, Mustafa Suleyman, and Phil Blunsom. Teaching
+machines to read and comprehend. In Proc. of NeurIPS, 2015.
+[20] Max Grusky, Mor Naaman, and Yoav Artzi. Newsroom: A dataset of
+1.3 million summaries with diverse extractive strategies. In Proc. of
+AACL, 2018.
+[21] Shashi Narayan, Shay B. Cohen, and Mirella Lapata. Don’t give me the
+details, just the summary! topic-aware convolutional neural networks for
+extreme summarization. In Proc. of EMNLP, 2018.
+[22] Byeongchang Kim, Haengkang Kim, and Gunhee Kim. Abstractive
+summarization of reddit posts with multi-level memory networks. In
+Proc. of AACL, 2018.
+[23] James Allan, Rahul Gupta, and Vikas Khandelwal. Temporal summaries
+of news topics. In Proc. of SIGIR, 2001.
+[24] Rui Yan, Xiaojun Wan, Jahna Otterbacher, Liang Kong, Xiaoming Li,
+and Yan Zhang. Evolutionary timeline summarization: a balanced
+optimization framework via iterative substitution. In Proc. of SIGIR,
+2011.
+[25] Rui Yan, Liang Kong, Congrui Huang, Xiaojun Wan, Xiaoming Li, and
+Yan Zhang. Timeline generation through evolutionary trans-temporal
+summarization. In Proc. of EMNLP, 2011.
+[26] Wayne Xin Zhao, Yanwei Guo, Rui Yan, Yulan He, and Xiaoming Li.
+Timeline generation with social attention. In Proc. of SIGIR, 2013.
+[27] Xiuying Chen, Zhangming Chan, Shen Gao, Meng-Hsuan Yu, Dongyan
+Zhao, and Rui Yan. Learning towards abstractive timeline summarization. In Proc. of IJCAI, 2019.
+[28] Xiuying Chen, Mingzhe Li, Shen Gao, Zhangming Chan, Dongyan
+Zhao, Xin Gao, Xiangliang Zhang, and Rui Yan. Follow the timeline!
+generating an abstractive and extractive timeline summary in chronological order. ACM Transactions on Information Systems, 41(1):1–30,
+2023.
+[29] Demian Gholipour Ghalandari and Georgiana Ifrim.
+Examining
+the state-of-the-art in news timeline summarization. arXiv preprint
+arXiv:2005.10107, 2020.
+[30] Yi Yu, Adam Jatowt, Antoine Doucet, Kazunari Sugiyama, and
+Masatoshi Yoshikawa. Multi-timeline summarization (mtls): Improving
+timeline summarization by generating multiple summaries. In Proc. of
+ACL, 2021.
+[31] Lidan Shou, Zhenhua Wang, Ke Chen, and Gang Chen. Sumblr:
+continuous summarization of evolving tweet streams. In Proc. of SIGIR,
+2013.
+[32] Andrei Olariu. Efficient online summarization of microblogging streams.
+In Proc. of ACL, 2014.
+[33] Zhaochun Ren, Oana Inel, Lora Aroyo, and Maarten De Rijke. Timeaware multi-viewpoint summarization of multilingual social text streams.
+In Conference on Information and Knowledge Management, 2016.
+[34] Florian Boudin, Marc El-Bèze, and Juan-Manuel Torres-Moreno. A
+scalable mmr approach to sentence scoring for multi-document update
+summarization. In Proc. of COLING, 2008.
+[35] Jean-Yves Delort and Enrique Alfonseca. Dualsum: a topic-model based
+approach for update summarization. In Proc. of ACL, 2012.
+[36] Maali Mnasri, Gaël de Chalendar, and Olivier Ferret. Taking into
+account inter-sentence similarity for update summarization. In IJCNLP,
+2017.
+[37] Mingda Chen and Kevin Gimpel. Tvrecap: A dataset for generating
+stories with character descriptions. arXiv preprint arXiv:2109.08833,
+2021.
+[38] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion
+Jones, Aidan N. Gomez, Lukasz Kaiser, and Illia Polosukhin. Attention
+is all you need. In Proc. of NeurIPS, 2017.
+[39] Mike Lewis, Yinhan Liu, Naman Goyal, Marjan Ghazvininejad, Abdelrahman Mohamed, Omer Levy, Veselin Stoyanov, and Luke Zettlemoyer.
+Bart: Denoising sequence-to-sequence pre-training for natural language
+generation, translation, and comprehension. In Proc. of ACL, 2020.
+[40] Xiuying Chen, Shen Gao, Chongyang Tao, Yan Song, Dongyan Zhao,
+and Rui Yan. Iterative document representation learning towards
+summarization with polishing. Empirical Methods in Natural Language
+Processing, 2018.
+[41] Ari Holtzman, Jan Buys, Maxwell Forbes, Antoine Bosselut, David
+Golub, and Yejin Choi. Learning to write with cooperative discriminators. In Proc. of ACL, 2018.
+[42] Tianyi Zhang, Varsha Kishore, Felix Wu, Kilian Q Weinberger, and Yoav
+Artzi. Bertscore: Evaluating text generation with bert. In Proc. of ICLR,
+2020.
+[43] Amanda Stent, Matthew Marge, and Mohit Singhai. Evaluating evaluation methods for generation in the presence of variation. In CICLing,
+2005.
+
+10
+
+[44] Rada Mihalcea and Paul Tarau. Textrank: Bringing order into text. In
+Proc. of EMNLP, 2004.
+[45] Dan Gillick and Benoı̂t Favre. A scalable global model for summarization. In ILP 2009, 2009.
+[46] Song Xu, Haoran Li, P. Yuan, Youzheng Wu, Xiaodong He, and
+Bowen Zhou. Self-attention guided copy mechanism for abstractive
+summarization. In Proc. of ACL, 2020.
+[47] Jingqing Zhang, Yao Zhao, Mohammad Saleh, and Peter Liu. Pegasus:
+Pre-training with extracted gap-sentences for abstractive summarization.
+In Proc. of ICML, 2020.
+[48] Diederik P Kingma and Jimmy Ba. Adam: A method for stochastic
+optimization. arXiv preprint arXiv:1412.6980, 2014.
+[49] Razvan Pascanu, Tomas Mikolov, and Yoshua Bengio. On the difficulty
+of training recurrent neural networks. In ICML, 2013.
+[50] Yang Liu and Mirella Lapata. Hierarchical transformers for multidocument summarization. In Proc. of ACL, 2019.
+[51] James Clarke and Mirella Lapata. Discourse constraints for document
+compression. Computational Linguistics, 2010.
+
+

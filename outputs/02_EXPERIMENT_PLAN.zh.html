@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>实验计划 — I1 安全冗余 MoE（SafeSpread）</title>
+<style>
+  :root{--ink:#1a1a1a;--mut:#5a6270;--line:#e2e6ec;--bg:#fbfcfe;--acc:#2b5c9e;--ok:#0a7f52;--warn:#b5820a;--card:#fff;}
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei","Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.8;margin:0;padding:0 20px 80px}
+  .wrap{max-width:1040px;margin:0 auto}
+  h1{font-size:1.8rem;margin:.6em 0 .1em;letter-spacing:-.01em}
+  h2{font-size:1.3rem;margin:2em 0 .5em;padding-bottom:.25em;border-bottom:2px solid var(--line)}
+  h3{font-size:1.05rem;margin:1.3em 0 .3em}
+  .sub{color:var(--mut);font-size:.95rem;margin:.2em 0 1.4em}
+  code{background:#eef1f6;padding:.08em .35em;border-radius:4px;font-size:.9em}
+  a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline}
+  table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.9rem}
+  th,td{border:1px solid var(--line);padding:.5em .65em;text-align:left;vertical-align:top}
+  th{background:#eef2f8;font-weight:600}
+  tr:nth-child(even) td{background:#f6f8fb}
+  ul{margin:.3em 0 .6em;padding-left:1.3em} li{margin:.2em 0}
+  .abs{background:#fff;border:1px solid var(--line);border-left:5px solid var(--warn);border-radius:8px;padding:1em 1.3em;margin:1em 0}
+  .proj{display:inline-block;background:var(--warn);color:#fff;font-size:.72rem;font-weight:700;padding:.12em .6em;border-radius:20px}
+  .ph{background:#fff3cf;padding:0 .25em;border-radius:3px;font-weight:600}
+  .note{background:#fff8e6;border:1px solid #f0dfa8;border-radius:8px;padding:.7em 1em;font-size:.9rem;color:#6b5600;margin:1em 0}
+  .meta{font-size:.85rem;color:var(--mut)}
+  .pill{display:inline-block;font-size:.72rem;font-weight:700;padding:.1em .5em;border-radius:5px;background:#eef2f8;color:var(--acc)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>实验计划 — I1 · 安全冗余 MoE（SafeSpread）</h1>
+<p class="sub">
+  想法（来自 <a href="01_IDEA_REPORT.zh.html">01_IDEA_REPORT</a>，<b>已选定 I1</b>）：用一次 LoRA 微调 + 路由正则，<b>把拒答行为摊分到许多专家上</b>，使得没有任何一个可被消融的小专家子集能被敲掉来越狱模型——一个针对 SAFEx/SteerMoE 专家消融攻击、且不需要原始对齐路由权重的防御。·
+  研究者：<b>Xiuying Chen</b> · 视角：工程 · 生成日期：<b>2026-07-02</b> ·
+  <span class="pill">claim 驱动，倒着从摘要写起</span>
+</p>
+
+<div class="note">
+<b>可行性。</b>单张 A100 80GB 足够：<a href="https://arxiv.org/abs/2509.22745">SafeMoE</a> 就是在 1× A100 80GB 上、以 <b>OLMoE-1B-7B</b> 为主模型完成整个 MoE 防御研究的。我们把 OLMoE-1B-7B-0924-Instruct 作为主要目标，把 <b>Qwen3-30B-A3B</b>（SAFEx 的招牌模型，6144 个专家）作为迁移验证。全程 LoRA + 推理期攻击评测，无需多卡训练。安全性用现成的 Llama-Guard 分类器判定（与 SteerMoE/SafeMoE 一致）。
+</div>
+
+<!-- ===================== PROJECTED ABSTRACT ===================== -->
+<h2>0 · 预期摘要 &nbsp;<span class="proj">预期 — 非真实结果</span></h2>
+<div class="abs">
+<p>混合专家语言模型经过对齐、会拒绝有害请求，但近期工作表明它们的拒答行为集中在少数几个安全关键专家上，于是只要禁用一小撮专家就能移除安全护栏。已有的防御要么在攻击之后才恢复拒答、要么需要原始的安全对齐路由权重，而一个已部署的模型并没有这些权重。我们提出 <b>SafeSpread</b>，一种把拒答行为摊分到许多专家上、使得没有任何一个可被消融的小子集独自承载它的方法。我们先从路由统计中定位安全关键专家，然后做一次轻量的 LoRA 微调，配一个路由正则项和一个反集中项，把与拒答相关的路由质量推到许多专家上，且只用已部署的模型。在标准的有害集和越狱集上，SafeSpread 把专家消融下的最坏情况拒答跌幅从 <span class="ph">[X%]</span> 降到 <span class="ph">[X%]</span>，即便攻击者针对加固后的模型重新优化消融，也能把跌幅压在 <span class="ph">[X%]</span> 以内。它的代价是 <span class="ph">[X%]</span> 的能力损失，且不带来可测的过度拒答。这些结果给出了一种可部署的、能消除对齐混合专家模型专家消融脆弱性的办法。</p>
+</div>
+<p class="meta"><b>结构：</b>背景（MoE 经对齐会拒答）→ 问题（拒答集中在少数专家、消融即可攻破、已有防御需参考权重）→ 方法（SafeSpread：定位 + 路由正则摊分，只用已部署模型）→ 结果（占位符）→ 结论。<b>摘要↔claim 自检：</b>集中 → C1；最坏跌幅下降 → C2；扛住自适应再攻击 → C3；不需参考权重 → C4；能力/过度拒答代价低 → C5。所有数字都是占位符。</p>
+
+<!-- ===================== PAPER SKELETON ===================== -->
+<h2>0.5 · 预期论文骨架 &nbsp;<span class="proj">预期</span></h2>
+<p class="sub">结构以 <a href="https://arxiv.org/abs/2509.22745">SafeMoE</a>（最接近的 MoE 安全防御论文）为模板：Intro（4 段）· 威胁模型 · Method（各 module）· Experiments（5.1–5.n）· Related Work · Conclusion。下面 §1–§5 的具体实验计划正是用来填它的 Experiments 部分。</p>
+
+<h3>Introduction — 每段一句主旨（共 4 段，gap-first，你的风格）</h3>
+<ol>
+  <li><b>P1（全景 → 缺口）：</b>MoE 大模型经过对齐会拒绝有害请求，但稀疏模型里的安全性并没有均匀地分布在各专家上。</li>
+  <li><b>P2（收紧缺口）：</b>拒答集中在少数安全关键专家上，于是攻击者只要禁用一小撮专家（或把路由从它们那里引开）就能移除护栏，而现有防御要么攻击后才恢复拒答、要么需要原始对齐路由权重。</li>
+  <li><b>P3（贡献）：</b>我们提出 SafeSpread，在一次轻量 LoRA 微调里用路由正则项和反集中项把拒答摊分到许多专家上，只用已部署的模型，使得没有任何一个可被消融的小子集独自承载护栏。</li>
+  <li><b>P4（贡献清单）：</b>我们 (i) 在多个 MoE 家族上量化这种集中脆弱性；(ii) 提出 SafeSpread，一种无需参考权重的再分布防御；(iii) 在静态、自适应、仅输入三类攻击下评测它；(iv) 证明最坏情况拒答跌幅从 <span class="ph">[X%]</span> 降到 <span class="ph">[X%]</span>，能力代价 <span class="ph">[X%]</span>。</li>
+</ol>
+
+<h3>Related Work — 分节（对应 MoE 安全文献，每篇都是真实链接）</h3>
+<ul>
+  <li><b>MoE 路由的脆弱性</b> — 安全集中与专家消融（<a href="https://arxiv.org/abs/2506.17368">SAFEx</a>）、专家（去）激活 steering（<a href="https://arxiv.org/abs/2509.09660">SteerMoE</a>）、路由/后门攻击。<i>定位：</i>我们防御它们揭示的这种集中。</li>
+  <li><b>MoE / 安全微调的防御</b> — 路由对齐（<a href="https://arxiv.org/abs/2509.22745">SafeMoE</a>）、SafeInstr、SaLoRA。<i>定位：</i>我们不需要参考对齐路由权重，且针对的是消融而非微调漂移。</li>
+  <li><b>更广义的安全对齐与越狱</b> — 你的<a href="https://arxiv.org/abs/2502.14296">可信性</a> / Safety-Boundaries / 越狱 benchmark 这条线。<i>定位：</i>我们把它从攻击/评测推进到架构级防御。</li>
+</ul>
+
+<h3>Method — 各 module（每个是一个带标题的小节）</h3>
+<ul>
+  <li><b>§ 安全关键专家定位</b> — 复现 SAFEx 的稳定性专家选择（SES），找出「一旦消融就掉拒答」的那些专家。</li>
+  <li><b>§ 再分布目标</b> — 带路由正则的 LoRA 微调：把与拒答相关的路由质量摊分到许多专家，外加在安全关键集合上的反集中（熵）项。</li>
+  <li><b>§ 路由 logit 正则</b> — 一个约束项，让路由器在微调后不会又把拒答重新集中到一小撮专家上。</li>
+</ul>
+
+<h3>Experiments — 计划的各小节（每行 = 下面 §1–§3 的具体实验）</h3>
+<table>
+<thead><tr><th>论文小节</th><th>计划的实验</th><th>Claim / 指标</th></tr></thead>
+<tbody>
+<tr><td>5.1 集中度审计</td><td>在未防御 MoE 上复现 SAFEx 的 k-专家消融曲线</td><td>C1 · 拒答跌幅 vs k</td></tr>
+<tr><td>5.2 主防御</td><td>SafeSpread vs 未防御 + SAFEx-修复 + SafeMoE</td><td>C2 · 最坏情况拒答跌幅</td></tr>
+<tr><td>5.3 自适应鲁棒性</td><td>攻击者在加固模型上重新优化消融；仅输入越狱（SteerMoE 不安全 steer + AIM）</td><td>C3 · 拒答跌幅 / ASR</td></tr>
+<tr><td>5.4 无参考权重验证</td><td>SafeSpread（不需对齐权重）vs SafeMoE（需要）</td><td>C4 · 无参考权重也能防</td></tr>
+<tr><td>5.5 消融</td><td>A1（去熵项）· A2（全专家 vs 关键集）· A3（去路由正则）</td><td>方法归因</td></tr>
+<tr><td>5.6 安全税</td><td>能力（AIME-2024、MMLU-Redux）+ 良性集上的过度拒答</td><td>C5 · &lt;[X%] 损失</td></tr>
+<tr><td>5.7 迁移</td><td>OLMoE-1B-7B → Qwen3-30B-A3B</td><td>通用性</td></tr>
+</tbody>
+</table>
+
+<h3>Discussion / Conclusion — 主旨句</h3>
+<ul>
+  <li><b>Discussion：</b>把一个安全行为摊分到多个专家上，用一点容量换来集中式设计给不了的鲁棒性，而且除了已部署的模型什么都不需要。</li>
+  <li><b>Conclusion：</b>一种无需参考权重的再分布防御，消除对齐 MoE 模型的专家消融脆弱性，并附一个可复用的集中度指标。</li>
+</ul>
+
+<!-- ===================== CLAIMS ===================== -->
+<h2>1 · Claims → 证据 &nbsp;<span class="meta">（具体的实验计划——填充论文的 Experiments 部分）</span></h2>
+<table>
+<thead><tr><th>#</th><th>Claim（若想法成立）</th><th>支撑它的实验</th></tr></thead>
+<tbody>
+<tr><td><b>C1</b></td><td>未防御 MoE 的拒答是集中的——少数专家承载护栏。</td><td>在 OLMoE 与 Qwen3-30B-A3B 上复现 SAFEx 的 SES + k-专家消融曲线（拒答跌幅 vs k）。</td></tr>
+<tr><td><b>C2</b></td><td>SafeSpread 压平脆弱性——SAFEx 预算下的最坏 k-消融跌幅降到 &lt;5%。</td><td>最坏情况 k-专家消融下的拒答跌幅，SafeSpread vs 未防御、SAFEx-修复、SafeMoE。</td></tr>
+<tr><td><b>C3</b></td><td>对自适应与仅输入攻击都鲁棒，而不只是静态消融。</td><td>攻击者在加固模型上重新优化消融；SteerMoE 式不安全 steer + AIM 越狱；报告拒答跌幅 + ASR。</td></tr>
+<tr><td><b>C4</b></td><td>只用已部署模型即可——不需要原始对齐路由权重。</td><td>SafeSpread vs SafeMoE（后者需要参考路由权重），预算对齐。</td></tr>
+<tr><td><b>C5</b></td><td>安全税低——能力损失小、无过度拒答上升。</td><td>AIME-2024 + MMLU-Redux 能力；500 条良性 prompt 上的过度拒答。</td></tr>
+</tbody>
+</table>
+
+<!-- ===================== SYSTEMS ===================== -->
+<h2>2 · 系统 — 方法 + 必须击败的 baseline</h2>
+<h3>方法：<b>SafeSpread</b></h3>
+<ul>
+  <li>用 SAFEx 稳定性专家选择（SES）<b>定位</b>安全关键专家。</li>
+  <li>用 LoRA 微调<b>再分布</b>：把与拒答相关的路由质量摊分到许多专家的路由正则 + 关键集合上的反集中熵项。</li>
+  <li><b>正则化路由器</b>，使其微调后不再把拒答重新集中。</li>
+  <li><b>攻击评测</b>：最坏情况 k-专家消融（静态 + 自适应）与仅输入路由越狱。</li>
+</ul>
+<h3>必须击败的 baseline（全部来自 grounding 表，真实存在）</h3>
+<table>
+<thead><tr><th>Baseline</th><th>作用 / 隔离什么</th><th>出处</th></tr></thead>
+<tbody>
+<tr><td>未防御的对齐 MoE</td><td>脆弱参照（C1/C2 靶子）。</td><td>OLMoE-1B-7B · Qwen3-30B-A3B</td></tr>
+<tr><td>SAFEx 的 HRCG 定向 LoRA 修复</td><td>最接近的 MoE 防御——恢复拒答但不再分布。</td><td><a href="https://arxiv.org/abs/2506.17368">SAFEx</a></td></tr>
+<tr><td>SafeMoE（路由对齐）</td><td>需要参考对齐路由权重的防御——C4 的对照。</td><td><a href="https://arxiv.org/abs/2509.22745">SafeMoE</a></td></tr>
+<tr><td>SafeInstr · SaLoRA</td><td>通用安全微调防御（非 MoE 专属）。</td><td><a href="https://arxiv.org/abs/2509.22745">经 SafeMoE</a></td></tr>
+</tbody>
+</table>
+<h3>数据集与指标（提前明确——W7）</h3>
+<ul>
+  <li><b>攻击 / 安全数据：</b>SAFEx 式 500 有害 · 500 越狱 · 500 良性；<a href="https://arxiv.org/abs/2509.09660">AdvBench</a> · JailbreakBench · HEx-PHI；SteerMoE 不安全 steer + AIM 越狱。</li>
+  <li><b>指标：</b>(1) <b>拒答率</b>与 k-专家消融下的最坏情况拒答跌幅（SAFEx）；(2) 经 Llama-Guard 的 <b>Harmfulness Score</b> + <b>攻击成功率 ASR</b>（SteerMoE/SafeMoE）；(3) <b>能力</b> AIME-2024 + MMLU-Redux；(4) 良性 prompt 上的<b>过度拒答</b>。</li>
+</ul>
+
+<!-- ===================== ABLATION ===================== -->
+<h2>3 · 消融矩阵 — 每行只改一个变量</h2>
+<table>
+<thead><tr><th>ID</th><th>被消融的组件（相对完整 SafeSpread）</th><th>隔离什么</th><th>预期</th></tr></thead>
+<tbody>
+<tr><td>A1</td><td>去掉<b>反集中熵</b>项（只留再分布损失）</td><td>反集中的价值</td><td>拒答重新集中，曲线不够平</td></tr>
+<tr><td>A2</td><td>摊分到<b>全部</b>专家 vs 只摊到定位出的<b>安全关键</b>集</td><td>「针对性」的价值</td><td>针对关键集更高效 / 税更低</td></tr>
+<tr><td>A3</td><td>去掉<b>路由 logit 正则</b>（只留 LoRA）</td><td>路由器是否会重新集中</td><td>路由器把拒答漂回一小撮专家</td></tr>
+<tr><td>A4</td><td>把 SafeSpread 换成 <b>SAFEx HRCG-修复</b></td><td>再分布 vs 恢复</td><td>同等预算下 SafeSpread 最坏曲线更平</td></tr>
+<tr><td>A5</td><td><b>攻击强度</b>：静态 k-消融 vs 自适应重优化 vs 仅输入越狱</td><td>鲁棒性边界</td><td>防御在三类攻击下都成立，而非只对静态</td></tr>
+</tbody>
+</table>
+<p class="meta">每一行相对完整方法只改一件事；没有任何一行混入两个变量。</p>
+
+<!-- ===================== RUN ORDER ===================== -->
+<h2>4 · Run 顺序 &nbsp;<span class="pill">smoke → baseline → main → ablation → polish</span></h2>
+<ol>
+  <li><b>Smoke（W1，先做便宜/确定性的）：</b>OLMoE-1B-7B、50 条有害 + 50 条良性——验证 SES 定位、消融攻击框架、Llama-Guard 判定能端到端跑通并产出一个拒答数字。</li>
+  <li><b>Baseline / 审计：</b>在未防御 OLMoE 上复现 SAFEx 集中度曲线（C1）；跑 SAFEx-修复与 SafeMoE 基线。</li>
+  <li><b>Main：</b>SafeSpread 微调 + 重新测最坏情况消融曲线（C2）。</li>
+  <li><b>自适应：</b>攻击者在加固模型上重新优化消融 + 仅输入越狱（C3）。</li>
+  <li><b>消融：</b>A1–A5，每个只改一个变量。</li>
+  <li><b>Polish：</b>迁移到 Qwen3-30B-A3B；3-seed 重复；能力 + 过度拒答表。</li>
+</ol>
+
+<!-- ===================== BUDGET ===================== -->
+<h2>5 · 预算（单张 A100 80GB）</h2>
+<table>
+<thead><tr><th>模块</th><th>run 数</th><th>预估 GPU-小时</th></tr></thead>
+<tbody>
+<tr><td>Smoke</td><td>1 个极小</td><td>&lt; 0.5</td></tr>
+<tr><td>审计 + 基线（SAFEx-修复、SafeMoE、SafeInstr、SaLoRA）</td><td>约 5 个配置</td><td>约 25</td></tr>
+<tr><td>Main SafeSpread（训练 + 攻击评测）</td><td>1 个配置</td><td>约 6</td></tr>
+<tr><td>自适应 + 仅输入攻击</td><td>2 套攻击</td><td>约 10</td></tr>
+<tr><td>消融 A1–A5</td><td>5 个配置</td><td>约 20</td></tr>
+<tr><td>Polish：Qwen3-30B-A3B 迁移 + 3-seed</td><td>约 6 个额外 run</td><td>约 30</td></tr>
+<tr><td colspan="2"><b>合计</b></td><td><b>约 90 GPU-小时（单卡约 4–5 天）</b></td></tr>
+</tbody>
+</table>
+<div class="note">落在单张 A100 80GB。<b>需签字（&gt;1 天）：</b>Qwen3-30B-A3B 迁移 + 3-seed polish——先在 OLMoE 上确认效应。</div>
+
+<!-- ===================== GROUNDING (APPENDIX) ===================== -->
+<h2>附录 · Grounding 表 — 最接近论文的真实设置</h2>
+<p class="sub">读自各论文实际的实验章节（已抓全文），非凭记忆。§2 的 baseline / 数据集 / 指标都取自这里。</p>
+<table>
+<thead><tr><th>论文</th><th>Baseline / 攻击</th><th>数据集</th><th>指标</th><th>模型 / GPU</th></tr></thead>
+<tbody>
+<tr>
+  <td><a href="https://arxiv.org/abs/2506.17368">SAFEx</a>（脆弱性 + 修复）</td>
+  <td>稠密模型对照；防御 = HRCG 定向 LoRA 减法合并</td>
+  <td>500 有害 · 500 越狱 · 500 良性 · AIME-2024（能力）</td>
+  <td>拒答率；探针 F1；AIME 分</td>
+  <td>Mixtral-8x7B · Qwen1.5-MoE · Qwen3-30B-A3B（6144 专家）· deepseek-moe-16b · OLMoE-1B-7B。<b>招牌：mask 12 个专家 → 掉 22% 拒答（越狱下 48.4%）。</b></td>
+</tr>
+<tr>
+  <td><a href="https://arxiv.org/abs/2509.09660">SteerMoE</a>（steering / 攻击）</td>
+  <td>越狱：GCG · ArtPrompt · FFA · AIM</td>
+  <td>AdvBench · TDC2023 · MaliciousInstruct · StrongREJECT+AIM · MultiJail；FaithEval（忠实度）</td>
+  <td>经 Llama-Guard-3-8B 的安全；ASR；流畅度（Gemma-3-27B）</td>
+  <td>OLMoE · Qwen3-30B-A3B · Mixtral · Phi-3.5-MoE · GPT-OSS。<b>不安全 steer -41%；+AIM -100%。</b></td>
+</tr>
+<tr>
+  <td><a href="https://arxiv.org/abs/2509.22745">SafeMoE</a>（防御）</td>
+  <td>SafeInstr · SaLoRA · Antidote · SafeDelta</td>
+  <td>BeaverTails（有害）+ SAMSum/SQL；评测 JailbreakBench · HEx-PHI；MMLU-Redux</td>
+  <td>Harmfulness Score（Llama-Guard-4-12B）；效用（Rouge/EM）；路由 KL</td>
+  <td>OLMoE-1B-7B（主）· Qwen3-30B-A3B · … · Mixtral-8x22B。<b>1× A100 80GB。需参考对齐路由权重。招牌 62.0 → 5.0 有害度，效用损失约 1%。</b></td>
+</tr>
+</tbody>
+</table>
+<p class="meta"><b>决定计划走向的结论：</b>(1) OLMoE-1B-7B 在单张 A100 80GB 上是已验证、可行的目标。(2) SAFEx 提供攻击（SES + k-消融曲线）和一个要击败的修复式防御；SafeMoE 提供防御基线以及 SafeSpread 规避掉的「参考权重」限制；SteerMoE 提供仅输入攻击和 Llama-Guard/ASR 评测协议。</p>
+
+<!-- ===================== GATE ===================== -->
+<h2>批准关口 — 研究者是裁判</h2>
+<p>这是计划、不是结果——每个数字都是占位符。未经你批准不会开跑。请确认或调整：
+<b>(a)</b> 主模型 OLMoE-1B-7B（+ Qwen3-30B-A3B 迁移），<b>(b)</b> 攻击/评测协议（SAFEx k-消融 + SteerMoE 仅输入），
+<b>(c)</b> baseline 集合（SAFEx-修复、SafeMoE、SafeInstr、SaLoRA），<b>(d)</b> 预算。批准后 → <code>/run-plan</code>。</p>
+
+<p class="meta" style="margin-top:2em">由 <code>/workplan</code> 生成 · 种子想法 I1 · 基于 SAFEx / SteerMoE / SafeMoE。英文正本（canonical）：<a href="02_EXPERIMENT_PLAN.html">02_EXPERIMENT_PLAN.html</a>。</p>
+
+</div>
+</body>
+</html>

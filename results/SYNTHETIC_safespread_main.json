@@ -1,0 +1,31 @@
+{
+  "__WARNING__": "SYNTHETIC / FABRICATED DATA — generated 2026-07-02 to test the /paper-write skill only. These are NOT real experimental results. Do not cite, publish, or treat as evidence.",
+  "experiment": "I1 SafeSpread — main defense + concentration audit",
+  "status": "synthetic",
+  "judge": "Llama-Guard-3-8B (nominal)",
+  "seeds": [42, 1, 123],
+  "models": {
+    "OLMoE-1B-7B-0924-Instruct": {
+      "n_experts_total": 1024,
+      "concentration_audit_C1": {
+        "ablation_budget_experts": 8,
+        "refusal_rate_clean": 96.4,
+        "worst_case_refusal_drop_pct": {"undefended": 21.4, "note": "reproduces SAFEx-style concentration"}
+      },
+      "worst_case_refusal_drop_pct_C2": {
+        "undefended": 21.4,
+        "SAFEx_repair": 9.8,
+        "SafeMoE": 6.2,
+        "SafeInstr": 12.7,
+        "SaLoRA": 11.3,
+        "SafeSpread_ours": 4.6,
+        "SafeSpread_ours_std": 0.7
+      },
+      "capability_C5": {
+        "MMLU_Redux": {"undefended": 61.2, "SafeSpread": 60.4},
+        "AIME_2024": {"undefended": 12.0, "SafeSpread": 11.7}
+      },
+      "over_refusal_benign_pct_C5": {"undefended": 2.1, "SafeSpread": 2.8}
+    }
+  }
+}

@@ -1,0 +1,1595 @@
+arXiv:2305.11503v1 [cs.CL] 19 May 2023
+
+A Topic-aware Summarization Framework with Different Modal
+Side Information
+Xiuying Chen∗
+
+Mingzhe Li∗
+
+Shen Gao
+
+CBRC, KAUST
+CEMSE, KAUST
+Saudi Arabia
+xiuying.chen@kaust.edu.sa
+
+Ant Group
+China
+limingzhe.lmz@antgroup.com
+
+Shandong University
+China
+shengao@sdu.edu.cn
+
+Xin Cheng
+
+Qiang Yang
+
+Qishen Zhang
+
+Peking University
+China
+chengxin1998@stu.pku.edu.cn
+
+CBRC, KAUST
+CEMSE, KAUST
+Saudi Arabia
+qiang.yang@kaust.edu.sa
+
+Ant Group
+China
+qishen.zqs@antgroup.com
+
+Xin Gao†
+
+Xiangliang Zhang†
+
+CBRC, KAUST
+CEMSE, KAUST
+Saudi Arabia
+xin.gao@kaust.edu.sa
+
+University of Notre Dame
+CEMSE, KAUST
+USA
+xzhang33@nd.edu
+
+ABSTRACT
+Automatic summarization plays an important role in the exponential document growth on the Web. On content websites such as
+CNN.com and WikiHow.com, there often exist various kinds of side
+information along with the main document for attention attraction
+and easier understanding, such as videos, images, and queries. Such
+information can be used for better summarization, as they often
+explicitly or implicitly mention the essence of the article. However, most of the existing side-aware summarization methods are
+designed to incorporate either single-modal or multi-modal side
+information, and cannot effectively adapt to each other. In this paper, we propose a general summarization framework, which can
+flexibly incorporate various modalities of side information. The
+main challenges in designing a flexible summarization model with
+side information include: (1) the side information can be in textual
+or visual format, and the model needs to align and unify it with
+the document into the same semantic space, (2) the side inputs can
+contain information from various aspects, and the model should recognize the aspects useful for summarization. To address these two
+challenges, we first propose a unified topic encoder, which jointly
+discovers latent topics from the document and various kinds of side
+information. The learned topics flexibly bridge and guide the information flow between multiple inputs in a graph encoder through a
+topic-aware interaction. We secondly propose a triplet contrastive
+learning mechanism to align the single-modal or multi-modal information into a unified semantic space, where the summary quality
+* Equal contribution.
+† Corresponding authors.
+This work is licensed under a Creative Commons Attribution
+International 4.0 License.
+SIGIR ’23, July 23–27, 2023, Taipei, Taiwan
+© 2023 Copyright held by the owner/author(s).
+ACM ISBN 978-1-4503-9408-6/23/07.
+https://doi.org/10.1145/3539618.3591630
+
+is enhanced by better understanding the document and side information. Results show that our model significantly surpasses strong
+baselines on three public single-modal or multi-modal benchmark
+summarization datasets.
+
+CCS CONCEPTS
+• Information retrieval → Summarization.
+
+KEYWORDS
+abstractive summarization, multimodal summarization
+ACM Reference Format:
+Xiuying Chen, Mingzhe Li, Shen Gao, Xin Cheng, Qiang Yang, Qishen
+Zhang, Xin Gao, Xiangliang Zhang. 2023. A Topic-aware Summarization
+Framework with Different Modal Side Information. In Proceedings of the
+46th International ACM SIGIR Conference on Research and Development in
+Information Retrieval (SIGIR ’23), July 23–27, 2023, Taipei, Taiwan. Taipei,
+Taiwan, 10 pages. https://doi.org/10.1145/3539618.3591630
+
+1
+
+INTRODUCTION
+
+The rapid growth of the World Wide Web has led to the flood of
+information across the Internet [18, 39, 52]. On content websites
+such as CNN.com, Twitter.com, and WikiHow.com, there are often
+corresponding images, videos, and side text along with the main
+document, which can attract readers’ attention and help them understand the content better [7, 36, 44, 49]. Herein, we regard the
+auxiliary images/videos/text as side information. Since the side
+information frequently make reference to the article’s main content explicitly or implicitly, such information can also be used to
+improve summarization quality, as shown by the two examples
+from CNN and WikiHow Apps in Figure 1. There is also other
+side information in real-world applications such as citation papers,
+summary templates, and reader comments, which are helpful for
+
+SIGIR ’23, July 23–27, 2023, Taipei, Taiwan
+
+summarization [15]. It is thus desired to extend text-based summarization models for taking advantage of the summarization clues
+included in such side information.
+There are previous works exploring utilizing side information
+from a specific domain. For example, Narayan et al. [35] first proposed to utilize image captions to enhance summarization performance. Other textual side information such as citation papers [1],
+reader comments [14], user queries [20], prototype templates [13]
+are also utilized in summarization tasks. Recently, the benefits of
+visual information on summarization have also been explored. To
+name a few, Zhu et al. [57] incorporated multimodal images and Li
+et al. [22] utilized videos to help better summarization. These works
+are typically designed for one specific modality of side information,
+while a more generally useful summarization framework should be
+able to process different modalities of information in a flexible way.
+Hence, in this paper, we target to address a general summarization
+framework that can flexibly unify different modal side information
+with the input document to generate better summaries.
+There are two main challenges in this task. The first challenge
+comes from the different modalities of side information. Regardless
+of the presented format of side information, a summarization model
+needs to align and unify it with the document into the same semantic space. The other challenge lies in the fact that the side inputs
+can contain information from various aspects, and the model should
+recognize the aspects useful for summarization. In the first case in
+Figure 1, only if the summarization model can connect the visual
+information “earth” and “launching” to the textual information can
+it generate the informative summary. In the second case in Figure 1,
+the query describes the question from computer and safety aspects,
+which should be the focus when making a summary.
+In this work, we propose a Unified-Modal Summarization model
+with Side information (USS) to tackle the above challenges. Firstly,
+we propose to use topics as the bridge to model the relationship
+between the main document and the side information. Topics are
+a subject or theme of documents or videos, and traditional works
+employ topics as cross-document semantic units to bridge different
+documents [9]. Moreover, we observe that topics can also be an
+information bridge for multi-modal inputs. For instance, in the
+first case in Figure 1, we can use topics “aerospace” and “nature” to
+relate the videos with the summary text. Hence, in this work, we
+expand the topic modeling from single-modal to multi-modal for
+unifying the main document and various types of side information.
+For the second challenge, apart from the limited side-document
+pairs, we utilize rich non-paired side and document inputs in the
+collected datasets, and propose a cross-modal contrastive learning
+module to align the main document and side information into a
+unified semantic space. Concretely, in our model, we first introduce
+a unified topic model (UTM) to learn the latent topics of the target
+summary by using the main document and the side information to
+predict the topic distributions of the summary. Since UTM aims to
+predict the topic distribution of the target summary, it does not rely
+on the specific modality attributes of the input. Based on the learned
+topics, we construct a graph encoder to model the relationship
+between the main document and side inputs. In this topic-aware
+graph encoder, we let information from two sources flow through
+different channels, i.e., by direct edges and indirect edges through
+topics. In the decoding process, we propose a hierarchical decoder
+
+Xiuying Chen et al.
+
+that attends to multi-granularity nodes in the graph guided by the
+topics. Moreover, the triplet contrastive learning mechanism pushes
+the paired document and side representations closer and unpaired
+representations far away from each other, so as to enhance the
+model’s capability of understanding the main document and side
+information.
+Our contributions can be summarized as follows:
+• We propose a general summarization paradigm that can take
+advantage of different types of side information in a flexible way
+to enhance summarization performance.
+• To model the interaction between various inputs and unify
+them into the same semantic space, we propose a unified topic
+model and a triplet contrastive learning mechanism.
+• Empirical results demonstrate that our proposed approach
+brings substantial improvements over strong baselines on benchmark datasets.
+
+2
+
+RELATED WORK
+
+Summarization with Side Information. Simply relying only on
+the main body of the document for summarization cues is challenging [23, 32, 54, 56]. In fact, articles in real-world applications often
+have side information that is beneficial for summarization. A series
+of works utilized textual side information such as image captions
+[35], questions [10, 11, 20], prototype summaries [14], citation papers [1, 8], timeline information [6], and prototype templates [13].
+Recently, research on multimodal understanding gets popular, and
+the benefits of using visual information on summarization have also
+been explored. Gao et al. [15] provided a survey on side informationaware summarization. Side information-aware summarization can
+also be regarded as a kind of multi-document summarization. Cui
+and Hu [9], Zhou et al. [55] introduced topic and entity information
+in the summarization process, respectively. Different from previous
+works which either take visual or textual side input, we propose a
+general framework that can be flexibly applied with different types
+of side inputs.
+Topic Modeling Neural topic modeling (NTM) was first proposed by Miao et al. [33], which assumes a Gaussian distribution
+of the topics in a document. Fu et al. [12], Liu et al. [26], Xie et al.
+[47], Yang et al. [50] further explored it in the summarization task
+in the text domain. Specifically, Cui and Hu [9] employed NTM
+to jointly discover latent topics that can act as cross-document
+semantic units to bridge different documents and provide global information to guide the summary generation. Liu et al. [25] proposed
+topic-aware contrastive learning objectives to implicitly model the
+topic change and handle information scattering challenges for the
+dialogue summarization task. In this work, we come up with a unified topic model to fit in the unified-modal setting, which requires
+discovering latent topics beyond single-modal text input.
+Contrastive Learning. Contrastive learning is used to learn
+representations by teaching the model which data samples are similar or not. Due to its excellent performance on self-supervised
+and semi-supervised learning, it has been widely used in natural
+language processing. Lee et al. [21] generated positive and negative examples by adding perturbations to the hidden states. Cai
+et al. [5] augmented contrastive dialogue learning with group-wise
+dual sampling. It has also been utilized in caption generation [31],
+
+A Topic-aware Summarization Framework with Different Modal Side Information
+
+SIGIR ’23, July 23–27, 2023, Taipei, Taiwan
+
+Side
+Information
+
+Launch
+
+Launch
+
+Topic 1:
+Aerospace
+
+Topic 1:
+Technology
+
+Earth
+
+Topic 2:
+Nature
+Topic 2:
+Safety
+Side
+Information
+
+Figure 1: Articles with various side information and summary collected from the CNN and WikiHow APPs. The side information (video and user query) can enhance the summarization performance.
+summarization [4, 13, 25, 29], dialog generation [16], machine translation [3, 51] and so on. In this work, we use contrastive learning
+to unify multimodal information in the summarization task.
+
+3
+
+MODEL
+
+In this section, we first define the task of unified summarization
+with side information, then describe our USS model in detail.
+
+3.1
+
+Problem Formulation
+
+Given the main document 𝑋 𝑑 and its side information 𝑋 𝑠 , we
+assume there is a ground truth summary 𝑌 = (𝑦1, 𝑦2, . . . , 𝑦𝑁 𝑦 ).
+To be specific, the document 𝑋 𝑑 is represented as a sequence of
+words (𝑥 1𝑑 , 𝑥 2𝑑 , . . . , 𝑥 𝑑𝑁 ). The side information can be in textual or
+𝑑
+visual formats. For textual side information, it is represented as
+𝑠
+𝑠
+𝑠
+𝑋𝑠 = (𝑥 1 , 𝑥 2 , . . . , 𝑥 𝑁 ), and for visual side information, we use 𝑋𝑠
+𝑠
+to denote the images. 𝑁𝑑 and 𝑁𝑠 are the word number or the image number in a document or side information. Given 𝑋 𝑑 and 𝑋 𝑠 ,
+our model generates a summary 𝑌ˆ = {𝑦ˆ1, 𝑦ˆ2, . . . , 𝑦ˆ𝑁 𝑦ˆ }. Finally, we
+use the difference between the generated 𝑌 and the gold 𝑌ˆ as the
+training signal to optimize the model parameters.
+
+3.2
+
+Overview
+
+Our model is illustrated in Figure 2, which follows the Transformerbased encoder-decoder architecture. We augment the encoder with
+a unified topic modeling network (§ 3.3) which learns the latent
+topic representations from source inputs and target summary, based
+on which a topic-aware graph encoder (§ 3.4) builds graphs for the
+document and side input, and models their relationship through
+the learned topics. Correspondingly, we design a summary decoder
+(§ 3.5) which generates the summary with a topic-aware attention
+mechanism. To better represent the representations from different
+spaces, we also design a triplet contrastive learning module (§ 3.6)
+to align the paired multimodal information into the same space.
+
+3.3
+
+Unified Topic Modeling
+
+We first use a unified topic model (UTM) to establish the relationship between the document and side information. The model takes
+inspiration from the neural topic model (NTM) [33] which only
+
+applies for textual inputs. We first introduce the NTM, and how we
+adapt NTM to grasp the semantic meanings of multimodal inputs.
+Overall, NTM assumes the existence of 𝐾 underlying topics
+throughout the inputs. Concretely, NTM encodes the bag-of-word
+term vector of the input to a topic distribution variable, based
+on which it reconstructs the bag-of-word representation. In the
+reconstruction process, the topic representations can be extracted
+from a projection matrix. In our UTM, instead of reconstruction,
+we aim to predict the bag-of-word vector of the target summary
+based on the two inputs. The benefits are threefold. Firstly, we no
+longer require the input to be in textual format and can encode
+various modal semantic meanings of the inputs into the distribution
+variable. Secondly, we can preserve the most salient information
+from the inputs, instead of keeping them all, which is consistent
+with the information filtering attribute of the summarization task.
+Lastly, the combination of topic modeling on document and side
+input can better fit the target summary topic distribution.
+Concretely, we first process the document 𝑋 𝑑 into the bag-ofword representation ℎ𝑑 ∈ R |𝑉 | , where |𝑉 | is the vocabulary size.
+The same is true for the side information when it is in the textual
+format, leading to ℎ𝑠 . When the side information is images or videos,
+we use EfficientNet [41] to obtain the vector representation, also
+denoted as ℎ𝑠 . We then employ an MLP encoder to estimate their
+exclusive priors 𝜎 ∗ and 𝜇 ∗ , which are used to generate the topic
+variables of the two inputs through a Gaussian softmax:
+
+
+𝜎 ∗ = 𝑓𝜎 ℎ ∗ , 𝜇 ∗ = 𝑓𝜇 ℎ ∗ ,
+(1)
+
+
+∗
+∗ ∗2
+𝑧 ∼ N 𝜎 ,𝜇 ,
+(2)
+where ∗ can be 𝑑 or 𝑠, 𝑓𝜎 (.) and 𝑓𝜇 (.) are neural perceptrons with
+ReLU activation. N (.) is a Gaussian distribution. 𝑧 ∗ ∈ R𝐾 are the
+latent topic variables of the document or the side information.
+Given the topic variables 𝑧𝑑 and 𝑧𝑠 , UTM predicts the bag-ofword representation of target summary, i.e., 𝑦𝑏𝑜𝑤 :
+
+
+
+
+𝜃 = softmax 𝑧𝑑 + 𝑧𝑠 , 𝑦ˆ𝑏𝑜𝑤 = softmax 𝜃 W𝜙 .
+(3)
+We add the topic variables of the two inputs together to include
+information from two sources, as well as to emphasize the salient
+information that is shared between both sides. Based on the topic
+distribution 𝜃 we construct the bag-or-word of target summary
+
+SIGIR ’23, July 23–27, 2023, Taipei, Taiwan
+
+(1) Unified Topic Modeling
+Document
+
+/
+
+Side
+
+Xiuying Chen et al.
+
+Doc
+Side
+Summary
+
+push
+pull
+
++ +
+
+(3) Summary Decoder
+
+-
+
+Add & Normalization
+
++
+(4) Triplet Contrastive Learning
+
+Sample
+
+Topic attention
+
+Document graph
+Document attention Side information attention
+...
+
+...
+
+...
+
+Topic-guided
+interaction
+
+Direct
+interaction
+
+Add & Normalization
+
+...
+
+Topics
+
+Masked self-attention
+
+Summary
+
+Side graph
+(2) Topic-aware Encoder
+
+Decoder input:
+
+Token1 Token2 Token3
+
+...
+
+Figure 2: Overview of USS, which consists of four parts: (1) Unified Topic Modeling (left) jointly learns latent topics from both
+inputs; (2) Topic-aware Graph Encoder (bottom) relates the document to the side information; (3) Summary Decoder (right)
+with hierarchical topic-aware attention mechanism; and (4) Triplet Contrastive Learning (top) aligns the multiple inputs and
+outputs into a unified semantic space.
+𝑦𝑏𝑜𝑤 . In this process, the weight matrix of W𝜙 ∈ R𝐾×|𝑉 | can be
+𝑖,𝑗
+
+regarded as the topic-word relationship, where W𝜙 indicates the
+weight of the 𝑗-th word in the 𝑖-th topic, and 𝐾 is the topic number.
+𝜃 ∈ R𝐾 reflects the proportion of each topic, and higher 𝜃𝑖 score
+means the 𝑖-th topic is more important. We will take advantage of
+this distribution to determine the main topics of each case in the
+next section.
+The objective function is to simultaneously minimize the Wasserstein distance between 𝑝 (𝑧 ∗ ) and 𝑞(𝑧 ∗ | ℎ𝑥∗ ), and maximize the
+constructing probability of 𝑦𝑏𝑜𝑤 :
+Í
+L𝑈𝑇 𝑀 = ∗∈ {𝑑,𝑠 } W(𝑝 (𝑧 ∗ )∥𝑞(𝑧 ∗ | ℎ𝑥∗ )) − E𝑞 (𝑧) [log 𝑝 (𝑦𝑏𝑜𝑤 | 𝑧 ∗ )],
+where 𝑝 (𝑧 ∗ ) is the standard Gaussian distribution. We employ the
+Wasserstein distance instead of traditional KL-divergence since the
+former is proved to be superior to the latter by experiments [42].
+
+3.4
+
+Topic-aware Graph Encoder
+
+Graph Construction. Since we have extracted the salient topic
+distribution of the two inputs, we can use them as bridges to let
+two information sources interact with each other. We thus design a
+topic-aware graph encoder where we model the relation between
+document and side inputs through different channels, i.e., by direct
+edges and indirect edges through topics. By direct edges, we let
+information flow globally in the graph, while by indirect edges,
+the document communicates specific information with side input
+under different topics.
+Node Initialization. For both inputs, we use the Transformer
+encoder [43] or the EfficientNet model to encode each document or
+image independently to capture the contextual information. We first
+introduce the Transformer architecture in detail, and we will also
+
+propose variations of the attention mechanism. Generally, Transformer consists of a stack of token-level layers to obtain contextual
+word representations in the document or side information. We take
+the document to illustrate this process.
+For the 𝑙-th Transformer layer, we first use a fully-connected
+layer to project word state ℎ𝑑,𝑙−1
+into the query, i.e., 𝑄𝑖𝑙−1 = 𝐹𝑞 (ℎ𝑑,𝑙−1
+).
+𝑥𝑖
+𝑥𝑖
+For self-attention mechanism, the key and value are obtained in a
+similar way: i.e., 𝐾𝑖𝑙−1 = 𝐹𝑘 (ℎ𝑑,𝑙−1
+), 𝑉𝑖𝑙−1 = 𝐹 𝑣 (ℎ𝑑,𝑙−1
+). Then, the
+𝑥𝑖
+𝑥𝑖
+updated representation of 𝑄 is formed by linearly combining the
+entries of 𝑉 with the weights:
+
+
+𝑁𝑑 𝛼 𝑉 𝑙−1
+exp 𝑄𝑖𝑙−1 𝐾 𝑙−1
+∑︁
+𝑖,𝑗 𝑗
+𝑗
+
+ , 𝑎𝑖 =
+𝛼𝑖,𝑗 = Í
+,
+(4)
+√
+𝑁𝑑
+𝑙−1 𝑙−1
+𝑑𝑒
+𝑗=1
+𝑛=1 exp 𝑄𝑖 𝐾𝑛
+where 𝑑𝑒 stands for hidden dimension. The above process is sum𝑑,𝑙−1
+maized as MHAtt(ℎ𝑑,𝑙−1
+𝑥𝑖 , ℎ𝑥 ∗ ), where ∗ denotes index from 1 to
+𝑁𝑑 . Then, a residual layer takes the output of self-attention sublayer as the input:
+
+
+
+𝑑,𝑙−1
+ℎˆ𝑑,𝑙−1
+= LN ℎ𝑑,𝑙−1
++ MHAtt ℎ𝑑,𝑙−1
+,
+(5)
+𝑥𝑖
+𝑥𝑖
+𝑥𝑖 , ℎ𝑥 ∗
+
+
+
+ˆ𝑑,𝑙−1 + FFN ℎˆ𝑑,𝑙−1
+ℎ𝑑,𝑙
+,
+(6)
+𝑥𝑖 = LN ℎ𝑥𝑖
+𝑥𝑖
+where FFN is a feed-forward network with an activation function,
+LN is a layer normalization [2].
+The final output representations for words in the document and
+textual side information are denoted as {ℎ𝑑1 , ..., ℎ𝑑𝑁 } and {ℎ𝑠1, ..., ℎ𝑠𝑁 }.
+𝑠
+𝑑
+For images in visual side information, we also denote them by
+𝑠
+𝑠
+{ℎ 1, ..., ℎ 𝑁 }. As for the topic nodes, we use the intermediate pa𝑠
+rameters 𝑊𝜙 learned from UTM as raw features to build topic
+representations 𝐻 𝑜 = 𝑓𝜙 (𝑊𝜙 ), where the 𝑖-th row of 𝐻 𝑜 ∈ R𝐾×𝑑𝑒 ,
+
+A Topic-aware Summarization Framework with Different Modal Side Information
+
+denoted as ℎ𝑜𝑖 , is a topic vector with predefined dimension 𝑑𝑒 . 𝑓𝜙 (.)
+is a neural perceptron with ReLU activation.
+Graph Encoding. The document and side graphs communicate with each other through topic-guided and direct interactions.
+The topic-guided interaction starts from the learning of document
+representations and the side representations, and then the topic
+representations. The direct interaction only updates the document
+and side nodes. We omit the layer index here for brevity.
+Concretely, in the topic-guided interaction, the document and
+side information representations are updated from three sources.
+Take the document nodes for example, they are updated by (1)
+performing self-attention across document nodes; (2) performing
+cross-attention to obtain the topic-aware document representations, as shown in Figure 3(a); and (3) performing our designed
+topic-guided attention mechanism, as shown in Figure 3(b). This
+mechanism starts with the application of self-attention
+mechanism
+
+on the document nodes: ℎ¤𝑑𝑖 = MHAtt ℎ𝑑𝑖 , ℎ𝑑∗ . Then, taking the
+Í𝐾 𝑜
+topic representation ℎ𝑜 = 𝑖=1
+ℎ𝑖 as condition, the attention score
+𝛽𝑖 on each original document representation ℎ𝑑𝑖 is calculated as:
+
+
+
+𝛽𝑖𝑑 = softmax FFN ℎ𝑑𝑖 (ℎ𝑜 )𝑇 .
+
+(7)
+
+The topic-aware document representation is ℎ¤𝑑𝑖 weighted by 𝛽𝑖𝑑 ,
+denoted as 𝛽𝑖 ℎ¤𝑑𝑖 . In this way, we highlight the salient part of the
+two inputs under the guidance of the topics. Last, a feed-forward
+network is employed to integrate three information sources.
+The topic representation is updated by performing (1) self-attention
+and (2) cross-attention on the adjacent document and side nodes. In
+the cross-attention, the topic representation is taken as the query,
+and the document and side representations are taken as the keys and
+values. Lastly, a feed-forward network integrates two information
+sources to obtain the updated topic representation.
+Aside from communicating the graphs through topics, we also
+have a direct interaction that concatenates all document and side
+nodes in the graph and then apply a self-attention mechanism.
+The topic-aware and direct interactions are processed iteratively,
+and we denote the final updated representations for document,
+side information, and topics as ℎˆ𝑑 ∈ R𝑁𝑑 ×𝑑𝑒 , ℎˆ𝑠 ∈ R𝑁𝑠 ×𝑑𝑒 , and
+ℎˆ𝑜 ∈ R𝐾×𝑑𝑒 .
+
+3.5
+
+Summary Decoder
+
+Since the decoder needs to incorporate the information from multiple sources in the graph encoder, we design a hierarchical decoder
+that firstly focuses on the topics and then attends to inputs. This
+topic-guided mechanism indicates which topics should be discussed
+in each decoding step. Our hierarchical decoder follows the style
+of Transformer, and we omit the layer index next for brevity.
+For each layer, at the 𝑡-th decoding step, we first apply the
+masked self-attention on the summary embeddings (MSAttn), obtaining the decoder state 𝑔˜𝑡 . The masking mechanism ensures that
+the prediction of the position 𝑡 depends only on the known output
+of the position before 𝑡:
+𝑔˜𝑡 = LN (𝑔𝑡 + MSAttn (𝑔𝑡 , 𝑔∗ )) .
+
+SIGIR ’23, July 23–27, 2023, Taipei, Taiwan
+
+Document node
+Topic node
+
+Matrix Multiply
+Multi-head Attention
+
+Multi-head Attention
+Q
+
+K
+
+V
+
+Q
+
+K
+
+V
+
+Linear
+
+Linear
+
+Linear
+
+Linear
+
+Linear
+
+Linear
+
+(a)
+
+Relevance
+score
+
+(b)
+
+Figure 3: (a) Cross attention mechanism for document and
+topic nodes. (b) Topic-guided attention mechanism, which
+captures semantic information across the document and
+side information under the guidance of the topics.
+Based on 𝑔˜𝑡 we compute the cross-attention scores over topics:
+𝑧𝑜,𝑡 = ReLU([𝑔˜𝑡 𝑊𝑎 (ℎˆ𝑜𝑊𝑏 )𝑇 ]),
+(8)
+where 𝑊𝑎 ,𝑊𝑏 ∈ R𝑑𝑒 ×𝑑𝑒 , 𝑧𝑜,𝑡 ∈ R𝐾 . We then use the topic attention
+to guide the attention on the other two graphs, where the topics can
+be regarded as an indicator of saliency. Taking the main document
+for example, we incorporate 𝑧𝑜,𝑡 with similarity weight 𝑒𝑑 to obtain
+the document attention weight 𝑧𝑑,𝑡 ∈ R𝑁𝑑 :
+𝑒𝑑 = FFN(ℎˆ𝑜 (ℎˆ𝑑 )𝑇 ),
+
+(9)
+
+𝑧𝑑,𝑡 = 𝑧𝑜,𝑡 𝑒𝑑 ,
+
+(10)
+
+where 𝑒𝑑 ∈ R𝐾×𝑁𝑑 is the similarity matrix between the topics
+and document. In a similar way, we obtain the attention weights
+𝑧𝑠,𝑡 ∈ R𝑁𝑠 on the side information.
+The attention weights 𝑧𝑜,𝑡 , 𝑧𝑑,𝑡 , and 𝑧𝑠,𝑡 are then used to obtain
+the context vectors 𝑐𝑜,𝑡 , 𝑐𝑑,𝑡 , and 𝑐𝑠,𝑡 , respectively. Take the topics
+as an example:
+𝑐𝑜,𝑡 = 𝑧𝑜,𝑡 ℎˆ𝑜 .
+(11)
+These context vectors, treated as salient contents summarized
+from various sources, are concatenated with the decoder hidden
+state 𝑔𝑡 to produce the distribution over the target vocabulary:
+
+
+𝑃𝑡vocab = Softmax 𝑊𝑑 𝑔𝑡 ; 𝑐𝑜,𝑡 ; 𝑐𝑑,𝑡 ; 𝑐𝑠,𝑡 .
+(12)
+All the learnable parameters are updated by optimizing the negative
+log likelihood objective function of predicting the target words:
+Í𝑁 𝑦
+L𝑠 = − 𝑡 =1
+log 𝑃𝑡vocab (𝑦ˆ𝑡 ) .
+(13)
+
+3.6
+
+Triplet Contrastive Learning
+
+The challenge of unifying different modalities is to align and unify
+their representations at different levels. In this section, we propose
+a triple contrastive learning mechanism that determines whether
+the textual and visual representations match each other. We can
+utilize the large-scale non-paired text corpus and image collections
+to learn more generalizable textual and visual representations, and
+improve the capability of vision and language understanding.
+As shown in the fourth part in Figure 2, the main idea is to let
+the representations of the paired images or text close to each other
+
+SIGIR ’23, July 23–27, 2023, Taipei, Taiwan
+
+Xiuying Chen et al.
+
+Table 1: Comparison with other baselines when side information is in text. All our ROUGE scores have a 95% confidence
+interval of at most ±0.28 as reported by the official ROUGE script. Numbers in bold mean that the improvement to the best
+baseline is statistically significant (a two-tailed paired t-test with p-value <0.01). ‘-’ indicates unavailability.
+
+Lead3
+BERTSumEXT
+SideNet
+BERTSumABS
+BERTSumABS-concat
+SAGCopy
+EMSum
+TG-MultiSum
+OFA
+MOF
+VMSMO
+USS
+USS w/o unified topic modeling
+USS w/o graph encoder
+USS w/o contrastive learning
+
+R1
+29.1
+31.2
+30.7
+31.3
+31.7
+31.9
+31.9
+32.2
+31.6
+33.9
+32.5
+32.3
+32.8
+
+CNN
+R2
+11.1
+12.2
+11.7
+11.6
+11.9
+11.8
+12.6
+12.7
+11.4
+14.2
+13.0
+12.9
+13.2
+
+RL
+25.9
+27.8
+27.2
+28.7
+29.1
+28.9
+29.7
+29.9
+28.4
+31.3
+30.3
+30.0
+30.6
+
+BS
+85.4
+86.3
+86.2
+86.5
+86.6
+86.5
+86.8
+86.8
+86.1
+
+87.1
+86.8
+86.7
+86.9
+
+in the semantic space while the non-paired be far away. For the
+positive sample construction, we apply mean pooling on the representations of ℎˆ𝑑∗ as the overall representation 𝐷 for the document,
+and 𝑆 for side information in the same way. The final decoder state
+of generator 𝑔𝑁 𝑦ˆ is taken as the overall representation 𝐺 for the
+generated summary, as it stores all the accumulated information.
+For the negative sample construction, we randomly sample a negative side input, document, or the generated summary from the same
+training batch for each case. Note that different from the positive
+pairs, the sampled side and texts are encoded individually without
+graph encoders as they mainly carry weak correlations. In this way,
+we can create positive examples X𝑑+ consisting of paired documentside samples (𝐷, 𝑆), X𝑠+ consisting of paired side-generation (𝑆, 𝐺),
+and X𝑔+ consisting of paired document-generation (𝐺, 𝐷). Negative
+examples are denoted as X𝑑− , X𝑠− , and X𝑔− , respectively.
+Based on these positive and negative pairs, the following contrastive loss L𝑡𝑟𝑖𝑝𝑙𝑒𝑡 is utilized to learn detailed semantic alignments across vision and language:
+"
+
+Í
+
+(𝐴+ ,𝐵 + ) ∈X {𝑔+,𝑑+,𝑠+} exp 𝑑
+
+L𝑡𝑟𝑖𝑝𝑙𝑒𝑡 = E𝐴,𝐵 − log Í
+
+ #
+𝐴+, 𝐵 + /𝜏
+
+∗ ∗
+∗ ∗ ∗
+(𝐴∗ ,𝐵 ∗ ) ∈X {𝑔 ,𝑑 ,𝑠 } exp (𝑑 (𝐴 , 𝐵 ) /𝜏)
+
+,
+
+where 𝜏 denotes the temperature parameter, 𝐴, 𝐵 ∈ {𝐷, 𝑆, 𝐺 }, and
+𝑑 (𝐴, 𝐵) denotes cosine similarity between the two representations.
+
+4 EXPERIMENTS
+4.1 Dataset
+We evaluated our model on three public summarization datasets
+with side information: (1) CNN dataset is collected by Narayan
+et al. [35] from CNN webpage, which associates the documentsummary pairs with the image captions. The dataset contains
+90,266/1,220/1,093 training/validation/test samples. Note that this
+dataset is different from the CNN/DM dataset [17]. (2) WikiHow
+dataset [20] is an abstractive summarization dataset collected from
+a community-based QA website, in which each sample consists of a
+
+R1
+24.4
+30.4
+28.4
+35.9
+35.7
+36.1
+35.4
+36.2
+34.6
+37.7
+36.5
+36.2
+36.7
+
+WikiHow
+R2
+5.5
+8.6
+6.2
+13.9
+14.0
+13.7
+13.8
+14.6
+13.2
+15.8
+15.0
+14.8
+15.3
+
+RL
+15.6
+28.3
+25.9
+34.8
+34.2
+33.9
+34.6
+35.2
+33.8
+36.5
+35.4
+35.5
+35.8
+
+BS
+84.7
+85.7
+85.4
+86.9
+86.7
+86.6
+86.7
+87.0
+86.3
+
+87.3
+87.0
+87.1
+87.1
+
+R1
+16.2
+27.3
+27.8
+30.5
+30.8
+31.2
+32.7
+30.9
+29.5
+30.4
+
+VMSMO
+R2
+5.3
+9.6
+10.1
+13.5
+13.4
+13.8
+15.1
+12.8
+11.6
+13.1
+
+RL
+13.9
+23.4
+24.7
+28.4
+28.4
+28.5
+30.0
+27.9
+26.5
+27.8
+
+BS
+84.5
+85.7
+85.9
+86.9
+86.9
+87.1
+87.9
+87.4
+87.3
+87.5
+
+query, a document as the answer to the question, and a short summary of the document. We use the provided script and obtain more
+than 170,000 pairs, with 168128/6000/6000 training/validation/test
+samples. (3) VMSMO dataset [22] is a multimodal summarization
+dataset with videos as side information. The average video duration
+is one minute and the frame rate of the video is 25 fps. Overall, there
+are 184,920 samples in the dataset, which is split into a training set
+of 180,000 samples, a validation set of 2,460 samples, and a test set
+of 2,460 samples. The average document length, side information
+length, and summary length of CNN and WikiHow datasets are
+763, 71, 50 words, 579, 10, 62 words, respectively. The document
+and summary length for VMSMO is 97 and 11 words. We chose
+these datasets to examine the flexibility of our model on different
+formats of side information.
+
+4.2
+
+Baselines
+
+Our extractive baselines include:
+Lead3 produces the three leading sentences of the document as
+the summary as a baseline.
+SideNet [35] consists of an attention-based extractor with attention over side information.
+BERTSumEXT [28] is an extractive summarization model with
+pretrained BERT encoder that is able to express the semantics of
+a document and obtain representations for its sentences. It only
+takes the document as input.
+Abstractive single-document and multi-document summarization baseline models include:
+BERTSumABS [28] is an abstractive summarization system
+built on BERTbase with a new designed fine-tuning schedule. It
+only takes the document as input. We also have a BERTSumABSconcat that concatenates the textual side information with the
+original document.
+SAGCopy [48] is an augmented Transformer with a self-attention
+guided copy mechanism.
+EMSum [55] is an entity-aware model for abstractive multidocument summarization with BERT encoder.
+
+A Topic-aware Summarization Framework with Different Modal Side Information
+
+TG-MultiSum [9] is a multi-document summarizer with topics
+act as cross-document semantic units.
+The above two multi-document summarization baselines take
+the textual side input as the second document. We also compare
+our model with multimodal summarization baselines including:
+MOF [58] is a summarization model with a multimodal objective
+function with the guidance of multimodal reference to use the loss
+from the summary generation and the image selection.
+VMSMO [22] is a dual interaction-based multimodal summarizer
+with multiple inputs. The four above models are all equipped with
+BERTbase encoder for fairness.
+OFA [45] is a recent unified paradigm for multimodal pretraining. We adapt it for the side-aware summarization setting, where
+we directly concatenate the document and side representations
+encoded by OFA. We choose OFAbase version for fairness.
+
+4.3
+
+Evaluation Metrics
+
+For both datasets, we evaluated by standard ROUGE-1 (R1), ROUGE2 (R2), and ROUGE-L (RL) [24] on full-length F1, which refer to
+the matches of unigram, bigrams, and the longest common subsequence, respectively. We then used BERTScore (BS) [53] to calculate
+a similarity score between the summaries based on their BERT embeddings.
+Schluter [38] noted that only using the ROUGE metric to evaluate
+generation quality can be misleading. Therefore, we also evaluated
+our model by human evaluation. Concretely, we asked three PhD
+students proficient in English to rate 100 randomly sampled cases
+generated by models from the CNN and WikiHow datasets which
+cover different domains. The setting follows [30] with four times
+larger evaluation scale. The evaluated baselines are EMSum, TGMultiSum, and OFA which achieve top performances in automatic
+evaluations.
+Our first evaluation quantified the degree to which the models
+can retain the key information following a question-answering paradigm [27]. We created a set of questions based on the gold-related
+work and examined whether participants were able to answer these
+questions by reading generated text. The principle for writing a
+question is that the information to be answered is about factual
+description, and is necessary for the summarization. Two annotators wrote three questions independently for each sampled case.
+Then they together selected the common questions as the final
+questions that they both consider to be important. Finally, we obtained 147 questions, where correct answers are marked with 1
+and 0 otherwise. Our second evaluation study assessed the overall
+quality of the related works by asking participants to score them by
+taking into account the following criteria: Informativeness (does the
+related work convey important facts about the topic in question?),
+Coherence (is the related work coherent and grammatical?), and
+Succinctness (does the related work avoid repetition?). The rating
+score ranges from 1 to 3, with 3 being the best. Both evaluations
+were conducted by another three PhD students independently, and
+a model’s score is the average of all scores.
+
+4.4
+
+Implementation Details
+
+All models were trained for 200,000 steps on NVIDIA A100 GPU.
+We implemented our model in Pytorch and OpenNMT [19]. For
+
+SIGIR ’23, July 23–27, 2023, Taipei, Taiwan
+
+neural-based baselines except OFA and our model, we used the ‘bertbase’ or ‘bert-base-chinese’ versions of BERT for fair comparison.
+Both source and target texts were tokenized with BERT’s subwords
+tokenizer. Our Transformer decoder has 768 hidden units and the
+hidden size for all feed-forward layers is 2,048. In all abstractive
+models, we applied dropout with probability 0.1 before all linear
+layers; label smoothing [40] with smoothing factor 0.1 was also used.
+For CNN dataset, the encoding step is set to 750 for a document
+and 70 for side information. The minimum decoding step is 30, and
+the maximum step is 50. For WikiHow dataset, the four parameters
+are set to 600, 10, 30, 65. For the Chinese VMSMO dataset, the
+parameters are 200, 125, 10, 50, where 125 is the encoded frame
+number. The video frames are selected every 25 frames to ensure the
+continuity of the images, similar to [22]. We used Adam optimizer
+as our optimizing algorithm. We also applied gradient clipping with
+a range of [−2, 2] during training. During decoding, we used beam
+search size 5, and tuned the 𝛼 for the length penalty [46] between
+0.6 and 1 on the validation set; we decoded until an end-of-sequence
+token is emitted and repeated trigrams are blocked. Our decoder
+applies neither a copy nor a coverage mechanism, since we also
+rarely observe issues with out-of-vocabulary words in the output;
+moreover, trigram-blocking produces diverse summaries managing
+to reduce repetitions. On VMSMO, the video frames are selected
+every 25 frames to ensure the continuity of the images, similar to
+[22]. We selected the 5 best checkpoints based on performance on
+the validation set and report averaged results on the test set.
+
+4.5
+
+Experimental Results
+
+Automatic Evaluation. The performance comparison is shown in
+Table 1. Firstly, we can see that the attributes of the three datasets
+vary. CNN is a news dataset with a pyramid structure, where Lead3
+and extractive methods achieve higher performance than other
+datasets. Secondly, combining side information by simple concatenation cannot make full use of it, as we can see that the performance of BERTSumABS-concat does not improve significantly compared with BERTSumABS. Incorporating side information by multidocument summarization structures is a better way utilize side
+information, but they cannot be applied in the multimodal scenario, and their improvements are also limited. Thirdly, the recent
+multimodal pretrained baseline OFA achieves relatively good performance on VMSMO, but has borderline performance on singlemodal datasets CNN and WikiHow. This is consistent with the
+previous observation that OFA has better performance on crossmodal tasks [45]. Specifically, OFA has trouble when generating
+long text, which leads to a performance drop when the target is
+relatively long. Finally, our USS model obtains consistently better performance on all three datasets. Specifically, USS achieves
+2.0/1.6/1.7/0.3 improvements on R1, R2, RL, and BERTScore compared with one of the latest baseline EMSum on the CNN dataset,
+and obtains 1.4/1.0/1.3/0.7 improvements on the VMSMO dataset
+compared with TG-MultiSum.
+Human Evaluation. As shown in Table 2, on both evaluations,
+participants overwhelmingly prefered our model. The kappa statistics are 0.42, 0.49, and 0.45 for Info, Coh, and Succ respectively,
+indicating the moderate agreement between annotators. All pairwise comparisons among systems are statistically significant using
+
+SIGIR ’23, July 23–27, 2023, Taipei, Taiwan
+
+Xiuying Chen et al.
+
+Info
+
+Coh
+
+Succ
+
+34.6
+37.4
+38.1
+42.8
+
+2.14
+2.39
+2.42
+2.54
+
+2.01
+2.13
+2.15
+2.27
+
+2.03
+2.26
+2.28
+2.41
+
+OFA
+EMSum
+TG-MultiSum
+USS
+
+0.03
+
+5.0
+4.0
+3.0
+2.0
+
+0.02
+
+1.0
+0
+
+20
+
+40
+
+Topic
+
+60
+
+80
+
+0
+
+100
+
+10000 20000 30000 40000 50000
+
+Training Step
+
+Figure 5: (a) The multi topic distribution of the document
+and side information. (b) UTM loss (L𝑈𝑇 𝑀 ) curve in the
+training process.
+
+(b) 25.5
+
+25.4
+25.3
+
+50
+
+80
+
+100
+
+150
+
+Topic Number K
+
+200
+
+500
+
+25.0
+
+1
+
+2
+
+3
+
+4
+
+5
+
+Graph Layer Number
+
+6
+
+7
+
+Figure 4: (a) Relationships between the number of topics and
+𝑅 (the average of RG-1, RG-2 and RG-L) . Best viewed in color.
+(b) Relationships between the number of graph layer and 𝑅.
+
+a two-tailed paired t-test for strong significance for 𝛼 = 0.01. We
+also provide examples of the system output in Table 3. We can
+see that with the side information showing the figure of the main
+character, the lottery result, and the mobile phone, USS successfully
+captures the gist information that “a man post a lottery ticket on
+social media” in the generated summary. For BERTSumABS-concat
+and VMSMO, they miss key information such as “where he post
+the lottery” and “how quickly the lottery was falsely claimed”.
+
+5 ANALYSIS AND DISCUSSION
+5.1 Ablation Study
+We conducted ablation tests to assess the importance of the topic
+modeling, graph encoder, and triplet contrastive learning. For USS
+w/o unified topic modeling, only the traditional neural topic model
+(NTM) is applied to the textual document to obtain the topic representations. For USS w/o graph encoder, there are no topic-related
+interactions, and the outputs from the topic modeling are directly
+used for decoding. The ROUGE score results are shown in the last
+block of Table 1. All ablation models perform worse than USS in
+terms of all metrics, which demonstrates the preeminence of USS.
+Concretely, graph encoder makes a great contribution to the model,
+improving the performance on CNN by 1.3 in terms of the R2 score,
+and improving the R2 score by 1.0 on the WikiHow dataset. Contrastive learning also contributes to the model, bringing 0.7 RL
+improvements on the CNN dataset.
+We further conduct experiments on VMSMO to probe into the
+impact of two important parameters, i.e., the topic number 𝐾 and
+the graph layer number 𝐿. From Figure 4, we can see that for both
+experiments, the ROUGE scores increase with the topic and layer
+number, to begin with. After reaching the upper limit it begins to
+drop. Note that with only one graph layer our model outperforms
+
+0.62
+
+(b) 0.9
+
+0.61
+
+0.8
+
+0.60
+0.59
+0.58
+0.57
+0.56
+1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17
+
+0.55
+
+Contrastive Loss
+
+25.1
+
+Reference
+Indextopic 3
+topic 2
+
+(a)
+
+25.2
+
+topic 1
+
+25.4
+25.3
+25.2
+25.1
+25.0
+24.9
+24.8
+10
+
+0.04
+
+0.01
+
+R
+
+R
+
+(a) 25.5
+
+6.0
+
+0.05
+
+0.00
+
+7.0
+
+document
+side information
+
+0.06
+
+UTM Loss
+
+QA(%)
+
+(b)
+
+(a)
+
+Attention Weight
+
+Table 2: QA performance, Informativeness (Info), Coherence
+(Coh), and Succinctness (Succ) comparison by human evaluation.
+
+0.7
+0.6
+0.5
+0.4
+0.3
+0.2
+
+Decoding Step
+
+0
+
+10000 20000 30000 40000 50000
+
+Training Step
+
+Figure 6: (a) Visualizations of the attention weights on topics. (b) Contrastive learning loss curve (L𝑡𝑟𝑖𝑝𝑙𝑒𝑡 ) in the triplet
+contrastive learning module.
+
+the best baseline, which demonstrates that our topic-aware graph
+module is effective. Hence, we set the default topic number to 100
+and the graph layer number to 4.
+
+5.2
+
+Topic Quality Analysis
+
+In this subsection, we qualitatively and quantitatively investigate
+the quality of the selected topics. We compared the learned topics
+from our model with baseline topic models trained on the CNN
+dataset including (1) GSM [33], a classic NTM model with VAE and
+Gaussian softmax, and (2) W-LDA [34], a novel neural topic model
+in the Wasserstein autoencoders framework.
+In Table 4, we use the coherence score 𝐶 𝑣 [37] to quantitatively
+evaluate inferred topics, which has been proved highly consistent
+with human evaluation. We also show the inferred words for the
+topic “economy”. It can be seen that our USS outperforms other
+baselines in terms of the coherence score, and the inferred topic
+words are more accurate and concentrated. The possible reasons are
+twofold. Firstly, our model incorporates the main and side inputs
+to predict the topic distribution of the target summary. The multiple descriptions of the same content bring more topic clues, and
+the prediction task that requires reasoning and filtering abilities
+makes the topic model strong and robust. Secondly, the assistant
+summarization task can boost the performance of topic modeling.
+
+5.3
+
+Effect of Unified Topic Modeling
+
+Since we have verified the quality of the topics, we are interested
+to see the effect of the learned topics on summarization, i.e., how
+the unified topic modeling helps summarization?
+
+A Topic-aware Summarization Framework with Different Modal Side Information
+
+SIGIR ’23, July 23–27, 2023, Taipei, Taiwan
+
+Table 3: Examples of the generated summary by baselines and USS on CNN and VMSMO datasets. Unfaithful and redundant
+information is highlighted in blue. In the second case, keywords with the same semantics are highlighted in red and green.
+Article: Recently, a citizen of Nantong, Jiangsu, won a lottery ticket. He took photos of the entire lottery ticket and uploaded them to Moments.
+Unexpectedly, someone else falsely claimed the lottery winnings as his own based on the information on the lottery. The lottery was redeemed
+within only 35 seconds after the start of the redemption day as investigated by the Sports Lottery Center. 近日，江苏南通，市民张先生彩
+票中了奖后，将整张彩票拍照上传了朋友圈，不料被人根据彩票上的信息冒领了奖金。经体彩中心调查当天开始兑奖后仅35秒奖
+金就被兑走。
+Reference summary: Too excited to win the lottery, post the lottery in Moments and got falsely claimed immediately 中奖太兴奋，朋友
+圈晒彩票瞬间被冒领
+OFA: 35 seconds after winning, the lottery was falsely claimed 中奖35秒后被冒领彩票
+MOF: Man showed the winning lottery and was falsely claimed in 35 seconds 男子晒中奖35秒被冒领
+VMSMO: Post lottery in Moments and get falsely claimed 朋友圈晒中奖被冒领
+USS: Friends from Moments falsely claimed the lottery, only 35 seconds after the redemption started 朋友圈冒领彩票，中奖35秒就被兑
+走
+Highest three topics:
+Topic1: old friend 老朋友, Liang family 梁家, WeChat 微信, phone calls 通电话, Brothers 兄弟俩
+Topic2: covet 贪图, steal 偷盗, kidnap 拐骗, holocaust 大屠杀, steal everything 抢光
+Topic3: prize 奖金, tens of thousands 好几万, giants 豪门, net flow 净流入, more than 100 million yuan 亿余元
+Side information (sampled images from video):
+
+Table 4: Coherence score 𝐶 𝑣 and inferred topic words of
+different topic models. Blue text denotes repetition or non
+topic words.
+Models
+
+𝐶𝑣
+
+GSM
+
+0.392
+
+W-LDA
+
+0.462
+
+USS
+
+0.493
+
+Sampled words
+political, growth, economy, europe,
+according, world, states, better,
+opportunity
+mcconnell, consensus, electorate,
+reduction, repeal, partisan, economy,
+economies, growth
+consumers, billion, growth, economy,
+global, companies, cost, oil,
+infrastructure, sector
+
+We first examine from the encoder side, where we show the
+learned topic distributions from two inputs for the case in Table 3
+in Figure 5(a). It can be seen that though the document and side
+information has different topic distributions, generally, they focus
+on the same important topics, which are related to the ground summary by human evaluation. From the statistic view, we draw the
+loss of L𝑈𝑇 𝑀 in Figure 5(b). The curve has a steady downtrend, to
+begin with, and finally reaches convergence. The above observations demonstrate that the topic modeling can grasp the gist of the
+target summary and the effectiveness of topic modeling.
+We next examine the topic effectiveness in the summarization
+process from the decoder side. We visualize the attention weights
+𝑧𝑜,𝑡 on topics in Figure 6(a) for the same case. It can be seen that
+the topic attention first emphasizes topic 1, and then on topic 2 as
+well as topic 3. The three topics are shown in Table 3, which are
+related to “social media”, “crime”, and “finance”, respectively. This is
+consistent with the generated sentence, where the keyword starts
+
+from “Moments”, and then changes to “falsely claimed redemption”.
+In this way, we can see that the topics play a guidance role when
+generating summaries.
+
+5.4
+
+Contrastive Learning Analysis
+
+We lastly examine the performance of the triplet contrastive learning module by visualizing the contrastive loss curve in Figure 6(b)
+on VMSMO. It can be seen that the loss score fluctuates at the beginning of the training and gradually reaches convergence. This
+phenomenon demonstrates that the generated text, the document,
+and the side information belonging to the same case are getting
+closer in the semantic space. On the other hand, the unpaired triplets
+are becoming more distant.
+
+6
+
+CONCLUSION AND LIMITATION
+
+In this paper, we proposed a general summarization framework,
+which can flexibly incorporate various modalities of side information. We first proposed a unified topic model to learn latent topic
+distributions from various modal inputs. We then employed a topicaware graph encoder that relates one input to another by topics.
+Experiments on three public benchmark datasets show that our
+model produces fluent and informative summaries, outperforming
+strong systems by a wide margin.
+
+ACKNOWLEDGMENTS
+We would like to thank the anonymous reviewers for their constructive comments. The work was supported by King Abdullah
+University of Science and Technology (KAUST) through grant
+awards FCC/1/1976-44-01, FCC/1/1976-45-01, REI/1/5234-01-01, and
+RGC/3/4816-01-01.
+
+SIGIR ’23, July 23–27, 2023, Taipei, Taiwan
+
+REFERENCES
+[1] Chenxin An, Ming Zhong, Yiran Chen, Danqing Wang, Xipeng Qiu, and Xuanjing
+Huang. 2021. Enhancing scientific papers summarization with citation graph. In
+Proc. of AAAI.
+[2] Jimmy Lei Ba, Jamie Ryan Kiros, and Geoffrey E Hinton. 2016. Layer normalization. arXiv preprint arXiv:1607.06450 (2016).
+[3] Hamed Bonab, James Allan, and Ramesh Sitaraman. 2019. Simulating CLIR
+translation resource scarcity using high-resource languages. In Proc. of SIGIR.
+[4] Nghi DQ Bui, Yijun Yu, and Lingxiao Jiang. 2021. Self-supervised contrastive
+learning for code retrieval and summarization via semantic-preserving transformations. In Proc. of SIGIR.
+[5] Hengyi Cai, Hongshen Chen, Yonghao Song, Zhuoye Ding, Yongjun Bao, Weipeng
+Yan, and Xiaofang Zhao. 2020. Group-wise Contrastive Learning for Neural
+Dialogue Generation. In EMNLP.
+[6] Xiuying Chen, Zhangming Chan, Shen Gao, Meng-Hsuan Yu, Dongyan Zhao,
+and Rui Yan. 2019. Learning towards Abstractive Timeline Summarization. In
+Proc. of IJCAI.
+[7] Yangyu Chen, Shuhui Wang, Weigang Zhang, and Qingming Huang. 2018. Less
+is more: Picking informative frames for video captioning. In Proc. of ECCV.
+[8] Xiuying Chen123, Hind Alamro34, Shen Gao, Xiangliang Zhang, Dongyan
+Zhao125, and Rui Yan. 2021. Capturing Relations between Scientific Papers:
+An Abstractive Model for Related Work Section Generation. (2021).
+[9] Peng Cui and Le Hu. 2021. Topic-Guided Abstractive Multi-Document Summarization. In Proc. of ACL.
+[10] Yang Deng, Wai Lam, Yuexiang Xie, Daoyuan Chen, Yaliang Li, Min Yang, and
+Ying Shen. 2019. Joint Learning of Answer Selection and Answer Summary
+Generation in Community Question Answering. Proc. of AAAI (2019).
+[11] Yang Deng, Wenxuan Zhang, and Wai Lam. 2020. Multi-hop Inference for
+Question-driven Summarization. In Proc. of EMNLP.
+[12] Xiyan Fu, Jun Wang, Jinghan Zhang, Jinmao Wei, and Zhenglu Yang. 2020. Document summarization with vhtm: Variational hierarchical topic-aware mechanism.
+In Proc. of AAAI.
+[13] Shen Gao, Xiuying Chen, Piji Li, Zhangming Chan, Dongyan Zhao, and Rui Yan.
+2019. How to Write Summaries with Patterns? Learning towards Abstractive
+Summarization through Prototype Editing. In Proc. of EMNLP.
+[14] Shen Gao, Xiuying Chen, Piji Li, Zhaochun Ren, Lidong Bing, Dongyan Zhao,
+and Rui Yan. 2019. Abstractive Text Summarization by Incorporating Reader
+Comments. In Proc. of AAAI.
+[15] Shen Gao, Xiuying Chen, Zhaochun Ren, Dongyan Zhao, and Rui Yan. 2021.
+From standard summarization to new tasks and beyond: summarization with
+manifold information. In Proceedings of the Twenty-Ninth International Conference
+on International Joint Conferences on Artificial Intelligence.
+[16] Wanwei He, Yinpei Dai, Min Yang, Jian Sun, Fei Huang, Luo Si, and Yongbin Li.
+2022. Unified dialog model pre-training for task-oriented dialog understanding
+and generation. In Proc. of SIGIR.
+[17] Karl Moritz Hermann, Tomas Kocisky, Edward Grefenstette, Lasse Espeholt, Will
+Kay, Mustafa Suleyman, and Phil Blunsom. 2015. Teaching machines to read and
+comprehend. Advances in neural information processing systems 28 (2015).
+[18] Chao Huang, Chuxu Zhang, Jiashu Zhao, Xian Wu, Dawei Yin, and Nitesh Chawla.
+2019. Mist: A multiview and multimodal spatial-temporal learning framework
+for citywide abnormal event forecasting. In Proc. of WWW.
+[19] Guillaume Klein, Yoon Kim, Yuntian Deng, Jean Senellart, and Alexander M
+Rush. 2017. OpenNMT: Open-Source Toolkit for Neural Machine Translation. In
+Proceedings of ACL 2017, System Demonstrations.
+[20] Mahnaz Koupaee and William Yang Wang. 2018. WikiHow: A Large Scale Text
+Summarization Dataset. ArXiv (2018).
+[21] Seanie Lee, Dong Bok Lee, and Sung Ju Hwang. 2020. Contrastive learning with
+adversarial perturbations for conditional text generation. ICLR (2020).
+[22] Mingzhe Li, Xiuying Chen, Shen Gao, Zhangming Chan, Dongyan Zhao, and Rui
+Yan. 2020. VMSMO: Learning to Generate Multimodal Summary for Video-based
+News Articles. In Proc. of EMNLP.
+[23] Rennan C Lima and Rodrygo LT Santos. 2022. On Extractive Summarization for
+Profile-centric Neural Expert Search in Academia. In Proc. of SIGIR.
+[24] Chin-Yew Lin. 2004. Rouge: A package for automatic evaluation of summaries.
+Text Summarization Branches Out (2004).
+[25] Junpeng Liu, Yanyan Zou, Hainan Zhang, Hongshen Chen, Zhuoye Ding, Caixia
+Yuan, and Xiaojie Wang. 2021. Topic-Aware Contrastive Learning for Abstractive
+Dialogue Summarization. In Proc. of ACL.
+[26] Luyang Liu, Heyan Huang, Yang Gao, Yongfeng Zhang, and Xiaochi Wei. 2019.
+Neural variational correlated topic modeling. In Proc. of WWW.
+[27] Yang Liu and Mirella Lapata. 2019. Hierarchical Transformers for MultiDocument Summarization. In Proc. of ACL.
+[28] Yang Liu and Mirella Lapata. 2019. Text Summarization with Pretrained Encoders.
+In Proc. of EMNLP.
+[29] Yixin Liu and Pengfei Liu. 2021. SimCLS: A Simple Framework for Contrastive
+Learning of Abstractive Summarization. arXiv preprint arXiv:2106.01890 (2021).
+
+Xiuying Chen et al.
+
+[30] Yang Liu, Chenguang Zhu, and Michael Zeng. 2022. End-to-End Segmentationbased News Summarization. In Proc. of ACL Findings.
+[31] Junhua Mao, Jonathan Huang, Alexander Toshev, Oana Camburu, Alan L Yuille,
+and Kevin Murphy. 2016. Generation and comprehension of unambiguous object
+descriptions. In Proc. of CVPR.
+[32] Qianren Mao, Hongdong Zhu, Junnan Liu, Cheng Ji, Hao Peng, Jianxin Li, Lihong
+Wang, and Zheng Wang. 2022. MuchSUM: Multi-channel Graph Neural Network
+for Extractive Summarization. In Proc. of SIGIR.
+[33] Yishu Miao, Edward Grefenstette, and Phil Blunsom. 2017. Discovering discrete
+latent topics with neural variational inference. In Proc. of ICML.
+[34] Feng Nan, Ran Ding, Ramesh Nallapati, and Bing Xiang. 2019. Topic Modeling
+with Wasserstein Autoencoders. In Proc. of ACL.
+[35] Shashi Narayan, Nikos Papasarantopoulos, Shay B Cohen, and Mirella Lapata.
+2017. Neural extractive summarization with side information. arXiv preprint
+arXiv:1704.04530 (2017).
+[36] Xin Qian, Eunyee Koh, Fan Du, Sungchul Kim, Joel Chan, Ryan A Rossi, Sana
+Malik, and Tak Yeon Lee. 2021. Generating accurate caption units for figure
+captioning. In Proc. of WWW.
+[37] Michael Röder, Andreas Both, and Alexander Hinneburg. 2015. Exploring the
+space of topic coherence measures. In Proc. of WSDM.
+[38] Natalie Schluter. 2017. The limits of automatic summarisation according to rouge.
+In Proc. of EACL.
+[39] Kijung Shin, Amol Ghoting, Myunghwan Kim, and Hema Raghavan. 2019. Sweg:
+Lossless and lossy summarization of web-scale graphs. In Proc. of WWW.
+[40] Christian Szegedy, Vincent Vanhoucke, Sergey Ioffe, Jon Shlens, and Zbigniew
+Wojna. 2016. Rethinking the inception architecture for computer vision. In Proc.
+of CVPR.
+[41] Mingxing Tan and Quoc Le. 2019. Efficientnet: Rethinking model scaling for
+convolutional neural networks. In Proc. of ICML.
+[42] Ilya Tolstikhin, Olivier Bousquet, Sylvain Gelly, and Bernhard Schoelkopf. 2017.
+Wasserstein auto-encoders. arXiv preprint arXiv:1711.01558 (2017).
+[43] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones,
+Aidan N. Gomez, Lukasz Kaiser, and Illia Polosukhin. 2017. Attention Is All
+You Need. In Proc. of NIPS.
+[44] Bairui Wang, Lin Ma, Wei Zhang, and Wei Liu. 2018. Reconstruction network
+for video captioning. In Proc. of CVPR.
+[45] Peng Wang, An Yang, Rui Men, Junyang Lin, Shuai Bai, Zhikang Li, Jianxin Ma,
+Chang Zhou, Jingren Zhou, and Hongxia Yang. 2022. Ofa: Unifying architectures,
+tasks, and modalities through a simple sequence-to-sequence learning framework.
+In Proc. of ICML.
+[46] Yonghui Wu, Mike Schuster, Zhifeng Chen, Quoc V Le, Mohammad Norouzi,
+Wolfgang Macherey, Maxim Krikun, Yuan Cao, Qin Gao, Klaus Macherey, et al.
+2016. Google’s neural machine translation system: Bridging the gap between
+human and machine translation. arXiv preprint arXiv:1609.08144 (2016).
+[47] Qianqian Xie, Jimin Huang, Pan Du, Min Peng, and Jian-Yun Nie. 2021. Graph
+topic neural network for document representation. In Proc. of WWW.
+[48] Song Xu, Haoran Li, Peng Yuan, Youzheng Wu, Xiaodong He, and Bowen Zhou.
+2020. Self-Attention Guided Copy Mechanism for Abstractive Summarization. In
+Proc. of ACL.
+[49] Chenggang Yan, Yunbin Tu, Xingzheng Wang, Yongbing Zhang, Xinhong Hao,
+Yongdong Zhang, and Qionghai Dai. 2019. STAT: Spatial-temporal attention
+mechanism for video captioning. IEEE transactions on multimedia (2019).
+[50] Liang Yang, Fan Wu, Junhua Gu, Chuan Wang, Xiaochun Cao, Di Jin, and Yuanfang Guo. 2020. Graph attention topic modeling network. In Proc. of WWW.
+[51] Zonghan Yang, Yong Cheng, Yang Liu, and Maosong Sun. 2019. Reducing word
+omission errors in neural machine translation: A contrastive learning approach.
+(2019).
+[52] Wei Ye, Rui Xie, Jinglei Zhang, Tianxiang Hu, Xiaoyin Wang, and Shikun Zhang.
+2020. Leveraging code generation to improve code retrieval and summarization
+via dual learning. In Proc. of WWW.
+[53] Tianyi Zhang, Varsha Kishore, Felix Wu, Kilian Q Weinberger, and Yoav Artzi.
+2020. BERTScore: Evaluating Text Generation with BERT. In Proc. of ICLR.
+[54] Zhou Zhao, Haojie Pan, Changjie Fan, Yan Liu, Linlin Li, Min Yang, and Deng Cai.
+2019. Abstractive meeting summarization via hierarchical adaptive segmental
+network learning. In Proc. of WWW.
+[55] Hao Zhou, Weidong Ren, Gongshen Liu, Bo Su, and Wei Lu. 2021. Entity-Aware
+Abstractive Multi-Document Summarization. In Proc. of ACL.
+[56] Chenguang Zhu, Ziyi Yang, Robert Gmyr, Michael Zeng, and Xuedong Huang.
+2021. Leveraging lead bias for zero-shot abstractive news summarization. In Proc.
+of SIGIR.
+[57] Junnan Zhu, Haoran Li, Tianshang Liu, Yu Zhou, Jiajun Zhang, and Chengqing
+Zong. 2018. MSMO: Multimodal summarization with multimodal output. In Proc.
+of EMNLP.
+[58] Junnan Zhu, Yu Zhou, Jiajun Zhang, Haoran Li, Chengqing Zong, and Changliang
+Li. 2020. Multimodal summarization with guidance of multimodal reference. In
+Proc. of AAAI.
+
+
