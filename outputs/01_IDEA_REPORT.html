@@ -3,372 +3,297 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Idea Report — MoE (engineering lens) · Xiuying Chen</title>
+<title>Idea Report — Representation Steering / Circuit Control (engineering)</title>
 <style>
-  :root{--ink:#1a1a1a;--mut:#5a6270;--line:#e2e6ec;--bg:#fbfcfe;--acc:#2b5c9e;--novel:#0a7f52;--diff:#b5820a;--exist:#a33;--card:#fff;}
+  :root{--ink:#1a1a1a;--mut:#5c6672;--line:#e3e7ec;--bg:#fafbfc;--card:#fff;
+        --novel:#0a7d43;--diff:#b8860b;--exist:#a33;--accent:#1f4e79;--chip:#eef3f8;--new:#7048c4;}
   *{box-sizing:border-box}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;margin:0;padding:0 20px 80px}
-  .wrap{max-width:1000px;margin:0 auto}
-  h1{font-size:1.85rem;margin:.6em 0 .1em;letter-spacing:-.01em}
-  h2{font-size:1.32rem;margin:2.2em 0 .5em;padding-bottom:.25em;border-bottom:2px solid var(--line)}
-  h3{font-size:1.08rem;margin:1.4em 0 .3em}
-  .sub{color:var(--mut);font-size:.95rem;margin:.2em 0 1.4em}
-  code{background:#eef1f6;padding:.08em .35em;border-radius:4px;font-size:.9em}
-  a{color:var(--acc);text-decoration:none}
-  a:hover{text-decoration:underline}
-  table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.93rem}
-  th,td{border:1px solid var(--line);padding:.55em .7em;text-align:left;vertical-align:top}
-  th{background:#eef2f8;font-weight:600}
-  tr:nth-child(even) td{background:#f6f8fb}
-  .tag{display:inline-block;font-size:.72rem;font-weight:700;padding:.12em .55em;border-radius:20px;color:#fff;white-space:nowrap}
-  .t-novel{background:var(--novel)} .t-diff{background:var(--diff)} .t-exist{background:var(--exist)}
-  .t-new{background:#7a3fb0}
-  .card{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--acc);border-radius:8px;padding:1.1em 1.3em;margin:1.1em 0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
-  .card.rank1{border-left-color:var(--novel)}
-  .pitch{font-size:1.06rem;font-weight:600;margin:.1em 0 .6em}
-  .idlabel{font-size:.82rem;color:var(--mut);font-weight:700;letter-spacing:.05em}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:.3em 1.4em;font-size:.9rem;margin:.6em 0}
-  .grid b{color:var(--mut);font-weight:600}
-  ul{margin:.3em 0 .6em;padding-left:1.3em}
-  li{margin:.15em 0}
-  .banner{background:#eafaf1;border:1px solid #b7e5cd;border-radius:8px;padding:.7em 1em;margin:1em 0;font-weight:600;color:#0a7f52;display:none}
-  .note{background:#fff8e6;border:1px solid #f0dfa8;border-radius:8px;padding:.7em 1em;font-size:.9rem;color:#6b5600;margin:1em 0}
-  .meta{font-size:.85rem;color:var(--mut)}
-  .kill{opacity:.72}
-  small.cw{color:var(--mut)}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);line-height:1.62;margin:0;background:var(--bg);}
+  .wrap{max-width:960px;margin:0 auto;padding:36px 28px 90px;}
+  h1{font-size:25px;margin:.2em 0 .1em;letter-spacing:-.01em}
+  h2{font-size:20px;margin:2.1em 0 .5em;padding-bottom:.28em;border-bottom:2px solid var(--accent);color:var(--accent)}
+  h3{font-size:16px;margin:1.5em 0 .35em}
+  .sub{color:var(--mut);font-size:14px;margin-top:.2em}
+  p{margin:.55em 0} a{color:var(--accent);text-decoration:none;border-bottom:1px solid #cdd7e2} a:hover{border-bottom-color:var(--accent)}
+  table{border-collapse:collapse;width:100%;margin:.7em 0;font-size:13.5px}
+  th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+  th{background:var(--chip);font-weight:600}
+  code{background:#f0f2f5;padding:1px 5px;border-radius:4px;font-size:.9em}
+  .banner{background:#fff8e6;border:1px solid #e8d48a;border-left:5px solid #d4a017;padding:10px 16px;border-radius:8px;margin:14px 0 6px;font-size:14px;color:#6b5410}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:16px 0;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .card.new{border-color:#c9b8ec;box-shadow:0 1px 4px rgba(112,72,196,.10)}
+  .card h3{margin-top:0;font-size:17px}
+  .pitch{font-size:15px;font-weight:500;background:#f4f8fc;border-left:4px solid var(--accent);padding:9px 13px;border-radius:6px;margin:.4em 0 .8em}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;color:#fff;vertical-align:middle}
+  .t-novel{background:var(--novel)} .t-diff{background:var(--diff)} .t-exist{background:var(--exist)} .t-new{background:var(--new)}
+  .grid{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;font-size:13.5px;margin:.5em 0}
+  .grid b{color:var(--mut);font-weight:600;white-space:nowrap}
+  .steps{margin:.3em 0;padding-left:1.15em} .steps li{margin:.18em 0}
+  .rank td:first-child{font-weight:700;text-align:center;width:34px}
+  .note{color:var(--mut);font-size:13px}
+  .cat-desc{color:var(--mut);font-size:13px;margin:.1em 0 .3em}
+  .foot{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:12.5px}
+  .pill{font-size:11px;background:var(--chip);color:var(--accent);border:1px solid #cfe0ef;padding:1px 7px;border-radius:20px}
+  .carried{background:#f7f7f9;border:1px dashed #ccc;border-radius:10px;padding:12px 16px;margin:14px 0;font-size:13.5px}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<div id="selbanner" class="banner" style="display:block">✅ Selected: <b>I1 — Safety-Redundant MoE (redistribute refusal across experts)</b> &nbsp;·&nbsp; picked 2026-07-02 (switched from I6) &nbsp;·&nbsp; handoff → <code>/workplan</code></div>
+<h1>Idea Report — Representation Steering / Circuit Control</h1>
+<div class="sub">Researcher: <b>Lang Gao</b> · Direction: representation steering / circuit control · Lens: <b>engineering</b> · Generated 2026-07-03 · <b>Re-ranked for engineering</b> after your redirect ("too theoretical — want something more engineer-y"). New engineering candidates <span class="tag t-new">🆕 new this run</span>; the prior theory slate is carried, de-prioritized. Grounded in a multi-angle, ~58-paper survey.</div>
 
-<h1>Research Idea Report — Mixture-of-Experts</h1>
-<p class="sub">
-  Researcher: <b>Xiuying Chen</b> (MBZUAI) · Lens: <b>engineering</b> (iterate habitual methods, reuse code) ·
-  Direction: <b>MoE-related</b> · Generated <b>2026-07-02</b> · Run 1 (fresh slate)<br>
-  Grounding: <b>65 papers surveyed</b> across 5 angles (2024–2026); adversarial ranking cross-checked with a second model (codex/GPT-5.2).
-</p>
+<div class="banner" id="selbanner" style="background:#eafaef;border-color:#8fce9f;border-left-color:#0a7d43;color:#0a5a30"><b>✅ Selected: I11 — Deployable ABD++ jailbreak defense</b> · 2026-07-03. Your pick from the engineering re-rank — the most shippable option, fusing your Activation Boundary Defense with conditional steering on vLLM, benchmarked across text + audio attacks. Handoff → <code>/workplan</code>. (Reviewer note: to clear a top venue this needs a strong <em>adaptive-attack</em> story + real serving latency/utility numbers, else it reads as an ABD extension — /workplan should foreground those.)</div>
 
-<!-- ============================= LANDSCAPE ============================= -->
 <h2>1 · Literature Landscape</h2>
 
-<p>The MoE field in 2024–2026 has <b>converged on one architecture and fractured on one question</b>. The architecture is
-<a href="https://arxiv.org/abs/2401.06066">fine-grained experts + a few always-on shared experts + top-k / sigmoid routing</a>
-(DeepSeekMoE → DeepSeek-V3, <a href="https://arxiv.org/abs/2409.02060">OLMoE</a>,
-<a href="https://arxiv.org/abs/2505.09388">Qwen3-MoE</a>, which drops the shared expert). Load balancing has shifted from an
-auxiliary-loss gradient toward <a href="https://arxiv.org/abs/2408.15664">aux-loss-free bias-based balancing</a>, because the
-balance-loss gradient measurably hurts quality — but the <a href="https://arxiv.org/abs/2501.11873">balance-vs-specialization
-tension</a> is fundamental and implementation-sensitive. Discrete top-k remains the pain point, spawning
-<a href="https://arxiv.org/abs/2412.14711">differentiable</a> and <a href="https://arxiv.org/abs/2501.13074">router-free</a> escapes,
-none of which has displaced learned top-k in production.</p>
+<p>The direction sits on <b>your</b> intellectual center (<a href="https://arxiv.org/abs/2605.01844">CRH</a> → <a href="https://arxiv.org/abs/2510.11328">Emotion Circuits</a> → <a href="https://arxiv.org/abs/2505.15524">BiasLens</a> → <a href="https://arxiv.org/abs/2412.17034">ABD</a>). The first pass surveyed steering methods, reliable/geometry-aware steering, circuit discovery/editing, and the reliability audits (see the appendix, categories A–F). <b>This pass adds the engineering front you asked for: turning steering from a fragile inference-time hack into TRAINED, deployable behavior control</b> (appendix category G).</p>
 
-<p>The fracture is <b>what experts actually specialize in</b>. One camp finds robust fine-grained specialization —
-<a href="https://arxiv.org/abs/2412.16971">POS-sensitive routers</a>,
-<a href="https://arxiv.org/abs/2502.10928">semantic routing recoverable by linear probes</a>,
-<a href="https://arxiv.org/abs/2412.04139">monosemantic-by-design experts</a>. A rising counter-camp argues the apparent
-specialization is a <a href="https://arxiv.org/abs/2604.09780">hidden-state geometry artifact of the linear router</a>, and that a
-large "domain-invariant standing committee" of always-active experts dominates routing. This unresolved tension is the single
-most exploitable seam for a white-box researcher.</p>
+<p><b>The trained/deployable end of steering is real but fragmented.</b> Trained steering-as-a-module is built — <a href="https://arxiv.org/abs/2404.03592">ReFT/LoReFT</a> trains interventions on frozen activations as a PEFT drop-in, <a href="https://arxiv.org/abs/2409.06927">Representation Tuning</a> bakes a steering direction straight into weights via an activation-matching loss, and <a href="https://arxiv.org/abs/2505.20809">RePS</a> trains a robustness-hardened preference-steering objective. Composition is built but shallow — <a href="https://arxiv.org/abs/2307.13269">LoraHub</a> and <a href="https://arxiv.org/abs/2511.07129">LoRA-on-the-Go</a> compose/route adapters, but the recurring failure is <em>interference</em> and no one ships a behavior-adapter suite with <em>measured</em> non-interference. Steering-as-RL-reward is emerging — <a href="https://arxiv.org/abs/2505.19590">RLIF/Intuitor</a> and <a href="https://arxiv.org/abs/2509.06608">Small Vectors, Big Effects</a> — but target reasoning, not robust behavior control, and reward-hack. And steering-in-serving already exists — <a href="https://arxiv.org/abs/2509.25175">EasySteer</a> and <a href="https://arxiv.org/abs/2603.06588">vLLM Hook v0</a> make steering a vLLM serving hook.</p>
 
-<p>For a <b>trustworthy-LLM / steering</b> researcher, the most actionable findings cluster around <b>safety localization</b>:
-<a href="https://arxiv.org/abs/2509.09660">SteerMoE</a> shows expert (de)activation steers safety (+20%) and faithfulness
-(+27%) with no weight change — but the same handle is an attack. <a href="https://arxiv.org/abs/2506.17368">SAFEx</a> finds
-refusal is dangerously concentrated: disabling <b>12 of 6,144 experts</b> in Qwen3-30B-A3B drops the refusal rate 22%.
-<a href="https://arxiv.org/abs/2509.22745">SafeMoE</a> defends harmful fine-tuning by penalizing routing drift — but <i>requires
-the original safety-aligned routing weights</i>, unavailable in most deployments. The offense side (
-<a href="https://arxiv.org/abs/2402.05526">buffer overflow</a>,
-<a href="https://arxiv.org/abs/2410.22884">prompt-stealing via tie-break leakage</a>,
-<a href="https://arxiv.org/abs/2504.18598">BadMoE dormant-expert backdoors</a>,
-input-only routing jailbreaks) is far more developed than defense, and <b>the router — not the experts — is the recurring attack
-surface</b>. There is still <b>no deployment-realistic (black-box, no reference-weights) defense</b>, and MoE-specific
-faithfulness/trust evaluation is thin.</p>
+<p><b>The load-bearing negative result — the seed for the engineering flagship.</b> <a href="https://arxiv.org/abs/2503.05371">Shifting Perspectives</a> shows that naive LoRA <em>did not</em> converge on a robust behavior subspace: <b>baking steering into weights LOSES the adversarial/shift robustness that inference-time steering had.</b> A distillation objective that <em>preserves</em> that robustness is unbuilt.</p>
 
-<p>Two more seams matter for her profile. <b>Cross-lingual / domain knowledge localizes to experts</b>: deactivating ~20 of 6,000
-experts <a href="https://arxiv.org/abs/2603.17102">erases correct answers in &gt;40% of cases</a>, and
-<a href="https://arxiv.org/abs/2604.05267">domain-specific experts demonstrably exist</a> — but repair, not just localization,
-is unaddressed. And <b>RL post-training on MoE is the least-mature sub-angle</b>: GRPO-style RL collapses because the router
-differs between rollout and training (<a href="https://arxiv.org/abs/2510.11370">R3</a>,
-<a href="https://arxiv.org/abs/2510.23027">RSPO</a> are corrective patches, not RL-co-designed routers). On the cheap-construction
-side, <a href="https://arxiv.org/abs/2212.05055">sparse upcycling</a> produces homogeneous experts and
-<a href="https://arxiv.org/abs/2404.15159">LoRA-as-experts</a> is the cheapest MoE she can build on one GPU.</p>
+<p><b>Three engineering white spaces (all buildable on your Qwen3 + TRL/PEFT/vLLM/DeepSpeed stack):</b></p>
+<ul>
+  <li><b>EG1 — robustness-preserving distillation.</b> Nobody bakes steering into weights while keeping inference-steering's robustness under distribution shift / adaptive attack (the <a href="https://arxiv.org/abs/2503.05371">Shifting Perspectives</a> gap). → <b>I8</b>.</li>
+  <li><b>EG2 — a reliability gate in the loop.</b> Extraction, conditional gating (<a href="https://arxiv.org/abs/2409.05907">CAST</a>), distillation, and serving (<a href="https://arxiv.org/abs/2509.25175">EasySteer</a>) exist in isolation; nothing chains them behind a pass/FAIL reliability gate that rejects unreliable steers before deployment. → <b>I9</b>.</li>
+  <li><b>EG3 — measured behavioral non-interference.</b> Adapter composition exists but interference is documented, not guaranteed; no behavior-adapter suite ships a measured pairwise non-interference. → <b>I10</b> (the buildable form of the carried <b>I4</b>).</li>
+</ul>
 
-<p class="meta"><b>Structural gaps → idea seeds:</b> (1) safety concentration has attacks but no redundancy-based defense that works
-without reference routing weights; (2) knowledge is localizable per expert/language but not <i>repaired</i>; (3) upcycled experts
-are homogeneous / dormant and no one uses small specialist teachers to revive them; (4) MoE-specific trust/faithfulness eval under
-routing shift is missing; (5) the semantic-vs-geometric specialization question is unresolved and causally testable.</p>
+<h2>2 · Ranked Idea Slate (re-ranked for engineering)</h2>
+<p class="note">Ranked by a cross-model adversarial pass (<b>codex / GPT-5.2</b>, high effort — §4), weighting buildable/trainable payoff after your redirect. <span class="tag t-novel">novel</span> · <span class="tag t-diff">differentiable</span> · <span class="tag t-exist">incremental</span>. New this run: <span class="tag t-new">🆕</span>. Pick <b>one</b> id.</p>
 
-<!-- ============================= RANKING ============================= -->
-<h2>2 · Ranked Idea Slate</h2>
-<p class="sub">6 ideas, A4 rank order (devil's-advocate verdict, not first-pass enthusiasm). Each leads with its one-sentence pitch.
-≥3 carry a <span class="tag t-novel">novel</span> verdict. Stable ids <code>I1…I8</code> are how the pick is referenced downstream
-(<code>I5</code>/<code>I8</code> generated but de-prioritized — see note below).</p>
-
-<table>
-<thead><tr><th>Rank</th><th>ID</th><th>One-sentence pitch</th><th>Verdict</th><th>Novelty</th><th>Risk</th></tr></thead>
+<table class="rank">
+<thead><tr><th>#</th><th>id</th><th>One-sentence pitch</th><th>Novelty</th><th>Feasib.</th><th>Risk</th><th>Effort</th></tr></thead>
 <tbody>
-<tr>
-  <td><b>1</b></td><td><b>I1</b></td>
-  <td>Redistribute refusal behavior across many experts via a LoRA fine-tune + routing regularizer, so no small ablatable expert subset can be knocked out to jailbreak the model — a defense against SAFEx/SteerMoE expert-ablation attacks that needs no original aligned routing weights.</td>
-  <td><span class="tag t-novel">novel</span> <span class="tag t-new">✅ SELECTED</span></td><td>7.5/10</td><td>MED</td>
-</tr>
-<tr>
-  <td><b>2</b></td><td><b>I3</b></td>
-  <td>Use cross-lingual inconsistency to localize the experts holding wrong/missing medical knowledge in a target language, then repair just those experts with targeted per-expert LoRA — turning known localization into an actual fix, on her CURE-Med stack.</td>
-  <td><span class="tag t-novel">novel</span></td><td>7.0/10</td><td>MED</td>
-</tr>
-<tr>
-  <td><b>3</b></td><td><b>I6</b></td>
-  <td>Flip her "small models teach LLMs" KD: use small domain-specialist models as teachers to specialize the dormant/underused experts of a cheaply-upcycled MoE, breaking upcycling homogeneity so the router actually uses them.</td>
-  <td><span class="tag t-novel">novel</span></td><td>6.5/10</td><td>MED</td>
-</tr>
-<tr>
-  <td><b>4</b></td><td><b>I7</b></td>
-  <td>Run a causal intervention with her concept-representation + steering toolkit to decide whether MoE experts specialize semantically or are just a linear-router geometry artifact — resolving the "Myth of Expert Specialization" tension.</td>
-  <td><span class="tag t-diff">differentiable</span></td><td>5.5/10</td><td>MED</td>
-</tr>
-<tr>
-  <td><b>5</b></td><td><b>I4</b></td>
-  <td>Bring her curriculum-RL (CURE-Med) to MoE reasoning with a router-stability term, tested on multilingual medical reasoning.</td>
-  <td><span class="tag t-diff">differentiable</span></td><td>5.0/10</td><td>HIGH</td>
-</tr>
-<tr>
-  <td><b>6</b></td><td><b>I2</b></td>
-  <td>Extend her "Emotion Circuits" white-box control from neurons to experts, building one inference-time (de)activation knob for multi-attribute (safety/faithfulness/bias) trust steering.</td>
-  <td><span class="tag t-diff">differentiable</span></td><td>4.0/10</td><td>MED</td>
-</tr>
+<tr><td>1</td><td><b>I8</b> <span class="tag t-new">🆕</span></td><td><b>Robustness-preserving steering distillation:</b> bake behavior steering into the weights with a training objective explicitly designed to keep the distribution-shift &amp; adversarial robustness that inference-time steering has but naive LoRA-baking loses — a deployable, robust-by-training control, benchmarked under attack and shift.</td><td><span class="tag t-novel">novel</span></td><td>High</td><td>MED-HI</td><td>~6–8 wk</td></tr>
+<tr><td>2</td><td><b>I9</b> <span class="tag t-new">🆕</span></td><td><b>Reliability-gated steering factory:</b> an end-to-end pipeline that turns a natural-language behavior description into a served control adapter — mine the direction, gate it CAST-style, run a pass/FAIL reliability check, and distill only reliable behaviors into the serving stack.</td><td><span class="tag t-diff">differentiable</span></td><td>High</td><td>MED-HI</td><td>~5–7 wk</td></tr>
+<tr style="background:#eafaef"><td>3</td><td><b>I11 ✅</b> <span class="tag t-new">🆕</span></td><td><b>Deployable ABD++ defense:</b> fuse your Activation Boundary Defense with conditional steering into a serve-time (vLLM) jailbreak defense, hardened and benchmarked across text + audio attack suites with explicit latency/utility budgets and adaptive attacks.</td><td><span class="tag t-diff">differentiable</span></td><td>High</td><td>MED</td><td>~5–6 wk</td></tr>
+<tr><td>4</td><td><b>I10</b> <span class="tag t-new">🆕</span></td><td><b>Behavior-adapter library:</b> distill steering directions for safety/formality/emotion/honesty into composable LoRA/ReFT adapters, shipped as a suite with a <em>measured</em> pairwise non-interference guarantee, stackable blindly at serve time.</td><td><span class="tag t-diff">differentiable</span></td><td>High</td><td>HIGH</td><td>~6–8 wk</td></tr>
+<tr><td>5</td><td><b>I2</b></td><td><b>Closed-loop circuit controller:</b> a feedback controller that discovers a behavior circuit, applies a graded edit, and verifies target-control + off-target + fluency online — accepting only when a specificity constraint passes, replacing hand-tuned control strength.</td><td><span class="tag t-diff">differentiable</span></td><td>MED</td><td>HIGH</td><td>~7–9 wk</td></tr>
+<tr><td>6</td><td><b>I4</b></td><td><b>Compositional non-interference (theory sibling of I10):</b> edit one behavior's circuit while constraining the edit to the null space of other behaviors' directions — porting AlphaEdit's factual null-space idea to behavioral steering.</td><td><span class="tag t-novel">novel</span></td><td>MED</td><td>HIGH</td><td>~6–8 wk</td></tr>
+<tr><td>7</td><td><b>I1</b></td><td><b>Sensitive-Sector Steering (the science option):</b> estimate the causally-sensitive sub-region of a concept's normal plane and steer along the per-sample sector-corrected direction — turning your CRH's diagnosis of steering instability into a fix.</td><td><span class="tag t-novel">novel</span></td><td>High</td><td>MED</td><td>~5–7 wk</td></tr>
 </tbody>
 </table>
 
-<div class="note">
-<b>Considered and de-prioritized (honest, not padded):</b>
-<b>I5</b> — learned routing over debate agents (MoE↔MoA bridge for her fake-news system): collides heavily with Router-R1 /
-mixture-of-debaters agent-routing work; reads as "agent selection," not MoE research (novelty ~3.5/10). <b>I8</b> — a MoE
-faithfulness/trust benchmark under routing OOD: valuable, but benchmark-only is thin as a lead claim and this run's lens is
-engineering — <b>fold it in as the evaluation suite for I1 or I3</b> rather than a standalone paper. Neither is a strong
-engineering lead this run; they are recorded here so a re-run can carry them forward, not dropped as rejected.
-</div>
+<p class="note"><b>Reviewer's headline:</b> build <b>I8 + a narrow I9 reliability gate around it</b> — I8 gives the one clean, immediately-legible research claim (baking steering into weights need not lose robustness), I9 gives the engineering artifact and stops the project becoming another hand-tuned steering-vector paper. <b>I11</b> is the most shippable (a vLLM ABD++ defense with real latency/utility numbers). <b>I10</b> is useful only if the non-interference guarantee — not the library — is the contribution. Carried but de-prioritized after your redirect: <b>I3</b> (fine affective circuits), <b>I7</b> (CRH reliability predictor — folds into I1), <b>I6</b> (geodesic ABD), <b>I5</b> (bias mitigation) — full cards in the prior report; one-liners below.</p>
 
-<!-- ============================= CARDS ============================= -->
 <h2>3 · Idea Cards</h2>
 
-<!-- I1 -->
-<div class="card rank1">
-  <div class="idlabel">RANK 1 · I1 &nbsp;<span class="tag t-novel">novel</span> <span class="tag t-new">✅ SELECTED</span></div>
-  <div class="pitch">Redistribute refusal behavior across many experts (LoRA + routing regularizer) so no small ablatable expert subset can be knocked out to jailbreak the model — a defense against expert-ablation attacks that needs no original aligned routing weights.</div>
-  <div class="grid">
-    <div><b>Contribution type:</b> method (defense)</div><div><b>Fit:</b> Trustworthy/Safe LLMs (stated #1) + steering</div>
-    <div><b>Feasibility:</b> HIGH — LoRA fine-tune on Qwen3-30B-A3B or OLMoE; inference-only ablation eval; single A100 w/ offloading, or 4090 w/ smaller MoE</div>
-    <div><b>Risk:</b> MED</div>
-    <div><b>Rough effort:</b> ~5–7 weeks</div><div><b>Reviewer's likely objection:</b> "You made SAFEx harder — but did deployable safety actually improve under <i>adaptive</i> attacks, and at what over-refusal cost?"</div>
-  </div>
-  <h3>Method steps</h3>
-  <ul>
-    <li><b>Reproduce the attack (cheap, first — W1):</b> replicate SAFEx/SteerMoE worst-case k-expert ablation on Qwen3-30B-A3B (& OLMoE) using her jailbreak-benchmark harness; record refusal-rate drop vs k as the baseline vulnerability curve.</li>
-    <li><b>Redistribution objective:</b> LoRA fine-tune with a routing regularizer that (a) spreads safety-relevant routing mass across many experts and (b) adds an entropy/anti-concentration term on the safety-critical expert set — so refusal survives ablation of any small subset.</li>
-    <li><b>Adaptive re-attack:</b> re-run worst-case ablation <i>and</i> input-only routing jailbreaks against the hardened model (attacker re-optimizes k against the new routing) — the honest evaluation, not just the static one.</li>
-    <li><b>Utility & over-refusal guardrail:</b> track general capability + over-refusal on benign prompts to bound the safety tax.</li>
-  </ul>
-  <p><b>Hypothesis / acceptance:</b> after hardening, the worst-case refusal drop at the SAFEx budget (≈12 experts) falls from ~22% to &lt;5%, and survives adaptive re-optimization, with &lt;2% general-capability loss and no significant over-refusal rise.</p>
-  <p><b>MVE (minimum viable experiment):</b> one model (Qwen3-30B-A3B), one jailbreak set, reproduce the SAFEx drop, apply the regularizer, show the ablation curve flattens — before scaling to a second model / adaptive attacker.</p>
-  <p><b>Novelty vs her own work:</b> extends <a href="https://arxiv.org/abs/2502.14296">her trustworthiness</a> / Safety-Boundaries / jailbreak-benchmark line from <i>attack &amp; evaluation</i> into <i>architectural defense</i> — new territory, not a restatement.</p>
-  <p class="meta"><b>Closest work &amp; differentiation:</b> <a href="https://arxiv.org/abs/2506.17368">SAFEx</a> and <a href="https://arxiv.org/abs/2509.09660">SteerMoE</a> expose the concentration/ablation vulnerability but propose no redistribution defense; <a href="https://arxiv.org/abs/2509.22745">SafeMoE</a> defends harmful-FT but <i>requires the original aligned routing weights</i> — I1's redistribution needs none, and targets ablation attacks rather than fine-tuning drift.</p>
+<div class="card new" id="I8">
+<h3>I8 · Robustness-preserving steering distillation <span class="tag t-novel">novel</span> <span class="tag t-new">🆕 new this run</span></h3>
+<div class="pitch">Bake behavior steering into the weights with a training objective explicitly designed to PRESERVE the distribution-shift and adversarial robustness that inference-time steering has but naive LoRA-baking loses — turning fragile activation hacks into a deployable, robust-by-training control, benchmarked under attack and shift.</div>
+<div class="grid">
+<b>Novelty</b><span><b>7/10.</b> Closest: <a href="https://arxiv.org/abs/2409.06927">Representation Tuning</a> (bakes steering into weights, no robustness focus), <a href="https://arxiv.org/abs/2505.20809">RePS</a> (trained robust preference steering — resists prompt-jailbreaks), <a href="https://arxiv.org/abs/2509.06608">Small Vectors, Big Effects</a> (RL-trained steering vectors). Differentiation: the explicit target is the <a href="https://arxiv.org/abs/2503.05371">Shifting Perspectives</a> negative result — preserve inference-steering's <em>shift/adversarial</em> robustness during distillation, with attack+shift benchmarks and honest negatives. The cleanest research-shaped idea: it attacks a known failure mode, not "another steering method."</span>
+<b>Feasibility</b><span>High — your TRL/PEFT/RL + DeepSpeed stack; Qwen3-4B/7B.</span>
+<b>Risk</b><span>MED-HI — the null is plausible: weight-baking may still lose robustness, or robustness trades off with control/utility. Either outcome is a publishable, decision-useful result.</span>
+<b>Contribution</b><span>Method + empirical (targets a field negative result).</span>
+<b>Fit</b><span>Your steering line + RL-tuning stack (One Model / DyFlow).</span>
+<b>Reviewer's objection</b><span>"This is Representation Tuning + adversarial regularization — why should it generalize?" → answer with attack+shift benchmarks vs inference-steering, ReFT, RePS, and a mechanistic account of <em>why</em> the objective preserves robustness.</span>
+</div>
+<b>Method steps</b>
+<ol class="steps">
+<li>Extract steering directions for target behaviors (refusal, sentiment, formality) with your usual contrastive pipeline.</li>
+<li>Distill into weights via activation-matching + a <b>robustness regularizer</b> that matches inference-steering behavior under perturbed / shifted / adversarial inputs (optionally an RL objective with a robustness reward).</li>
+<li>Benchmark control + utility + <b>robustness under distribution shift + adaptive attacks</b> vs inference-steering, ReFT, Representation Tuning, RePS, and naive LoRA-baking.</li>
+<li>Report the robustness-vs-controllability frontier honestly (the negative-result axis).</li>
+</ol>
+<b>Hypothesis / acceptance:</b> the robustness-preserving objective retains most of inference-steering's under-shift/attack robustness while removing the inference-time hook, beating naive LoRA-baking at matched control.<br>
+<b>MVE:</b> one behavior (refusal), robustness under 5 paraphrase/attack sets: distilled vs inference-steering vs naive LoRA — one node, ~2 days.<br>
+<b>vs your own work:</b> new — targets a field negative result, not a restatement of ABD/Emotion Circuits. <b>Pairs with I9</b> (reviewer's recommended build).
 </div>
 
-<!-- I3 -->
-<div class="card">
-  <div class="idlabel">RANK 2 · I3 &nbsp;<span class="tag t-novel">novel</span></div>
-  <div class="pitch">Use cross-lingual inconsistency to localize the experts holding wrong/missing medical knowledge in a target language, then repair just those experts with targeted per-expert LoRA — turning known localization into an actual fix, on her CURE-Med stack.</div>
-  <div class="grid">
-    <div><b>Contribution type:</b> method (repair)</div><div><b>Fit:</b> Multilingual/medical LLMs + CURE-Med</div>
-    <div><b>Feasibility:</b> HIGH — per-expert LoRA is parameter-light; reuses CURE-Med data/eval; single A100</div>
-    <div><b>Risk:</b> MED</div>
-    <div><b>Rough effort:</b> ~6–8 weeks</div><div><b>Reviewer's likely objection:</b> "Is targeted expert repair actually better than ordinary multilingual/domain LoRA <i>at equal parameter budget</i>?"</div>
-  </div>
-  <h3>Method steps</h3>
-  <ul>
-    <li><b>Localize (cheap, first):</b> compute cross-lingual answer-inconsistency on medical QA per expert (XICI-style) to identify the small expert set whose deactivation erases correct answers in the weak language.</li>
-    <li><b>Targeted repair:</b> attach per-expert LoRA <i>only</i> to the localized experts and fine-tune on the medical curriculum in the weak language, freezing the rest — the "surgical" alternative to whole-model multilingual tuning.</li>
-    <li><b>Router-usage check:</b> verify the router keeps selecting the repaired experts post-repair (the known failure mode) and doesn't route around them.</li>
-    <li><b>Equal-budget baseline (W7):</b> compare against standard full-model / random-expert LoRA at matched trainable-parameter budget — the objection killer.</li>
-  </ul>
-  <p><b>Hypothesis / acceptance:</b> targeted repair recovers weak-language medical accuracy to within X% of the strong language, beating equal-budget non-targeted LoRA, without degrading the strong language.</p>
-  <p><b>MVE:</b> one MoE, one weak↔strong language pair, one medical QA set — show localization → repair beats matched-budget baseline before adding languages/domains.</p>
-  <p><b>Novelty vs her own work:</b> <a href="#">CURE-Med</a> does multilingual medical curriculum-RL on (implicitly dense) models; I3 makes the <i>MoE structure</i> the lever — localize-then-repair is a new mechanism, not a re-run of CURE-Med.</p>
-  <p class="meta"><b>Closest work &amp; differentiation:</b> <a href="https://arxiv.org/abs/2603.17102">cross-lingual knowledge localization</a> <small class="cw">[2026 preprint — verify id before citing]</small> localizes but does <i>not repair</i>; <a href="https://arxiv.org/abs/2604.05267">domain-expert existence audits</a> <small class="cw">[2026 preprint — verify]</small> confirm experts exist but propose only training-free steering, not knowledge repair.</p>
+<div class="card new" id="I9">
+<h3>I9 · Reliability-gated auto steering-vector factory <span class="tag t-diff">differentiable</span> <span class="tag t-new">🆕 new this run</span></h3>
+<div class="pitch">An end-to-end pipeline that turns a natural-language behavior description into a served control adapter — mining the direction, gating it CAST-style, running a pass/FAIL reliability check, and distilling only reliable behaviors into the serving stack, so unreliable steers are rejected before deployment.</div>
+<div class="grid">
+<b>Novelty</b><span><b>6/10.</b> Closest: <a href="https://arxiv.org/abs/2509.25175">EasySteer</a> (serving + vector library, no reliability gate), <a href="https://arxiv.org/abs/2409.05907">CAST</a> (gating), <a href="https://arxiv.org/abs/2507.21509">Persona Vectors</a> (auto extraction). Differentiation: the reliability GATE that predicts deployment failure + end-to-end chaining. Risk of reading as glue — the gate must beat existing in-distribution evals at predicting real failure.</span>
+<b>Feasibility</b><span>High — chains existing components on your stack; this is the <em>buildable</em> realization of the carried I1/I7 reliability ideas.</span>
+<b>Risk</b><span>MED-HI — the gate may overfit easy evals; most useful behaviors may fail the gate; distillation may break a gated behavior.</span>
+<b>Contribution</b><span>System + reliability science.</span> <b>Fit</b><span>Your evaluation/probing line + serving.</span>
+<b>Reviewer's objection</b><span>"System-integration paper — where's the science?" → the science is the <em>predictive</em> reliability gate (predicts post-deployment failure better than control accuracy), not the plumbing.</span>
+</div>
+<b>Method:</b> (1) NL behavior → synth contrastive data → extract direction; (2) CAST-style conditional gate; (3) reliability check (off-target + shift + jailbreak) → pass/FAIL; (4) distill reliable ones into a served adapter (vLLM/EasySteer). Ship a toolkit.<br>
+<b>Hypothesis:</b> the reliability gate predicts post-deployment failure better than in-distribution control accuracy. <b>MVE:</b> 5 behaviors through the pipeline; gate's predicted-vs-actual failure correlation. <b>Best paired with I8.</b>
 </div>
 
-<!-- I6 -->
-<div class="card">
-  <div class="idlabel">RANK 3 · I6 &nbsp;<span class="tag t-novel">novel</span> <span class="tag t-new">✅ SELECTED</span></div>
-  <div class="pitch">Flip her "small models teach LLMs" KD: use small domain-specialist models as teachers to specialize the dormant/underused experts of a cheaply-upcycled MoE, breaking upcycling homogeneity so the router actually uses them.</div>
-  <div class="grid">
-    <div><b>Contribution type:</b> method (KD / expert-utilization)</div><div><b>Fit:</b> KD (Flipping-KD) + cheap MoE construction</div>
-    <div><b>Feasibility:</b> HIGH — LoRA-as-experts / small upcycled MoE; small teachers are cheap; single A100/4090</div>
-    <div><b>Risk:</b> MED</div>
-    <div><b>Rough effort:</b> ~5–7 weeks</div><div><b>Reviewer's likely objection:</b> "Plausible — but does the router <i>actually</i> use the revived experts, and does end-task utility improve (vs load-balancing faking specialization)?"</div>
-  </div>
-  <h3>Method steps</h3>
-  <ul>
-    <li><b>Scope small (W1):</b> build a small upcycled MoE (or LoRA-experts / MixLoRA) from a Qwen3 dense checkpoint; measure per-expert utilization to identify dormant experts.</li>
-    <li><b>Small-teacher assignment:</b> pair each dormant expert with a small domain-specialist teacher and distill the teacher's behavior <i>into that expert</i> (her Flipping-KD direction: small expertise → large model).</li>
-    <li><b>Router incentive:</b> add a light routing term so the router is induced to actually route the target domain to the revived expert.</li>
-    <li><b>Utilization + utility eval:</b> report the change in expert-utilization entropy <i>and</i> downstream task gains — both, so the win isn't just cosmetic balancing.</li>
-  </ul>
-  <p><b>Hypothesis / acceptance:</b> small-teacher revival raises dormant-expert utilization and yields a measurable downstream gain over (a) vanilla upcycling and (b) dense-KD, at equal compute.</p>
-  <p><b>MVE:</b> one small upcycled MoE, 2–3 domains, show dormant→active + a task gain vs vanilla upcycling before scaling.</p>
-  <p><b>Novelty vs her own work:</b> directly leverages her <a href="#">Flipping-KD</a> identity (small models' expertise → LLMs), applied to a new object — MoE expert revival — rather than text matching.</p>
-  <p class="meta"><b>Closest work &amp; differentiation:</b> <a href="https://arxiv.org/abs/2502.12947">Every Expert Matters</a> does dense→MoE KD aggregating all experts; I6 flips the direction (small specialist teachers) and targets <i>dormant</i> experts specifically; <a href="https://arxiv.org/abs/2502.19261">Drop-Upcycling</a> breaks homogeneity by re-init, not by distilled specialization.</p>
+<div class="card new" id="I11">
+<h3>I11 · Deployable ABD++ jailbreak defense <span class="tag t-diff">differentiable</span> <span class="tag t-new">🆕 new this run</span> <span class="tag" style="background:#0a7d43">✅ SELECTED</span></h3>
+<div class="pitch">Fuse your Activation Boundary Defense with conditional steering into a serve-time (vLLM) jailbreak defense, hardened and benchmarked across text + audio attack suites with explicit latency and utility budgets and adaptive attacks.</div>
+<div class="grid">
+<b>Novelty</b><span><b>5/10.</b> Closest: your own <a href="https://arxiv.org/abs/2412.17034">ABD</a>, <a href="https://arxiv.org/abs/2509.25175">EasySteer</a> serving. Differentiation: a deployable defense with adaptive-attack + latency/utility benchmarking across <em>text + audio</em> (ties to your <a href="https://arxiv.org/abs/2505.15406">Audio Jailbreak</a>).</span>
+<b>Feasibility</b><span>High — your defense + serving stack.</span>
+<b>Risk</b><span>MED — boundary detector may miss adaptive attacks; steering refusal harms benign utility; latency at serving scale.</span>
+<b>Contribution</b><span>Security systems.</span> <b>Fit</b><span>Your jailbreak-defense + audio line.</span>
+<b>Reviewer's objection</b><span>"ABD + another knob." → needs a strong adaptive-attack story and real serving numbers to be more than an extension.</span>
+</div>
+<b>Method:</b> ABD + conditional-steering gate on vLLM → benchmark ASR / utility / latency vs adaptive attacks, across text + audio suites. <b>Most shippable of the slate</b> (codex).
 </div>
 
-<!-- I7 -->
-<div class="card">
-  <div class="idlabel">RANK 4 · I7 &nbsp;<span class="tag t-diff">differentiable (needs framing)</span></div>
-  <div class="pitch">Run a causal intervention with her concept-representation + steering toolkit to decide whether MoE experts specialize semantically or are just a linear-router geometry artifact — resolving the "Myth of Expert Specialization" tension.</div>
-  <div class="grid">
-    <div><b>Contribution type:</b> diagnostic / empirical</div><div><b>Fit:</b> interpretability + concept-representation (bias-probe) work</div>
-    <div><b>Feasibility:</b> HIGH (inference-time interventions)</div><div><b>Risk:</b> MED (confounding geometry vs semantics)</div>
-    <div><b>Rough effort:</b> ~4–6 weeks</div><div><b>Reviewer's likely objection:</b> "This is a diagnostic, not the engineering paper — and interventions may confound geometry with semantics."</div>
-  </div>
-  <p><b>Why ranked here:</b> intellectually sharp and squarely in her interpretability wheelhouse, but it is more a <i>measurement study</i> than an engineering method — best value as a rigorous companion/section to I1 or I3, or as a standalone if reframed with a concrete control mechanism attached.</p>
-  <p class="meta"><b>Closest work &amp; differentiation:</b> <a href="https://arxiv.org/abs/2604.09780">Myth of Expert Specialization</a> and <a href="https://arxiv.org/abs/2604.02178">Expert Strikes Back</a> <small class="cw">[2026 preprints — verify ids]</small> argue the two sides <i>observationally</i>; I7 adds the <i>causal</i> test via steering, which neither does.</p>
+<div class="card new" id="I10">
+<h3>I10 · Behavior-adapter library with measured non-interference <span class="tag t-diff">differentiable</span> <span class="tag t-new">🆕 new this run</span></h3>
+<div class="pitch">Distill steering directions for a set of behaviors (safety, formality, emotion, honesty) into composable LoRA/ReFT adapters, shipped as a suite with a MEASURED pairwise non-interference guarantee, so they can be stacked blindly at serve time.</div>
+<div class="grid">
+<b>Novelty</b><span><b>5/10.</b> Closest: <a href="https://arxiv.org/abs/2307.13269">LoraHub</a> / <a href="https://arxiv.org/abs/2511.07129">LoRA-on-the-Go</a> (composition, interference documented), <a href="https://arxiv.org/abs/2404.03592">ReFT</a>. Differentiation: the <em>measured non-interference guarantee</em> (orthogonality-constrained training) must be the contribution — not the library. This is the engineering realization of the carried <b>I4</b>.</span>
+<b>Feasibility</b><span>High — PEFT/ReFT training on your stack.</span>
+<b>Risk</b><span>HIGH — behaviors entangled; 3+ composition fails; orthogonality constraints reduce control strength.</span>
+<b>Contribution</b><span>Method + artifact.</span> <b>Fit</b><span>Your steering + emotion-circuit line.</span>
+<b>Reviewer's objection</b><span>"LoRA composition again." → rebut only if non-interference is rigorously defined, adversarial, behavior-level, and surprisingly effective under 3+ composition.</span>
+</div>
+<b>Method:</b> train per-behavior adapters with an inter-adapter orthogonality/non-interference constraint → measure the full interference matrix under 1/2/3+ composition → ship the suite. <b>Buildable sibling of I4.</b>
 </div>
 
-<!-- I4 -->
-<div class="card kill">
-  <div class="idlabel">RANK 5 · I4 &nbsp;<span class="tag t-diff">differentiable (crowded)</span></div>
-  <div class="pitch">Bring her curriculum-RL (CURE-Med) to MoE reasoning with a router-stability term, tested on multilingual medical reasoning.</div>
-  <div class="grid">
-    <div><b>Contribution type:</b> method (RL)</div><div><b>Fit:</b> RL post-training + curriculum + medical</div>
-    <div><b>Feasibility:</b> LOW–MED — RL-on-MoE is infra-heavy; OOM is her #1 failure</div><div><b>Risk:</b> HIGH</div>
-  </div>
-  <p><b>Why ranked low:</b> high upside but the sub-area is moving fast and already contested by <a href="https://arxiv.org/abs/2510.11370">R3</a> and <a href="https://arxiv.org/abs/2510.23027">RSPO</a>; a curriculum + regularizer twist is incremental against router-co-designed methods, and full RL-on-MoE loops (TRL + vLLM rollouts) risk exactly her recurring OOM failure on one GPU. Pursue only if the router-stability idea is genuinely new, not another regularizer.</p>
+<h3>Carried from the theory slate (still full-detail below / in prior report)</h3>
+
+<div class="card" id="I2">
+<h3>I2 · Closed-loop discover→edit→verify circuit controller <span class="tag t-diff">differentiable</span></h3>
+<div class="pitch">A feedback controller that discovers a behavior circuit, applies a graded edit, and verifies target-control + off-target + fluency online — accepting the edit only when a specificity constraint passes, replacing today's hand-tuned control strength.</div>
+<div class="grid">
+<b>Novelty</b><span><b>6/10.</b> Real gap (no closed controller), differentiable-from-glue only with a principled specificity constraint + search policy. Discovery (<a href="https://arxiv.org/abs/2310.10348">EAP</a>/<a href="https://arxiv.org/abs/2403.19647">feature circuits</a>) and eval (<a href="https://arxiv.org/abs/2602.06256">Off-a-Cliff</a>) exist separately.</span>
+<b>Feasibility</b><span>MED — engineering-heavy; reuse your emotion-circuit discovery as the localizer.</span>
+<b>Risk</b><span>HIGH — verifier gameable; circuit discovery noisy for stable closed-loop control.</span>
+<b>Contribution</b><span>Method / systems.</span> <b>Fit</b><span>Your circuit-control + DyFlow controller instincts.</span>
+</div>
+<b>Method:</b> localize circuit (EAP/feature circuits) → graded edit → online verifier (target + held-out off-target + fluency) → feedback search over strength/locus until specificity passes. <b>The most engineering of the carried theory ideas.</b>
 </div>
 
-<!-- I2 -->
-<div class="card kill">
-  <div class="idlabel">RANK 6 · I2 &nbsp;<span class="tag t-diff">differentiable (close to SteerMoE)</span></div>
-  <div class="pitch">Extend her "Emotion Circuits" white-box control from neurons to experts, building one inference-time (de)activation knob for multi-attribute (safety/faithfulness/bias) trust steering.</div>
-  <div class="grid">
-    <div><b>Contribution type:</b> method (steering)</div><div><b>Fit:</b> steering + trustworthiness</div>
-    <div><b>Feasibility:</b> HIGH</div><div><b>Risk:</b> MED (attributes entangled across experts)</div>
-  </div>
-  <p><b>Why ranked low:</b> reads as "<a href="https://arxiv.org/abs/2509.09660">SteerMoE</a> + more attribute labels." The single-knob premise is fragile — safety/faithfulness/bias experts are entangled, and <a href="https://arxiv.org/abs/2605.29708">recent work</a> <small class="cw">[verify id]</small> finds safety lives in expert <i>weights</i>, not the routing path, so (de)activation may not transfer to decoded generations. Its strongest life is as the steering component <i>inside</i> I1's defense, not a standalone paper.</p>
+<div class="card" id="I4">
+<h3>I4 · Compositional non-interference for behavioral steering <span class="tag t-novel">novel</span></h3>
+<div class="pitch">Edit one behavior's circuit while constraining the edit to the null space of other behaviors' directions, so you can move emotion without moving truthfulness or refusal — porting AlphaEdit's factual null-space idea to behavioral steering.</div>
+<div class="grid">
+<b>Novelty</b><span><b>7/10.</b> Real gap. Closest: <a href="https://arxiv.org/abs/2410.02355">AlphaEdit</a> / <a href="https://arxiv.org/abs/2506.07022">AlphaSteer</a> — null-space applied to factual editing / refusal, never to compositional multi-attribute behavioral control. <b>I10 is its buildable, trained realization.</b></span>
+<b>Feasibility</b><span>MED.</span> <b>Risk</b><span>HIGH — behavior directions non-orthogonal/entangled; null constraints may erase target efficacy.</span>
+<b>Contribution</b><span>Method.</span> <b>Fit</b><span>Your steering + emotion-circuit line.</span>
+</div>
+<b>Method:</b> extract directions/circuits for K behaviors → constrain each edit to the null space of the others → measure the interference matrix vs additive multi-vector. <b>Choose I4 for the principled version, I10 for the shipped-adapter version.</b>
 </div>
 
-<!-- ============================= GATE ============================= -->
-<h2>4 · Decision Gate — the researcher is the judge</h2>
-<p>Per your workflow, I do not declare any idea "the one." My cross-model recommendation is <b>I1 + I3</b> as the two to push
-(strongest safety-MoE story + least-crowded multilingual-medical niche), with <b>I6</b> as a low-compute parallel/backup that
-leverages your Flipping-KD identity. But the pick is yours — pick / kill / redirect below. Once you pick, I stamp this file with a
-<code>Selected: I&lt;k&gt;</code> banner and hand the chosen idea to <code>/workplan</code>.</p>
-
-<!-- ============================= APPENDIX ============================= -->
-<h2>Appendix · All Surveyed Papers (65)</h2>
-<div class="note" style="background:#eef2f8;border-color:#c9d6ea;color:#33507a">
-Anti-hallucination note: ids in the <code>2603–2606</code> range are recent 2026 preprints returned by the survey agents;
-where an agent could verify only the title (not the body) it is marked <small class="cw">[UNVERIFIED]</small>. The core novelty
-arguments above rest on the verified 2024–2025 papers (SAFEx, SteerMoE, SafeMoE, R3/RSPO, Every Expert Matters, upcycling line).
-Verify any 2026 id before it reaches a manuscript.
+<div class="card" id="I1">
+<h3>I1 · Sensitive-Sector Steering (the science option) <span class="tag t-novel">novel</span></h3>
+<div class="pitch">Instead of committing to the difference-vector direction, empirically estimate the causally-sensitive sub-region of a concept's normal plane (the CRH "sensitive sector") and steer along the per-sample, sector-corrected direction — turning your CRH's diagnosis of steering instability into an actual fix.</div>
+<div class="grid">
+<b>Novelty</b><span><b>8/10.</b> The survey is explicit: <b>no method identifies the sensitive sector at all</b> (<a href="https://arxiv.org/abs/2605.01167">Collateral-Damage</a> uses only a global anisotropy prior). The most novel idea overall — but the most theory-flavored, which is why it dropped after your redirect.</span>
+<b>Feasibility</b><span>High — inference-time; reuse CRH machinery.</span>
+<b>Risk</b><span>MED — CRH says the sector is intrinsically uncertain; estimates may be unstable.</span>
+<b>Contribution</b><span>Method + diagnostic.</span> <b>Fit</b><span>Direct follow-up to your CRH.</span>
 </div>
-<h3>A · Architecture, Routing &amp; Cheap Construction <span class="meta">(18)</span></h3>
-<p class="meta">The converged recipe (fine-grained + shared experts), load balancing, differentiable/router-free routing alternatives, and cheap construction via sparse-upcycling. The upcycling homogeneity problem here is the seed for <b>I6</b>.</p>
-<table>
-<thead><tr><th>Title</th><th>Year</th><th>One-line relevance</th></tr></thead>
-<tbody>
-<tr><td><a href="https://arxiv.org/abs/2401.06066">DeepSeekMoE: Ultimate Expert Specialization</a></td><td>2024</td><td>Dominant recipe: fine-grained + shared experts.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2408.15664">Auxiliary-Loss-Free Load Balancing</a></td><td>2024</td><td>Bias-based balancing beats aux-loss (DeepSeek-V3).</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2412.19437">DeepSeek-V3 Technical Report</a></td><td>2024</td><td>671B/37B-active production MoE reference.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2401.04088">Mixtral of Experts</a></td><td>2024</td><td>Canonical open coarse SMoE; routing is syntactic, not topical.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2409.02060">OLMoE</a></td><td>2024</td><td>Fully open MoE + specialization/balance ablations.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2505.09388">Qwen3 Technical Report</a></td><td>2025</td><td>Qwen3-MoE (128 experts, no shared); her habitual backbone.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2402.07871">Scaling Laws for Fine-Grained MoE</a></td><td>2024</td><td>Granularity as a scaling variable.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2212.05055">Sparse Upcycling from Dense Checkpoints</a></td><td>2022</td><td>Seminal cheap-MoE recipe; homogeneous experts.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2502.19261">Drop-Upcycling (partial re-init)</a></td><td>2025</td><td>Breaks upcycling homogeneity via re-init.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2410.07524">Upcycling LLMs into MoE (Nemotron)</a></td><td>2024</td><td>Large-scale upcycling recipe.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2410.01610">Upcycling Instruction Tuning via Param Merging</a></td><td>2024</td><td>Cheapest build-an-MoE (no fresh pretraining).</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2412.14711">ReMoE (ReLU routing)</a></td><td>2024</td><td>Fully differentiable routing.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2606.17952">SoftMoE (LapSum soft top-k)</a></td><td>2026</td><td>Differentiable per-layer expert budget. <small class="cw">[verify id]</small></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2501.13074">Autonomy-of-Experts</a></td><td>2025</td><td>Router-free self-selection.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2501.11873">Demons in the Detail (LBL granularity)</a></td><td>2025</td><td>Global-batch balance loss aids specialization.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2407.06204">A Survey on MoE in LLMs</a></td><td>2024</td><td>Design-space map. <small class="cw">[UNVERIFIED]</small></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2407.00945">Efficient Expert Pruning</a></td><td>2024</td><td>Expert redundancy → pruning beats merging.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2202.09368">Expert-Choice Routing</a></td><td>2022</td><td>Balance-by-construction routing.</td></tr>
+<b>Method:</b> compute central axis + normal plane (CRH) → in-plane causal-effect probe to locate the sensitive sector → per-sample sector-corrected steer → benchmark control + off-target + <b>outcome variance</b> vs CAA/Spherical/Collateral-Damage. <b>Pick this only if you want the science paper</b> (pairs with I7).
+</div>
+
+<div class="carried">
+<b>Also carried (one-liners; full cards in the first report):</b>
+<ul>
+<li><b>I7</b> <span class="tag t-novel">novel</span> — <b>CRH as a per-sample steering-reliability predictor</b>: does sensitive-sector uncertainty predict when a steer fails? Best folded into I1 (or the reliability gate of I9).</li>
+<li><b>I3</b> <span class="tag t-diff">differentiable</span> — <b>Fine affective/social circuits</b>: extend Emotion Circuits to empathy/politeness/formality/confidence/deception; map what's circuit-controllable.</li>
+<li><b>I6</b> <span class="tag t-exist">incremental</span> — <b>Geodesic ABD</b>: rebuild ABD with norm-preserving geodesic steering (method-swap on your own work).</li>
+<li><b>I5</b> <span class="tag t-exist">incremental</span> — <b>Bias mitigation via anisotropy steering</b>: mitigate BiasLens-detected biases with second-moment-weighted steering (closes a personal loop).</li>
+</ul>
+</div>
+
+<h2>4 · Devil's-Advocate Pass (cross-model: codex / GPT-5.2, high effort)</h2>
+<p>The new engineering candidates (I8–I11) were sent to a cross-model reviewer. Condensed:</p>
+<ul>
+<li><b>Top-venue rank:</b> I8 ▸ I9 ▸ I10 ▸ I11. <b>Shippability rank:</b> I11 ▸ I9 ▸ I10 ▸ I8. <b>Build:</b> "<b>I8 + a narrow I9 reliability gate around it</b> — I8 gives the publishable scientific claim; I9 gives the engineering artifact and prevents another hand-tuned steering-vector paper."</li>
+<li><b>I8</b> — novel/differentiable, "the cleanest research-shaped idea because it targets a known failure mode (Shifting Perspectives) rather than adding another steering method." Collides with Representation Tuning / RePS unless framed as <em>preserving inference-steering's robustness during distillation</em>.</li>
+<li><b>I9</b> — "differentiable but risky; strong artifact, weaker novelty unless the gate predicts deployment failure better than existing evals."</li>
+<li><b>I11</b> — most shippable ("a vLLM ABD++ defense with latency/utility numbers is immediately useful"), but "easiest to dismiss as an extension of ABD unless adaptive-attack results are genuinely strong."</li>
+<li><b>I10</b> — "LoRA composition again unless the non-interference guarantee is rigorously defined and surprisingly effective." Collides with ReFT/LoraHub/EasySteer.</li>
+<li><b>Earlier theory pass</b> (I1–I7) ranked I1 ▸ I4 ▸ I2 ▸ I7…; you redirected away from it as too theoretical. I1/I4 are kept in this top-7 as the science options; I3/I5/I6/I7 are carried below.</li>
+</ul>
+
+<h2>5 · The Gate — you are the judge</h2>
+<p>Pick <b>one</b> id to hand to <code>/workplan</code>, or kill / redirect. Nothing is auto-selected. Reviewer's recommendation for the engineering framing you asked for: <b>I8 (with I9's reliability gate folded in)</b>; <b>I11</b> if you want the most immediately shippable; <b>I1/I4</b> remain if you swing back toward the science.</p>
+
+<!-- ===================== APPENDIX ===================== -->
+<h2>Appendix · Full Surveyed Corpus (~58 papers, 7 categories)</h2>
+<p class="note">Complete evidence list. Links go to arXiv / DOI / OpenReview. 2026 (26xx) ids are search-surfaced and consistent with the current date; treat exact ids as lightly-verified if formally cited. Nothing here is a fabricated id/URL. Categories A–F are from the first pass; <b>category G is this run's engineering front.</b></p>
+
+<h3>G · Steering as trained / deployable behavior control <span class="pill">13</span> <span class="tag t-new">this run</span></h3>
+<div class="cat-desc">The engineering front — baking steering into weights (ReFT/RePS), composing adapters, steering-as-RL-reward, steering-in-serving. Direct basis for I8–I11.</div>
+<table><thead><tr><th>Title</th><th>Yr</th><th>Takeaway</th></tr></thead><tbody>
+<tr><td><a href="https://arxiv.org/abs/2404.03592">ReFT / LoReFT — Representation Finetuning</a></td><td>2024</td><td>Trains interventions on frozen activations as a PEFT drop-in; 10–50× more param-efficient than LoRA (NeurIPS 2024).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2409.06927">Representation Tuning</a></td><td>2024</td><td>Bakes a steering vector into weights via an activation-matching loss — permanent, no inference hook.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.20809">RePS — Improved Representation Steering</a></td><td>2025</td><td>Trained bidirectional preference steering; robustness-hardened, resists prompt-jailbreaks (AxBench, Gemma 2B–27B).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2503.05371">Shifting Perspectives — bias steering</a></td><td>2025</td><td><b>Key negative result.</b> Naive LoRA did NOT converge on a robust subspace; weight-baking loses adversarial robustness inference-steering had. Seed for I8.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2409.05907">Conditional Activation Steering (CAST)</a></td><td>2024</td><td>Learned condition vector → rule-gated steering; the composable/conditional building block (ICLR 2025).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2307.13269">LoraHub</a></td><td>2023</td><td>Gradient-free scalar composition of many task LoRAs — foundational composable-adapter mechanism.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2511.07129">LoRA on the Go</a></td><td>2025</td><td>Per-instance dynamic LoRA selection + merging at serving; interference-at-the-request-level engineering.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.19590">RLIF / Intuitor</a></td><td>2025</td><td>RL from internal self-certainty reward; template for representation-as-RL-reward (reasoning, reward-hacks).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2509.06608">Small Vectors, Big Effects</a></td><td>2025</td><td>Trains steering vectors with an RL objective; recovers much of RL reasoning gain, transfers across a model family.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2509.25175">EasySteer</a></td><td>2025</td><td>Production steering framework on vLLM; pluggable vectors, 10.8–22.3× speedup — steering-in-serving exists.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2603.06588">vLLM Hook v0</a></td><td>2026</td><td>Config-driven plug-in exposing capture + active intervention inside vLLM — steering as a first-class serving hook.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2408.12599">Controllable Text Generation: A Survey</a></td><td>2024</td><td>Maps training-time (adapters/finetune) vs inference-time (decoding/steering) control — framing for "trained control."</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2603.00425">Weight Updates as Activation Shifts</a></td><td>2026</td><td>Unifies full-FT / LoRA / activation steering as one object — the bridge that lets a steer be re-expressed as a weight delta. <span class="note">[2026, id per listing]</span></td></tr>
 </tbody></table>
-<h3>B · Interpretability, Expert Specialization &amp; Steering <span class="meta">(12)</span></h3>
-<p class="meta">The semantic-vs-geometric specialization debate, probing routing, knowledge/expert localization, and expert (de)activation steering (SteerMoE). Directly feeds <b>I7</b> and grounds <b>I6</b>'s "dormant expert" premise.</p>
-<table>
-<thead><tr><th>Title</th><th>Year</th><th>One-line relevance</th></tr></thead>
-<tbody>
-<tr><td><a href="https://arxiv.org/abs/2412.04139">Monet: Monosemantic Experts</a></td><td>2024</td><td>Interpretability-by-architecture (262K experts).</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2503.07639">MoE-X (intrinsically interpretable)</a></td><td>2025</td><td>Wide-ReLU experts reduce polysemanticity.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2604.02178">The Expert Strikes Back</a></td><td>2026</td><td>Experts less polysemantic than dense FFNs. <small class="cw">[verify id]</small></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2502.10928">Probing Semantic Routing</a></td><td>2025</td><td>Linear probes find semantic routing.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2412.16971">POS Sensitivity of Routers</a></td><td>2024</td><td>80–89% POS recoverable from routing.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2604.09780">Myth of Expert Specialization</a></td><td>2026</td><td>Routing = hidden-state geometry artifact. <small class="cw">[verify id]</small></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2509.09660">SteerMoE (expert de/activation steering)</a></td><td>2025</td><td>Steers safety/faithfulness; also an attack. <b>Core for I1/I2.</b></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2605.29708">Understanding Safety-Sensitive Expert Behavior</a></td><td>2026</td><td>Safety in expert weights, not routing. <small class="cw">[verify id]</small></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2603.17102">Knowledge Localization via Cross-Lingual Inconsistency</a></td><td>2026</td><td>~20/6000 experts erase &gt;40% answers. <b>Core for I3.</b> <small class="cw">[verify id]</small></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2504.12359">Unveiling Hidden Collaboration in MoE</a></td><td>2025</td><td>Inter-expert collaboration + pruning.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2510.04694">Multilingual Routing in MoE</a></td><td>2025</td><td>Language-conditioned specialization.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2505.24593">Decoding Knowledge Attribution in MoE</a></td><td>2025</td><td>Basic+refinement expert collaboration.</td></tr>
-</tbody></table>
-<h3>C · Safety, Attacks &amp; Robustness <span class="meta">(11)</span></h3>
-<p class="meta">The router as attack surface (leakage, backdoors, routing jailbreaks), safety concentration in a few experts, and the few defenses. The <b>I1</b> (unselected) seam.</p>
-<table>
-<thead><tr><th>Title</th><th>Year</th><th>One-line relevance</th></tr></thead>
-<tbody>
-<tr><td><a href="https://arxiv.org/abs/2402.05526">Buffer Overflow in MoE</a></td><td>2024</td><td>Cross-batch routing attack surface.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2410.22884">Stealing User Prompts from MoE (tie-break leakage)</a></td><td>2024</td><td>Routing determinism leaks ~99.9% of prompts.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2502.06094">Fair-MoE (fairness in medical VLM)</a></td><td>2025</td><td>Fairness-oriented experts; vision/medical only.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2504.18598">BadMoE (dormant-expert backdoor)</a></td><td>2025</td><td>Routing-trigger backdoor in dormant experts.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2505.01811">BadPatches (vision-MoE backdoor)</a></td><td>2025</td><td>Routing-aware trigger at 0.01% poison rate.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2506.17368">SAFEx (safety-critical expert id)</a></td><td>2025</td><td>12/6144 experts → 22% refusal drop. <b>Core for I1.</b></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2509.05086">Robust Experts (adv training + sparse MoE)</a></td><td>2025</td><td>Routing collapse concentrates robustness.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2509.22745">SafeMoE (safety routing alignment)</a></td><td>2025</td><td>Defends harmful-FT but needs aligned routing weights. <b>Core for I1.</b></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2510.13462">BadSwitch (dynamic-routing backdoor)</a></td><td>2025</td><td>Backdoor via routing preference.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2510.15333">Graph-MoE adversarial defense</a></td><td>2025</td><td>Rare defensive use of MoE routing.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2605.04446">Misrouter (input-only routing jailbreak)</a></td><td>2026</td><td>Transferable black-box routing steering. <small class="cw">[verify id]</small></td></tr>
-</tbody></table>
-<h3>D · Efficiency: Inference / Serving / Compression / PEFT-KD <span class="meta">(15)</span></h3>
-<p class="meta">Single-GPU offloading &amp; serving, quantization, expert pruning, plus LoRA-as-experts (MixLoRA) and MoE knowledge distillation (Every Expert Matters) — the low-compute construction path and <b>I6</b>'s direct baselines.</p>
-<table>
-<thead><tr><th>Title</th><th>Year</th><th>One-line relevance</th></tr></thead>
-<tbody>
-<tr><td><a href="https://arxiv.org/abs/2312.17238">Mixtral-offloading (LRU cache + prefetch)</a></td><td>2023</td><td>Mixtral on a desktop GPU.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2401.14361">MoE-Infinity (activation-aware offloading)</a></td><td>2024</td><td>4–20× latency cut on constrained GPU.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2402.07033">Fiddler (CPU-GPU orchestration)</a></td><td>2024</td><td>&gt;3 tok/s Mixtral on one 24GB GPU.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2411.01433">HOBBIT (mixed-precision offloading)</a></td><td>2024</td><td>Edge MoE inference.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2410.17954">ExpertFlow (predictive expert caching)</a></td><td>2024</td><td>Routing-path prediction + scheduling.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2502.05370">FineMoE (fine-grained offloading)</a></td><td>2025</td><td>Sub-expert offloading, EuroSys'26.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2503.09716">MoE-Gen (module-based batching)</a></td><td>2025</td><td>High-throughput single-GPU MoE.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2310.02410">MoQE (quantized experts)</a></td><td>2023</td><td>2-bit expert-only quantization.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2511.15015">Dynamic Expert Quantization</a></td><td>2025</td><td>Per-expert bit-width. <small class="cw">[UNVERIFIED]</small></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2511.04805">PuzzleMoE (merge + bit-pack)</a></td><td>2025</td><td>Sparse merge compression. <small class="cw">[UNVERIFIED]</small></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2402.14800">Not All Experts Are Equal (prune+skip)</a></td><td>2024</td><td>Layer-wise expert pruning.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2410.12013">MoE-Pruner (router-hint pruning)</a></td><td>2024</td><td>Router-gate saliency one-shot prune.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2411.01016">MoE-I² (inter+intra compression)</a></td><td>2024</td><td>Expert prune + low-rank decomposition.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2404.15159">MixLoRA (LoRA-as-experts)</a></td><td>2024</td><td>Cheapest MoE on one GPU. <b>Core for I6.</b></td></tr>
-<tr><td><a href="https://arxiv.org/abs/2502.12947">Every Expert Matters (MoE-KD)</a></td><td>2025</td><td>KD aggregating all experts. <b>Core for I6.</b></td></tr>
-</tbody></table>
-<h3>E · Reasoning, RL, Domain &amp; Multi-Agent <span class="meta">(9)</span></h3>
-<p class="meta">Domain/medical MoE, the MoE↔Mixture-of-Agents bridge, and the immature RL-on-MoE sub-angle (router instability). Home of the de-prioritized <b>I4</b>/<b>I5</b>.</p>
-<table>
-<thead><tr><th>Title</th><th>Year</th><th>One-line relevance</th></tr></thead>
-<tbody>
-<tr><td><a href="https://arxiv.org/abs/2403.07816">Branch-Train-MiX (BTX)</a></td><td>2024</td><td>Splice domain-trained branches into MoE.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2404.10237">Med-MoE (domain experts, medical VLM)</a></td><td>2024</td><td>Hand-assigned medical domain experts.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2406.04692">Mixture-of-Agents (MoA)</a></td><td>2024</td><td>Experts-as-agents; MoA↔MoE contrast.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2406.12034">Self-MoE (self-specialized experts)</a></td><td>2024</td><td>Monolith → modular self-experts.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2502.00674">Rethinking Mixture-of-Agents</a></td><td>2025</td><td>Self-MoA often beats mixing models.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2503.05641">Symbolic-MoE (skill-based routing)</a></td><td>2025</td><td>Per-query skill routing; 16 experts on 1 GPU.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2510.11370">Rollout Routing Replay (R3)</a></td><td>2025</td><td>Fixes RL-on-MoE router divergence.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2510.23027">RSPO (router-aware IS rescaling)</a></td><td>2025</td><td>Stable RL on MoE vs GRPO collapse.</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2604.05267">Do Domain-specific Experts Exist in MoE?</a></td><td>2026</td><td>Domain experts exist; training-free steering. <small class="cw">[verify id]</small></td></tr>
-</tbody>
-</table>
 
-<p class="meta" style="margin-top:2em">Generated by <code>/ideagen</code> · engineering lens · 65 papers · cross-model adversarial ranking (codex/GPT-5.2). Chinese mirror: <a href="01_IDEA_REPORT.zh.html">01_IDEA_REPORT.zh.html</a>.</p>
+<h3>A · Your own grounding works <span class="pill">5</span></h3>
+<table><thead><tr><th>Title</th><th>Yr</th><th>Takeaway</th></tr></thead><tbody>
+<tr><td><a href="https://arxiv.org/abs/2605.01844">Cylindrical Representation Hypothesis (CRH)</a></td><td>2026</td><td><b>Lead.</b> Steering unstable — the normal-plane sensitive sector can't be identified from difference vectors. Seed for I1/I7.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2510.11328">Emotion Circuits Discovery &amp; Control</a></td><td>2025</td><td><b>Lead.</b> 99.65% emotion control via discovered circuits. Seed for I2/I3/I4/I8.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.15524">BiasLens</a></td><td>2025</td><td><b>Lead.</b> Test-set-free concept-representation bias detection. Seed for I5.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2412.17034">Shaping the Safety Boundaries (ABD)</a></td><td>2024</td><td><b>Lead.</b> Activation Boundary Defense. Seed for I6/I11.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.15406">Audio Jailbreak (AJailBench)</a></td><td>2025</td><td>Your audio-attack benchmark — the audio suite for I11.</td></tr>
+</tbody></table>
+
+<h3>B · Steering methods — foundational &amp; learned <span class="pill">9</span></h3>
+<table><thead><tr><th>Title</th><th>Yr</th><th>Takeaway</th></tr></thead><tbody>
+<tr><td><a href="https://arxiv.org/abs/2308.10248">ActAdd</a></td><td>2023</td><td>Steering vector from one contrast pair.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2312.06681">Contrastive Activation Addition (CAA)</a></td><td>2023</td><td>Mean-difference vectors — canonical recipe (ACL 2024).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2306.03341">Inference-Time Intervention (ITI)</a></td><td>2023</td><td>Probe truthful heads, shift activations (NeurIPS 2023).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2310.01405">Representation Engineering (RepE)</a></td><td>2023</td><td>Population-level reading/steering vectors — umbrella.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2305.12798">LM-Steer</a></td><td>2023</td><td>0.2%-param linear transform on output embeddings (ACL 2024 Outstanding).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2406.00045">BiPO</a></td><td>2024</td><td>Steering vectors optimized against preference pairs — reversible, intensity-tunable.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2310.15213">Function Vectors</a></td><td>2023</td><td>Causal-mediation task vector (ICLR 2024).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2311.06668">In-Context Vectors (ICV)</a></td><td>2023</td><td>Steering vector from a demo forward pass (ICML 2024).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2507.21509">Persona Vectors</a></td><td>2025</td><td>Trait directions to monitor/control persona (Anthropic) — auto-extraction precedent for I9.</td></tr>
+</tbody></table>
+
+<h3>C · Reliable / conditional / precise steering <span class="pill">10</span></h3>
+<table><thead><tr><th>Title</th><th>Yr</th><th>Takeaway</th></tr></thead><tbody>
+<tr><td><a href="https://arxiv.org/abs/2504.09466">AdaSteer</a></td><td>2025</td><td>Per-input adaptive coefficients; cuts false refusals (EMNLP 2025).</td></tr>
+<tr><td><a href="https://www.arxiv.org/abs/2509.21400">SafeSteer — adaptive subspace</a></td><td>2025</td><td>Fire-only-when-needed subspace steering.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2506.07022">AlphaSteer — null-space</a></td><td>2025</td><td>Null-space-constrained on benign; refusal for malicious (ICLR 2026). Seed for I4.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2405.09719">Spectral Editing (SEA)</a></td><td>2024</td><td>SVD projection toward positive / away negative covariance (NeurIPS 2024).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2409.10053">Householder Pseudo-Rotation</a></td><td>2024</td><td>Norm-preserving pseudo-rotation (EMNLP 2024). Seed for I6.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2605.01167">Minimizing Collateral Damage</a></td><td>2026</td><td>Anisotropy-aware constrained steering — global prior, not sensitive-sector.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2605.06342">Key-Orthogonal Projections</a></td><td>2026</td><td>Steer orthogonal to attention-key subspaces.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2502.18862">One-shot Optimized Steering Vectors</a></td><td>2025</td><td>Gradient-optimized (MELBO-line) directions; generalization probe.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.15038">Denoising Concept Vectors (SDCV)</a></td><td>2025</td><td>SAE-denoised few-shot steering vectors.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2410.17194">Representation Shattering</a></td><td>2024</td><td>Edits "shatter" relational representations — locality-failure account.</td></tr>
+</tbody></table>
+
+<h3>D · Geometry-aware / non-linear steering <span class="pill">4</span></h3>
+<table><thead><tr><th>Title</th><th>Yr</th><th>Takeaway</th></tr></thead><tbody>
+<tr><td><a href="https://arxiv.org/abs/2602.08169">Spherical Steering</a></td><td>2026</td><td>Geodesic rotation + confidence gate (ICML 2026).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2605.24942">Riemannian-Manifold Steering</a></td><td>2026</td><td>Steering as geodesics under specified metrics.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2603.09313">Curveball Steering</a></td><td>2026</td><td>Effective steering path is non-linear.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2605.05115">Manifold Steering</a></td><td>2026</td><td>Flat-geometry vs curved-manifold mismatch.</td></tr>
+</tbody></table>
+
+<h3>E · Circuit discovery &amp; behavior/knowledge editing <span class="pill">7</span></h3>
+<table><thead><tr><th>Title</th><th>Yr</th><th>Takeaway</th></tr></thead><tbody>
+<tr><td><a href="https://arxiv.org/abs/2304.14997">ACDC</a></td><td>2023</td><td>Automated circuit discovery (NeurIPS 2023).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2310.10348">Edge Attribution Patching (EAP)</a></td><td>2023</td><td>Scalable circuit localization. Localizer for I2.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2403.19647">Sparse Feature Circuits</a></td><td>2024</td><td>Circuits from SAE features; SHIFT edits behavior (ICLR 2025).</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2410.02355">AlphaEdit — null-space editing</a></td><td>2024</td><td>Edits onto null space of preserved knowledge (ICLR 2025 Outstanding). Seed for I4/I10.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2503.01090">FiNE — neuron editing</a></td><td>2025</td><td>Edits a small neuron set for better locality.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2604.14602">CausalDetox</a></td><td>2026</td><td>Causal (PNS) head selection + intervention.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2406.11717">Refusal Is Mediated by a Single Direction</a></td><td>2024</td><td>One direction necessary+sufficient for refusal (NeurIPS 2024).</td></tr>
+</tbody></table>
+
+<h3>F · Steering reliability &amp; control-quality audits <span class="pill">6</span></h3>
+<table><thead><tr><th>Title</th><th>Yr</th><th>Takeaway</th></tr></thead><tbody>
+<tr><td><a href="https://arxiv.org/abs/2407.12404">Generalization &amp; Reliability of Steering Vectors</a></td><td>2024</td><td>Variable in-distribution, brittle OOD (NeurIPS 2024). Motivates I9.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.22637">Understanding (Un)Reliability of Steering Vectors</a></td><td>2025</td><td>Spurious-bias-driven in-distribution.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2511.18284">What Can We Actually Steer? Multi-Behavior</a></td><td>2025</td><td>Control is behavior-uneven. Motivates I3.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2602.06256">Steering Safely or Off a Cliff?</a></td><td>2026</td><td>Steering hits target yet raises jailbreak vulnerability.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2504.04635">Steering off Course</a></td><td>2025</td><td>Function/task vectors brittle across models/tasks.</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2411.11296">Steering LM Refusal with SAEs</a></td><td>2024</td><td>SAE refusal steering degrades benchmarks — safety/capability entanglement (ICML 2025).</td></tr>
+</tbody></table>
+
+<div class="foot">
+Generated by <code>/ideagen</code> · engineering lens · 2026-07-03 · researcher Lang Gao · <b>re-ranked for engineering after redirect</b>. Survey: 3 parallel angles + reused corpus, ~58 papers, saturation-checked. Ranking: cross-model adversarial pass (codex / GPT-5.2). Anti-hallucination: only retrieved papers cited; 2026 ids search-surfaced and marked. Human is the judge — no idea auto-selected. Chosen idea → <code>/workplan</code>.
+</div>
 
 </div>
 </body>

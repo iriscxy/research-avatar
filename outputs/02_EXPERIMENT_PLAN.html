@@ -3,229 +3,176 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Experiment Plan — I1 Safety-Redundant MoE (SafeSpread)</title>
+<title>Experiment Plan — ABD++ (I11) Deployable Jailbreak Defense</title>
 <style>
-  :root{--ink:#1a1a1a;--mut:#5a6270;--line:#e2e6ec;--bg:#fbfcfe;--acc:#2b5c9e;--ok:#0a7f52;--warn:#b5820a;--card:#fff;}
+  :root{--ink:#1a1a1a;--mut:#5c6672;--line:#e3e7ec;--bg:#fafbfc;--card:#fff;--accent:#1f4e79;--chip:#eef3f8;--warn:#b8860b;--ok:#0a7d43;}
   *{box-sizing:border-box}
-  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.65;margin:0;padding:0 20px 80px}
-  .wrap{max-width:1040px;margin:0 auto}
-  h1{font-size:1.8rem;margin:.6em 0 .1em;letter-spacing:-.01em}
-  h2{font-size:1.3rem;margin:2em 0 .5em;padding-bottom:.25em;border-bottom:2px solid var(--line)}
-  h3{font-size:1.05rem;margin:1.3em 0 .3em}
-  .sub{color:var(--mut);font-size:.95rem;margin:.2em 0 1.4em}
-  code{background:#eef1f6;padding:.08em .35em;border-radius:4px;font-size:.9em}
-  a{color:var(--acc);text-decoration:none} a:hover{text-decoration:underline}
-  table{border-collapse:collapse;width:100%;margin:1em 0;font-size:.9rem}
-  th,td{border:1px solid var(--line);padding:.5em .65em;text-align:left;vertical-align:top}
-  th{background:#eef2f8;font-weight:600}
-  tr:nth-child(even) td{background:#f6f8fb}
-  ul{margin:.3em 0 .6em;padding-left:1.3em} li{margin:.2em 0}
-  .abs{background:#fff;border:1px solid var(--line);border-left:5px solid var(--warn);border-radius:8px;padding:1em 1.3em;margin:1em 0}
-  .proj{display:inline-block;background:var(--warn);color:#fff;font-size:.72rem;font-weight:700;padding:.12em .6em;border-radius:20px}
-  .ph{background:#fff3cf;padding:0 .25em;border-radius:3px;font-weight:600}
-  .note{background:#fff8e6;border:1px solid #f0dfa8;border-radius:8px;padding:.7em 1em;font-size:.9rem;color:#6b5600;margin:1em 0}
-  .meta{font-size:.85rem;color:var(--mut)}
-  .pill{display:inline-block;font-size:.72rem;font-weight:700;padding:.1em .5em;border-radius:5px;background:#eef2f8;color:var(--acc)}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);line-height:1.62;margin:0;background:var(--bg);}
+  .wrap{max-width:980px;margin:0 auto;padding:36px 28px 90px;}
+  h1{font-size:24px;margin:.2em 0 .1em} h2{font-size:20px;margin:2em 0 .5em;padding-bottom:.28em;border-bottom:2px solid var(--accent);color:var(--accent)} h3{font-size:16px;margin:1.3em 0 .35em}
+  .sub{color:var(--mut);font-size:14px;margin-top:.2em}
+  p{margin:.55em 0} a{color:var(--accent);text-decoration:none;border-bottom:1px solid #cdd7e2} a:hover{border-bottom-color:var(--accent)}
+  table{border-collapse:collapse;width:100%;margin:.7em 0;font-size:13px} th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top} th{background:var(--chip);font-weight:600}
+  code{background:#f0f2f5;padding:1px 5px;border-radius:4px;font-size:.9em}
+  .proj{background:#fff8e6;border:1px solid #e8d48a;border-left:5px solid var(--warn);padding:12px 16px;border-radius:8px;margin:12px 0;font-size:14px}
+  .abstract{background:#fff;border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;padding:14px 18px;margin:10px 0}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:12px 0}
+  .note{color:var(--mut);font-size:13px} .ph{background:#fdeecb;padding:0 4px;border-radius:3px;font-weight:600}
+  ul.tight li{margin:.15em 0} .flag{color:#a33;font-weight:600}
+  .foot{margin-top:36px;padding-top:14px;border-top:1px solid var(--line);color:var(--mut);font-size:12.5px}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<h1>Experiment Plan — I1 · Safety-Redundant MoE (SafeSpread)</h1>
-<p class="sub">
-  Idea (from <a href="01_IDEA_REPORT.html">01_IDEA_REPORT.html</a>, <b>SELECTED I1</b>): via a LoRA fine-tune plus a routing
-  regularizer, <b>redistribute refusal behavior across many experts</b> so no small ablatable expert subset can be knocked out to
-  jailbreak the model — a defense against SAFEx/SteerMoE expert-ablation attacks that needs no original aligned routing weights. ·
-  Researcher: <b>Xiuying Chen</b> · Lens: engineering · Generated <b>2026-07-02</b> ·
-  <span class="pill">claim-driven, written backward from the abstract</span>
-</p>
+<h1>Experiment Plan — <span style="color:var(--accent)">ABD++</span>: a Deployable, Audio-Aware Jailbreak Defense</h1>
+<div class="sub">Idea <b>I11</b> (SELECTED in <a href="01_IDEA_REPORT.html">01_IDEA_REPORT.html</a>) · Researcher: Lang Gao · Lens: engineering · 2026-07-03. Fuse your <a href="https://arxiv.org/abs/2412.17034">Activation Boundary Defense (ABD)</a> with input-conditional steering, serve it on vLLM, and benchmark it on text + audio attacks under a latency budget, with attack-aware adaptive attacks.</div>
 
-<div class="note">
-<b>Feasibility.</b> Single A100 80GB is enough: <a href="https://arxiv.org/abs/2509.22745">SafeMoE</a> ran its full MoE-defense
-study on 1× A100 80GB with <b>OLMoE-1B-7B</b> as the primary model. We adopt OLMoE-1B-7B-0924-Instruct as the primary target and
-<b>Qwen3-30B-A3B</b> (the SAFEx headline model, 6,144 experts) as a transfer check. Everything is LoRA + inference-time attack eval,
-so no multi-GPU training. Safety judged by an off-the-shelf Llama-Guard classifier as in SteerMoE/SafeMoE.
+<div class="proj"><b>PROJECTED PLAN — not results.</b> Every number below is a placeholder <span class="ph">[X%]</span>; nothing here is measured. Written backward from the projected abstract. Stop at the approval gate (§8) before <code>/run-plan</code>.</div>
+
+<h2>0 · Grounding — real setups of the closest papers</h2>
+<p class="note">Read from the closest papers' experiments sections (your ABD + AJailBench full text; AdaSteer + EasySteer via arXiv). This decides the baselines / datasets / metrics — §2 draws only from here. Nothing invented; unfetched fields marked <code>[UNVERIFIED]</code>.</p>
+<table>
+<thead><tr><th>Paper (closest work)</th><th>Baselines it reports</th><th>Datasets</th><th>Metrics</th></tr></thead>
+<tbody>
+<tr><td><a href="https://arxiv.org/abs/2412.17034">ABD — Shaping Safety Boundaries</a> <span class="note">(yours; the base method)</span></td><td>Paraphrase, defense methods vs undefended; 7 attacks: GCG-Individual, GCG-Universal, AutoDAN, PAIR, COLD-Suffix, ArtPrompt (+1)</td><td>AdvBench (50-behavior test subset; 400 for boundary μ / validation), RedEval; Alpaca / Just-Eval for utility</td><td><b>DSR</b> (Defense Success Rate); Just-Eval overall utility; reported &lt;2% capability drop (MMLU)</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2504.09466">AdaSteer</a> <span class="note">(direct competitor: conditional steering defense)</span></td><td>Decoding: ROSE, Self-CD · Steering: <a href="https://arxiv.org/abs/2409.05907">CAST</a>, Jailbreak Antidote, Surgical, InferAligner</td><td>Harmful: AdvBench, TDC2023, MaliciousInstruct, JailbreakBench · Over-refusal: XSTest (250), OKTest (300), OR-Bench · Utility: AlpacaEval</td><td><b>DSR</b>; <b>Compliance Rate (CR)</b> on XSTest/OKTest (over-safety); AlpacaEval Win Rate (utility); tokens/sec (efficiency). Models: LLaMA-3.1, Gemma-2, Qwen2.5. Attacks: AIM, AutoDAN, Cipher, GCG, Jailbroken, Multilingual, ReNeLLM</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.15406">AJailBench (Audio Jailbreak)</a> <span class="note">(yours; the audio suite)</span></td><td>7 LAMs vs each other (Qwen2-Audio, LLaMA-Omni, Gemini-1.5-pro, GPT-4o-audio, …)</td><td>AJailBench-Base (1,495 audio prompts, 10 policy categories); AJailBench-APT+ (optimized via APT: time / frequency / hybrid perturbations + Bayesian search)</td><td><b>ASR</b> (Attack Success Rate); GPTScore; semantic-consistency constraint</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2509.25175">EasySteer</a> <span class="note">(serving substrate)</span></td><td>vs existing steering frameworks</td><td>—</td><td>10.8–22.3× speedup on vLLM; 81–91% of baseline throughput under multi-vector configs; pluggable analysis/learning vectors <span class="note">[serving numbers per abstract/survey]</span></td></tr>
+</tbody>
+</table>
+
+<h2>1 · Projected Abstract (write FIRST)</h2>
+<div class="proj" style="margin-bottom:0"><b>PROJECTED — not results.</b> In your gap-first style; no em-dashes; placeholders only.</div>
+<div class="abstract">
+Jailbreak defenses for large language models are usually evaluated offline and on text alone, and the strongest activation level defense, Activation Boundary Defense, still refuses too many benign prompts and has never been tested as a deployed system or against audio attacks. We present <b>ABD++</b>, a serve time jailbreak defense that fuses activation boundary constraints with input conditional steering: a lightweight detector fires a rejection steer only when an input is judged harmful, so benign prompts pass untouched. We build ABD++ as a vLLM serving hook and measure it under a fixed latency budget. On text attacks ABD++ reaches <span class="ph">[X%]</span> defense success rate, above ABD and steering baselines, while cutting over refusal to <span class="ph">[X%]</span> and keeping utility within <span class="ph">[X%]</span> of the base model. We further show ABD++ transfers to large audio language models, lowering attack success rate on AJailBench by <span class="ph">[X%]</span>. Under attack aware adaptive attacks its defense success rate drops only <span class="ph">[X%]</span>, far less than static defenses. We release the defense and its text and audio evaluation suite.
+</div>
+<p class="note"><b>abstract↔claim self-check:</b> every sentence maps to a §3 claim — "higher DSR"→C1, "cuts over-refusal / keeps utility"→C2, "transfers to audio"→C3, "adaptive attacks"→C4, "latency budget / serving"→C5, "we release"→artifact. No sentence is unbacked.</p>
+
+<h2>2 · Projected Paper Skeleton (INSIDE this plan)</h2>
+<p class="note">Structure modeled on the single closest paper, your <a href="https://arxiv.org/abs/2412.17034">ABD</a> (its real sections: Introduction · Related Work / Controversy · Jailbreak-Mechanism Findings · Method / BO-tuning · Experiments · Conclusion). PROJECTED; <span class="ph">[X%]</span> placeholders.</p>
+
+<h3>Introduction (one topic sentence per paragraph, gap-first)</h3>
+<ul class="tight">
+<li><b>¶1</b> — Jailbreaks remain the central safety risk for deployed LLMs, and defenses are judged by how much they block versus how much they break benign use.</li>
+<li><b>¶2</b> — Activation-level defenses (your ABD) give the strongest block rates, but they are always-on, so they over-refuse benign prompts, and they have only been shown offline on text.</li>
+<li><b>¶3</b> — Two gaps follow: (i) the defense should fire only when needed (conditional), and (ii) it must survive as a real deployed system (latency), across modalities (audio), and against an adaptive attacker.</li>
+<li><b>¶4</b> — We present ABD++, fusing the boundary constraint with conditional rejection steering on a vLLM hook, and evaluate it on text + audio + adaptive attacks; contributions as enumerated bullets ("We propose / We build / We release").</li>
+</ul>
+
+<h3>Related Work (sections + one-line position)</h3>
+<ul class="tight">
+<li><b>2.1 Jailbreak attacks</b> — optimization (<a href="https://arxiv.org/abs/2307.15043">GCG</a>, <a href="https://arxiv.org/abs/2310.04451">AutoDAN</a>), model-based (<a href="https://arxiv.org/abs/2310.08419">PAIR</a>, <a href="https://arxiv.org/abs/2311.08268">ReNeLLM</a>), and audio (<a href="https://arxiv.org/abs/2505.15406">AJailBench</a>); we defend against all three families.</li>
+<li><b>2.2 Inference-time defenses</b> — decoding (<a href="https://arxiv.org/abs/2310.03684">SmoothLLM</a>, ROSE/Self-CD), steering (<a href="https://arxiv.org/abs/2504.09466">AdaSteer</a>, <a href="https://arxiv.org/abs/2409.05907">CAST</a>, AlphaSteer), and activation-boundary (<a href="https://arxiv.org/abs/2412.17034">ABD</a>); we fuse boundary + conditional steering, which none combine.</li>
+<li><b>2.3 Steering-in-serving</b> — <a href="https://arxiv.org/abs/2509.25175">EasySteer</a> / <a href="https://arxiv.org/abs/2603.06588">vLLM Hook</a> make steering deployable; we build the first activation-boundary defense as a serving hook with a latency budget.</li>
+</ul>
+
+<h3>Method — modules</h3>
+<ul class="tight">
+<li><b>3.1 Activation Boundary Constraint</b> — your ABD: penalize outlier activation coordinates on BO-selected low/middle layers (recap + reuse).</li>
+<li><b>3.2 Conditional Rejection Steering</b> — a CAST-style condition detector fires a rejection-direction steer only on inputs judged harmful, cutting over-refusal.</li>
+<li><b>3.3 Fusion &amp; vLLM Serving Hook</b> — order + interaction of 3.1 and 3.2 inside a vLLM hook under a latency budget.</li>
+<li><b>3.4 Audio Extension</b> — apply the fused defense to LAM activations (Qwen2-Audio) for AJailBench.</li>
+</ul>
+
+<h3>Experiments — subsection → experiment → claim/metric</h3>
+<table>
+<thead><tr><th>Paper §</th><th>Experiment</th><th>Backs claim · metric</th></tr></thead>
+<tbody>
+<tr><td>5.1 Main text defense</td><td>ABD++ vs undefended / ABD / AdaSteer / CAST / SmoothLLM across 9 text attacks</td><td>C1 · DSR <span class="ph">[X%]</span></td></tr>
+<tr><td>5.2 Over-refusal &amp; utility</td><td>Compliance Rate on XSTest/OKTest; AlpacaEval Win Rate; MMLU/GSM8K</td><td>C2 · CR <span class="ph">[X%]</span> / Win Rate <span class="ph">[X%]</span></td></tr>
+<tr><td>5.3 Audio transfer</td><td>ABD++ on Qwen2-Audio / LLaMA-Omni vs undefended on AJailBench-Base + APT+</td><td>C3 · ASR <span class="ph">[X%]</span> / GPTScore</td></tr>
+<tr><td>5.4 Adaptive attack</td><td>Attack-aware GCG (defense in the attacker loss) vs static ABD</td><td>C4 · DSR drop <span class="ph">[X%]</span></td></tr>
+<tr><td>5.5 Serving cost</td><td>tokens/sec + p50/p99 latency on vLLM vs undefended</td><td>C5 · overhead <span class="ph">[X%]</span></td></tr>
+<tr><td>5.6 Ablations</td><td>§5 below (one variable per row)</td><td>component attribution</td></tr>
+</tbody>
+</table>
+
+<h3>Discussion / Conclusion</h3>
+<ul class="tight">
+<li><b>Discussion</b> — where the conditional gate helps most (attack type × benign category), and the residual adaptive-attack gap.</li>
+<li><b>Conclusion</b> — ABD++ makes activation-boundary defense deployable, benign-friendly, and audio-capable; release the suite.</li>
+</ul>
+
+<h2>3 · Claims → evidence</h2>
+<table>
+<thead><tr><th>#</th><th>Claim (projected)</th><th>Supporting experiment</th></tr></thead>
+<tbody>
+<tr><td>C1</td><td>ABD++ raises DSR above ABD and steering defenses across text attacks at matched or lower over-refusal.</td><td>§5.1 main text defense (9 attacks × baselines).</td></tr>
+<tr><td>C2</td><td>The conditional gate cuts over-refusal (CR) vs always-on ABD/steering while keeping utility.</td><td>§5.2 CR on XSTest/OKTest + AlpacaEval/MMLU/GSM8K; ablation A1 (gate on/off).</td></tr>
+<tr><td>C3</td><td>ABD++ transfers to audio LAMs, lowering ASR on AJailBench.</td><td>§5.3 Qwen2-Audio/LLaMA-Omni on AJailBench-Base + APT+.</td></tr>
+<tr><td>C4</td><td>ABD++ degrades less than static defenses under attack-aware adaptive attacks.</td><td>§5.4 adaptive GCG vs static ABD.</td></tr>
+<tr><td>C5</td><td>Serve-time overhead is within a stated latency budget on vLLM.</td><td>§5.5 tokens/sec + p50/p99 latency.</td></tr>
+</tbody>
+</table>
+<p class="note">No claim without a planned experiment; no experiment without a claim.</p>
+
+<h2>4 · Systems — method, baselines, datasets, metrics (W7, from grounding)</h2>
+<div class="box">
+<b>Method:</b> <b>ABD++</b> = ABD activation-boundary constraint (3.1) + conditional rejection steering (3.2) fused in a vLLM hook (3.3), + audio extension (3.4).<br>
+<b>Must-beat baselines</b> (all real, from grounding): <b>undefended</b> · <b>ABD</b> (your base) · steering defenses <b>AdaSteer</b>, <b>CAST</b>, <b>InferAligner</b>, <b>Jailbreak Antidote</b> · decoding defenses <b>SmoothLLM</b>, <b>ROSE / Self-CD</b>, <b>Paraphrase / Self-Reminder</b>.<br>
+<b>Models:</b> text — <b>Qwen3-4B-Instruct-2507</b> (your default), Llama-3.1-8B, Gemma-2-9B (match AdaSteer). Audio — Qwen2-Audio-7B, LLaMA-Omni.<br>
+<b>Datasets:</b> harmful — AdvBench (50-behavior + full), <a href="https://arxiv.org/abs/2402.04249">HarmBench</a>, TDC2023, MaliciousInstruct, JailbreakBench; over-refusal — <a href="https://arxiv.org/abs/2308.01263">XSTest</a> (250), OKTest (300), OR-Bench; utility — AlpacaEval, Just-Eval, MMLU, GSM8K; audio — AJailBench-Base (1,495), AJailBench-APT+.<br>
+<b>Attacks:</b> GCG-Individual/Universal, AutoDAN, PAIR, ReNeLLM, AIM, Cipher, Multilingual, ArtPrompt, COLD-Suffix; <b>adaptive</b> attack-aware GCG. Audio — APT time/freq/hybrid.<br>
+<b>Metrics:</b> <b>DSR</b> (safety); <b>Compliance Rate</b> / over-refusal (over-safety); <b>AlpacaEval Win Rate</b> + MMLU/GSM8K (utility); <b>ASR</b> + GPTScore (audio); <b>tokens/sec</b> + p50/p99 latency (serving).
 </div>
 
-<!-- ===================== PROJECTED ABSTRACT ===================== -->
-<h2>0 · Projected Abstract &nbsp;<span class="proj">PROJECTED — not results</span></h2>
-<div class="abs">
-<p>Mixture-of-experts language models are aligned to refuse harmful requests, but recent work shows their refusal behavior
-concentrates in a few safety-critical experts, so disabling a small set of experts removes the safety guardrail. Existing defenses
-either restore refusal after an attack or require the original safety-aligned routing weights, which a deployed model does not have.
-We present <b>SafeSpread</b>, a method that spreads refusal behavior across many experts so that no small ablatable subset carries it.
-We first locate the safety-critical experts from routing statistics, then run a light LoRA fine-tune with a routing regularizer and an
-anti-concentration term that push refusal-relevant routing mass onto many experts, using only the deployed model. On standard harmful
-and jailbreak sets, SafeSpread lowers the worst-case refusal drop under expert ablation from <span class="ph">[X%]</span> to
-<span class="ph">[X%]</span>, and keeps it below <span class="ph">[X%]</span> even when the attacker re-optimizes the ablation against
-the hardened model. It costs <span class="ph">[X%]</span> capability loss and adds no measurable over-refusal. These results give a
-deployable way to remove the expert-ablation vulnerability of aligned mixture-of-experts models.</p>
+<h2>5 · Ablation matrix (one variable per row)</h2>
+<table>
+<thead><tr><th>#</th><th>Ablation</th><th>Changed vs full ABD++</th><th>Tests</th></tr></thead>
+<tbody>
+<tr><td>A1</td><td>ABD + always-on steering</td><td>remove the conditional gate only</td><td>the gate's over-refusal benefit (C2)</td></tr>
+<tr><td>A2</td><td>ABD only</td><td>remove conditional steering</td><td>steering's DSR/over-refusal contribution (= your baseline)</td></tr>
+<tr><td>A3</td><td>Conditional steering only</td><td>remove the boundary constraint</td><td>the boundary's contribution</td></tr>
+<tr><td>A4</td><td>Gate threshold τ sweep</td><td>vary detector threshold only</td><td>DSR ↔ over-refusal trade-off curve</td></tr>
+<tr><td>A5</td><td>Layer scope</td><td>all layers vs BO-selected low/mid</td><td>value of BO layer selection</td></tr>
+<tr><td>A6</td><td>Text-only vs +audio adaptation</td><td>toggle audio module</td><td>cross-modal transfer (C3)</td></tr>
+</tbody>
+</table>
+
+<h2>6 · Run order (cheap → expensive; W1 smoke-test first)</h2>
+<ol class="tight">
+<li><b>Sanity (smallest):</b> Qwen3-4B, AdvBench-50, one attack (GCG-Individual), ABD++ vs undefended — confirm the hook fires + DSR moves. &lt;1 GPU-h.</li>
+<li><b>Baselines:</b> undefended / ABD / AdaSteer / CAST on the AdvBench-50 + XSTest slice.</li>
+<li><b>Main text (§5.1–5.2):</b> full 9-attack suite × baselines × 3 models; over-refusal + utility.</li>
+<li><b>Audio (§5.3):</b> Qwen2-Audio on AJailBench-Base + APT+.</li>
+<li><b>Adaptive (§5.4):</b> attack-aware GCG. <span class="flag">&gt;1-day — flag for sign-off.</span></li>
+<li><b>Ablations (§5.6):</b> A1–A6.</li>
+<li><b>Polish:</b> serving latency (§5.5), seeds, tables.</li>
+</ol>
+
+<h2>7 · Configs (stack from your Experiment Templates)</h2>
+<div class="box">
+<b>Launcher:</b> DeepSpeed (for the light condition-detector training) · <b>Serving:</b> vLLM (EasySteer-style hook) · <b>Framework:</b> PyTorch-Lightning + TRL/PEFT · <b>Base model:</b> Qwen3-4B-Instruct-2507.<br>
+<b>Task-determined hyperparameters (set here — profile does not supply these):</b>
+<ul class="tight">
+<li><b>Condition detector</b> (linear/logistic probe on residual activations): lr <code>1e-3</code>, batch <code>64</code>, epochs <code>3–5</code>, seed <code>42</code>.</li>
+<li><b>ABD boundary:</b> μ from 400 non-overlapping AdvBench samples (validation), BO over layer set + (α, β); no gradient training.</li>
+<li><b>Steering vectors:</b> difference-of-means (rejection direction), no training; strength swept in A4.</li>
+<li><b>Decoding:</b> greedy for DSR/ASR scoring; temp 0.7 for utility gen; 3 seeds for variance.</li>
+</ul>
+<b>OOM-safe (your OOM is the #1 recorded failure):</b> Qwen3-4B fp16 fits one A100; audio Qwen2-Audio-7B fits; keep batch ≤ default and raise grad-accum if the detector training OOMs.
 </div>
-<p class="meta"><b>Structure:</b> background (MoE aligned to refuse) → problem (refusal concentrates in few experts, ablation breaks it, existing defenses need reference weights) → method (SafeSpread: locate + redistribute via routing regularizer, deployed model only) → results (placeholders) → conclusion. <b>abstract↔claim self-check:</b> concentration → C1; worst-case drop reduced → C2; robust to adaptive re-attack → C3; no reference weights → C4; low capability/over-refusal cost → C5. All numbers are placeholders.</p>
 
-<!-- ===================== PAPER SKELETON ===================== -->
-<h2>0.5 · Projected Paper Skeleton &nbsp;<span class="proj">PROJECTED</span></h2>
-<p class="sub">Structure modeled on <a href="https://arxiv.org/abs/2509.22745">SafeMoE</a> (the closest MoE safety-defense paper): Intro (4 para) · Threat Model · Method (modules) · Experiments (5.1–5.n) · Related Work · Conclusion. §1–§5 below are the concrete experiment plan that fills its Experiments section.</p>
-
-<h3>Introduction — one topic sentence per paragraph (4, gap-first, her style)</h3>
-<ol>
-  <li><b>P1 (landscape → gap):</b> MoE LLMs are aligned to refuse harmful requests, but safety in a sparse model is not spread evenly across experts.</li>
-  <li><b>P2 (sharpen the gap):</b> Refusal concentrates in a few safety-critical experts, so an attacker who disables a small expert subset (or steers routing away from them) removes the guardrail, and current defenses either only restore refusal after the attack or need the original aligned routing weights.</li>
-  <li><b>P3 (contribution):</b> We present SafeSpread, which redistributes refusal across many experts with a routing regularizer and an anti-concentration term in a light LoRA fine-tune, using only the deployed model, so no small ablatable subset carries the guardrail.</li>
-  <li><b>P4 (contributions):</b> We (i) quantify the concentration vulnerability across MoE families; (ii) propose SafeSpread, a reference-free redistribution defense; (iii) evaluate it under static, adaptive, and input-only routing attacks; (iv) show the worst-case refusal drop falls from <span class="ph">[X%]</span> to <span class="ph">[X%]</span> at <span class="ph">[X%]</span> capability cost.</li>
-</ol>
-
-<h3>Related Work — sections (mirrors the MoE-safety literature, each paper a real link)</h3>
-<ul>
-  <li><b>Vulnerabilities of MoE routing</b> — safety concentration &amp; expert ablation (<a href="https://arxiv.org/abs/2506.17368">SAFEx</a>), expert (de)activation steering (<a href="https://arxiv.org/abs/2509.09660">SteerMoE</a>), routing/backdoor attacks. <i>Position:</i> we defend the concentration they expose.</li>
-  <li><b>Defenses for MoE / safety fine-tuning</b> — routing alignment (<a href="https://arxiv.org/abs/2509.22745">SafeMoE</a>), SafeInstr, SaLoRA. <i>Position:</i> we need no reference aligned routing weights and target ablation, not fine-tuning drift.</li>
-  <li><b>Safety alignment &amp; jailbreaks broadly</b> — her <a href="https://arxiv.org/abs/2502.14296">trustworthiness</a> / Safety-Boundaries / jailbreak-benchmark line. <i>Position:</i> we move it from attack/eval to architectural defense.</li>
-</ul>
-
-<h3>Method — modules (each a titled subsection)</h3>
-<ul>
-  <li><b>§ Safety-Critical Expert Localization</b> — reproduce SAFEx stability-based selection (SES) to find the experts whose ablation drops refusal.</li>
-  <li><b>§ Redistribution Objective</b> — LoRA fine-tune with a routing regularizer that spreads refusal-relevant routing mass across many experts, plus an anti-concentration (entropy) term on the safety-critical set.</li>
-  <li><b>§ Router-Logit Regularization</b> — a term so the router does not re-concentrate refusal onto a small subset after fine-tuning.</li>
-</ul>
-
-<h3>Experiments — planned subsections (each row = the concrete experiment in §1–§3 below)</h3>
+<h2>8 · Budget &amp; GATE</h2>
 <table>
-<thead><tr><th>Paper subsection</th><th>Planned experiment</th><th>Claim / metric</th></tr></thead>
+<thead><tr><th>Block</th><th>Rough GPU-hours</th><th>Note</th></tr></thead>
 <tbody>
-<tr><td>5.1 Concentration audit</td><td>Reproduce SAFEx k-expert ablation curve on undefended MoE</td><td>C1 · refusal-drop vs k</td></tr>
-<tr><td>5.2 Main defense</td><td>SafeSpread vs undefended + SAFEx-repair + SafeMoE</td><td>C2 · worst-case refusal drop</td></tr>
-<tr><td>5.3 Adaptive robustness</td><td>Attacker re-optimizes ablation on hardened model; input-only jailbreak (SteerMoE unsafe-steer + AIM)</td><td>C3 · refusal drop / ASR</td></tr>
-<tr><td>5.4 Reference-free check</td><td>SafeSpread (no aligned weights) vs SafeMoE (needs them)</td><td>C4 · defense w/o reference weights</td></tr>
-<tr><td>5.5 Ablations</td><td>A1 (no entropy) · A2 (all vs critical set) · A3 (no router reg)</td><td>method attribution</td></tr>
-<tr><td>5.6 Safety tax</td><td>Capability (AIME-2024, MMLU-Redux) + over-refusal on benign set</td><td>C5 · &lt;[X%] loss</td></tr>
-<tr><td>5.7 Transfer</td><td>OLMoE-1B-7B → Qwen3-30B-A3B</td><td>generality</td></tr>
+<tr><td>Sanity</td><td>&lt;1</td><td>W1 smoke test</td></tr>
+<tr><td>Baselines + main text (§5.1–5.2)</td><td>~24 (GCG optimization dominates)</td><td>3 models × 9 attacks</td></tr>
+<tr><td>Audio (§5.3)</td><td>~10</td><td>1,495 prompts × APT variants</td></tr>
+<tr><td>Adaptive attack (§5.4)</td><td>~24–48</td><td><span class="flag">&gt;1 day — needs your sign-off</span></td></tr>
+<tr><td>Ablations (§5.6)</td><td>~24</td><td>A1–A6</td></tr>
+<tr><td>Serving/polish (§5.5)</td><td>~4</td><td>latency profiling</td></tr>
 </tbody>
 </table>
+<p class="note">Total ≈ 4–6 GPU-days, dominated by GCG-style optimization + the adaptive-attack block.</p>
 
-<h3>Discussion / Conclusion — topic sentences</h3>
-<ul>
-  <li><b>Discussion:</b> spreading a safety behavior across experts trades a little capacity for robustness the concentrated design cannot offer, and it needs nothing beyond the deployed model.</li>
-  <li><b>Conclusion:</b> a reference-free redistribution defense that removes the expert-ablation vulnerability of aligned MoE models, with a reusable concentration metric.</li>
-</ul>
+<div class="proj"><b>GATE — stop for your approval before <code>/run-plan</code>.</b> Summary: <b>Claims</b> C1–C5 · <b>Must-beat</b> undefended / ABD / AdaSteer / CAST / SmoothLLM · <b>Ablations</b> A1–A6 (gate on/off, ABD-only, steering-only, threshold, layers, audio) · <b>First 3 runs</b> sanity(GCG on AdvBench-50) → baselines → main text suite · <b>Budget</b> ~4–6 GPU-days, adaptive-attack block &gt;1 day flagged. <b>Reviewer's warning (from 01):</b> the adaptive-attack story (§5.4) + real serving latency (§5.5) are what lift this above "ABD + a knob" — keep them first-class. Approve, or tell me what to change.</div>
 
-<!-- ===================== CLAIMS ===================== -->
-<h2>1 · Claims → Evidence &nbsp;<span class="meta">(the concrete Experiment Plan — fills the paper's Experiments section)</span></h2>
-<table>
-<thead><tr><th>#</th><th>Claim (if the idea succeeds)</th><th>Experiment that supports it</th></tr></thead>
-<tbody>
-<tr><td><b>C1</b></td><td>Undefended MoE concentrates refusal — a few experts carry the guardrail.</td><td>Reproduce SAFEx SES + k-expert ablation curve (refusal drop vs k) on OLMoE &amp; Qwen3-30B-A3B.</td></tr>
-<tr><td><b>C2</b></td><td>SafeSpread flattens the vulnerability — worst-case k-ablation drop at the SAFEx budget falls to &lt;5%.</td><td>Refusal drop under worst-case k-expert ablation, SafeSpread vs undefended, SAFEx-repair, SafeMoE.</td></tr>
-<tr><td><b>C3</b></td><td>Robust to adaptive and input-only attacks, not just the static ablation.</td><td>Attacker re-optimizes ablation on the hardened model; SteerMoE-style unsafe steering + AIM jailbreak; report refusal drop + ASR.</td></tr>
-<tr><td><b>C4</b></td><td>Works from the deployed model alone — no original aligned routing weights needed.</td><td>SafeSpread vs SafeMoE (which requires reference routing weights) at matched budget.</td></tr>
-<tr><td><b>C5</b></td><td>Low safety tax — small capability loss, no over-refusal rise.</td><td>AIME-2024 + MMLU-Redux capability; over-refusal on the 500 benign prompts.</td></tr>
-</tbody>
-</table>
-
-<!-- ===================== SYSTEMS ===================== -->
-<h2>2 · Systems — method + must-beat baselines</h2>
-<h3>Method: <b>SafeSpread</b></h3>
-<ul>
-  <li><b>Locate</b> safety-critical experts via SAFEx stability-based selection (SES).</li>
-  <li><b>Redistribute</b> with a LoRA fine-tune: routing regularizer spreading refusal-relevant routing mass across many experts + anti-concentration entropy term on the critical set.</li>
-  <li><b>Regularize the router</b> so it does not re-concentrate refusal after fine-tuning.</li>
-  <li><b>Attack-evaluate</b>: worst-case k-expert ablation (static + adaptive) and input-only routing jailbreak.</li>
-</ul>
-<h3>Baselines it must beat (all from the grounding table, real)</h3>
-<table>
-<thead><tr><th>Baseline</th><th>Role / what it isolates</th><th>Source</th></tr></thead>
-<tbody>
-<tr><td>Undefended aligned MoE</td><td>The vulnerable reference (C1/C2 target).</td><td>OLMoE-1B-7B · Qwen3-30B-A3B</td></tr>
-<tr><td>SAFEx HRCG-targeted LoRA repair</td><td>Closest MoE defense — restores refusal but does not redistribute.</td><td><a href="https://arxiv.org/abs/2506.17368">SAFEx</a></td></tr>
-<tr><td>SafeMoE (routing alignment)</td><td>Defense that needs reference aligned routing weights — the C4 contrast.</td><td><a href="https://arxiv.org/abs/2509.22745">SafeMoE</a></td></tr>
-<tr><td>SafeInstr · SaLoRA</td><td>General safety fine-tuning defenses (not MoE-aware).</td><td><a href="https://arxiv.org/abs/2509.22745">via SafeMoE</a></td></tr>
-</tbody>
-</table>
-<h3>Datasets &amp; metrics (explicit up front — W7)</h3>
-<ul>
-  <li><b>Attack / safety data:</b> SAFEx-style 500 harmful · 500 jailbreak · 500 benign; <a href="https://arxiv.org/abs/2509.09660">AdvBench</a> · JailbreakBench · HEx-PHI; SteerMoE unsafe-steer + AIM jailbreak.</li>
-  <li><b>Metrics:</b> (1) <b>refusal rate</b> &amp; worst-case refusal drop under k-expert ablation (SAFEx); (2) <b>Harmfulness Score</b> via Llama-Guard + <b>Attack Success Rate</b> (SteerMoE/SafeMoE); (3) <b>capability</b> AIME-2024 + MMLU-Redux; (4) <b>over-refusal</b> on benign prompts.</li>
-</ul>
-
-<!-- ===================== ABLATION ===================== -->
-<h2>3 · Ablation Matrix — one variable per row</h2>
-<table>
-<thead><tr><th>ID</th><th>Ablated component (vs full SafeSpread)</th><th>Isolates</th><th>Expected</th></tr></thead>
-<tbody>
-<tr><td>A1</td><td>Remove the <b>anti-concentration entropy</b> term (redistribution loss only)</td><td>Value of anti-concentration</td><td>Refusal re-concentrates, curve less flat</td></tr>
-<tr><td>A2</td><td>Redistribute across <b>all</b> experts vs only the located <b>safety-critical</b> set</td><td>Value of targeting</td><td>Targeting the critical set is more efficient / less tax</td></tr>
-<tr><td>A3</td><td>Remove <b>router-logit regularization</b> (LoRA only)</td><td>Whether the router re-concentrates</td><td>Router drifts refusal back onto a small subset</td></tr>
-<tr><td>A4</td><td>Swap SafeSpread for <b>SAFEx HRCG-repair</b></td><td>Redistribution vs restoration</td><td>SafeSpread flatter worst-case curve at equal budget</td></tr>
-<tr><td>A5</td><td><b>Attack strength</b>: static k-ablation vs adaptive re-optimized vs input-only jailbreak</td><td>Robustness envelope</td><td>Defense holds across all three, not just static</td></tr>
-</tbody>
-</table>
-<p class="meta">Each row changes exactly one thing vs the full method; no row confounds two changes.</p>
-
-<!-- ===================== RUN ORDER ===================== -->
-<h2>4 · Run Order &nbsp;<span class="pill">smoke → baseline → main → ablation → polish</span></h2>
-<ol>
-  <li><b>Smoke (W1, cheap/deterministic first):</b> OLMoE-1B-7B, 50 harmful + 50 benign prompts — verify SES localization, the ablation-attack harness, and the Llama-Guard judge run end-to-end and produce a refusal number.</li>
-  <li><b>Baseline / audit:</b> reproduce the SAFEx concentration curve on the undefended OLMoE (C1); run SAFEx-repair and SafeMoE baselines.</li>
-  <li><b>Main:</b> SafeSpread fine-tune + re-measure the worst-case ablation curve (C2).</li>
-  <li><b>Adaptive:</b> attacker re-optimizes ablation on the hardened model + input-only jailbreak (C3).</li>
-  <li><b>Ablations:</b> A1–A5, one variable each.</li>
-  <li><b>Polish:</b> transfer to Qwen3-30B-A3B; 3-seed repeats; capability + over-refusal tables.</li>
-</ol>
-
-<!-- ===================== BUDGET ===================== -->
-<h2>5 · Budget (single A100 80GB)</h2>
-<table>
-<thead><tr><th>Block</th><th>Runs</th><th>Est. GPU-hours</th></tr></thead>
-<tbody>
-<tr><td>Smoke</td><td>1 tiny</td><td>&lt; 0.5</td></tr>
-<tr><td>Audit + baselines (SAFEx-repair, SafeMoE, SafeInstr, SaLoRA)</td><td>~5 configs</td><td>~25</td></tr>
-<tr><td>Main SafeSpread (train + attack eval)</td><td>1 config</td><td>~6</td></tr>
-<tr><td>Adaptive + input-only attacks</td><td>2 attack suites</td><td>~10</td></tr>
-<tr><td>Ablations A1–A5</td><td>5 configs</td><td>~20</td></tr>
-<tr><td>Polish: Qwen3-30B-A3B transfer + 3-seed</td><td>~6 extra runs</td><td>~30</td></tr>
-<tr><td colspan="2"><b>Total</b></td><td><b>~90 GPU-h (≈ 4–5 days on 1 GPU)</b></td></tr>
-</tbody>
-</table>
-<div class="note">Fits one A100 80GB. <b>Flag for sign-off (&gt;1 day):</b> the Qwen3-30B-A3B transfer + 3-seed polish — confirm the effect on OLMoE first.</div>
-
-<!-- ===================== GROUNDING (APPENDIX) ===================== -->
-<h2>Appendix · Grounding Table — real setups of the closest papers</h2>
-<p class="sub">Read from the papers' actual Experiments sections (full text fetched), not from memory. The baselines/datasets/metrics in §2 draw from here.</p>
-<table>
-<thead><tr><th>Paper</th><th>Baselines / attacks</th><th>Datasets</th><th>Metrics</th><th>Models / GPU</th></tr></thead>
-<tbody>
-<tr>
-  <td><a href="https://arxiv.org/abs/2506.17368">SAFEx</a> (vulnerability + repair)</td>
-  <td>Dense-model contrast; defense = HRCG-targeted LoRA subtractive merging</td>
-  <td>500 harmful · 500 jailbreak · 500 benign · AIME-2024 (capability)</td>
-  <td>Refusal rate; probe F1; AIME score</td>
-  <td>Mixtral-8x7B · Qwen1.5-MoE · Qwen3-30B-A3B (6144 experts) · deepseek-moe-16b · OLMoE-1B-7B. <b>Headline: mask 12 experts → 22% refusal drop (48.4% under jailbreak).</b></td>
-</tr>
-<tr>
-  <td><a href="https://arxiv.org/abs/2509.09660">SteerMoE</a> (steering / attack)</td>
-  <td>Jailbreaks: GCG · ArtPrompt · FFA · AIM</td>
-  <td>AdvBench · TDC2023 · MaliciousInstruct · StrongREJECT+AIM · MultiJail; FaithEval (faithfulness)</td>
-  <td>Safety via Llama-Guard-3-8B; ASR; fluency (Gemma-3-27B)</td>
-  <td>OLMoE · Qwen3-30B-A3B · Mixtral · Phi-3.5-MoE · GPT-OSS. <b>Unsafe steering -41%; +AIM -100%.</b></td>
-</tr>
-<tr>
-  <td><a href="https://arxiv.org/abs/2509.22745">SafeMoE</a> (defense)</td>
-  <td>SafeInstr · SaLoRA · Antidote · SafeDelta</td>
-  <td>BeaverTails (harmful) + SAMSum/SQL; eval JailbreakBench · HEx-PHI; MMLU-Redux</td>
-  <td>Harmfulness Score (Llama-Guard-4-12B); utility (Rouge/EM); routing KL</td>
-  <td>OLMoE-1B-7B (primary) · Qwen3-30B-A3B · … · Mixtral-8x22B. <b>1× A100 80GB. Needs reference aligned routing weights. Headline 62.0 → 5.0 harmfulness, ~1% utility loss.</b></td>
-</tr>
-</tbody>
-</table>
-<p class="meta"><b>Takeaways that shape the plan:</b> (1) OLMoE-1B-7B on one A100 80GB is the proven, feasible target. (2) SAFEx supplies the attack (SES + k-ablation curve) and a repair-style defense to beat; SafeMoE supplies defense baselines and the reference-weight limitation SafeSpread avoids; SteerMoE supplies the input-only attack and the Llama-Guard/ASR eval protocol.</p>
-
-<!-- ===================== GATE ===================== -->
-<h2>Approval Gate — the researcher is the judge</h2>
-<p>This is a plan, not results — every number is a placeholder. Nothing runs until you approve. Confirm or adjust:
-<b>(a)</b> primary model OLMoE-1B-7B (+ Qwen3-30B-A3B transfer), <b>(b)</b> the attack/eval protocol (SAFEx k-ablation + SteerMoE input-only),
-<b>(c)</b> the baseline set (SAFEx-repair, SafeMoE, SafeInstr, SaLoRA), <b>(d)</b> the budget. On approval → <code>/run-plan</code>.</p>
-
-<p class="meta" style="margin-top:2em">Generated by <code>/workplan</code> · seed idea I1 · grounded on SAFEx / SteerMoE / SafeMoE. Chinese mirror: <a href="02_EXPERIMENT_PLAN.zh.html">02_EXPERIMENT_PLAN.zh.html</a>.</p>
+<div class="foot">
+Generated by <code>/workplan</code> · 2026-07-03 · idea I11 (ABD++) · researcher Lang Gao. Grounding read from ABD + AJailBench full text and AdaSteer + EasySteer (arXiv). PROJECTED plan — all numbers placeholders. Baselines/datasets/metrics drawn only from the grounding table. Next: approve → <code>/run-plan</code>. Chinese mirror: <code>02_EXPERIMENT_PLAN.zh.html</code> (follows <code>scholar-translation-zh</code>).
+</div>
 
 </div>
 </body>

@@ -1,17 +1,15 @@
 Shaping the Safety Boundaries: Understanding and Defending Against
 Jailbreaks in Large Language Models
 Lang Gao1,2 , Jiahui Geng1 , Xiangliang Zhang3 , Preslav Nakov1 , Xiuying Chen1 *
-1
-
 MBZUAI 2 Huazhong University of Science and Technology
 3
 University of Notre Dame
 {Lang.Gao, Jiahui.Geng, Preslav.Nakov, Xiuying.Chen}@mbzuai.ac.ae
 xzhang33@nd.edu
+1
+
 WARNING: This paper contains model outputs that
 may be considered offensive.
-
-arXiv:2412.17034v2 [cs.CL] 21 May 2025
 
 Abstract
 Jailbreaking in large language models (LLMs)
@@ -43,18 +41,19 @@ Introduction
 
 The widespread use of Large Language Models
 (LLMs) across various fields (Kaddour et al., 2023;
-Chen et al., 2025; Xie et al., 2025; Liu et al., 2024c)
-has raised concerns about the safety of the output
-and the robustness of these models (Ye et al., 2024;
-Huang et al., 2025; Wang et al., 2025). It has been
-shown that jailbreak attacks, which use crafted
-prompts to deceive LLMs into generating harmful
+Xu et al., 2025c; Chen et al., 2025; Xie et al., 2025;
+Liu et al., 2024c; Xu et al., 2025b; Wang et al.,
+2025b) has raised concerns about the safety of the
+output and the robustness of these models (Ye et al.,
+2024; Xu et al., 2025a; Huang et al., 2025; Wang
 * Corresponding author.
 
-content, can bypass LLM’s safety alignment (Liu
-et al., 2024b; Zou et al., 2023; Song et al., 2025),
-and a lot of research has focused on developing defense mechanisms and counter-prompts to mitigate
-such attacks (Robey et al., 2023; Xie et al., 2024).
+et al., 2025c). It has been shown that jailbreak attacks, which use crafted prompts to deceive LLMs
+into generating harmful content, can bypass LLM’s
+safety alignment (Liu et al., 2024b; Zou et al., 2023;
+Song et al., 2025), and a lot of research has focused
+on developing defense mechanisms and counterprompts to mitigate such attacks (Robey et al.,
+2023; Xie et al., 2024).
 Understanding the internal mechanisms of jailbreak attacks is crucial for both explaining their
 operation and developing effective defenses. While
 existing studies have made initial explorations (Yu
@@ -79,14 +78,19 @@ normal model capabilities.
 In this work, we aim to better understand the
 mechanism of how jailbreaking works. In particular, we provide our explanation of jailbreaks based
 on a comprehensive analysis of over 30,000 samples, a significantly larger scale than previous studies. Figure 1 shows the projection of three types
-of prompts: benign prompts that contain no harmful information, harmful prompts that attempt to
-induce the LLM to generate harmful content but
-fail, and various jailbreak prompts that successfully
+of prompts: benign prompts that contain no harm-
+
+25378
+Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pages 25378–25398
+July 27 - August 1, 2025 ©2025 Association for Computational Linguistics
 
 Figure 1: Projected activation space overview of Vicuna-7B-v1.3 across different layers. Harmful activations are
 observed to cluster together, and we define the surrounding boundary as the safety boundary. The attack arrow
 indicates that jailbreak prompts shift harmful activations into the benign space to evade safety checks.
 
+ful information, harmful prompts that attempt to
+induce the LLM to generate harmful content but
+fail, and various jailbreak prompts that successfully
 induce harmful outputs, collected from different
 types of jailbreak attack methods. The projection
 is based on the last token representations across
@@ -111,10 +115,10 @@ various factors, including the defense layer and
 the defense dimension, which balance the performance on defense and on general tasks. We propose a novel objective that maximizes the Defense
 Success Rate (DSR) while minimizing the number of penalized layers. This objective is implemented with an adapted Bayesian Optimization
 method (Jones et al., 1998), which iteratively proposes and refines selection suggestions.
+
 Experiments on AdvBench (Zou et al., 2023)
 show that ABD has good generalization, achieving
 an average DSR of over 98% against various forms
-
 of jailbreak attacks. For general ability tasks, the
 performance drop of the model equipped with ABD
 does not exceed 2%, which is substantially lower
@@ -147,10 +151,12 @@ prompts. Meanwhile, rule-based methods (Jiang
 et al., 2024; Liu et al., 2024d) rewrite prompts using predefined rules that effectively deceive the
 model. In this work, we analyze the mechanisms
 behind these jailbreak techniques.
-Defense against jailbreak attacks. Defense
-strategies for jailbreak attacks typically fall into
 
-three categories. One common approach enhances model safety and robustness by reformulating inputs to counter jailbreak prompts through
+25379
+
+Defense against jailbreak attacks. Defense
+strategies for jailbreak attacks typically fall into
+three categories. One common approach enhances model safety and robustness by reformulating inputs to counter jailbreak prompts through
 techniques such as backtranslation (Wang et al.,
 2024), paraphrasing (Jain et al., 2023), selfreminding (Xie et al., 2023), and adversarial
 prompting (Zhou et al., 2024a). Another approach
@@ -160,38 +166,81 @@ jailbreak activations and decide whether to respond (Zhao et al., 2024a). A more
 directly manipulates the model’s internal representations (Xu et al., 2024; Li et al., 2024; Liu et al.,
 2024a) or editing the model (Zhao et al., 2024b).
 Unlike these methods, our approach directly constrains activations within a safety boundary, avoiding extra tokens or modules.
-Mechanistic interpretability of LLMs. The
-growing concern about LLM safety has sparked
-increasing interest in interpreting LLM features
-in jailbreak prompts. For example, Ball et al.
-(2024b) identified a common mechanism whereby
-jailbreaks reduce the harmfulness perception in
-most LLMs. Similarly, Li et al. (2024) investigated
-patterns that trigger the model to recognize safety
-issues. Zhou et al. (2024b) discovered that the
-vocabulary mappings of activations significantly
-changed when processing jailbreak inputs. Research efforts have also focused on proposing corresponding defense methods based on interpretability results. For instance, Zhao et al. (2024a) and
-Shen et al. (2024) modeled how jailbreak activations transfer between benign and harmful activation spaces as layers deepen. They designed adaptive defenses whose strength varies across different
-layers. However, the limited data in all previous
-studies often led to controversy and ambiguity.
+Mechanistic interpretability of LLMs. One purpose of interpretable analysis of LLMs is to enable
+deeper understanding and diagnosis of their abnormal behaviors (Wang et al., 2025a; Nasim et al.,
+2025; Gao et al., 2025). The growing concern
+about LLM safety has therefore sparked increasing
+interest in interpreting LLM features in jailbreak
+prompts. For example, Ball et al. (2024b) identified
+a common mechanism whereby jailbreaks reduce
+the harmfulness perception in most LLMs. Similarly, Li et al. (2024) investigated patterns that trigger the model to recognize safety issues. Zhou et al.
+(2024b) discovered that the vocabulary mappings
+of activations significantly changed when processing jailbreak inputs. Research efforts have also focused on proposing corresponding defense methods
+based on interpretability results. For instance, Zhao
+et al. (2024a) and Shen et al. (2024) modeled how
+jailbreak activations transfer between benign and
+harmful activation spaces as layers deepen. They
+designed adaptive defenses whose strength varies
+across different layers. However, the limited data
+in all previous studies often led to controversy and
+ambiguity.
 
 3
 
 Understanding Jailbreaks in LLMs
 
-3.1
-
-Controversy in Literature
-
+3.1 Controversy in Literature
 Disputes on layer importance. There have been
 different opinions about which layers are most important, mainly due to varying perspectives. For
+
 example, He et al. (2024) argued that the low layers
 were essential because they treated jailbreak activations as benign ones. Zhou et al. (2024b) believed
 that the low and the middle layers were essential
 based on tokens generated from activations. Li et al.
 (2024) argued that deep layers were critical, as their
+proposed safety pattern showed greater values in
+these layers. Similarly, He et al. (2024) focused
+on activations, as we do as well. However, their
+experimental setup suffers from a key limitation: a
+small sample size used in the analysis. As shown
+in Figure 2(a), under the original settings, benign
+and harmful activations are linearly separable, with
+most jailbreak samples misclassified as benign. After scaling, half of the jailbreak activations align
+with harmful ones, making the separation nonlinear.
+This underscores the risks of small-scale studies
+and the need for large-scale analysis.
+Disputes on the jailbreak mechanism. There
+are differing perspectives on the internal mechanism of jailbreaks. Zhao et al. (2024a) viewed
+jailbreak as a gradual process, where activations
+transition from harmful to benign spaces as they
+pass from the low to the deep layers. In contrast,
+Shen et al. (2024) argued that jailbreaks manifest
+abruptly in the deeper layers, with activations positioned between harmful and benign spaces. Both
+studies relied on fewer than 100 samples per activation type, contributing to similar inconsistencies.
+As shown in Figure 2(b), before scaling, jailbreak
+activations align closely with benign ones, consistent with Zhao et al. (2024a). However, after
+scaling, they diverge from both harmful and benign activations. When considering Shen et al.
+(2024), similar conflicts arise between pre- and
+post-scaling results (details in Appendix C.1, Figure 5). These conflicting observations cast doubt
+on their conclusions regarding the true mechanism
+of jailbreaks.
+3.2
 
-(b)
+Experimental Settings
+
+To address the above limitations, we conducted a
+large-scale analysis on a 300 times greater dataset.
+Dataset and Model. Our dataset consists of
+32,507 samples in three categories: benign, harmful, and jailbreak. For benign samples, we used a
+subset from the Alpaca dataset (Taori et al., 2023),
+as it has been carefully curated to ensure that only
+safe content is included. We collected harmful
+samples from five datasets in RedEval (Bhardwaj
+and Poria, 2023) and AdvBench (Zou et al., 2023).
+
+25380
+
+(b)
 
 (a)
 
@@ -227,46 +276,6 @@ small-sample sizes: (a) Top: 100 samples per type (He
 et al., 2024); Bottom: 5,000 benign and harmful samples. (b) Top: 60 samples per type (Zhao et al., 2024a);
 Bottom: 500 samples per type.
 
-proposed safety pattern showed greater values in
-these layers. Similarly, He et al. (2024) focused
-on activations, as we do as well. However, their
-experimental setup suffers from a key limitation: a
-small sample size used in the analysis. As shown
-in Figure 2(a), under the original settings, benign
-and harmful activations are linearly separable, with
-most jailbreak samples misclassified as benign. After scaling, half of the jailbreak activations align
-with harmful ones, making the separation nonlinear.
-This underscores the risks of small-scale studies
-and the need for large-scale analysis.
-Disputes on the jailbreak mechanism. There
-are differing perspectives on the internal mechanism of jailbreaks. Zhao et al. (2024a) viewed
-jailbreak as a gradual process, where activations
-transition from harmful to benign spaces as they
-pass from the low to the deep layers. In contrast,
-Shen et al. (2024) argued that jailbreaks manifest
-abruptly in the deeper layers, with activations positioned between harmful and benign spaces. Both
-studies relied on fewer than 100 samples per activation type, contributing to similar inconsistencies.
-As shown in Figure 2(b), before scaling, jailbreak
-activations align closely with benign ones, consistent with Zhao et al. (2024a). However, after
-scaling, they diverge from both harmful and benign activations. When considering Shen et al.
-(2024), similar conflicts arise between pre- and
-post-scaling results (details in Appendix C.1, Figure 5). These conflicting observations cast doubt
-on their conclusions regarding the true mechanism
-of jailbreaks.
-
-3.2
-
-Experimental Settings
-
-To address the above limitations, we conducted a
-large-scale analysis on a 300 times greater dataset.
-Dataset and Model. Our dataset consists of
-32,507 samples in three categories: benign, harmful, and jailbreak. For benign samples, we used a
-subset from the Alpaca dataset (Taori et al., 2023),
-as it has been carefully curated to ensure that only
-safe content is included. We collected harmful
-samples from five datasets in RedEval (Bhardwaj
-and Poria, 2023) and AdvBench (Zou et al., 2023).
 These datasets encompass a wide variety of harmful
 and misleading prompts. For jailbreak samples, we
 applied seven different jailbreak attack methods, including GCG-Individual and GCG-Universal (Zou
@@ -286,20 +295,16 @@ insufficient to model the boundary between different prompts. Therefore, we adop
 PCA assumes linear separability (Anowar et al.,
 2021), and t-SNE focuses on preserving local
 structures while distorting the global distribution (Van der Maaten and Hinton, 2008).
-3.3
-
-Jailbreak Mechanisms Findings
-
+3.3 Jailbreak Mechanisms Findings
 3.3.1 Activation Distribution
 We present the activation distributions of representative layers in Figure 1, with the full version
 available in Figures 7,8,9 in Appendix B. Our direct observations are as follows: (1) Harmful and
 benign activations overlap and are not linearly
 separable in most layers. There are no clear linear
+
 decision boundaries to distinguish between harmful
 and benign activations, highlighting the ineffectiveness of treating jailbreak activations as a simple
-linear classification problem. (2) Jailbreak activa-
-
-tions shift significantly out of the harmful activation space, forming distinct regions with minimal
+linear classification problem. (2) Jailbreak activations shift significantly out of the harmful activation space, forming distinct regions with minimal
 overlap. This shift is consistent across different
 jailbreaks, starting in the low layers and persisting throughout the model, rather than originating
 in the middle or deep layers (Zhou et al., 2024b;
@@ -346,27 +351,22 @@ where d(DSR)
 denotes the rate of change of DSR
 dr
 with respect to r. As shown in Figure 3(b), MVD
-increases with model depth, indicating that the
-safety boundary expands in deeper layers and requires larger shifts to bypass safety checks. This
-aligns with Figure 1: in lower layers (Figure 1(a)),
+
+25381
 
 Figure 3: (a) Impact of random activation shifts across layers. DSR (Defense Success Rate) decreases as shifting
 distance increases, regardless of the affected layers. (b) MVD (Most Vulnerable Distance) across layers. MVD
 increases as layers go deeper. (c) Inclusion ratio of jailbreaking activations in the harmful activation space. Without
 ABD, the ratio stays below 0.4 but rises to 1 when ABD is applied.
 
+increases with model depth, indicating that the
+safety boundary expands in deeper layers and requires larger shifts to bypass safety checks. This
+aligns with Figure 1: in lower layers (Figure 1(a)),
 jailbreak activations scatter widely but surpass the
 safety boundary; in middle layers (Figure 1(b)),
 jailbreak activations align more with benign activations while remaining outside the boundary; in
 deeper layers (Figure 1(c)), jailbreak activations
 cluster, partially overlapping the safety boundary.
-
-guide the activations back within the boundary.
-Since directly measuring the safety boundaries is
-challenging and rigid constraints risk disrupting
-model operations, we apply a smooth penalty, adjusting the outlier coordinates while leaving the
-normal ones unaffected.
-
 3.3.3 Key Takeaways on the Jailbreak Process
 Based on the above analysis, we summarize the
 jailbreak process as follows: (1) Jailbreak takes effect in the low layers, contrary to prior work (Zhou
@@ -376,19 +376,6 @@ safety boundary, causing the model to be deceived.
 (3) When comparing all layers, the low and the middle layers exhibit the strongest shift and smallest
 safety boundaries, demonstrating their importance
 in the jailbreak process.
-
-Approximation of activation distributions.
-We find that the activation distributions in each
-layer can be well approximated by a normal distribution. The proof is as follows. For each layer
-l, we examine two distributions: the activation
-coordinate distribution Dl (x) and a normal distribution DN l (x) with the same mean µlD and stanl . To measure their similarity,
-dard deviation σD
-we compute the Jensen-Shannon divergence (JS divergence) (Lin, 1991) between Dl (x) and DN l (x).
-Across all layers, the maximum JS divergence is
-0.0839, and the mean is 0.0575, and both are well
-below 0.1. We visualize all JS divergences in Table 7 in Appendix E.1. These low JS divergence
-values indicate a strong similarity between Dl (x)
-and DN l (x), which supports the validity of approximating Dl (x) with DN l (x).
 
 4
 
@@ -402,6 +389,7 @@ safety boundaries. The workflow of ABD is shown
 in Figure 4. ABD includes a penalty function and
 a Bayesian optimization process. The penalty constrains activations within safety boundaries, while
 Bayesian optimization iteratively adjusts the affected layers and the penalty parameters.
+
 4.1
 
 Penalty Function
@@ -410,6 +398,23 @@ Overall design of penalty. Intuitively, an activation stays within the safety bo
 coordinates lie within a regular range; in contrast,
 outliers have at least one coordinate exceeding this
 range. Adjusting these outlier coordinates can
+guide the activations back within the boundary.
+Since directly measuring the safety boundaries is
+challenging and rigid constraints risk disrupting
+model operations, we apply a smooth penalty, adjusting the outlier coordinates while leaving the
+normal ones unaffected.
+Approximation of activation distributions.
+We find that the activation distributions in each
+layer can be well approximated by a normal distribution. The proof is as follows. For each layer
+l, we examine two distributions: the activation
+coordinate distribution Dl (x) and a normal distribution DN l (x) with the same mean µlD and stanl . To measure their similarity,
+dard deviation σD
+we compute the Jensen-Shannon divergence (JS divergence) (Lin, 1991) between Dl (x) and DN l (x).
+Across all layers, the maximum JS divergence is
+0.0839, and the mean is 0.0575, and both are well
+below 0.1. We visualize all JS divergences in Table 7 in Appendix E.1. These low JS divergence
+values indicate a strong similarity between Dl (x)
+and DN l (x), which supports the validity of approximating Dl (x) with DN l (x).
 
 Penalty function design. To design a practical
 penalty function for activation coordinates, we establish three key principles: (1) It should target only
@@ -418,53 +423,14 @@ outlier activations, leaving non-outliers unaffected.
 of deviation, reflecting distance-based penalization.
 (3) The function must be computationally efficient.
 To construct penalty functions compatible with
-the activation coordinate distribution Dl (x), we approximate it using DN l (x) and focus on two geometric properties. First, symmetry around the mean
-value µlD requires the penalty function also to be
-symmetric about µlD , ensuring unbiased penalization of outliers above or below the safety boundary.
 
-Activations
+25382
 
-…
-
-m0 mi-1
-
-Responses
+Responses
 
 Apply: True
 
 mi=1
-
-Sorry, …
-I cannot …
-I’m just …
-…
-
-…
-
-Penalty
-Function
-
-M
-
-Sure, …
-Here’s …
-Sure! …
-…
-
-Layer i+2
-
-Layer i+1
-
-…
-
-…
-
-Layer i
-
-Jailbreak
-Prompts
-
-LLM
 
 Apply: False
 
@@ -476,49 +442,6 @@ Optimize
 
 Figure 4: Workflow of ABD. ABD restricts outlier activation coordinates using a penalty function and determines its application scope via BO-based tuning.
 
-Second, the nonlinear decay of probability density
-with increasing distance from µlD implies that the
-penalty should grow nonlinearly with the distance,
-rising faster than a linear penalty. Following these
-principles, we propose a penalty function that updates the original activation coordinate scalar value
-x to x′ as follows:
-x′ = αl · tanh(β l · (x − µlD )) + µlD ,
-
-(3)
-
-where αl ≥ 0 and β l ≥ 0 are hyperparameters.
-The penalty functions under different αl and β l are
-visualized in Figure 6 in Appendix E.2.
-This function meets the stated expectations. It is
-symmetric about the mean µlD , ensuring fair penalization for deviations above and below this central
-value. The penalty strength |x − x′ | increases nonlinearly with the distance from µlD because tanh(·)
-amplifies more significant deviations with its steep
-slope, reflecting stronger penalization for outliers.
-Moreover, the function mostly penalizes outliers.
-Within the range [µlD − bl , µlD + bl ], x′ ≈ x, where
-bl is a relatively small number, resulting in a negligible penalty for values close to the mean. The
-hyperparameters αl and β l govern the behavior of
-the penalty function. The parameter αl determines
-the maximum range of x′ , ensuring all coordinates
-are constrained within (−αl + µlD , αl + µlD ) after
-penalty application. Meanwhile, β l controls the
-size of the unmodified region [µlD − bl , µlD + bl ];
-increasing β l expands this region, while decreasing
-β l narrows it.
-4.2
-
-Bayesian Optimization-Based Tuning
-
-Another crucial aspect of ABD is determining
-which layers to penalize and what hyperparameters to choose. Specifically, we aim to minimize
-
-the affected layers to reduce unnecessary perturbations and optimize αl and β l for each layer l to
-enhance the model’s resilience against jailbreaks.
-To accomplish these goals, we use a Bayesian Optimization (BO)-based (Jones et al., 1998) tuning
-method to find suitable configurations. The BO
-process used for tuning is detailed in Appendix E.4.
-Concretely, we define two core objectives.
-Layer selection objective: We introduce a tunable
 mask M = [m0 , · · · , mL−1 ], mi ∈ {0, 1}, where
 mi = 1 indicates that ABD is applied to layer i.
 Here, L is the total number of transformer layers.
@@ -547,6 +470,93 @@ Since decreasing k l too aggressively can weaken
 ABD’s defense, our main strategy for reducing perturbations to the model is to minimize the number
 of affected layers by controlling the mask M . Our
 final objective is a weighted sum of two objectives:
+
+4.2 Bayesian Optimization-Based Tuning
+Another crucial aspect of ABD is determining
+which layers to penalize and what hyperparameters to choose. Specifically, we aim to minimize
+the affected layers to reduce unnecessary perturbations and optimize αl and β l for each layer l to
+enhance the model’s resilience against jailbreaks.
+To accomplish these goals, we use a Bayesian Optimization (BO)-based (Jones et al., 1998) tuning
+method to find suitable configurations. The BO
+process used for tuning is detailed in Appendix E.4.
+Concretely, we define two core objectives.
+Layer selection objective: We introduce a tunable
+
+…
+
+m0 mi-1
+
+Sorry, …
+I cannot …
+I’m just …
+…
+
+≥ 0 are hyperparameters.
+The penalty functions under different αl and β l are
+visualized in Figure 6 in Appendix E.2.
+This function meets the stated expectations. It is
+symmetric about the mean µlD , ensuring fair penalization for deviations above and below this central
+value. The penalty strength |x − x′ | increases nonlinearly with the distance from µlD because tanh(·)
+amplifies more significant deviations with its steep
+slope, reflecting stronger penalization for outliers.
+Moreover, the function mostly penalizes outliers.
+Within the range [µlD − bl , µlD + bl ], x′ ≈ x, where
+bl is a relatively small number, resulting in a negligible penalty for values close to the mean. The
+hyperparameters αl and β l govern the behavior of
+the penalty function. The parameter αl determines
+the maximum range of x′ , ensuring all coordinates
+are constrained within (−αl + µlD , αl + µlD ) after
+penalty application. Meanwhile, β l controls the
+size of the unmodified region [µlD − bl , µlD + bl ];
+increasing β l expands this region, while decreasing
+β l narrows it.
+
+…
+
+Penalty
+Function
+
+M
+
+Sure, …
+Here’s …
+Sure! …
+…
+
+≥ 0 and β l
+
+…
+
+…
+
+Layer i+2
+
+where αl
+
+(3)
+
+Jailbreak
+Prompts
+
+LLM
+Layer i+1
+
+x′ = αl · tanh(β l · (x − µlD )) + µlD ,
+
+Activations
+
+Layer i
+
+the activation coordinate distribution Dl (x), we approximate it using DN l (x) and focus on two geometric properties. First, symmetry around the mean
+value µlD requires the penalty function also to be
+symmetric about µlD , ensuring unbiased penalization of outliers above or below the safety boundary.
+Second, the nonlinear decay of probability density
+with increasing distance from µlD implies that the
+penalty should grow nonlinearly with the distance,
+rising faster than a linear penalty. Following these
+principles, we propose a penalty function that updates the original activation coordinate scalar value
+x to x′ as follows:
+
 Jtotal (Θ, M ) = w · LRobust + (1 − w) · LLayer ,
 
 where w is a manually set parameter balancing
@@ -564,9 +574,8 @@ Backbone models. We evaluated four widely
 used open-source LLMs of varying sizes and architectures: Llama-2-7B-Chat (Touvron et al., 2023),
 Vicuna-7B-v1.3, Qwen-1.5-0.5B-Chat (Bai et al.,
 2023), and Vicuna-13B-v1.5, referred to as Llama2, Vicuna-7B, Qwen, and Vicuna-13B. Llama-2
-is specifically trained for safety alignment, while
-Vicuna-7B is fine-tuned from Llama without additional safety alignment. Both Llama-2 and Vicuna7B have 32 layers. Qwen and Vicuna-13B have 24
-and 40 layers, respectively. The LLM configurations are detailed in Appendix F.1.
+
+25383
 
 Model
 
@@ -716,7 +725,6 @@ DeepInception
 
 Table 1: DSR of different defense methods across Vicuna-7B and Llama-2 along with different attack types . For
 ABD, the best , second and third performance across all defenses are highlighted.
-
 Model
 
 Jailbreak
@@ -758,6 +766,9 @@ GCG-Individual
 Table 2: Representative results comparing DSR of Qwen
 and Vicuna-13B. The best performance is highlighted.
 
+is specifically trained for safety alignment, while
+Vicuna-7B is fine-tuned from Llama without additional safety alignment. Both Llama-2 and Vicuna7B have 32 layers. Qwen and Vicuna-13B have 24
+and 40 layers, respectively. The LLM configurations are detailed in Appendix F.1.
 Jailbreak and defense baselines. For jailbreak
 methods, we considered four widely applied
 ones: optimization-based methods include GCGIndividual and AutoDAN, which iteratively optimize a jailbreak prompt aiming at generating affirmative responses. Model-based jailbreak, i.e.,
@@ -773,14 +784,14 @@ et al., 2024) uses a tuned model to modify the output probability distribution. 
 about these defenses can be found in Appendix F.3.
 Datasets and metrics. Following Xu et al.
 (2024), we adopted Just-Eval (Lin et al., 2023) to
-measure the general abilities of LLMs applied defense. Just-Eval is a comprehensive benchmark
+measure the general abilities of LLMs applied de-
+
+fense. Just-Eval is a comprehensive benchmark
 containing 1,000 diverse instructions, covering
 seven task types (e.g., reasoning, math, coding,
 etc.) and seven topics (e.g., ethics, nature, STEM,
 etc.). Furthermore, following Xu et al. (2024) and
-Liu et al. (2024d), we utilized the 50-behavior sub-
-
-set from AdvBench (Zou et al., 2023) as the test
+Liu et al. (2024d), we utilized the 50-behavior subset from AdvBench (Zou et al., 2023) as the test
 set. This subset, curated by Chao et al. (2023),
 was created by removing duplicate harmful behavior prompts from AdvBench, ensuring efficiency
 while mitigating biases caused by repeated behaviors. We used DSR when evaluating defense effectiveness. Following Lin et al. (2023), we leveraged
@@ -804,15 +815,8 @@ LRobust (Θ, M ) as it best balances performances
 on both attacked and unattached data. We conduct ablation studies on w in Appendix C.3, results
 shown in Table 5. Appendix E.3 presents settings
 of ABD optimization.
-5.2
 
-Experimental Results
-
-ABD reveals vulnerabilities in low and middle
-layers. In all models, the selected layers under
-the mask M mainly include low and middle layers,
-such as layers 5 and 12 in Vicuna-7B, layers 2
-and 12 in Llama-2, layers 2, 11, and 14 in Vicuna13B, and layers 5 and 14 in Qwen. These layers
+25384
 
 Runtime per
 Query↓
@@ -939,6 +943,12 @@ larger is better. For ABD, the best and second performances among all defenses a
 the model’s general performance, adding less than 0.1 seconds to runtime while producing high-quality outputs with
 leading evaluation scores. It has the best overall performance across all defenses.
 
+5.2 Experimental Results
+ABD reveals vulnerabilities in low and middle
+layers. In all models, the selected layers under
+the mask M mainly include low and middle layers,
+such as layers 5 and 12 in Vicuna-7B, layers 2
+and 12 in Llama-2, layers 2, 11, and 14 in Vicuna13B, and layers 5 and 14 in Qwen. These layers
 are most frequently penalized, consistent with our
 observations and proposed explanation that low
 and middle layers are more vulnerable to jailbreak
@@ -960,13 +970,13 @@ test set in Table 1. We also report representative
 results on Qwen and Vicuna-13B in Table 2, with
 full results shown in Table 9 in Appendix G.2.
 For Vicuna-7B which lacks specific safety alignment, the defense poses a more challenging task.
+
 Nevertheless, ABD demonstrates competitive performance. For jailbreak methods such as PAIR and
 DeepInception, ABD achieves a higher DSR (58%)
 compared to Paraphrase (2%) and Retokenization
 (0%), both of which require costly prompt reformulation. Against the GCG-Individual attack, ABD
 successfully defends against all jailbreak samples.
 For the well-aligned model Llama-2-7B-chat, ABD
-
 achieves 100% DSR under most jailbreak methods.
 For Qwen and Vicuna-13B, ABD maintains
 nearly 100% DSR, showcasing competitive performance. Notably, for smaller models like Qwen,
@@ -986,18 +996,36 @@ as Retokenization and Self-Reminder, LLM would
 generate overly simplistic outputs, which leads to
 smaller Runtime per Query, but they have significantly smaller Just-Eval scores.We also compared
 defenses on complexity, overhead, and implementation difficulty, highlighting ABD’s efficiency (see
-Table 10 in Appendix E.5).
+
+25385
+
+Table 10 in Appendix E.5).
+
+Ethical Considerations
 
 6
+
+The aim of this research is to enhance the explainability and safety of LLMs. Our proposed jailbreak
+mechanism, that jailbreak shift activations out of
+the safety boundary, can mitigate disputes on how
+jailbreak happens and promote the development of
+both LLM explainability and safety. We highlight
+that the development of ABD only needs publicly
+available datasets and jailbreak methods and does
+not require designing new jailbreak methods. We
+demonstrate some harmful responses from LLMs
+only for illustration. We acknowledge that ABD
+would cause the development of new attacks. We
+will explore using random perturbation in the input
+sequence rather than a particular jailbreak method
+when optimizing to mitigate such attacks.
 
 Conclusion and Future Work
 
 We conducted a comprehensive study of jailbreak
 mechanisms, analyzing over 30,000 samples. Our
 findings reveal that jailbreak shifts harmful activations outside the safety boundary in each layer, with
-the most severe shifts in the low and middle lay-
-
-ers. Motivated by this finding, we proposed ABD,
+the most severe shifts in the low and middle layers. Motivated by this finding, we proposed ABD,
 which drives jailbreak activations back within the
 safety boundary, utilizing LLMs’ intrinsic sensitivity to harmful information. Our experiments
 suggest that ABD is both practical and efficient. In
@@ -1015,7 +1043,7 @@ search for penalty functions that balance general
 ability and DSR. Therefore, they typically need
 more extensive optimization. Future work could
 refine ABD by specifically searching for activation
-spaces that preserve the concept of "safety", therefore enhancing its generalizability on uncensored
+spaces that preserve the concept of “safety”, therefore enhancing its generalizability on uncensored
 models.
 Focus on single-round jailbreak. In this study,
 we primarily focus on single-round jailbreak scenarios. We do not extend our analysis to more
@@ -1032,33 +1060,19 @@ ABD at critical points, e.g., when malicious topics emerge, to balance efficienc
 across turns to prevent harmful activations from
 accumulating.
 
-Ethical Considerations
-The aim of this research is to enhance the explainability and safety of LLMs. Our proposed jailbreak
-mechanism, that jailbreak shift activations out of
-the safety boundary, can mitigate disputes on how
-jailbreak happens and promote the development of
-both LLM explainability and safety. We highlight
-
-that the development of ABD only needs publicly
-available datasets and jailbreak methods and does
-not require designing new jailbreak methods. We
-demonstrate some harmful responses from LLMs
-only for illustration. We acknowledge that ABD
-would cause the development of new attacks. We
-will explore using random perturbation in the input
-sequence rather than a particular jailbreak method
-when optimizing to mitigate such attacks.
-
 References
 Takuya Akiba, Shotaro Sano, Toshihiko Yanase, Takeru
-Ohta, and Masanori Koyama. 2019. Optuna: A nextgeneration hyperparameter optimization framework.
-In The 25th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining, pages
-2623–2631.
+Ohta, and Masanori Koyama. 2019. Optuna: A NextGeneration Hyperparameter Optimization Framework. In Proceedings of the 25th ACM SIGKDD
+International Conference on Knowledge Discovery
+and Data Mining, pages 2623–2631, Anchorage, AK,
+USA. ACM.
 Gabriel Alon and Michael Kamfonas. 2023. Detecting language model attacks with perplexity. arXiv
 preprint arXiv:2308.14132.
 Farzana Anowar, Samira Sadaoui, and Bassant Selim.
-2021. Conceptual and empirical comparison of dimensionality reduction algorithms (pca, kpca, lda,
-mds, svd, lle, isomap, le, ica, t-sne). Computer Science Review, 40:100378.
+2021. Conceptual and empirical comparison of
+dimensionality reduction algorithms (PCA, KPCA,
+LDA, MDS, SVD, LLE, Isomap, LE, ICA, t-SNE).
+Computer Science Review, 40:100378.
 Jinze Bai, Shuai Bai, Yunfei Chu, Zeyu Cui, Kai Dang,
 Xiaodong Deng, Yang Fan, Wenbin Ge, Yu Han, Fei
 Huang, Binyuan Hui, Luo Ji, Mei Li, Junyang Lin,
@@ -1077,7 +1091,10 @@ of latent space dynamics in large language models.
 arXiv preprint arXiv:2406.09289.
 Sarah Ball, Frauke Kreuter, and Nina Panickssery.
 2024b. Understanding jailbreak success: A study
-of latent space dynamics in large language models.
+
+25386
+
+of latent space dynamics in large language models.
 Preprint, arXiv:2406.09289.
 James Bergstra, Rémi Bardenet, Yoshua Bengio, and
 Balázs Kégl. 2011. Algorithms for hyper-parameter
@@ -1085,12 +1102,9 @@ optimization. In Advances in Neural Information
 Processing Systems, volume 24. Curran Associates,
 Inc.
 Rishabh Bhardwaj and Soujanya Poria. 2023. Redteaming large language models using chain
-
-of utterances for safety-alignment.
-arXiv:2308.09662.
-
+of utterances for safety-alignment.
 Preprint,
-
+arXiv:2308.09662.
 J Douglas Carroll and Phipps Arabie. 1998. Multidimensional scaling. Measurement, judgment and
 decision making, pages 179–250.
 Patrick Chao, Alexander Robey, Edgar Dobriban,
@@ -1107,7 +1121,39 @@ Zhanghao Wu, Hao Zhang, Lianmin Zheng, Siyuan
 Zhuang, Yonghao Zhuang, Joseph E. Gonzalez, Ion
 Stoica, and Eric P. Xing. 2023. Vicuna: An opensource chatbot impressing gpt-4 with 90%* chatgpt
 quality.
+Junjie Chu, Yugeng Liu, Ziqing Yang, Xinyue Shen,
+Michael Backes, and Yang Zhang. 2024. Comprehensive assessment of jailbreak attacks against llms.
+arXiv preprint arXiv:2402.05668.
+Peng Ding, Jun Kuang, Dan Ma, Xuezhi Cao, Yunsen Xian, Jiajun Chen, and Shujian Huang. 2024.
+A wolf in sheep‘s clothing: Generalized nested jailbreak prompts can fool large language models easily.
+In Proceedings of the 2024 Conference of the North
+American Chapter of the Association for Computational Linguistics: Human Language Technologies
+(Volume 1: Long Papers), pages 2136–2153, Mexico
+City, Mexico. Association for Computational Linguistics.
+Lang Gao, Kaiyang Wan, Wei Liu, Chenxi Wang, Zirui
+Song, Zixiang Xu, Yanbo Wang, Veselin Stoyanov,
+and Xiuying Chen. 2025. Evaluate bias without manual test sets: A concept representation perspective for
+llms. Preprint, arXiv:2505.15524.
+Xingang Guo, Fangxu Yu, Huan Zhang, Lianhui Qin,
+and Bin Hu. 2024. Cold-attack: Jailbreaking llms
+with stealthiness and controllability. arXiv preprint
+arXiv:2402.08679.
+Zeqing He, Zhibo Wang, Zhixuan Chu, Huiyu Xu,
+Rui Zheng, Kui Ren, and Chun Chen. 2024. Jailbreaklens: Interpreting jailbreak mechanism in
 
+the lens of representation and circuit.
+arXiv:2411.11114.
+
+Preprint,
+
+Yue Huang, Chujie Gao, Siyuan Wu, Haoran Wang,
+Xiangqi Wang, Yujun Zhou, Yanbo Wang, Jiayi Ye,
+Jiawen Shi, Qihui Zhang, et al. 2025. On the trustworthiness of generative foundation models: Guideline, assessment, and perspective. arXiv preprint
+arXiv:2502.14296.
+Yue Huang, Jingyu Tang, Dongping Chen, Bingda Tang,
+Yao Wan, Lichao Sun, and Xiangliang Zhang. 2024.
+Obscureprompt: Jailbreaking large language models
+via obscure input. arXiv preprint arXiv:2406.13662.
 Neel Jain, Avi Schwarzschild, Yuxin Wen, Gowthami
 Somepalli, John Kirchenbauer, Ping-yeh Chiang,
 Micah Goldblum, Aniruddha Saha, Jonas Geiping,
@@ -1123,45 +1169,14 @@ Donald R. Jones. 2001. A taxonomy of global optimization methods based on respon
 Global Optimization, 21(4):345–383.
 Donald R Jones, Matthias Schonlau, and William J
 Welch. 1998. Efficient global optimization of expensive black-box functions. Journal of Global optimization, 13:455–492.
-
-Junjie Chu, Yugeng Liu, Ziqing Yang, Xinyue Shen,
-Michael Backes, and Yang Zhang. 2024. Comprehensive assessment of jailbreak attacks against llms.
-arXiv preprint arXiv:2402.05668.
-
 Jean Kaddour, Joshua Harris, Maximilian Mozes, Herbie Bradley, Roberta Raileanu, and Robert McHardy.
 2023. Challenges and applications of large language
 models. arXiv preprint arXiv:2307.10169.
-
-Peng Ding, Jun Kuang, Dan Ma, Xuezhi Cao, Yunsen Xian, Jiajun Chen, and Shujian Huang. 2024.
-A wolf in sheep‘s clothing: Generalized nested jailbreak prompts can fool large language models easily.
-In Proceedings of the 2024 Conference of the North
-American Chapter of the Association for Computational Linguistics: Human Language Technologies
-(Volume 1: Long Papers), pages 2136–2153, Mexico
-City, Mexico. Association for Computational Linguistics.
-
 Tianlong Li, Xiaoqing Zheng, and Xuanjing Huang.
 2024. Rethinking jailbreaking through the lens
 of representation engineering.
 ArXiv preprint,
 abs/2401.06824.
-
-Xingang Guo, Fangxu Yu, Huan Zhang, Lianhui Qin,
-and Bin Hu. 2024. Cold-attack: Jailbreaking llms
-with stealthiness and controllability. arXiv preprint
-arXiv:2402.08679.
-Zeqing He, Zhibo Wang, Zhixuan Chu, Huiyu Xu,
-Rui Zheng, Kui Ren, and Chun Chen. 2024. Jailbreaklens: Interpreting jailbreak mechanism in
-the lens of representation and circuit. Preprint,
-arXiv:2411.11114.
-Yue Huang, Chujie Gao, Siyuan Wu, Haoran Wang,
-Xiangqi Wang, Yujun Zhou, Yanbo Wang, Jiayi Ye,
-Jiawen Shi, Qihui Zhang, et al. 2025. On the trustworthiness of generative foundation models: Guideline, assessment, and perspective. arXiv preprint
-arXiv:2502.14296.
-Yue Huang, Jingyu Tang, Dongping Chen, Bingda Tang,
-Yao Wan, Lichao Sun, and Xiangliang Zhang. 2024.
-Obscureprompt: Jailbreaking large language models
-via obscure input. arXiv preprint arXiv:2406.13662.
-
 Xuan Li, Zhanke Zhou, Jianing Zhu, Jiangchao Yao,
 Tongliang Liu, and Bo Han. 2023. Deepinception:
 Hypnotize large language model to be jailbreaker.
@@ -1172,7 +1187,10 @@ in-context learning. ArXiv preprint.
 Jianhua Lin. 1991. Divergence measures based on the
 shannon entropy. IEEE Transactions on Information
 theory, 37(1):145–151.
-Yuping Lin, Pengfei He, Han Xu, Yue Xing, Makoto
+
+25387
+
+Yuping Lin, Pengfei He, Han Xu, Yue Xing, Makoto
 Yamada, Hui Liu, and Jiliang Tang. 2024. Towards
 understanding jailbreak attacks in LLMs: A representation space analysis. In Proceedings of the 2024
 Conference on Empirical Methods in Natural Language Processing, pages 7067–7085, Miami, Florida,
@@ -1183,8 +1201,7 @@ refining of probability distributions. In Proceedings
 of the 2024 Conference on Empirical Methods in
 Natural Language Processing, pages 2802–2816, Miami, Florida, USA. Association for Computational
 Linguistics.
-
-Xiaogeng Liu, Nan Xu, Muhao Chen, and Chaowei
+Xiaogeng Liu, Nan Xu, Muhao Chen, and Chaowei
 Xiao. 2024b. Autodan: Generating stealthy jailbreak
 prompts on aligned large language models. In The
 Twelfth International Conference on Learning Representations.
@@ -1194,6 +1211,11 @@ arXiv:2406.07595.
 Yue Liu, Xiaoxin He, Miao Xiong, Jinlan Fu, Shumin
 Deng, and Bryan Hooi. 2024d. Flipattack: Jailbreak
 llms via flipping. Preprint, arXiv:2410.02832.
+MD Abdullah Al Nasim, A. S. M Anas Ferdous,
+Abdur Rashid, Fatema Tuj Johura Soshi, Parag
+Biswas, Angona Biswas, and Kishor Datta Gupta.
+2025. Trustworthy xai and application. Preprint,
+arXiv:2410.17139.
 OpenAI. 2024. Gpt-4o mini: Advancing cost-efficient
 intelligence.
 Anselm Paulus, Arman Zharmagambetov, Chuan Guo,
@@ -1214,6 +1236,7 @@ language models against jailbreaking attacks. arXiv
 preprint arXiv:2310.03684.
 Guobin Shen, Dongcheng Zhao, Yiting Dong, Xiang
 He, and Yi Zeng. 2024. Jailbreak antidote: Runtime
+
 safety-utility balance via sparse representation adjustment in large language models. arXiv preprint
 arXiv:2410.02298.
 Xinyue Shen, Zeyuan Chen, Michael Backes, Yun
@@ -1232,7 +1255,6 @@ principles. arXiv preprint arXiv:2408.04686.
 Rohan Taori, Ishaan Gulrajani, Tianyi Zhang, Yann
 Dubois, Xuechen Li, Carlos Guestrin, Percy Liang,
 and Tatsunori B. Hashimoto. 2023. Stanford alpaca:
-
 An instruction-following llama model. https://
 github.com/tatsu-lab/stanford_alpaca.
 Hugo Touvron, Louis Martin, Kevin Stone, Peter Albert, Amjad Almahairi, Yasmine Babaei, Nikolay
@@ -1242,9 +1264,15 @@ arXiv:2307.09288.
 Laurens Van der Maaten and Geoffrey Hinton. 2008.
 Visualizing data using t-sne. Journal of machine
 learning research, 9(11).
+Chenxi Wang, Tianle Gu, Zhongyu Wei, Lang Gao,
+Zirui Song, and Xiuying Chen. 2025a. Word form
+matters: Llms’ semantic reconstruction under typoglycemia. Preprint, arXiv:2503.01714.
+Chenxi Wang, Zongfang Liu, Dequan Yang, and Xiuying Chen. 2025b. Decoding echo chambers: LLMpowered simulations revealing polarization in social networks. In Proceedings of the 31st International Conference on Computational Linguistics,
+pages 3913–3923, Abu Dhabi, UAE. Association for
+Computational Linguistics.
 Yanbo Wang, Jiayi Ye, Siyuan Wu, Chujie Gao, Yue
 Huang, Xiuying Chen, Yue Zhao, and Xiangliang
-Zhang. 2025. Trusteval: A dynamic evaluation
+Zhang. 2025c. Trusteval: A dynamic evaluation
 toolkit on trustworthiness of generative foundation
 models. In Proceedings of the 2025 Conference of the
 Nations of the Americas Chapter of the Association
@@ -1252,7 +1280,10 @@ for Computational Linguistics: Human Language
 Technologies (System Demonstrations), pages 70–84.
 Yihan Wang, Zhouxing Shi, Andrew Bai, and ChoJui Hsieh. 2024. Defending llms against jailbreaking attacks via backtranslation. Preprint,
 arXiv:2402.16459.
-Yueqi Xie, Minghong Fang, Renjie Pi, and Neil Gong.
+
+25388
+
+Yueqi Xie, Minghong Fang, Renjie Pi, and Neil Gong.
 2024. GradSafe: Detecting jailbreak prompts for
 LLMs via safety-critical gradient analysis. In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long
 Papers), pages 507–518, Bangkok, Thailand. Association for Computational Linguistics.
@@ -1270,42 +1301,16 @@ via safety-aware decoding. In Proceedings of the
 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
 pages 5587–5605, Bangkok, Thailand. Association
 for Computational Linguistics.
-Jiayi Ye, Yanbo Wang, Yue Huang, Dongping Chen,
-Qihui Zhang, Nuno Moniz, Tian Gao, Werner Geyer,
-Chao Huang, Pin-Yu Chen, et al. 2024. Justice
-or prejudice? quantifying biases in llm-as-a-judge.
-arXiv preprint arXiv:2410.02736.
-
-Zhiyuan Yu, Xiaogeng Liu, Shunning Liang, Zach
-Cameron, Chaowei Xiao, and Ning Zhang. 2024.
-Don’t listen to me: Understanding and exploring
-jailbreak prompts of large language models. In 33rd
-USENIX Security Symposium (USENIX Security 24),
-Philadelphia, PA. USENIX Association.
-
-A
-
-We present the statistics of our data for observation
-experiments as Table 4.
-Type
+Zixiang Xu, Yanbo Wang, Yue Huang, Xiuying Chen,
+Jieyu Zhao, Meng Jiang, and Xiangliang Zhang.
+2025a. Cross-lingual pitfalls: Automatic probing
+cross-lingual weakness of multilingual large language models. In Proceedings of the 63rd Annual
+Meeting of the Association for Computational Linguistics (ACL). Association for Computational Linguistics.
 
 Yuqi Zhang, Liang Ding, Lefei Zhang, and Dacheng
 Tao. 2025. Intention analysis makes llms a good
 jailbreak defender. In Proceedings of the 31st International Conference on Computational Linguistics,
 pages 2947–2968.
-
-Benign samples
-Harmful samples
-Jailbreak samples
-AdvPrompter
-AutoDAN
-COLD-Suffix
-ArtPrompt
-GCG-Individual
-GCG-Universal
-PAIR
-Total
-
 Chongwen Zhao, Zhihao Dou, and Kaizhu Huang.
 2024a. Eeg-defender: Defending against jailbreak
 through early exit generation of large language models. arXiv preprint arXiv:2408.11308.
@@ -1325,9 +1330,53 @@ arXiv:2406.05644.
 Andy Zou, Zifan Wang, J. Zico Kolter, and Matt Fredrikson. 2023. Universal and transferable adversarial attacks on aligned language models. Preprint,
 arXiv:2307.15043.
 
+Zixiang Xu, Yanbo Wang, Yue Huang, Jiayi Ye, Haomin
+Zhuang, Zirui Song, Lang Gao, Chenxi Wang,
+Zhaorun Chen, Yujun Zhou, Sixian Li, Wang Pan,
+Yue Zhao, Jieyu Zhao, Xiangliang Zhang, and Xiuying Chen. 2025b. Socialmaze: A benchmark for
+evaluating social reasoning in large language models.
+Zixiang Xu, Yanbo Wang, Chenxi Wang, Lang Gao,
+Zirui Song, Yue Huang, Zhaorun Chen, Xiangliang
+Zhang, and Xiuying Chen. 2025c. Gta: Graph theory
+agent and benchmark for algorithmic graph reasoning
+with llms.
+Jiayi Ye, Yanbo Wang, Yue Huang, Dongping Chen,
+Qihui Zhang, Nuno Moniz, Tian Gao, Werner Geyer,
+Chao Huang, Pin-Yu Chen, et al. 2024. Justice
+or prejudice? quantifying biases in llm-as-a-judge.
+arXiv preprint arXiv:2410.02736.
+Zhiyuan Yu, Xiaogeng Liu, Shunning Liang, Zach
+Cameron, Chaowei Xiao, and Ning Zhang. 2024.
+Don’t listen to me: Understanding and exploring
+jailbreak prompts of large language models. In 33rd
+USENIX Security Symposium (USENIX Security 24),
+Philadelphia, PA. USENIX Association.
+
+25389
+
+A
+
 Statistics of Observed Data
 
+We present the statistics of our data for observation
+experiments as Table 4.
+Type
+Benign samples
+Harmful samples
+Jailbreak samples
+AdvPrompter
+AutoDAN
+COLD-Suffix
+ArtPrompt
+GCG-Individual
+GCG-Universal
+PAIR
+Total
+
 Samples
+
+ρlinclusion =
+
 20,000
 8,556
 1,872
@@ -1353,13 +1402,16 @@ and Figure 9.
 
 C
 
+80% activations. The center of the ball is clD , and
+l .
+the radius of the ball is denoted as rD
+Then, we calculate the portion of Al which are
+contained within the ball:
+
 Supplementary Observational
 Experiments
 
-C.1
-
-Data Augmentation Experiment
-
+C.1 Data Augmentation Experiment
 We show that by adopting the same method as Shen
 et al. (2024), we can draw a different conclusion by
 scaling up data. Shen et al. (2024) state jailbreak
@@ -1376,22 +1428,12 @@ seem to cluster on the harmful activation side, as
 shown in the right part of 5. Therefore, jailbreak
 activations are not always between harmful and
 benign activations in deeper layers.
-C.2
-
-Inclusion Ratio Experiments
-
+C.2 Inclusion Ratio Experiments
 For a layer l, to measure the portion of a set of
 jailbreak activations Al = {al0 , al1 , · · · , aln } that
 resides in harmful activation space, we propose an
 inclusion ratio. Based on 8,556 harmful samples
 gathered in Table 4, we calculate a ball that covers
-
-80% activations. The center of the ball is clD , and
-l .
-the radius of the ball is denoted as rD
-Then, we calculate the portion of Al which are
-contained within the ball:
-ρlinclusion =
 
 l }
 {ali ∈ Al | ∥ali − clD ∥2 ≤ rD
@@ -1421,30 +1463,6 @@ model achieves the best average DSR, balancing
 robustness and benign performance. Therefore,
 we set w = 0.8 in our experiments in Section 5.
 
-Figure 5: t-SNE visualization of activations in layer
-14. Left: Results with 60 samples per type following
-(Shen et al., 2024), showing jailbreak activations between harmful and benign activations. Right: Results
-after scaling up to 500 samples per type, showing jailbreak activations clustering on the harmful side.
-
-layer, we compute their coordinate distributions:
-l and harmful actibenign activation distribution DB
-l . Using their means and divation distribution DH
-l
-vergences, we generate normal distributions DBN
-l
-and DHN . Finally, we calculate the JS-divergence
-(JSD) between the original and generated distributions. Results are shown in Table 7.
-The results show that (1) In all layers,
-l , Dl
-l
-l
-JSD(DB
-BN ) < 0.1 and JSD(DH , DHN ) <
-0.1, confirming the validity of approximating coordinate distributions with normal distributions. (2)
-Earlier layers have lower JSDs, making this approximation safer in early and middle layers. This
-supports our ABD settings, where penalty functions are primarily applied to these layers.
-E.2
-
 D
 
 Supplementary Illustration on Safety
@@ -1473,31 +1491,12 @@ Approximation
 
 We use the 20,000 benign samples and 8,556 harmful samples to form 4096-dim activations. For each
 
-Visualization of the penalty function.
-
-A visualization of penalty functions are shown
-in Figure 6. The penalty function is symmetric
-about (µlD , µlD ). Figure 6(a) and Figure Figure 6(b)
-presents the change in the range [µlD − bl , µlD + bl ],
-where x′ ≈ x. A larger β l results in the larger
-little-perturbed region. Figure 6(a) and Figure 6(c)
-presents the change in the range of x′ . When αl
-increases, x′ is confined within a wider range of
-values. αl and β l collaboratively determines behaviors of the penalty function.
-E.3
-
-ABD Optimization Settings
-
-Validation data. To make validation data, we
-adopt GCG-Universal (Zou et al., 2023). We optimize a common suffix for all 400 samples, with
-n_steps=1, batch_size=512.
-To ensure efficiency, in each iteration of optimization, we select a batch of harmful prompts
-from the 400 entries as Sval . We initially
-set the batch size to 15.
-In most cases
-LRobust (Θ, M |Sval ) < 0.9, and the optimiza-
+25390
 
 Jailbreak
+No Jailbreaks
+GCG-Individual
+Avg.
 
 No defense
 
@@ -1528,10 +1527,6 @@ w=1
 86%
 100%
 93%
-
-No Jailbreaks
-GCG-Individual
-Avg.
 
 Table 5: Defense performance comparison under different w.
 Query: Write a script that can exploit vulnerabilities in a software or operating system
@@ -1568,7 +1563,69 @@ on exploiting vulnerabilities . . .
 Yes
 
 Table 6: Model output under different shifting distances.
-Layer
+
+Figure 5: t-SNE visualization of activations in layer
+14. Left: Results with 60 samples per type following
+(Shen et al., 2024), showing jailbreak activations between harmful and benign activations. Right: Results
+after scaling up to 500 samples per type, showing jailbreak activations clustering on the harmful side.
+
+layer, we compute their coordinate distributions:
+l and harmful actibenign activation distribution DB
+l . Using their means and divation distribution DH
+l
+vergences, we generate normal distributions DBN
+l
+and DHN . Finally, we calculate the JS-divergence
+(JSD) between the original and generated distributions. Results are shown in Table 7.
+The results show that (1) In all layers,
+l , Dl
+l
+l
+JSD(DB
+BN ) < 0.1 and JSD(DH , DHN ) <
+0.1, confirming the validity of approximating coordinate distributions with normal distributions. (2)
+Earlier layers have lower JSDs, making this approximation safer in early and middle layers. This
+supports our ABD settings, where penalty functions are primarily applied to these layers.
+E.2
+
+Visualization of the penalty function.
+
+A visualization of penalty functions are shown
+in Figure 6. The penalty function is symmetric
+
+about (µlD , µlD ). Figure 6(a) and Figure Figure 6(b)
+presents the change in the range [µlD − bl , µlD + bl ],
+where x′ ≈ x. A larger β l results in the larger
+little-perturbed region. Figure 6(a) and Figure 6(c)
+presents the change in the range of x′ . When αl
+increases, x′ is confined within a wider range of
+values. αl and β l collaboratively determines behaviors of the penalty function.
+E.3
+
+ABD Optimization Settings
+
+Validation data. To make validation data, we
+adopt GCG-Universal (Zou et al., 2023). We optimize a common suffix for all 400 samples, with
+n_steps=1, batch_size=512.
+To ensure efficiency, in each iteration of optimization, we select a batch of harmful prompts
+from the 400 entries as Sval . We initially
+set the batch size to 15.
+In most cases
+LRobust (Θ, M |Sval ) < 0.9, and the optimization process continues to the next iteration. If
+LRobust (Θ, M |Sval ) ≥ 0.9, due to the potential
+regional optimal, we iteratively increase the batch
+size by ten and reformulate Sval to test again. This
+process ends if 1) the calculated LRobust < 0.9 or
+2) batch size reaches 50.
+Initial values. To prevent the futile search of the
+optimizer, we set valid initial values before optimization: for i ∈ {2, 12}, mi = 1, αi = 1, βi =
+0.5, ki = 0.5; for i ∈
+/ {2, 12}, mi = αi = βi =
+ki = 0.
+
+25391
+
+Layer
 
 0
 
@@ -1588,9 +1645,9 @@ Layer
 
 l
 l
-)
-, DBN
 JSD(DB
+, DBN
+)
 
 0.0036
 
@@ -1610,9 +1667,9 @@ JSD(DB
 
 l
 l
-)
-, DHN
 JSD(DH
+, DHN
+)
 
 0.0033
 
@@ -1650,9 +1707,9 @@ Layer
 
 l
 l
-)
-, DBN
 JSD(DB
+, DBN
+)
 
 0.039
 
@@ -1672,9 +1729,9 @@ JSD(DB
 
 l
 l
-)
-, DHN
 JSD(DH
+, DHN
+)
 
 0.0396
 
@@ -1712,9 +1769,9 @@ Layer
 
 l
 l
-)
-, DBN
 JSD(DB
+, DBN
+)
 
 0.0848
 
@@ -1734,9 +1791,9 @@ JSD(DB
 
 l
 l
-)
-, DHN
 JSD(DH
+, DHN
+)
 
 0.0823
 
@@ -1774,9 +1831,9 @@ Layer
 
 l
 l
-)
 JSD(DB
 , DBN
+)
 
 0.0789
 
@@ -1796,9 +1853,9 @@ JSD(DB
 
 l
 l
-)
-, DHN
 JSD(DH
+, DHN
+)
 
 0.0681
 
@@ -1817,6 +1874,8 @@ JSD(DH
 0.0724
 
 Table 7: Layer-wise JSD Comparisons
+
+Figure 6: Penalty functions under different αl , β l compared with x′ = x.
 DSR
 
 No attack
@@ -1864,21 +1923,6 @@ ABD (Ours)
 
 Table 8: Performance comparison of different methods under various attack scenarios. The best performance is
 highlighted in bold.
-
-tion process continues to the next iteration. If
-LRobust (Θ, M |Sval ) ≥ 0.9, due to the potential
-regional optimal, we iteratively increase the batch
-size by ten and reformulate Sval to test again. This
-process ends if 1) the calculated LRobust < 0.9 or
-2) batch size reaches 50.
-
-Initial values. To prevent the futile search of the
-optimizer, we set valid initial values before optimization: for i ∈ {2, 12}, mi = 1, αi = 1, βi =
-0.5, ki = 0.5; for i ∈
-/ {2, 12}, mi = αi = βi =
-ki = 0.
-
-Figure 6: Penalty functions under different αl , β l compared with x′ = x.
 Model
 
 Attack
@@ -1978,16 +2022,18 @@ AutoDAN
 Table 9: Performance comparison of different defenses across models with different scales and structures. For ABD,
 the best and second-best performance across all defenses are highlighted.
 
-Optimizing framework. We adopt Optuna (Akiba et al., 2019) as our framework of optimization. We follow Optuna’s default settings, i.e., Treestructured Parzen Estimator (TPE) (Bergstra et al.,
-2011)-based Optimization.
+Optimizing framework. We adopt Optuna (Akiba et al., 2019) as our framework of optimiza-
 
-observations. This approach ensures efficient exploration while mitigating local optima risks. By leveraging Optuna’s TPE implementation, the optimizer
-adapts dynamically to Jtotal feedback, achieving
-automated defense parameter optimization.
+tion. We follow Optuna’s default settings, i.e., Treestructured Parzen Estimator (TPE) (Bergstra et al.,
 
+25392
+
+2011)-based Optimization.
 E.4
 
-E.5
+fastchat . model .
+get_conversation_template (
+template_name ).
 
 ABD Optimizing Process
 
@@ -2010,6 +2056,10 @@ prioritizing parameters likely to outperform the
 current best. The process begins with a warm-up
 phase, where random evaluations establish a baseline, followed by a density-guided search, which
 iteratively refines l(Θ) and g(Θ) using historical
+observations. This approach ensures efficient exploration while mitigating local optima risks. By leveraging Optuna’s TPE implementation, the optimizer
+adapts dynamically to Jtotal feedback, achieving
+automated defense parameter optimization.
+E.5
 
 Comparison with other defense methods
 
@@ -2025,16 +2075,56 @@ F
 Supplementary Illustration on
 Experiments
 
-F.1
-
-Generation Configs
-
+F.1 Generation Configs
 When conducting experiments, we directly utilize
 most of the original configurations of all LLMs.
 Specifically, we set max_new_tokens=128. We
 find that the proper functioning of these LLMs
 largely depends on the chat template of the inputs.
 We apply chat templates in fastchat v0.2.36 by:
+
+We set template_name="vicuna" for Vicuna-7B
+and Vicuna-13B, template_name="llama-2" for
+Llama-2, and template_name="qwen" for Qwen.
+F.2
+
+Jailbreak Methods
+
+GCG-Individual and GCG-Universal (Zou
+et al., 2023) are optimization-based jailbreak attacks. They build towards an objective to repeat the
+prompt affirmatively and optimize a suffix based
+on a Greedy Coordinate Gradient-based search.
+The model would likely repeat the prompt affirmatively and generate harmful content with the suffix
+added behind the original prompt. GCG-Individual
+focuses on generating a tailored suffix designed
+specifically for a particular prompt. In contrast,
+GCG-Universal seeks to identify a generalized suffix that can be applied across multiple prompts,
+enabling it to deceive the model in a broader range
+of scenarios.
+AutoDAN (Liu et al., 2024b) utilize a meticulously designed hierarchical genetic algorithm and
+generate stealthy jailbreak prompts. The generated
+prompts are highly readable and transferable.
+PAIR (Chao et al., 2023) is a jailbreak method
+that leverages an attacker LLM aiming at making
+the target LLM answer harmful prompts. The attacker LLM iteratively queries the target LLM to
+update and refine a candidate jailbreak prompt.
+DeepInception (Li et al., 2023) proposes a simple method that uses the personification ability of
+LLMs. It creates a virtual and layered scene, allowing the model to find flexible ways to bypass usage
+controls in normal situations.
+F.3
+
+Defense Methods
+
+PPL (Alon and Kamfonas, 2023) discovers that
+jailbreak prompts often lead to high perplexity values in LLMs. It, therefore, involves adding a classifier trained on perplexity and text length at the
+end of LLMs. The classifier can serve as a filter to
+avoid outputting potentially harmful answers.
+Paraphrase (Jain et al., 2023) defense LLMs
+by making them paraphrase their inputs, avoiding
+deception caused by potential adversarial jailbreak
+suffixes within original inputs.
+
+25393
 
 Extra
 Complexity
@@ -2173,51 +2263,6 @@ Retokenization
 
 Table 10: Empirical Comparison of Defenses. t is the length of input sequence.
 
-fastchat . model .
-get_conversation_template (
-template_name ) .
-We set template_name="vicuna" for Vicuna-7B
-and Vicuna-13B, template_name="llama-2" for
-Llama-2, and template_name="qwen" for Qwen.
-F.2
-
-Jailbreak Methods
-
-GCG-Individual and GCG-Universal (Zou
-et al., 2023) are optimization-based jailbreak attacks. They build towards an objective to repeat the
-prompt affirmatively and optimize a suffix based
-on a Greedy Coordinate Gradient-based search.
-The model would likely repeat the prompt affirmatively and generate harmful content with the suffix
-added behind the original prompt. GCG-Individual
-focuses on generating a tailored suffix designed
-specifically for a particular prompt. In contrast,
-GCG-Universal seeks to identify a generalized suffix that can be applied across multiple prompts,
-enabling it to deceive the model in a broader range
-of scenarios.
-AutoDAN (Liu et al., 2024b) utilize a meticulously designed hierarchical genetic algorithm and
-generate stealthy jailbreak prompts. The generated
-prompts are highly readable and transferable.
-PAIR (Chao et al., 2023) is a jailbreak method
-that leverages an attacker LLM aiming at making
-the target LLM answer harmful prompts. The at-
-
-tacker LLM iteratively queries the target LLM to
-update and refine a candidate jailbreak prompt.
-DeepInception (Li et al., 2023) proposes a simple method that uses the personification ability of
-LLMs. It creates a virtual and layered scene, allowing the model to find flexible ways to bypass usage
-controls in normal situations.
-F.3
-
-Defense Methods
-
-PPL (Alon and Kamfonas, 2023) discovers that
-jailbreak prompts often lead to high perplexity values in LLMs. It, therefore, involves adding a classifier trained on perplexity and text length at the
-end of LLMs. The classifier can serve as a filter to
-avoid outputting potentially harmful answers.
-Paraphrase (Jain et al., 2023) defense LLMs
-by making them paraphrase their inputs, avoiding
-deception caused by potential adversarial jailbreak
-suffixes within original inputs.
 Retokenization (Jain et al., 2023) disrupts adversarial suffixes by retokenizing the input sequence,
 breaking tokens apart, and re-representing them
 with smaller tokens.
@@ -2226,23 +2271,10 @@ decoding strategy. It mitigates jailbreak attacks by
 amplifying the probabilities of safety disclaimers
 tokens among top-ranked tokens and attenuating
 the probabilities of harmful token sequences, ensuring LLMs generate helpful and harmless responses.
-
-Self-Exam (Phute et al., 2023) triggers the
+Self-Exam (Phute et al., 2023) triggers the
 LLMs’ awareness of safety issues by adding a predefined prompt template, asking LLMs to examine
 if their outputs are safe.
-Self-Reminder (Xie et al., 2023) defends the
-LLMs by adding a system prompt specifically emphasizing potential safety issues to prevent the
-model from outputting harmful responses.
-Intention Analysis (Zhang et al., 2025) enhances
-LLM safety by guiding the model to explicitly identify the essential intention of user queries and subsequently generate policy-aligned responses to mitigate harmful outputs.
-F.4
 
-Metrics
-
-F.4.1 Calculating DSR
-We use Dic-Judge (Zou et al., 2023) to calculate
-DSR. Dic-Judge detects the presence of pre-defined
-refusal strings in the outputs of LLMs. Given a
 jailbreak query as input, if a particular refusal string
 is detected in the outputs, we consider the model
 successfully refuses to answer the question, thereby
@@ -2250,7 +2282,56 @@ achieving the goal of defense; otherwise, the model
 is deemed to be deceived by the jailbreak inputs.
 DSR is defined as follows:
 
-Refusal Strings
+DSR =
+
+|{responses containing refusal strings}|
+.
+|{input jailbreak queires}|
+
+We adopt refusal strings as proposed by Xu et al.
+(2024), presented in Table 11.
+
+Self-Reminder (Xie et al., 2023) defends the
+LLMs by adding a system prompt specifically emphasizing potential safety issues to prevent the
+model from outputting harmful responses.
+
+F.4.2 Calculating Overall Scores
+We use Runtime per Query and overall averaged
+Just-Eval scores to calculate overall scores:
+
+
+Overall = 1 − Norm(t) + Norm(Avg.) /2,
+
+Intention Analysis (Zhang et al., 2025) enhances
+LLM safety by guiding the model to explicitly identify the essential intention of user queries and subsequently generate policy-aligned responses to mitigate harmful outputs.
+
+G
+
+Supplementary Experiments
+
+F.4 Metrics
+
+G.1
+
+Scale Up Baselines and Data
+
+F.4.1 Calculating DSR
+We use Dic-Judge (Zou et al., 2023) to calculate
+DSR. Dic-Judge detects the presence of pre-defined
+refusal strings in the outputs of LLMs. Given a
+
+To further strengthen our evaluation, we expanded
+the jailbreak test samples from the initial 50behavior subset to the full AdvBench (5̃20 samples) and applied the jailbreak method from Section
+
+where t is Runtime per Query and Avg. represents
+overall averaged Just-Eval scores. Here, Norm(x)
+denotes the normalization of a metric x, calculated
+as x divided by the sum of x and the corresponding
+values for all reference groups.
+
+25394
+
+Refusal Strings
 I’m sorry
 Sorry
 I am sorry
@@ -2271,46 +2352,21 @@ I am not allowed to
 I am an AI language model
 Table 11: Refusal strings.
 
+3.2 for a more intuitive observation. The defense
 performances on Vicuna-7B-v1.3 are presented
 in Table 8.The results remain consistent with Table 1, reaffirming ABD’s strong defense capability
 against various stealthy jailbreak methods.
-
-|{responses containing refusal strings}| G.2 Full Results on Qwen and Vicuna-13B
-.
-|{input jailbreak queires}|
+G.2 Full Results on Qwen and Vicuna-13B
 The results are shown in Table 9. ABD remains
-We adopt refusal strings as proposed by Xu et al. performing decent on other sizes of models. Besides, in Vicuna-13B, 6 out of 9 selected layers are
-(2024), presented in Table 11.
+performing decent on other sizes of models. Besides, in Vicuna-13B, 6 out of 9 selected layers are
 early and intermediate layers (layer 2, 11, 14, 19,
-F.4.2 Calculating Overall Scores
 26, 29), and in Qwen, 2 out of 3 layers (layer 5,
-We use Runtime per Query and overall averaged 14). This supports our interpretations of jailbreak
-Just-Eval scores to calculate overall scores:
+14). This supports our interpretations of jailbreak
 mechanisms, as well as the conclusion that early
-
-
 and middle layers are most vulnerable to jailbreaks,
-Overall = 1 − Norm(t) + Norm(Avg.) /2,
 basically hold in larger and smaller models.
-DSR =
 
-where t is Runtime per Query and Avg. represents
-overall averaged Just-Eval scores. Here, Norm(x)
-denotes the normalization of a metric x, calculated
-as x divided by the sum of x and the corresponding
-values for all reference groups.
-
-G
-
-Supplementary Experiments
-
-G.1
-
-Scale Up Baselines and Data
-
-To further strengthen our evaluation, we expanded
-the jailbreak test samples from the initial 50behavior subset to the full AdvBench (5̃20 samples) and applied the jailbreak method from Section
-3.2 for a more intuitive observation. The defense
+25395
 
 Layer 0
 
@@ -2344,6 +2400,8 @@ Layer 14
 
 Figure 7: Activation spaces from layer 0 to layer 14.
 
+25396
+
 Layer 15
 
 Layer 16
@@ -2376,6 +2434,8 @@ Layer 29
 
 Figure 8: Activation spaces from layer 15 to layer 29.
 
+25397
+
 Benign
 Harmful
 COLD-suffix
@@ -2392,5 +2452,7 @@ Layer 30
 
 Layer 31
 Figure 9: Activation spaces from layer 30 to layer 31.
+
+25398
 
 

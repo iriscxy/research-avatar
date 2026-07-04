@@ -470,20 +470,23 @@
     "/Users/xiuying.chen/.claude/projects/-Users-xiuying-chen-code-catalyst-api/be0bedff-d433-485d-9d12-b5955ebde4e5.jsonl",
     "/Users/xiuying.chen/.claude/projects/-Users-xiuying-chen-code-interface/c6ad1d06-fe18-463a-8af1-688c0f4a77ef.jsonl",
     "/Users/xiuying.chen/.claude/projects/-Users-xiuying-chen-code-research-buddy/05470e18-18d6-47a7-a59d-515bbfe1bb96.jsonl",
+    "/Users/xiuying.chen/.claude/projects/-Users-xiuying-chen-code-research-buddy/116f72db-acfc-41d5-8859-f9cbe0b54f43.jsonl",
+    "/Users/xiuying.chen/.claude/projects/-Users-xiuying-chen-code-research-buddy/8b64446e-2b7d-461c-bac4-dc55a966a851.jsonl",
+    "/Users/xiuying.chen/.claude/projects/-Users-xiuying-chen-code-research-buddy/8eeaf009-c625-4432-b065-ad34dacdb934.jsonl",
     "/Users/xiuying.chen/.claude/projects/-Users-xiuying-chen-code-vibe-multiagent/a3ed7cb8-fb84-409b-89ed-433be27ec39b.jsonl",
     "/Users/xiuying.chen/.claude/projects/-Users-xiuying-chen-code-vibe-multiagent/a4c1b7ff-50f9-4b38-8f20-5ab4b2b22864.jsonl",
     "/Users/xiuying.chen/.claude/projects/-Users-xiuying-chen-code-vibe-multiagent/f54ecbf8-8123-4b17-a337-d412ff4e7d0f.jsonl"
   ],
-  "lines_scanned": 61644,
+  "lines_scanned": 64940,
   "impl_patterns": {
     "launchers": {
-      "deepspeed": 137,
-      "srun": 64,
-      "accelerate launch": 37,
-      "modal run": 22,
-      "torchrun": 20,
-      "python -m torch.distributed": 13,
-      "sbatch": 13
+      "deepspeed": 171,
+      "srun": 78,
+      "accelerate launch": 60,
+      "modal run": 34,
+      "torchrun": 32,
+      "python -m torch.distributed": 14,
+      "sbatch": 14
     },
     "base_models": {
       "/root/autodl-tmp/models/Qwen/Qwen3-4B-Instruct-2507": 125,
@@ -497,59 +500,59 @@
     }
   },
   "dependency_prefs": {
-    "lightning": 8486,
-    "trl": 1287,
-    "vllm": 936,
-    "jax": 663,
-    "accelerate": 653,
-    "torch": 512,
-    "transformers": 445,
-    "datasets": 355,
-    "peft": 278,
-    "pytorch": 138,
-    "deepspeed": 137,
-    "fsdp": 112,
-    "flax": 93,
-    "bitsandbytes": 49,
-    "wandb": 38,
-    "flash_attn": 12,
-    "flash-attn": 12,
-    "xformers": 12
+    "lightning": 8509,
+    "trl": 1367,
+    "vllm": 996,
+    "jax": 701,
+    "accelerate": 695,
+    "torch": 546,
+    "datasets": 536,
+    "transformers": 477,
+    "peft": 326,
+    "deepspeed": 171,
+    "pytorch": 170,
+    "fsdp": 127,
+    "flax": 94,
+    "wandb": 50,
+    "bitsandbytes": 50,
+    "flash_attn": 13,
+    "flash-attn": 13,
+    "xformers": 13
   },
   "resource_habits": {
     "gpus": {
-      "a100": 276,
-      "4090": 100,
-      "rtx 4090": 90,
-      "3090": 68,
-      "tpu": 62,
-      "a800": 59,
-      "h100": 55,
-      "v100": 41,
-      "l40": 38,
-      "rtx 3090": 34,
-      "a6000": 26,
-      "h800": 24,
-      "mi250": 24
+      "a100": 479,
+      "4090": 191,
+      "h100": 119,
+      "rtx 4090": 114,
+      "3090": 112,
+      "tpu": 82,
+      "a800": 81,
+      "v100": 63,
+      "l40": 60,
+      "a6000": 48,
+      "h800": 44,
+      "mi250": 44,
+      "rtx 3090": 40
     }
   },
   "failure_modes": {
-    "oom_hits": 1127,
+    "oom_hits": 1322,
     "error_types": {
-      "Exception": 2041,
-      "Error": 1060,
-      "Traceback": 577,
-      "ValueError": 548,
-      "RuntimeError": 509,
-      "exception": 268,
-      "error": 174,
-      "ImportError": 164
+      "Exception": 2063,
+      "Error": 1078,
+      "Traceback": 579,
+      "ValueError": 568,
+      "RuntimeError": 529,
+      "exception": 277,
+      "error": 185,
+      "ImportError": 184
     },
-    "total_error_lines": 5608
+    "total_error_lines": 5732
   },
   "success_signals": {
-    "wandb_runs": 36,
-    "checkpoints_saved": 180
+    "wandb_runs": 48,
+    "checkpoints_saved": 191
   },
-  "note": "Mined 61644 lines from 473 file(s)."
+  "note": "Mined 64940 lines from 476 file(s)."
 }
