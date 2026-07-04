@@ -30,18 +30,6 @@
 
 <div class="proj"><b>PROJECTED PLAN — not results.</b> Every number below is a placeholder <span class="ph">[X%]</span>; nothing here is measured. Written backward from the projected abstract. Stop at the approval gate (§8) before <code>/run-plan</code>.</div>
 
-<h2>0 · Grounding — real setups of the closest papers</h2>
-<p class="note">Read from the closest papers' experiments sections (your ABD + AJailBench full text; AdaSteer + EasySteer via arXiv). This decides the baselines / datasets / metrics — §2 draws only from here. Nothing invented; unfetched fields marked <code>[UNVERIFIED]</code>.</p>
-<table>
-<thead><tr><th>Paper (closest work)</th><th>Baselines it reports</th><th>Datasets</th><th>Metrics</th></tr></thead>
-<tbody>
-<tr><td><a href="https://arxiv.org/abs/2412.17034">ABD — Shaping Safety Boundaries</a> <span class="note">(yours; the base method)</span></td><td>Paraphrase, defense methods vs undefended; 7 attacks: GCG-Individual, GCG-Universal, AutoDAN, PAIR, COLD-Suffix, ArtPrompt (+1)</td><td>AdvBench (50-behavior test subset; 400 for boundary μ / validation), RedEval; Alpaca / Just-Eval for utility</td><td><b>DSR</b> (Defense Success Rate); Just-Eval overall utility; reported &lt;2% capability drop (MMLU)</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2504.09466">AdaSteer</a> <span class="note">(direct competitor: conditional steering defense)</span></td><td>Decoding: ROSE, Self-CD · Steering: <a href="https://arxiv.org/abs/2409.05907">CAST</a>, Jailbreak Antidote, Surgical, InferAligner</td><td>Harmful: AdvBench, TDC2023, MaliciousInstruct, JailbreakBench · Over-refusal: XSTest (250), OKTest (300), OR-Bench · Utility: AlpacaEval</td><td><b>DSR</b>; <b>Compliance Rate (CR)</b> on XSTest/OKTest (over-safety); AlpacaEval Win Rate (utility); tokens/sec (efficiency). Models: LLaMA-3.1, Gemma-2, Qwen2.5. Attacks: AIM, AutoDAN, Cipher, GCG, Jailbroken, Multilingual, ReNeLLM</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2505.15406">AJailBench (Audio Jailbreak)</a> <span class="note">(yours; the audio suite)</span></td><td>7 LAMs vs each other (Qwen2-Audio, LLaMA-Omni, Gemini-1.5-pro, GPT-4o-audio, …)</td><td>AJailBench-Base (1,495 audio prompts, 10 policy categories); AJailBench-APT+ (optimized via APT: time / frequency / hybrid perturbations + Bayesian search)</td><td><b>ASR</b> (Attack Success Rate); GPTScore; semantic-consistency constraint</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2509.25175">EasySteer</a> <span class="note">(serving substrate)</span></td><td>vs existing steering frameworks</td><td>—</td><td>10.8–22.3× speedup on vLLM; 81–91% of baseline throughput under multi-vector configs; pluggable analysis/learning vectors <span class="note">[serving numbers per abstract/survey]</span></td></tr>
-</tbody>
-</table>
-
 <h2>1 · Projected Abstract (write FIRST)</h2>
 <div class="proj" style="margin-bottom:0"><b>PROJECTED — not results.</b> In your gap-first style; no em-dashes; placeholders only.</div>
 <div class="abstract">
@@ -169,6 +157,18 @@ Jailbreak defenses for large language models are usually evaluated offline and o
 <p class="note">Total ≈ 4–6 GPU-days, dominated by GCG-style optimization + the adaptive-attack block.</p>
 
 <div class="proj"><b>GATE — stop for your approval before <code>/run-plan</code>.</b> Summary: <b>Claims</b> C1–C5 · <b>Must-beat</b> undefended / ABD / AdaSteer / CAST / SmoothLLM · <b>Ablations</b> A1–A6 (gate on/off, ABD-only, steering-only, threshold, layers, audio) · <b>First 3 runs</b> sanity(GCG on AdvBench-50) → baselines → main text suite · <b>Budget</b> ~4–6 GPU-days, adaptive-attack block &gt;1 day flagged. <b>Reviewer's warning (from 01):</b> the adaptive-attack story (§5.4) + real serving latency (§5.5) are what lift this above "ABD + a knob" — keep them first-class. Approve, or tell me what to change.</div>
+
+<h2 id="grounding">Appendix · Grounding — real setups of the closest papers</h2>
+<p class="note">The evidence base this whole plan is built on. Read from the closest papers' experiments sections (your ABD + AJailBench full text; AdaSteer + EasySteer via arXiv): every baseline / dataset / metric in §3–§5 is drawn only from this table. Nothing invented; unfetched fields marked <code>[UNVERIFIED]</code>.</p>
+<table>
+<thead><tr><th>Paper (closest work)</th><th>Baselines it reports</th><th>Datasets</th><th>Metrics</th></tr></thead>
+<tbody>
+<tr><td><a href="https://arxiv.org/abs/2412.17034">ABD — Shaping Safety Boundaries</a> <span class="note">(yours; the base method)</span></td><td>Paraphrase, defense methods vs undefended; 7 attacks: GCG-Individual, GCG-Universal, AutoDAN, PAIR, COLD-Suffix, ArtPrompt (+1)</td><td>AdvBench (50-behavior test subset; 400 for boundary μ / validation), RedEval; Alpaca / Just-Eval for utility</td><td><b>DSR</b> (Defense Success Rate); Just-Eval overall utility; reported &lt;2% capability drop (MMLU)</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2504.09466">AdaSteer</a> <span class="note">(direct competitor: conditional steering defense)</span></td><td>Decoding: ROSE, Self-CD · Steering: <a href="https://arxiv.org/abs/2409.05907">CAST</a>, Jailbreak Antidote, Surgical, InferAligner</td><td>Harmful: AdvBench, TDC2023, MaliciousInstruct, JailbreakBench · Over-refusal: XSTest (250), OKTest (300), OR-Bench · Utility: AlpacaEval</td><td><b>DSR</b>; <b>Compliance Rate (CR)</b> on XSTest/OKTest (over-safety); AlpacaEval Win Rate (utility); tokens/sec (efficiency). Models: LLaMA-3.1, Gemma-2, Qwen2.5. Attacks: AIM, AutoDAN, Cipher, GCG, Jailbroken, Multilingual, ReNeLLM</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.15406">AJailBench (Audio Jailbreak)</a> <span class="note">(yours; the audio suite)</span></td><td>7 LAMs vs each other (Qwen2-Audio, LLaMA-Omni, Gemini-1.5-pro, GPT-4o-audio, …)</td><td>AJailBench-Base (1,495 audio prompts, 10 policy categories); AJailBench-APT+ (optimized via APT: time / frequency / hybrid perturbations + Bayesian search)</td><td><b>ASR</b> (Attack Success Rate); GPTScore; semantic-consistency constraint</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2509.25175">EasySteer</a> <span class="note">(serving substrate)</span></td><td>vs existing steering frameworks</td><td>—</td><td>10.8–22.3× speedup on vLLM; 81–91% of baseline throughput under multi-vector configs; pluggable analysis/learning vectors <span class="note">[serving numbers per abstract/survey]</span></td></tr>
+</tbody>
+</table>
 
 <div class="foot">
 Generated by <code>/workplan</code> · 2026-07-03 · idea I11 (ABD++) · researcher Lang Gao. Grounding read from ABD + AJailBench full text and AdaSteer + EasySteer (arXiv). PROJECTED plan — all numbers placeholders. Baselines/datasets/metrics drawn only from the grounding table. Next: approve → <code>/run-plan</code>. Chinese mirror: <code>02_EXPERIMENT_PLAN.zh.html</code> (follows <code>scholar-translation-zh</code>).

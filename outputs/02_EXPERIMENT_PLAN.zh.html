@@ -30,18 +30,6 @@
 
 <div class="proj"><b>投影计划 — 非实验结果。</b> 下文每个数字都是占位符 <span class="ph">[X%]</span>；此处没有任何实测值。计划从投影摘要倒推写成。在 <code>/run-plan</code> 之前，请在审批关口（§8）停下。</div>
 
-<h2>0 · 扎根 — 最接近论文的真实实验设置</h2>
-<p class="note">读自最接近论文的实验章节（你的 ABD + AJailBench 全文；AdaSteer + EasySteer 经 arXiv）。它决定了基线 / 数据集 / 指标——§2 只从这里取材。无任何编造；未抓取到的字段标注 <code>[UNVERIFIED]</code>。</p>
-<table>
-<thead><tr><th>论文（最接近工作）</th><th>它报告的基线</th><th>数据集</th><th>指标</th></tr></thead>
-<tbody>
-<tr><td><a href="https://arxiv.org/abs/2412.17034">ABD — Shaping Safety Boundaries</a> <span class="note">（你的；基础方法）</span></td><td>Paraphrase、若干防御方法 vs 无防御；7 种攻击：GCG-Individual、GCG-Universal、AutoDAN、PAIR、COLD-Suffix、ArtPrompt（+1）</td><td>AdvBench（50 行为测试子集；400 条用于边界 μ / 验证）、RedEval；Alpaca / Just-Eval 测效用</td><td><b>DSR</b>（防御成功率）；Just-Eval 总体效用；报告能力下降 &lt;2%（MMLU）</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2504.09466">AdaSteer</a> <span class="note">（直接竞品：条件 steering 防御）</span></td><td>解码类：ROSE、Self-CD · steering 类：<a href="https://arxiv.org/abs/2409.05907">CAST</a>、Jailbreak Antidote、Surgical、InferAligner</td><td>有害：AdvBench、TDC2023、MaliciousInstruct、JailbreakBench · 过度拒答：XSTest（250）、OKTest（300）、OR-Bench · 效用：AlpacaEval</td><td><b>DSR</b>；XSTest/OKTest 上的 <b>Compliance Rate (CR)</b>（过度安全）；AlpacaEval Win Rate（效用）；tokens/秒（效率）。模型：LLaMA-3.1、Gemma-2、Qwen2.5。攻击：AIM、AutoDAN、Cipher、GCG、Jailbroken、Multilingual、ReNeLLM</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2505.15406">AJailBench (Audio Jailbreak)</a> <span class="note">（你的；音频攻击集）</span></td><td>7 个 LAM 相互对比（Qwen2-Audio、LLaMA-Omni、Gemini-1.5-pro、GPT-4o-audio…）</td><td>AJailBench-Base（1,495 条音频 prompt，10 个政策类别）；AJailBench-APT+（经 APT 优化：时域 / 频域 / 混合扰动 + 贝叶斯搜索）</td><td><b>ASR</b>（攻击成功率）；GPTScore；语义一致性约束</td></tr>
-<tr><td><a href="https://arxiv.org/abs/2509.25175">EasySteer</a> <span class="note">（服务底座）</span></td><td>vs 现有 steering 框架</td><td>—</td><td>vLLM 上 10.8–22.3 倍加速；多向量配置下达基线吞吐的 81–91%；可插拔分析/学习型向量 <span class="note">[服务数据据摘要/调研]</span></td></tr>
-</tbody>
-</table>
-
 <h2>1 · 投影摘要（最先写）</h2>
 <div class="proj" style="margin-bottom:0"><b>投影 — 非实验结果。</b> 采用你的"先点缺口"风格；无破折号；仅占位符。</div>
 <div class="abstract">
@@ -169,6 +157,18 @@
 <p class="note">合计 ≈ 4–6 GPU 天，主要由 GCG 式优化 + 自适应攻击区块占用。</p>
 
 <div class="proj"><b>关口 — 在 <code>/run-plan</code> 之前停下等你审批。</b> 摘要：<b>论断</b> C1–C5 · <b>必须超过</b> 无防御 / ABD / AdaSteer / CAST / SmoothLLM · <b>消融</b> A1–A6（门开/关、仅 ABD、仅 steering、阈值、层、音频）· <b>前 3 个运行</b> sanity（AdvBench-50 上的 GCG）→ 基线 → 主文本套件 · <b>预算</b> ~4–6 GPU 天，自适应攻击区块 &gt;1 天已标注。<b>评审警告（来自 01）：</b>自适应攻击论证（§5.4）+ 真实服务延迟（§5.5）才是把它抬到"ABD + 一个旋钮"之上的关键——请把它们放在一等位置。批准，或告诉我要改什么。</div>
+
+<h2 id="grounding">附录 · 扎根 — 最接近论文的真实实验设置</h2>
+<p class="note">整个计划所依据的证据底座。读自最接近论文的实验章节（你的 ABD + AJailBench 全文；AdaSteer + EasySteer 经 arXiv）：§3–§5 里的每一个基线 / 数据集 / 指标都只从这张表取材。无任何编造；未抓取到的字段标注 <code>[UNVERIFIED]</code>。</p>
+<table>
+<thead><tr><th>论文（最接近工作）</th><th>它报告的基线</th><th>数据集</th><th>指标</th></tr></thead>
+<tbody>
+<tr><td><a href="https://arxiv.org/abs/2412.17034">ABD — Shaping Safety Boundaries</a> <span class="note">（你的；基础方法）</span></td><td>Paraphrase、若干防御方法 vs 无防御；7 种攻击：GCG-Individual、GCG-Universal、AutoDAN、PAIR、COLD-Suffix、ArtPrompt（+1）</td><td>AdvBench（50 行为测试子集；400 条用于边界 μ / 验证）、RedEval；Alpaca / Just-Eval 测效用</td><td><b>DSR</b>（防御成功率）；Just-Eval 总体效用；报告能力下降 &lt;2%（MMLU）</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2504.09466">AdaSteer</a> <span class="note">（直接竞品：条件 steering 防御）</span></td><td>解码类：ROSE、Self-CD · steering 类：<a href="https://arxiv.org/abs/2409.05907">CAST</a>、Jailbreak Antidote、Surgical、InferAligner</td><td>有害：AdvBench、TDC2023、MaliciousInstruct、JailbreakBench · 过度拒答：XSTest（250）、OKTest（300）、OR-Bench · 效用：AlpacaEval</td><td><b>DSR</b>；XSTest/OKTest 上的 <b>Compliance Rate (CR)</b>（过度安全）；AlpacaEval Win Rate（效用）；tokens/秒（效率）。模型：LLaMA-3.1、Gemma-2、Qwen2.5。攻击：AIM、AutoDAN、Cipher、GCG、Jailbroken、Multilingual、ReNeLLM</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2505.15406">AJailBench (Audio Jailbreak)</a> <span class="note">（你的；音频攻击集）</span></td><td>7 个 LAM 相互对比（Qwen2-Audio、LLaMA-Omni、Gemini-1.5-pro、GPT-4o-audio…）</td><td>AJailBench-Base（1,495 条音频 prompt，10 个政策类别）；AJailBench-APT+（经 APT 优化：时域 / 频域 / 混合扰动 + 贝叶斯搜索）</td><td><b>ASR</b>（攻击成功率）；GPTScore；语义一致性约束</td></tr>
+<tr><td><a href="https://arxiv.org/abs/2509.25175">EasySteer</a> <span class="note">（服务底座）</span></td><td>vs 现有 steering 框架</td><td>—</td><td>vLLM 上 10.8–22.3 倍加速；多向量配置下达基线吞吐的 81–91%；可插拔分析/学习型向量 <span class="note">[服务数据据摘要/调研]</span></td></tr>
+</tbody>
+</table>
 
 <div class="foot">
 由 <code>/workplan</code> 生成 · 2026-07-03 · idea I11（ABD++）· 研究者 Lang Gao。扎根读自 ABD + AJailBench 全文以及 AdaSteer + EasySteer（arXiv）。投影计划——所有数字为占位符。基线/数据集/指标只取自扎根表。下一步：批准 → <code>/run-plan</code>。中文镜像遵循 <code>scholar-translation-zh</code> 翻译规范。
