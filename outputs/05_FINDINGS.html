@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>结果汇总 — I2 · Route-Then-Steer（合成占位）</title>
+<style>
+  :root{--ink:#1a1f2b;--muted:#5b6472;--line:#e3e7ee;--accent:#2563eb;--accent2:#0b7285;--ok:#1a7f52;--fake:#b42318;}
+  *{box-sizing:border-box}
+  body{margin:0;background:#ffffff;color:var(--ink);font:16px/1.72 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,Arial,sans-serif;}
+  .wrap{max-width:1020px;margin:0 auto;padding:34px 30px 90px;}
+  h1{font-size:25px;margin:.2em 0 .1em;} h2{font-size:20px;margin:1.9em 0 .5em;padding-bottom:.28em;border-bottom:2px solid var(--line);}
+  p{margin:.55em 0;} a{color:var(--accent);text-decoration:none;} a:hover{text-decoration:underline;}
+  code{background:#eef1f6;padding:.08em .38em;border-radius:5px;font:13px/1.4 ui-monospace,Menlo,monospace;}
+  .sub{color:var(--muted);font-size:14px;}
+  .fake{border:2px solid var(--fake);background:#fef3f2;color:#7a271a;border-radius:12px;padding:14px 18px;margin:14px 0;font-size:14.5px;font-weight:600;}
+  table{border-collapse:collapse;width:100%;margin:.8em 0;font-size:13.8px;background:#fff;}
+  th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top;}
+  th{background:#f2f5fa;font-weight:600;} td.c{white-space:nowrap;font-weight:600;color:var(--accent2);}
+  .best{background:#f4fbf7;font-weight:700;}
+  .num{font-weight:700;color:var(--ok);} .lbl{color:var(--muted);font-weight:600;font-size:12.5px;}
+  .file{font-size:12.5px;color:var(--muted);} .file code{font-size:12px;}
+  .foot{color:var(--muted);font-size:13px;margin-top:2.5em;border-top:1px solid var(--line);padding-top:1em;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="fake">
+  ⚠️ 合成占位数据 —— 所有数字都是<strong>编的</strong>,仅用于跑通 <code>/paper-write</code> 流程,<strong>不是真实实验结果</strong>。
+  真实结果需经 <code>/run-plan</code> 产生并覆盖 <code>results/*.json</code>(届时 <code>"synthetic"</code> 翻为 <code>false</code>)。切勿引用/上报本页任何数值。
+</div>
+
+<h1>结果汇总 — I2 · Route-Then-Steer（CRH-in-MoE）</h1>
+<p class="sub">
+  计划:<a href="03_EXPERIMENT_PLAN.html">03_EXPERIMENT_PLAN.html</a> · 想法:<a href="02_IDEA_REPORT.html">02_IDEA_REPORT.html</a> ·
+  生成:2026-07-05(测试夹具)· 主模型 OLMoE-1B-7B,次 Qwen1.5-MoE-A2.7B · 评判 GPT-4o · 5 seeds
+</p>
+<p>每条 claim 都追溯到 <code>results/</code> 下的真实文件(此处为合成)。下面数字即 <code>/paper-write</code> 用来填投影摘要 <code>[X%]</code> 占位的来源。</p>
+
+<h2>C1 · 碎片化存在且逐概念变化 <span class="sub">(§4.1)</span></h2>
+<p>OLMoE 上 100 概念的逐专家方向离散度:均值 <span class="num">0.52</span>(std 0.18);<strong>22</strong> 个低碎片化(&lt;0.30)、<strong>40</strong> 个中、<strong>38</strong> 个高(&gt;0.60)。refusal 最低(<span class="num">0.14</span>),medical/legal/poetic 等最高(0.68–0.76)。→ <strong>碎片化真实存在且逐概念差异大。</strong></p>
+<p class="file">来源:<code>results/fragmentation_olmoe.json</code></p>
+
+<h2>C2 · 高碎片化 → 残差向量被"路由甩开"(因果) <span class="sub">(§4.2)</span></h2>
+<table>
+<thead><tr><th>高碎片化子集(38 概念)</th><th>steering 成功率</th></tr></thead>
+<tbody>
+<tr><td>仅残差 steer</td><td><span class="num">34.2%</span> ± 4.1</td></tr>
+<tr><td>残差 steer + 强制路由到表达专家</td><td class="best"><span class="num">61.5%</span> ± 3.6</td></tr>
+<tr><td>被甩开的效应占比 / 强制路由挽回</td><td>44.4% 流失 · 挽回 66.3%</td></tr>
+<tr><td>低碎片化对照(refusal)</td><td>88.1% → 89.0%(几乎不变)</td></tr>
+</tbody>
+</table>
+<p>离散度 vs 残差成功率下降:Pearson <span class="num">r = −0.68</span>(p&lt;0.001)。→ <strong>甩开是因果的,且只发生在高碎片化处。</strong></p>
+<p class="file">来源:<code>results/routed_away_olmoe.json</code></p>
+
+<h2>C3 · Route-Then-Steer 打败 4 个基线 <span class="sub">(§4.3,高碎片化)</span></h2>
+<table>
+<thead><tr><th>System</th><th>成功率 ↑</th><th>跨样本 std ↓</th><th>MMLU Δ</th><th>GSM8K Δ</th><th>KL ↓</th></tr></thead>
+<tbody>
+<tr><td>仅残差(ActAdd/DiffMean)</td><td>41.3%</td><td>0.29</td><td>−0.4</td><td>−0.3</td><td>0.11</td></tr>
+<tr><td>仅 expert-output(SafetySE/AllAE)</td><td>37.8%</td><td>0.31</td><td>−0.9</td><td>−1.1</td><td>0.18</td></tr>
+<tr><td>仅 router(Rewiring-δ/MASCing)</td><td>28.6%</td><td>0.26</td><td>−2.3</td><td>−1.8</td><td>0.22</td></tr>
+<tr><td>整专家开关(SteerMoE)</td><td>33.0%</td><td>0.34</td><td>−3.1</td><td>−2.6</td><td>0.30</td></tr>
+<tr class="best"><td>Route-Then-Steer(ours)</td><td><span class="num">66.9%</span></td><td><span class="num">0.17</span></td><td>−0.6</td><td>−0.5</td><td>0.13</td></tr>
+</tbody>
+</table>
+<p>相对最强基线 <span class="num">+25.6pp</span> 成功率,方差 std <span class="num">−41%</span>,效用损失与仅残差相当。→ <strong>在高碎片化处显著更强、更稳,且不多付效用代价。</strong></p>
+<p class="file">来源:<code>results/headtohead_olmoe.json</code></p>
+
+<h2>C4 · 增益被碎片化预测,refusal 上持平 <span class="sub">(§4.4)</span></h2>
+<p>离散度 vs "RTS 相对残差的增益":Pearson <span class="num">r = 0.74</span>(p&lt;0.001)。分箱增益:低碎片化 <span class="num">+1.2pp</span> · 中 <span class="num">+9.8pp</span> · 高 <span class="num">+25.6pp</span>。refusal(低碎片化):残差 88.1% vs RTS 87.4%,<strong>噪声内持平</strong>。→ <strong>方法是有条件的:碎片化高才该 routing-aware——正好解释 Expert-Aware Refusal Steering 的"残差最强"负结果。</strong></p>
+<p class="file">来源:<code>results/predictor_ablation_olmoe.json</code></p>
+
+<h2>消融 · 各组件必要性 <span class="sub">(§4.5,高碎片化)</span></h2>
+<table>
+<thead><tr><th>配置</th><th>成功率</th><th>读数</th></tr></thead>
+<tbody>
+<tr class="best"><td>完整 Route-Then-Steer</td><td><span class="num">66.9%</span></td><td>—</td></tr>
+<tr><td>A1 去 route(仅残差)</td><td>41.3%</td><td>route 必要(−25.6)</td></tr>
+<tr><td>A2 去 steer(仅 router)</td><td>28.6%</td><td>steer 必要(−38.3)</td></tr>
+<tr><td>A3 nudge 到随机专家</td><td>39.1%</td><td>须是<em>对的</em>专家(≈残差)</td></tr>
+<tr><td>A4 度量变体(顶方向方差)</td><td>65.8%</td><td>预测器稳健(r=0.71)</td></tr>
+<tr><td>A5 top-1 nudge</td><td>58.2%</td><td>多专家更好(top-k=66.9%)</td></tr>
+</tbody>
+</table>
+<p class="file">来源:<code>results/predictor_ablation_olmoe.json</code></p>
+
+<h2>泛化 · Qwen1.5-MoE-A2.7B <span class="sub">(本轮;Qwen3-30B 首投后)</span></h2>
+<p>高碎片化:残差 44.0% → RTS <span class="num">64.1%</span>(<span class="num">+20.1pp</span>),std 0.30→0.19;离散度 vs 增益 <span class="num">r=0.69</span>;refusal 90.2% vs 89.6%(持平)。→ <strong>结论跨第二个 MoE 家族成立。</strong></p>
+<p class="file">来源:<code>results/generalization_qwen15moe.json</code></p>
+
+<h2>投影摘要占位 → 填入建议</h2>
+<table>
+<thead><tr><th>摘要 <code>[X%]</code></th><th>填入(合成)</th></tr></thead>
+<tbody>
+<tr><td>残差向量效果下降 [X%]</td><td>44%(被甩开占比)</td></tr>
+<tr><td>成功率 [X%] → [X%]</td><td>41.3% → 66.9%</td></tr>
+<tr><td>方差削减 [X%]</td><td>41%</td></tr>
+</tbody>
+</table>
+<p class="sub">这些映射即 <code>/paper-write</code> 把摘要/表格占位替换成"可追溯数字"的输入(本例追溯到合成文件)。</p>
+
+<p class="foot">
+  ⚠️ 再次提醒:全页数值均为<strong>合成占位</strong>,仅供 <code>/paper-write</code> 流程联调。真实数字请以 <code>/run-plan</code> 覆盖后的 <code>results/*.json</code> 为准。
+</p>
+
+</div>
+</body>
+</html>

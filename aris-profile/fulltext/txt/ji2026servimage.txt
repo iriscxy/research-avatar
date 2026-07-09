@@ -5,11 +5,14 @@ Zhenhao Chen1 , Jinghui Zhang1 , Xiuying Chen1†
 1
 MBZUAI, United Arab Emirates
 2
-Institute of Botany, the Chinese Academy of Sciences, China
-{fengxian.ji, zirui.song, lang.gao�junhong.liang� zhenhao.chen }@mbzuai.ac.ae
+Institute of Automation, Chinese Academy of Sciences, China
+{fengxian.ji, zirui.song, lang.gao,junhong.liang, zhenhao.chen }@mbzuai.ac.ae
 {jinghui.zhang, xiuying.chen}@mbzuai.ac.ae
 {jingpuyang290}@gmail.com
 Abstract
+
+arXiv:2604.24023v2 [cs.CV] 19 Jun 2026
+
 Recent image generation and editing models
 demonstrate robust adherence to instructions
 and high visual quality on academic benchmarks. However, their performance on paid,
@@ -30,7 +33,8 @@ factors that drive human payment decisions
 and indicate whether an image is commercially acceptable. (iii) ServImageModel: under this scoring system, we propose a payment prediction model trained on the humanannotated candidate images, achieving 82.00%
 accuracy in predicting human payment decisions and producing calibrated payment probabilities. ServImage provides a comprehensive
 foundation for assessing the commercial viability of image generation models and offers
-a scalable resource for future research on economically grounded vision systems  Github.
+a scalable resource for future research on economically grounded vision systems. https:
+//github.com/FengxianJi/ServImage
 
 1
 
@@ -49,7 +53,7 @@ InstructPix2Pix (Brooks et al., 2023) and MagicBrush (Zhang et al., 2023, 2025a)
 editing precision and controllability. These advances have broadened the use of image generation from conventional tasks such as object removal and style transfer to more complex design
 tasks, including poster design, logo creation, and
 IP illustration (Chen et al., 2024; Wang et al.,
-2025b), which originate from real-world commercial scenarios with well-defined requirements and
+2025c), which originate from real-world commercial scenarios with well-defined requirements and
 economic returns. On the evaluation side, recent
 benchmarks emphasized instruction following and
 semantic controllability (Ma et al., 2024), optical realism and reflection consistency (Zeng et al.,
@@ -69,52 +73,22 @@ reflects these business-rule, visual, and commercial considerations jointly, whi
 captured by existing benchmarks. The fundamental question in a business context is not merely “Is
 it good?” but rather “Is it worth paying for?” (Patwardhan et al., 2025; Mazeika et al., 2025).
 
-43504
-Proceedings of the 64th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pages 43504–43529
-July 2-7, 2026 ©2026 Association for Computational Linguistics
-
 (a) ServImageBench
-
-(b) ServImageScore
-Task-Level: BRF Score
-
-Advertising
-Visuals
-
 Branding
 Visuals
+
+Entertainment IP
 
 1.9%
 
 1.1%
 
-Marketing
-Communication
-
-9.7%
-
-Entertainment IP
-
 0.8%
 
 Web
 Visualization
-
-28.5%
-
-t Dig
-i
-
-7.3%
-
-ta
-
-Task
-
-l
-
-32.6
-%
+Marketing
+Communication
 
 25.3%
 
@@ -129,46 +103,21 @@ Photo
 
 Number of Subtasks
 
+​
+
+​​
+
+​
+
+​
+
 Task Image(s)
 
-Illustration
-
-7.1%
 2.9
 %
 2.1
 1.0 %
 %
-
-21.6%
-
-Hairstyle
-
-Headshot
-
-∈ [0,1]
-
-∈ [0,5]
-
-E-commerce
-
-Portrait
-Product
-Visuals
-
-BRF(t) = 5ct
-
-12.1%
-
-c
-du
-
-o
-Pr
-
-42.1%
-
-ct​=(1/Kt​)*​∑​rt,k​
 
 Artistic
 Portrait
@@ -177,29 +126,71 @@ Task Value
 
 Reference Image(s)
 
-Payment Decision: Paccept
+Illustration
+
+7.1%
+
+21.6%
+
+Hairstyle
+
+Headshot
+
+7.3%
+
+%
+
+Portrait
+Product
+Visuals
+
+VEQ Score
+
+ct=(1/Kt)*∑rt,k ∈ [0,1]
+
+VEQ(t,i) ∈ [0,5]
+
+E-commerce
+
+t Dig
+uc
+ita
+od
+l
+Pr
+Task 32.6
+
+42.1%
+
+Task-Level: BRF Score
+
+BRF(t) = 5ct ∈ [0,5]
+
+12.1%
+
+9.7%
+
+28.5%
+
+​
+
+(b) ServImageScore
+
+Advertising
+Visuals
 
 Interface
 Graphic
 Communication
 
-(c) Dataset pipeline
-
-VEQ Score
-VEQ(t,i)
-
-CNS Score
-
-∈
-
-∈ [0,5]
-
-CNS(t,i) [0,5]
-Editing Tasks:
-Retention of Unedited Regions
-
 VLM Evaluate VEQ:
 
+(c) Dataset pipeline
+CNS Score
+
+CNS(t,i) ∈ [0,5]
+Editing Tasks:
+Retention of Unedited Regions
 Key Subject Attributes
 
 Technical Quality
@@ -269,7 +260,7 @@ Task Requirement
 
 Subtask Requirements
 
-∈ [0,1]
+Payment Decision: Paccept ∈ [0,1]
 
 (d) ServImageModel
 
@@ -315,8 +306,6 @@ as GenAI-Bench and OmniGenBench foreground
 compositional reasoning and text rendering (Li
 et al., 2024; Peng et al., 2024; Zhou et al., 2025),
 
-43505
-
 while editing-oriented ones like EDITVAL, VIEScore, and IE-Bench emphasise controllability
 and region consistency (Basu et al., 2023; Sun
 et al., 2025; Wang et al., 2025a). Unified efforts,
@@ -330,8 +319,9 @@ VLM-based evaluation for image generation
 and edition. To automate assessment, the VLMas-a-Judge paradigm has become prevalent, using
 task-specific prompts to achieve high correlations
 with human preference (Wu et al., 2025; Ye et al.,
-2025; Pu et al., 2025; Wang et al., 2025b; Zhang
-et al., 2025b; Wang et al.; Yang et al., 2026). Systems like LMM4Edit (Xu et al., 2025a; Ji et al.,
+2025; Pu et al., 2025; Wang et al., 2025c; Zhang
+et al., 2025b; Wang et al., 2025b; Yang et al., 2026).
+Systems like LMM4Edit (Xu et al., 2025a; Ji et al.,
 2025) use few-shot learning for robust editing evaluation. While these methods align well with human perception, they don’t capture the economic
 value of outputs. This gap shows a decoupling
 where high technical metrics don’t necessarily lead
@@ -346,7 +336,10 @@ comparison is in Appendix Table 5.
 
 ServImage
 
-3.1 Task Formulation
+3.1
+
+Task Formulation
+
 We begin by formalizing the structure of ServImage tasks and the associated payment contracts.
 Let T denote the set of paid design tasks in ServImage. For each task t ∈ T , we denote the task context by xt = (brieft , refst , srct ), where brieft is
 a textual description of the design goal, refst are
@@ -399,11 +392,9 @@ total value earned by the model on task t is then:
 ∑Q(t)
 Vt (Ŷt ) = i=1 St,i pimg (t),
 (1)
-
 which measures how much the model would earn
 on task t under the same payment contract as human designers.
 3.2 ServImageBench
-
 With this task formulation in place, we now describe ServImageBench, the real-world dataset
 from which these tasks and payment contracts are
 instantiated. ServImageBench is constructed from
@@ -426,11 +417,9 @@ freelance design verticals: Portrait, Product, and
 Digital. The Portrait category covers personal
 imaging services such as ID photo retouching, profile pictures, and customized character portraits
 
-43506
+Share of tasks (%)
 
-Portrait
-
-Share of tasks (%)
+Portrait
 
 50
 40
@@ -440,20 +429,18 @@ Share of tasks (%)
 00
 
 n = 271, median = $51
-
 $51
 
 50
 
-100 150 200
-
-Task price (USD)
-
 Product
 
 n = 450, median = $139
-
 $139
+
+100 150 200
+
+Task price (USD)
 
 200 400 600 800
 
@@ -482,7 +469,10 @@ and marketing campaigns. Digital tasks involve
 broader digital content and web-oriented visual assets, such as UI mockups, web banners, illustrations, IP characters, and various online media creatives for websites, apps, or social platforms. Table 1 and Figure 2 summarize the number of tasks
 and deliverables, as well as the total contract value
 across these categories.
-3.3 ServImageScore
+3.3
+
+ServImageScore
+
 Existing benchmarks for image generation models
 rarely measure their economic value: their metrics
 mainly focus on instruction following and visual
@@ -545,11 +535,18 @@ Sec. 4, we annotate model-generated candidates
 across all tasks in ServImageBench. Concretely,
 we run the 16 image generation and editing models introduced in Sec. 5, denoted by M, on all
 
-43507
-
 4
 
 ServImageModel
+
+With the annotated candidate dataset in place, we
+now turn to modelling human payment decisions.
+Our objective is to train ServImageModel, a preˆ
+dictor of whether each candidate image img
+t,i in
+task t would be accepted and paid according to
+human payment labels yt,i . Concretely, ServImageModel is a two-stage neural network consisting of (i) a concept predictor and (ii) a payment
+head fθ . Given the task context xt and a candi-
 
 Human acceptance rate
 
@@ -659,22 +656,11 @@ The payment head is supervised using the binary
 payment labels yt,i ∈ {0, 1} obtained during annotation:
 Lpay = Et,i [−yt,i log p̂t,i − (1 − yt,i ) log(1 − p̂t,i )] , (4)
 
-With the annotated candidate dataset in place, we
-now turn to modelling human payment decisions.
-Our objective is to train ServImageModel, a preˆ
-dictor of whether each candidate image img
-t,i in
-task t would be accepted and paid according to
-human payment labels yt,i . Concretely, ServImageModel is a two-stage neural network consisting of (i) a concept predictor and (ii) a payment
-head fθ . Given the task context xt and a candi-
-
 which encourages the predicted acceptance probability to align with empirical human payment decisions.
 Concretely, we treat p̂t,i as the acceptance probability of candidate image i for task t, aggregate
 these probabilities within each task to obtain a tasklevel acceptance rate, and then combine this rate
 with the task price to compute each model’s total
 payment under our payment model.
-
-43508
 
 Main Functions of ServImageScore
 
@@ -748,43 +734,15 @@ Evaluate ONLY based on what is visible in the image
 - Do NOT adjust score based on visual quality
 - Focus purely on requirement compliance
 
-(b)
-
 Label
 
 BRF:[0-5]
 VEQ:[0-5]
 CNS:[1-5]
 
-CBM MLP Output
-
-BEQ: 3 [0,0,0,1,0,0]
-3 [0,0,0,1,0,0],
-CNS: 4 [0,0,0,0,1,0],
-1 [0,0,0,1,0,0],
-0 [0,0,0,0,1,0]
-VEQ: 2 [0,0,1,0,0,0],
-4 [0,0,0,0,1,0]
-
 Source Integrity Theme Align
 
-BRF
-
-Vector
-
-CNS VEQ
-
-BRF: 3
-VEQ: 3, 4, 1 , 0
-CNS: 2, 4
-
-Concatenation
-
-You will be given a list of evaluation points (requirements
-checklist). For each point:
-- Score 0: The requirement is NOT met
-- Score 1: The requirement IS met
-- Do NOT use N/A - you must choose 0 or 1 for every point
+Intent Match
 
 Object Keep
 
@@ -811,7 +769,35 @@ New Parameter
 Same LLM last hidden states
 Make final binary decision:
 
-Intent Match
+(b)
+
+CBM MLP Output
+
+BEQ: 3 [0,0,0,1,0,0]
+3 [0,0,0,1,0,0],
+CNS: 4 [0,0,0,0,1,0],
+1 [0,0,0,1,0,0],
+0 [0,0,0,0,1,0]
+VEQ: 2 [0,0,1,0,0,0],
+4 [0,0,0,0,1,0]
+
+BRF
+
+Vector
+
+CNS VEQ
+
+BRF: 3
+VEQ: 3, 4, 1 , 0
+CNS: 2, 4
+
+Concatenation
+
+You will be given a list of evaluation points (requirements
+checklist). For each point:
+- Score 0: The requirement is NOT met
+- Score 1: The requirement IS met
+- Do NOT use N/A - you must choose 0 or 1 for every point
 
 Final Decision: [0 or 1]
 0: Reject (The image does not worth paying for)
@@ -821,17 +807,17 @@ score decoder
 
 Frozen
 
-MLP
-
 Trainable
 
+MLP
+
 0
+
+(a)
 
 1
 
 (c)
-
-(a)
 
 Figure 4: Overview of ServImageModel: (a) Two-stage ServImageModel architecture; (b) Accuracy comparison
 of base models and our variants. (c) Radar chart of Accuracy Comparison Result.
@@ -840,7 +826,10 @@ of base models and our variants. (c) Radar chart of Accuracy Comparison Result.
 
 Experiments and Analysis
 
-5.1 Setups
+5.1
+
+Setups
+
 We evaluate 16 image models, including 12 proprietary and 4 open-source models, for text-to-image
 generation and image editing. On the commercial side, we include OpenAI’s GPT-5-Image
 family, including gpt-5-image and gpt-5-imagemini (OpenAI, 2025b,a); Google’s Gemini Nano
@@ -849,7 +838,7 @@ Banana, Banana Pro, and Imagen-4.0 (DeepMind,
 including Seedream 4.0 and Seedream 3.0-t2i
 for text-to-image generation (Seedream et al.,
 2025; Gao et al., 2025), and SeedEdit 3.0-i2i
-for image-to-image editing (Wang et al., 2025c);
+for image-to-image editing (Wang et al., 2025d);
 Kuaishou’s Kling-v2 (Technology, 2025); and
 models from professional design platforms such as
 Ideogram-v3 (Ideogram, 2025) and Midjourney’s
@@ -865,7 +854,10 @@ We
 use OpenAI’s GPT-5-mini as an automatic judge
 to compute the BRF, VEQ, and CNS scores
 defined in Sec. 3.3.
-5.2 Main Experiments
+5.2
+
+Main Experiments
+
 Under the standard settlement scenario, we evaluate 16 image models on ServImage and report
 
 their economic outcomes in Table 2. Overall,
@@ -892,8 +884,6 @@ room for improvement. Table 2 uses human accept/reject labels as ground truth; c
 Table 9 reports an automatic proxy estimated from
 ServImageModel-predicted payment probabilities.
 Additionally, the failure examples and corresponding analysis are provided in Appendix I.
-
-43509
 
 Total
 
@@ -1110,8 +1100,8 @@ Table 2: Model performance on ServImage under the standard settlement scenario. 
 contract value earned by a model, and Share is its fraction of the overall contract value ($295k), while category
 shares are computed within each category. Task Acceptance and Deliverable Acceptance are the proportions of
 tasks and deliverables approved according to human payment decisions (yt,i ). The last six columns report revenue
-and share by Portrait, Product, and Digital categories. All monetary values are in thousand USD. Color:
 1st
+and share by Portrait, Product, and Digital categories. All monetary values are in thousand USD. Color:
 2nd
 3rd.
 Model
@@ -1182,6 +1172,19 @@ earned Rev which means Revenue, and Rank. Color:
 2nd
 3rd.
 
+5.3
+
+Crowdsourcing Competition
+
+The settlement scenario above assumes that a single provider is deployed at a time: each model
+is evaluated on the full test split and earns revenue from all tasks it solves. In practice, commercial crowdsourcing platforms list a task to
+many providers, and only the best submission is
+paid. To capture this more competitive regime, we
+construct a crowdsourcing competition setting in
+which all models are run on the same tasks, and
+for each task, we select the winner by the number
+of deliverables accepted by human payment labels,
+
 ties are broken by the summed ServImageScore
 (BRF/VEQ/CNS). The full task revenue is then assigned to this “winner” model and all other models receive zero payment for that task, resulting in
 a winner-takes-all allocation of the total contract
@@ -1196,20 +1199,7 @@ first with $113.7k, but Gemini 2.5 Flash remains
 close behind at $78.9k, and an open-source model
 (flux-kontext-pro) also achieves a strong result
 with $37.9k.
-
-5.3 Crowdsourcing Competition
-
 5.4 Cost Reduction Analysis
-
-The settlement scenario above assumes that a single provider is deployed at a time: each model
-is evaluated on the full test split and earns revenue from all tasks it solves. In practice, commercial crowdsourcing platforms list a task to
-many providers, and only the best submission is
-paid. To capture this more competitive regime, we
-construct a crowdsourcing competition setting in
-which all models are run on the same tasks, and
-for each task, we select the winner by the number
-of deliverables accepted by human payment labels,
-
 The revenue analysis in Sec. 5.2 quantifies each
 model’s earnings under our settlement rule. In
 practice, platform operators and clients are also interested in a complementary question. If a model
@@ -1222,43 +1212,41 @@ this
 economic
 perspective using model-level aggregate quan-
 
-43510
-
 Score
 
-AUC
-Spearman
-PR-AUC
-0.7 Generation-Specific Editing-Specific
-General-Purpose
-0.610
+0.7
 0.6
 0.5
-0.430
 0.4
 0.3
-0.181
 0.2
 0.1
-0.0 h
+0.0
+
+AUC
+
+Spearman
+
+Generation-Specific Editing-Specific
+
+PR-AUC
+
+General-Purpose
+
+0.610
+
+0.430
+
+0.181
+
 t
 e
-e
-h
-h
-h
-h
-
-di
-or
-or
-nc
-nc
-nc
-nc
-nc
-4E
-Sc
+ore
+nch Scor
+nch 4Edi
+nch
+nch
+nch
 Sc
 Be
 Be
@@ -1307,8 +1295,8 @@ t∈T Price(t), Sc (m)
 )
 CostAPI (m)
 1 ∑
-Price(t) 1 − Successc (m, t) ,
 −
+Price(t) 1 − Successc (m, t) ,
 B
 B t∈T
 and the ∑Contribution Ratio Rc (m)
@@ -1331,10 +1319,13 @@ human rework yields about $4.4581 of end-to-end
 contract value handled by the model-first pipeline
 under realistic settlement rules. Appendix Table 7
 reports the full cost reduction results.
-5.5 Evaluation Method Comparison
+5.5
+
+Evaluation Method Comparison
+
 To evaluate ServImageScore in a paymentdecision setting, we compare it with seven metrics
 in three categories. Generation-specific metrics
-(OmniGenBench (Wang et al., 2025b), OneIGBench (Chang et al., 2025)) focus on text-to-image
+(OmniGenBench (Wang et al., 2025c), OneIGBench (Chang et al., 2025)) focus on text-to-image
 and do not fit source-constrained editing. Editingspecific metrics (VIEScore (Ye et al., 2025),
 RISEBench (Zhao et al., 2025)) target editing
 but not source-free generation. General-purpose
@@ -1413,8 +1404,6 @@ the effectiveness of the ServImageModel framework for predicting payment decisio
 6 Conclusion
 We present ServImage, a benchmark for evaluating image generation and editing models on real-
 
-43511
-
 world commercial design tasks and payment decisions. By connecting model outputs with task
 prices and human acceptance outcomes, and introducing ServImageScore to decompose commercial
 acceptability into baseline requirement fulfillment,
@@ -1490,8 +1479,6 @@ Scaling multimodal evaluation to over 500 real-world tasks.
 arXiv preprint arXiv:2410.10563.
 Google Cloud.
 reference.
-
-43512
 
 2025.
 
@@ -1599,17 +1586,16 @@ Yuang Peng, Yuxin Cui, Haomiao Tang, Zekun Qi, Runpei Dong, Jing Bai, Chunrui Ha
 Zhang, and Shu-Tao Xia. 2024. Dreambench++: A
 human-aligned benchmark for personalized image generation. arXiv preprint arXiv:2406.16855.
 
-43513
-
 Yuandong Pu, Le Zhuo, Songhao Han, Jinbo Xing, Kaiwen Zhu, Shuo Cao, Bin Fu, Si Liu, Hongsheng Li,
 Yu Qiao, and 1 others. 2025. Picabench: How far are we
 from physically realistic image editing? arXiv preprint
 arXiv:2510.17681.
 
-Zitong Xu, Huiyu Duan, Bingnan Liu, Guangji Ma, Jiarui
-Wang, Liu Yang, Shiqi Gao, Xiaoyu Wang, Jia Wang,
-Xiongkuo Min, and 1 others. 2025a. Lmm4edit: Benchmarking and evaluating multimodal image editing with
-lmms. arXiv preprint arXiv:2507.16193.
+Yongliang Wu, Zonghui Li, Xinting Hu, Xinyu Ye, Xianfang
+Zeng, Gang Yu, Wenbo Zhu, Bernt Schiele, Ming-Hsuan
+Yang, and Xu Yang. 2025. Kris-bench: Benchmarking
+next-level intelligent image editing models. arXiv preprint
+arXiv:2505.16707.
 
 Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya
 Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry,
@@ -1617,10 +1603,10 @@ Amanda Askell, Pamela Mishkin, Jack Clark, and 1 others.
 2021. Learning transferable visual models from natural
 language supervision. In International conference on machine learning, pages 8748–8763. PmLR.
 
-Zitong Xu, Huiyu Duan, Xiaoyu Wang, Zhaolin Cai, Kaiwei
-Zhang, Qiang Hu, Jing Liu, Xiongkuo Min, and Guangtao
-Zhai. 2025b. Manipshield: A unified framework for image manipulation detection, localization and explanation.
-arXiv preprint arXiv:2511.14259.
+Zitong Xu, Huiyu Duan, Bingnan Liu, Guangji Ma, Jiarui
+Wang, Liu Yang, Shiqi Gao, Xiaoyu Wang, Jia Wang,
+Xiongkuo Min, and 1 others. 2025a. Lmm4edit: Benchmarking and evaluating multimodal image editing with
+lmms. arXiv preprint arXiv:2507.16193.
 
 Robin Rombach, Andreas Blattmann, Dominik Lorenz,
 Patrick Esser, and Björn Ommer. 2022. High-resolution
@@ -1646,23 +1632,19 @@ Chenglin Wang, Yucheng Zhou, Qianning Wang, Zhe Wang,
 and Kai Zhang. 2025a. Complexbench-edit: Benchmarking complex instruction-driven image editing via compositional dependencies. In Proceedings of the 33rd ACM
 International Conference on Multimedia, pages 13391–
 13397.
-Jiarui Wang, Huiyu Duan, Yu Zhao, Juntong Wang, Guangtao
-Zhai, and Xiongkuo Min. Lmm4lmm: Benchmarking and
-evaluating large-multimodal image generation with lmms
-(supplementary material).
+Jiarui Wang, Huiyu Duan, Yu Zhao, Juntong Wang, Guangtao Zhai, and Xiongkuo Min. 2025b. Lmm4lmm: Benchmarking and evaluating large-multimodal image generation with lmms. In Proceedings of the IEEE/CVF International Conference on Computer Vision.
 Jiayu Wang, Yang Jiao, Yue Yu, Tianwen Qian, Shaoxiang
-Chen, Jingjing Chen, and Yu-Gang Jiang. 2025b. Omnigenbench: A benchmark for omnipotent multimodal generation across 50+ tasks. arXiv preprint arXiv:2505.18775.
+Chen, Jingjing Chen, and Yu-Gang Jiang. 2025c. Omnigenbench: A benchmark for omnipotent multimodal generation across 50+ tasks. arXiv preprint arXiv:2505.18775.
 Peng Wang, Yichun Shi, Xiaochen Lian, Zhonghua Zhai, Xin
 Xia, Xuefeng Xiao, Weilin Huang, and Jianchao Yang.
-2025c. Seededit 3.0: Fast and high-quality generative image editing. arXiv preprint arXiv:2506.05083.
+2025d. Seededit 3.0: Fast and high-quality generative image editing. arXiv preprint arXiv:2506.05083.
 Zhou Wang, Alan C Bovik, Hamid R Sheikh, and Eero P Simoncelli. 2004. Image quality assessment: from error visibility to structural similarity. IEEE transactions on image
 processing, 13(4):600–612.
-Yongliang Wu, Zonghui Li, Xinting Hu, Xinyu Ye, Xianfang
-Zeng, Gang Yu, Wenbo Zhu, Bernt Schiele, Ming-Hsuan
-Yang, and Xu Yang. 2025. Kris-bench: Benchmarking
-next-level intelligent image editing models. arXiv preprint
-arXiv:2505.16707.
 
+Zitong Xu, Huiyu Duan, Xiaoyu Wang, Zhaolin Cai, Kaiwei
+Zhang, Qiang Hu, Jing Liu, Xiongkuo Min, and Guangtao
+Zhai. 2025b. Manipshield: A unified framework for image manipulation detection, localization and explanation.
+arXiv preprint arXiv:2511.14259.
 Jingpu Yang, Mingxuan Cui, Hang Zhang, Fengxian Ji,
 Zhengzhao Lai, and Yufeng Wang. 2025. Agent-based
 anti-jamming techniques for uav communications in adversarial environments: A comprehensive survey. arXiv
@@ -1694,11 +1676,10 @@ IEEE conference on computer vision and pattern recognition, pages 586–595.
 Xiangyu Zhao, Peiyuan Zhang, Kexian Tang, Xiaorong Zhu,
 Hao Li, Wenhao Chai, Zicheng Zhang, Renqiu Xia, Guangtao Zhai, Junchi Yan, and 1 others. 2025. Envisioning beyond the pixels: Benchmarking reasoning-informed visual
 editing. arXiv preprint arXiv:2504.02826.
-Yucheng Zhou, Jiahao Yuan, and Qianning Wang. 2025.
+
+Yucheng Zhou, Jiahao Yuan, and Qianning Wang. 2025.
 Draw all your imagine: A holistic benchmark and agent
 framework for complex instruction-based image generation. arXiv preprint arXiv:2505.24787.
-
-43514
 
 Standardized VLM-based eval- Pre-trained
 vision–
@@ -1754,8 +1735,6 @@ et al., 2025a)
 editing
 edited images and hu- triples with MOS and alignment, attribute preservaman preferences
 question–answer pairs tion, task-specific QA
-
-43515
 
 Table 5: Comparison of ServImage with existing image generation and editing benchmarks. ServImage is the only benchmark that directly links technical scores to
 monetary outcomes on paid commercial tasks, while prior work focuses on technical quality or human preference without explicit settlement or earnings modeling.
@@ -1824,7 +1803,7 @@ et al., 2025)
 
 OmniGenBench (Wang
 Text-to-image
-et al., 2025b)
+et al., 2025c)
 
 Human mean-opinion scores
 and
@@ -1920,6 +1899,24 @@ qwen-text-to-image
 stable-diffusion-3.5-large
 imagen4
 
+API price (USD / call)
+0.027542370
+0.137406021
+0.028000000
+0.015947911
+0.027800000
+0.036000000
+0.041700000
+0.027800000
+0.030000000
+0.019800000
+0.019728000
+0.040000000
+0.040000000
+0.034000000
+0.065000000
+0.040000000
+
 Under a model-first workflow, the expected total
 spend consists of the model API cost plus human
 rework for failed tasks:
@@ -1951,25 +1948,6 @@ relative to the human-only baseline.
 The model contribution measures what fraction
 of the total contract value is completed end-to-end
 by the model without human redo:
-
-API price (USD / call)
-0.027542370
-0.137406021
-0.028000000
-0.015947911
-0.027800000
-0.036000000
-0.041700000
-0.027800000
-0.030000000
-0.019800000
-0.019728000
-0.040000000
-0.040000000
-0.034000000
-0.065000000
-0.040000000
-
 Mc (m) =
 
 1 ∑
@@ -1983,9 +1961,9 @@ t∈T
 Finally, we report the contribution ratio, which
 captures the return per dollar spent on model API
 usage and human rework under scenario c:
-Rc (m) =
-
 ∑
+
+Rc (m) =
 
 t∈T Price(t) Successc (m,t)
 
@@ -2126,8 +2104,6 @@ scenario. Color:
 2nd
 3rd.
 
-43516
-
 C
 
 Task cases
@@ -2137,7 +2113,7 @@ task_id: digital-009
 task: We have many products and want to focus on high-end SKUs such as rice and mixed grains. About
 10 SKUs initially, to be designed progressively with product R&D. Focus categories: sprouted brown
 rice (grains), sprouted brown rice powder (beverage mix, similar to meal replacement), brown rice
-tea (tea drinks), brown rice crisps/flakes (snacks). The design should look premium.
+tea (tea drinks), brown rice crisps/ akes (snacks). The design should look premium.
 Image Generation Prompt:
 Please read the main task below, then complete the subtask 'Premium Rice Packaging Design' for
 image generation.
@@ -2145,17 +2121,17 @@ Main Task: [Packaging Design] Packaging for Agricultural Products
 Requirements: We have many products and want to focus on high-end SKUs such as rice and mixed
 grains. About 10 SKUs initially, to be designed progressively with product R&D. Focus categories:
 sprouted brown rice (grains), sprouted brown rice powder (beverage mix, similar to meal
-replacement), brown rice tea (tea drinks), brown rice crisps/flakes (snacks). The design should look
+replacement), brown rice tea (tea drinks), brown rice crisps/ akes (snacks). The design should look
 premium.
 Subtask 1/4: Premium Rice Packaging Design
 + Subtask 2/4: Premium Mixed Grains Packaging Design
 + Subtask 3/4: Sprouted Brown Rice Packaging Design
 + Subtask 4/4: Sprouted Brown Rice Powder Packaging Design
-Specific requirements:
+Speci c requirements:
 - Packaging program includes sprouted brown rice products
 - Packaging program includes sprouted brown rice powder products
 - Packaging program includes brown rice tea products
-- Packaging program includes brown rice crisps/flakes products
+- Packaging program includes brown rice crisps/ akes products
 - Designs should look premium
 - Designs target high-end products
 - Designs apply across categories: grains, beverage mixes, tea drinks, snacks
@@ -2173,17 +2149,26 @@ money:
 $ 69.44
 
 deliverables:
+
 Subtask 1/4: Premium Rice Packaging Design
 Subtask 2/4: Premium Mixed Grains Packaging Design
 Subtask 3/4: Sprouted Brown Rice Packaging Design
 Subtask 4/4: Sprouted Brown Rice Powder Packaging Design
+
 outputs:
 
-Generated by flux-1.1-pro
+fl
+
+fl
+
+fi
+
+fl
+
+Generated by ux-1.1-pro
+fl
 
 Figure 6: Task case 1.
-
-43517
 
 portrait
 product
@@ -2196,7 +2181,7 @@ task:
 Image Generation Prompt:
 Change ID Photo Background Color - Retouch ID photo and change background to white
 Requirements: Modify the ID photo to have a white background
-Specific requirements:
+Speci c requirements:
 - Change the ID photo background to white
 
 Input:
@@ -2211,13 +2196,18 @@ $ 138.89
 
 deliverables:
 Retouch ID photo and change background to white
+
+fi
+
 outputs:
 
-Generated by flux-1.1-pro, gemini-2.5-flash-image, gpt-image-1, gpt-image-1-mini, ideogram-v3-text-to-image
+fl
+
+fl
+
+Generated by ux-1.1-pro, gemini-2.5- ash-image, gpt-image-1, gpt-image-1-mini, ideogram-v3-text-to-image
 
 Figure 7: Task case 2.
-
-43518
 
 product
 
@@ -2242,7 +2232,7 @@ interestedly consider purchasing the Anrui Collar car headrest. Highlight themes
 and comfort. Applicants are advised to reference some well-designed images on Taobao. Festive
 elements like the Spring Festival or other holiday decorations can be appropriately added. There
 are a few Anrui Collar health shoulder pillows on Taobao that can be referenced.
-Specific requirements:
+Speci c requirements:
 - The poster theme is 'Every car owner needs an Anrui neck support'
 - The design should inspire car owners to purchase Anrui car headrests and generate interest
 - The poster highlights themes of health, safety, and comfort
@@ -2263,13 +2253,18 @@ $ 138.89
 deliverables:
 Subtask : Design a poster that aligns with the theme, emphasizing health, safety,
 and comfort to attract car owners to purchase the Anrui Collar car headrest
+
+fi
+
 outputs:
 
-Generated by flux-1.1-pro, gemini-2.5-flash-image, gpt-image-1, gpt-image-1-mini, ideogram-v3-text-to-image
+fl
+
+fl
+
+Generated by ux-1.1-pro, gemini-2.5- ash-image, gpt-image-1, gpt-image-1-mini, ideogram-v3-text-to-image
 
 Figure 8: Task case 3.
-
-43519
 
 D
 
@@ -2645,8 +2640,6 @@ total contract value earned by a model in each category. Task Acceptance and Del
 within-category proportions of tasks and deliverables approved according to human payment decisions (yt,i ). All
 monetary values are reported in thousand USD.
 
-43520
-
 E
 
 Prompting
@@ -2658,23 +2651,23 @@ Evaluation Points Execution Prompt
 Prompt For Evaluation Points Extract
 
 #### **[CR] Capacity and Role**
-You are the Senior Technical Specification Analyst for DesignLancer. Convert any requirement list into the exact count
-of final image deliverables and describe each as a production-ready brief using real formats
+You are the Senior Technical Speci cation Analyst for DesignLancer. Convert any requirement list into the exact count
+of nal image deliverables and describe each as a production-ready brief using real formats
 (AI/PSD/SVG/PNG/JPG/PDF) plus CMYK 300 DPI print specs or RGB pixel specs for digital. Each deliverable equals
-one final image; drafts, explorations, and "pick-one" options do not count.
+one nal image; drafts, explorations, and "pick-one" options do not count.
 #### **[I] Insight**
 DesignLancer enforces two checks:
 1. **Deliverable quantity** – Count only the images the client receives. A deliverable looks like `<main subject> +
 <objective/variant>`. Every explicitly named artifact (logo, card, packaging front/back) or required variant (color vs.
 mono, portrait vs. landscape) adds to the tally.
-2. **Hard rules** – Capture only explicit binary constraints using `file_type`, `visual_specs` (`dimensions`,
-`aspect_ratio`, `resolution`), or `file_size`.
+2. **Hard rules** – Capture only explicit binary constraints using ` le_type`, `visual_specs` (`dimensions`,
+`aspect_ratio`, `resolution`), or ` le_size`.
 **Hard-rule cues**
-- `file_type`: quote requested formats verbatim (AI, PSD, JPG, PNG, SVG, EPS, PDF). “Source files” implies editable
+- ` le_type`: quote requested formats verbatim (AI, PSD, JPG, PNG, SVG, EPS, PDF). “Source les” implies editable
 formats but list only those named.
 - `visual_specs`: note numeric sizes/bounds, ratios such as 16:9 or “square/portrait/landscape”, and DPI values (`print
 quality` `min_dpi: 300`, `web use` `min_dpi: 72`).
-- `file_size`: include only when a limit is stated.
+- ` le_size`: include only when a limit is stated.
 
 ⇒
 
@@ -2703,18 +2696,35 @@ Omit keys without evidence. Apply shared rules to every affected deliverable.
 1. List every explicit deliverable/variant, merge duplicates, split true variants, and default to one only when quantity is
 unknowable.
 2. Attach global rules everywhere and local rules only where they apply; never invent specs.
-3. Count deliverables, resolve conflicts with the latest instruction, and cite evidence for both quantity and rules.
+3. Count deliverables, resolve con icts with the latest instruction, and cite evidence for both quantity and rules.
 #### **[P] Personality**
 Output JSON only; keep `subtask` snake_case and descriptions concise; reasoning sentences follow `Output quantity:
 ... | Rules extracted: ...`.
 #### **[E] Experiment & Reminders**
-Clarify ambiguous counts via context (otherwise default to 1 and explain). Treat “source files” as editable formats and
+Clarify ambiguous counts via context (otherwise default to 1 and explain). Treat “source les” as editable formats and
 “print quality” as 300 DPI but record only explicit numbers. Note contradictions or missing info instead of guessing, and
 ignore reference-only material or non-mandatory phrasing.
+fi
+
+fi
+
+fi
+
+fi
+
+fi
+
+fi
+
+fi
+
+fi
+
+fl
+
+fi
 
 Figure 9: Prompt for evaluation points extraction.
-
-43521
 
 E.2
 
@@ -2733,6 +2743,7 @@ generated {image_count} picture.
 1. {evaluation_point_1}
 2. {evaluation_point_2}
 ...
+
 **Evaluation Requirements** (Multi-image Evaluation - Only Provide Raw Scores):
 1. For each evaluation point on each image, make a STRICT 0/1 judgment (0=not completed, 1=completed)
 2. **IMPORTANT**: Do NOT use "N/A". You MUST choose either 0 or 1 for every evaluation point.
@@ -2743,7 +2754,6 @@ generated {image_count} picture.
 The aggregation and score calculation will be done
 by code.
 4. **CRITICAL**: You MUST use the EXACT evaluation point text from the list above.
-
 **Output Format** (must strictly follow JSON format):
 ```json
 {
@@ -2766,40 +2776,37 @@ Prompt for
 }
 ]
 }
-Note: Only return the raw 0/1 scores for each evaluation point. Do NOT include "reason" fields. Do not include
+Note: Only return the raw 0/1 scores for each evaluation point. Do NOT include "reason" elds. Do not include
 aggregated_points, do not calculate
-final_score_0to5, do not compute completion_rate. These will be calculated by code using OR rule.
+nal_score_0to5, do not compute completion_rate. These will be calculated by code using OR rule.
+fi
+
+fi
 
 Figure 10: BRF Evaluation prompt.
-
-43522
 
 Prompt for VEQ-Tech
 
 Please assess the technical quality of the image, focusing on the following two independent dimensions:
-
 A. Clarity & Detail:
 Evaluate the perceptual sharpness and detail richness of the image across multiple scales:
-- Sharpness: Is the image sharp with well-defined edges? Or is there noticeable blur, defocus, or softness?
-- Detail Richness: Are textures, fine structures, and small details clearly visible?
+- Sharpness: Is the image sharp with well-de ned edges? Or is there noticeable blur, defocus, or softness?
+- Detail Richness: Are textures, ne structures, and small details clearly visible?
 - Noise & Distortion: Are there visible noise, compression artifacts, or geometric distortions?
 - Multi-scale Quality: Check quality at both global level and local level
-
 Clarity & Detail Scoring Scale (0–5):
 - 5: Exceptionally sharp with crisp edges; extremely rich in detail at all scales
 - 4: Good sharpness with clear details; minor softness in limited areas
 - 3: Moderate sharpness; some details lost or blurred
-- 2: Poor sharpness with significant blur; many details unclear
+- 2: Poor sharpness with signi cant blur; many details unclear
 - 1: Severe blur; very few recognizable details
 - 0: Completely corrupted or unrecognizable
-
 B. Realism & Artifacts:
 Evaluate whether the image appears natural and photorealistic:
 - High-Frequency Artifacts: Check for unnatural patterns or synthetic textures
 - Visual Consistency: Do all elements blend seamlessly?
-- Environmental Realism: Are lighting, shadows, reflections physically plausible?
+- Environmental Realism: Are lighting, shadows, re ections physically plausible?
 - Material & Surface Quality: Do surfaces have realistic material properties?
-
 Realism & Artifacts Scoring Scale (0–5):
 - 5: Completely photorealistic; no detectable AI artifacts
 - 4: Mostly realistic; minor inconsistencies
@@ -2808,6 +2815,14 @@ Realism & Artifacts Scoring Scale (0–5):
 - 1: Heavily synthetic-looking with pervasive AI artifacts
 - 0: Completely unrealistic or obviously AI-generated
 
+fl
+
+fi
+
+fi
+
+fi
+
 Important Notes:
 -Prompt
 Evaluate
@@ -2815,7 +2830,6 @@ only based on the image's inherent technical quality
 for
 - Do not adjust score based on task requirements (compliance is handled by BRF)
 - Award high scores for good technical quality even if content is off-task
-
 Output Format:
 {
 "metric": "Technical_Quality",
@@ -2824,8 +2838,6 @@ Output Format:
 }
 
 Figure 11: VEQ-Tech Evaluation prompt.
-
-43523
 
 Prompt for VEQ-Aesthetic
 
@@ -2842,7 +2854,7 @@ Evaluation Dimensions:
 3. Lighting & Contrast:
 - Lighting appropriate for the scene
 - Highlights and shadows well-balanced
-- Sufficient contrast to create depth
+- Suf cient contrast to create depth
 4. Detail Richness & Texture:
 - Textures rendered with appropriate depth
 - Good balance between detailed areas and simplicity
@@ -2860,20 +2872,36 @@ Scoring Scale (0-5 points):
 Output Format:
 {
 "metric": "Aesthetic_Quality",
-"final_score_0to5": X
+" nal_score_0to5": X
 }
 Prompt for VEQ-Text
 
 Please assess the text quality in the image:
 Observation Dimensions:
 1. Text Correctness: Assess typos, garbled text, spelling errors
-2. Contrast & Background: Sufficient contrast between text and background
+2. Contrast & Background: Suf cient contrast between text and background
 3. Typography & Font: Appropriate stroke weight, no jagged edges
 4. Layout Safeguards: Enhancement methods like background plates, outlines, shadows
 Important Notes:
 - If there is no text in the image, mark "has_text": false
 - Evaluate based on obvious visual errors only
 - Do not depend on task requirements
+
+Output Format:
+{
+"metric": "Text_Quality",
+"has_text": true/false,
+" nal_score_0to5": X
+}
+
+fi
+
+fi
+
+fi
+
+fi
+
 Scoring Scale (0-5 points):
 - 5: No errors; strong contrast; clear font; excellent layout
 - 4: Minor errors; contrast slightly weak but readable
@@ -2881,20 +2909,12 @@ Scoring Scale (0-5 points):
 - 2: Multiple errors; contrast very weak
 - 1: Text largely unreadable
 - 0: Completely unable to recognize text
-Output Format:
-{
-"metric": "Text_Quality",
-"has_text": true/false,
-"final_score_0to5": X
-}
 
 Figure 12: VEQ-Aesthetic Quality AND Text Quality Evaluation prompt.
 
-43524
-
 Prompt for CNS-Edit
 
-Please evaluate the consistency of the image edit. You will be shown 2 images: the edited version (first) and the
+Please evaluate the consistency of the image edit. You will be shown 2 images: the edited version ( rst) and the
 source (second).
 Focus Areas:
 1. Unedited regions remain unchanged: Areas outside the edit should be untouched
@@ -2905,27 +2925,38 @@ Scoring Criteria (1–5):
 - 5: No visible changes in unedited regions; seamless edges; zero drift; coherent lighting
 - 4: Barely perceptible artifacts; slight blending at edges; minor detail changes
 - 3: Localized contamination; clear seams; visible attribute drift
-- 2: Multiple damaged areas; mismatched background; significant distortion
+- 2: Multiple damaged areas; mismatched background; signi cant distortion
 - 1: Large-scale unintended edits; subject identity lost; composite broken
-Available issue flags:
+Available issue ags:
 - "non_edit_changed": Unedited regions altered
 - "edge_seam": Obvious edge seam
 - "subject_drift": Subject attribute drift
-- "lighting_conflict": Lighting mismatch
+- "lighting_con ict": Lighting mismatch
 - "perspective_broken": Perspective break
 - "texture_damaged": Texture damage
 - "color_shift": Color shift
 - "identity_lost": Subject identity lost
+
+fl
+
+fl
+
+fl
+
+fl
+
+fi
+
+fi
+
 Output Format:
 {
 "metric": "CNS-Edit",
 "score_1to5": X,
-"flags": ["List of issue flags"]
+" ags": ["List of issue ags"]
 }
 
 Figure 13: CNS-Edit Evaluation prompt.
-
-43525
 
 Prompt for CNS-Set
 
@@ -2945,11 +2976,24 @@ Scoring Criteria (1-5 points) - FOR EACH IMAGE:
 Available Issue Flags (per image):
 - "style_inconsistent": Style inconsistent with others
 - "color_palette_broken": Color palette different
-- "layout_divergent": Layout significantly different
+- "layout_divergent": Layout signi cantly different
 - "brand_unstable": Brand elements inconsistent
-- "contrast_varies": Contrast varies significantly
+- "contrast_varies": Contrast varies signi cantly
 - "texture_inconsistent": Texture inconsistent
 - "spacing_inconsistent": Spacing/margins inconsistent
+
+fl
+
+fl
+
+fl
+
+fl
+
+fi
+
+fi
+
 Output Format:
 {
 "metric": "CNS-Set",
@@ -2957,12 +3001,12 @@ Output Format:
 {
 "image_index": 0,
 "score_1to5": X,
-"flags": ["List of issue flags for image 1"]
+" ags": ["List of issue ags for image 1"]
 },
 {
 "image_index": 1,
 "score_1to5": Y,
-"flags": ["List of issue flags for image 2"]
+" ags": ["List of issue ags for image 2"]
 },
 ...
 ]
@@ -2971,13 +3015,9 @@ Please evaluate EACH image individually and provide a score for each one based o
 
 Figure 14: CNS-Set Evaluation prompt.
 
-43526
-
 F
 
 Train Dataset
-
-H Judge Robustness and Reproducibility
 
 We start from the original annotations: about 17k
 paid design tasks with roughly 32.9k accept/rejectlabeled instances, and about 16k tasks with
@@ -2987,20 +3027,14 @@ label noise. To mitigate accept/reject class imbalance, we apply training-only o
 accepted examples, while keeping the validation
 and test splits unchanged to reflect the natural accept/reject distribution.
 
-G ServImageModel Settlement
+G
 
-To further reduce reliance on a single fixed VLM
-judge, we conduct two additional analyses. First,
-we perform human verification on a randomly sampled set of 300 deliverables and report the agreement between each automatic judge and human
-judgments on BRF, VEQ, CNS, and the overall
-score. Second, we recompute ServImageScore using two additional judge models and compare the
-resulting system rankings across judges. We report
-the rank correlation and Top-k overlap between
-judge pairs, showing that our main conclusions remain stable under different judge choices.
+ServImageModel Settlement
 
-I Failure Analyze
+G.1
 
-G.1 Training Setup
+Training Setup
+
 We adopt a two-stage training strategy on 4×A6000
 GPUs to learn both image quality assessment and
 downstream accept/reject decision-making. In
@@ -3019,7 +3053,10 @@ learning rate 4 × 10−5 , adding lightweight LoRA
 adapters (dropout 0.01). The decision head fuses
 representations from the frozen quality model and
 the original VLM by concatenation for binary classification.
-G.2 Automatic Settlement Results
+G.2
+
+Automatic Settlement Results
+
 ServImageModel-based settlement is an automatic
 proxy. It converts predicted payment probabilities into accept/reject outcomes and then applies
 the same accounting rule as in Table 2. Because
@@ -3028,6 +3065,17 @@ aggregation, its absolute revenues can deviate from
 human settlement, especially on particular categories; therefore, we use it only for scalable approximation, while all main conclusions rely on human
 labels.
 
+H Judge Robustness and Reproducibility
+To further reduce reliance on a single fixed VLM
+judge, we conduct two additional analyses. First,
+we perform human verification on a randomly sampled set of 300 deliverables and report the agreement between each automatic judge and human
+judgments on BRF, VEQ, CNS, and the overall
+score. Second, we recompute ServImageScore using two additional judge models and compare the
+resulting system rankings across judges. We report
+the rank correlation and Top-k overlap between
+judge pairs, showing that our main conclusions remain stable under different judge choices.
+
+I Failure Analyze
 In this appendix, we provide a more systematic analysis of rejection causes and the payment
 boundary, addressing the concern that the original
 case study was overly qualitative and insufficiently
@@ -3054,8 +3102,6 @@ To further illustrate these failure modes, we provide representative failure exa
 These examples show that rejection may arise from
 missing required elements (BRF), insufficient clarity or realism, severe aesthetic degradation, text
 rendering errors, or poor consistency across mul-
-
-43527
 
 Total
 
@@ -3346,8 +3392,6 @@ the resulting overall rankings. In addition, we also
 examine Top-k overlap, defined as the proportion of
 shared models in the top-k positions between two judgespecific rankings.
 
-43528
-
 Dimension
 BRF
 VEQ: Clarity
@@ -3529,7 +3573,5 @@ Table 13: Representative failure examples grouped by dominant failure dimension.
 score of the lowest-scoring dimension for the corresponding sample, which determines the failure label used in
 Table 12. When multiple dimensions tie for the minimum score, the example is assigned according to the predefined
 tie-breaking rule used in our analysis pipeline.
-
-43529
 
 

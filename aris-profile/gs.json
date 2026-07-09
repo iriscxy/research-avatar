@@ -1,49 +1,441 @@
 {
   "source": "google_scholar",
   "profile": {
-    "name": "Lang Gao",
-    "affiliation": "ByteDance | PhD Student in MBZUAI",
+    "name": "Xiuying Chen",
+    "affiliation": "MBZUAI",
     "interests": [
-      "Mechanistic Interpretability",
-      "Trustworthy AI",
-      "Natural Language Processing"
+      "Trustworthy NLP",
+      "Human-Centered NLP",
+      "Computational Social Science"
     ],
-    "citations_all": 363,
-    "h_index_all": 8,
-    "i10_index_all": 8
+    "citations_all": 5862,
+    "h_index_all": 32,
+    "i10_index_all": 77
   },
   "publications": [
     {
-      "title": "Medtrinity-25m: A large-scale multimodal dataset with multigranular annotations for medicine",
-      "authors": "Y Xie*, C Zhou*, L Gao*, J Wu*, X Li, HY Zhou, S Liu, L Xing, J Zou, C Xie, ...",
-      "venue": "ICLR 2025",
+      "title": "Large language model based multi-agents: A survey of progress and challenges",
+      "authors": "T Guo, X Chen, Y Wang, R Chang, S Pei, NV Chawla, O Wiest, X Zhang",
+      "venue": "IJCAI 2024",
       "year": "2024",
-      "cited_by": 123,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:u-x6o8ySG0sC"
+      "cited_by": 2011,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:M3NEmzRMIkIC"
     },
     {
-      "title": "Vuldetectbench: Evaluating the deep capability of vulnerability detection with large language models",
-      "authors": "Y Liu*, L Gao*, M Yang*, Y Xie, P Chen, X Zhang, W Chen",
-      "venue": "arXiv preprint arXiv:2406.07595",
+      "title": "Opportunities and challenges for ChatGPT and large language models in biomedicine and health",
+      "authors": "S Tian, Q Jin, L Yeganova, PT Lai, Q Zhu, X Chen, Y Yang, Q Chen, ...",
+      "venue": "Briefings in Bioinformatics 25 (1), bbad493",
       "year": "2024",
-      "cited_by": 79,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:u5HHmVD_uO8C"
+      "cited_by": 531,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:e5wmG9Sq2KIC"
+    },
+    {
+      "title": "Pre-trained multimodal large language model enhances dermatological diagnosis using SkinGPT-4",
+      "authors": "J Zhou, X He, L Sun, J Xu, X Chen, Y Chu, L Zhou, X Liao, B Zhang, ...",
+      "venue": "Nature Communications 15 (1), 5649",
+      "year": "2024",
+      "cited_by": 259,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:fPk4N6BV_jEC"
+    },
+    {
+      "title": "Lift yourself up: Retrieval-augmented text generation with self-memory",
+      "authors": "X Cheng, D Luo, X Chen, L Liu, D Zhao, R Yan",
+      "venue": "Advances in Neural Information Processing Systems 36, 43780-43799",
+      "year": "2023",
+      "cited_by": 205,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:mB3voiENLucC"
+    },
+    {
+      "title": "Injecting domain-specific knowledge into large language models: a comprehensive survey",
+      "authors": "XC Zirui Song, Bin Yan, Yuhan Liu, Miao Fang, Mingzhe Li, Rui Yan",
+      "venue": "EMNLP findings, https://aclanthology.org/2025.findings-emnlp.1379/",
+      "year": "2025",
+      "cited_by": 150,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:tkaPQYYpVKoC"
+    },
+    {
+      "title": "VMSMO: Learning to Generate Multimodal Summary for Video-based News Articles",
+      "authors": "M Li, X Chen, S Gao, Z Chan, D Zhao, R Yan",
+      "venue": "EMNLP",
+      "year": "2020",
+      "cited_by": 116,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:roLk4NBRz8UC"
+    },
+    {
+      "title": "An AI agent for fully automated multi‐omic analyses",
+      "authors": "J Zhou, B Zhang, G Li, X Chen, H Li, X Xu, S Chen, W He, C Xu, L Liu, ...",
+      "venue": "Advanced Science 11 (44), 2407094",
+      "year": "2024",
+      "cited_by": 100,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:p2g8aNsByqUC"
+    },
+    {
+      "title": "From Skepticism to Acceptance: Simulating the Attitude Dynamics Toward Fake News",
+      "authors": "Y Liu, X Chen, X Zhang, X Gao, J Zhang, R Yan",
+      "venue": "IJCAI 2024",
+      "year": "2024",
+      "cited_by": 99,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:vV6vV6tmYwMC"
+    },
+    {
+      "title": "Abstractive Text Summarization by Incorporating Reader Comments",
+      "authors": "S Gao, X Chen, P Li, Z Ren, L Bing, D Zhao, R Yan",
+      "venue": "AAAI 2019",
+      "year": "2018",
+      "cited_by": 98,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:qjMakFHDy7sC"
+    },
+    {
+      "title": "Interactive natural language processing",
+      "authors": "Z Wang, G Zhang, K Yang, N Shi, W Zhou, S Hao, G Xiong, Y Li, MY Sim, ...",
+      "venue": "arXiv preprint arXiv:2305.13246",
+      "year": "2023",
+      "cited_by": 89,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:HDshCWvjkbEC"
+    },
+    {
+      "title": "A multi-agent conversational recommender system",
+      "authors": "J Fang, S Gao, P Ren, X Chen, S Verberne, Z Ren",
+      "venue": "arXiv preprint arXiv:2402.01135",
+      "year": "2024",
+      "cited_by": 87,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:blknAaTinKkC"
+    },
+    {
+      "title": "Privacy-preserving collaborative model learning: The case of word vector training",
+      "authors": "Q Wang, M Du, X Chen, Y Chen, P Zhou, X Chen, X Huang",
+      "venue": "IEEE Transactions on Knowledge and Data Engineering 30 (12), 2381-2393",
+      "year": "2018",
+      "cited_by": 76,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:u5HHmVD_uO8C"
+    },
+    {
+      "title": "SkinGPT-4: an interactive dermatology diagnostic system with visual large language model",
+      "authors": "J Zhou, X He, L Sun, J Xu, X Chen, Y Chu, L Zhou, X Liao, B Zhang, ...",
+      "venue": "Nature Communications",
+      "year": "2023",
+      "cited_by": 75,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:R3hNpaxXUhUC"
+    },
+    {
+      "title": "Capturing relations between scientific papers: An abstractive model for related work section generation",
+      "authors": "X Chen, H Alamro, M Li, S Gao, X Zhang, D Zhao, R Yan",
+      "venue": "Proceedings of the 59th Annual Meeting of the Association for Computational …",
+      "year": "2021",
+      "cited_by": 74,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:Zph67rFs4hoC"
+    },
+    {
+      "title": "Decoding Echo Chambers: LLM-Powered Simulations Revealing Polarization in Social Networks",
+      "authors": "C Wang, Z Liu, D Yang, X Chen",
+      "venue": "COLING 2025",
+      "year": "2024",
+      "cited_by": 62,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:g5m5HwL7SMYC"
+    },
+    {
+      "title": "Towards improving faithfulness in abstractive summarization",
+      "authors": "X Chen, M Li, X Gao, X Zhang",
+      "venue": "Advances in Neural Information Processing Systems 35, 24516-24528",
+      "year": "2022",
+      "cited_by": 61,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:9ZlFYXVOiuMC"
+    },
+    {
+      "title": "Learning towards Abstractive Timeline Summarization",
+      "authors": "X Chen, Z Chan, S Gao, MH Yu, D Zhao, R Yan",
+      "venue": "IJCAI, 4939-4945",
+      "year": "2019",
+      "cited_by": 61,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:zYLM7Y9cAGgC"
+    },
+    {
+      "title": "On the trustworthiness of generative foundation models: Guideline, assessment, and perspective",
+      "authors": "Y Huang, C Gao, S Wu, H Wang, X Wang, Y Zhou, Y Wang, J Ye, J Shi, ...",
+      "venue": "arXiv preprint arXiv:2502.14296",
+      "year": "2025",
+      "cited_by": 60,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:dfsIfKJdRG4C"
+    },
+    {
+      "title": "Meaningful Answer Generation of E-Commerce Question-Answering",
+      "authors": "S Gao, X Chen, Z Ren, D Zhao, R Yan",
+      "venue": "TOIS",
+      "year": "2020",
+      "cited_by": 57,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:0EnyYjriUFMC"
+    },
+    {
+      "title": "The Truth Becomes Clearer Through Debate! Multi-Agent Systems with Large Language Models Unmask Fake News",
+      "authors": "Y Liu, Y Liu, X Zhang, X Chen, R Yan",
+      "venue": "SIGIR 2025",
+      "year": "2025",
+      "cited_by": 53,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&citation_for_view=COUnAF4AAAAJ:nb7KW1ujOQ8C"
+    },
+    {
+      "title": "Modeling personalization in continuous space for response generation via augmented wasserstein autoencoders",
+      "authors": "Z Chan, J Li, X Yang, X Chen, W Hu, D Zhao, R Yan",
+      "venue": "EMNLP 2019, 1931-1940",
+      "year": "2019",
+      "cited_by": 52,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:W7OEmFMy1HYC"
+    },
+    {
+      "title": "Iterative Document Representation Learning Towards Summarization with Polishing",
+      "authors": "X Chen, S Gao, C Tao, Y Song, D Zhao, R Yan",
+      "venue": "EMNLP 2018",
+      "year": "2018",
+      "cited_by": 50,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:9yKSN-GCB0IC"
     },
     {
       "title": "Shaping the Safety Boundaries: Understanding and Defending Against Jailbreaks in Large Language Models",
-      "authors": "L Gao, J Geng, X Zhang, P Nakov, X Chen",
-      "venue": "ACL 2025",
+      "authors": "L Gao, X Zhang, P Nakov, X Chen",
+      "venue": "ACL main 2025",
       "year": "2024",
       "cited_by": 49,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:d1gkVwhDpl0C"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:3s1wT3WcHBgC"
     },
     {
-      "title": "Audio jailbreak: An open comprehensive benchmark for jailbreaking large audio-language models",
-      "authors": "Z Song, Q Jiang, M Cui, M Li, L Gao, Z Zhang, Z Xu, Y Wang, C Wang, ...",
-      "venue": "ACL 2026",
+      "title": "Learning to respond with stickers: A framework of unifying multi-modality in multi-turn dialog",
+      "authors": "S Gao, X Chen, C Liu, L Liu, D Zhao, R Yan",
+      "venue": "Proceedings of the Web Conference 2020, 1138-1148",
+      "year": "2020",
+      "cited_by": 49,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:eQOLeE2rZwMC"
+    },
+    {
+      "title": "Target-aware Abstractive Related Work Generation with Contrastive Learning",
+      "authors": "X Chen, H Alamro, M Li, S Gao, R Yan, X Gao, X Zhang",
+      "venue": "SIGIR 2022",
+      "year": "2022",
+      "cited_by": 46,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:dhFuZR0502QC"
+    },
+    {
+      "title": "Large language model based multi-agents: A survey of progress and challenges. arXiv 2024",
+      "authors": "T Guo, X Chen, Y Wang, R Chang, S Pei, NV Chawla, O Wiest, X Zhang",
+      "venue": "arXiv preprint arXiv:2402.01680 10",
+      "year": "2024",
+      "cited_by": 42,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:5ugPr518TE4C"
+    },
+    {
+      "title": "Combining curriculum learning and knowledge distillation for dialogue generation",
+      "authors": "Q Zhu, X Chen, P Wu, JF Liu, D Zhao",
+      "venue": "Findings of the Association for Computational Linguistics: EMNLP 2021, 1284-1295",
+      "year": "2021",
+      "cited_by": 42,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:ULOm3_A8WrAC"
+    },
+    {
+      "title": "From Standard Summarization to New Tasks and Beyond: Summarization with Manifold Information",
+      "authors": "S Gao, X Chen, Z Ren, D Zhao, R Yan",
+      "venue": "IJCAI 2020",
+      "year": "2020",
+      "cited_by": 40,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:_FxGoFyzp5QC"
+    },
+    {
+      "title": "Maniplvm-r1: Reinforcement learning for reasoning in embodied manipulation with large vision-language models",
+      "authors": "Z Song, G Ouyang, M Li, Y Ji, C Wang, Z Xu, Z Zhang, X Zhang, Q Jiang, ...",
+      "venue": "AAAI 2026",
+      "year": "2025",
+      "cited_by": 37,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:uWQEDVKXjbEC"
+    },
+    {
+      "title": "Follow the timeline! generating an abstractive and extractive timeline summary in chronological order",
+      "authors": "X Chen, M Li, S Gao, Z Chan, D Zhao, X Gao, X Zhang, R Yan",
+      "venue": "ACM Transactions on Information Systems 41 (1), 1-30",
+      "year": "2023",
+      "cited_by": 34,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:4DMP91E08xMC"
+    },
+    {
+      "title": "Stick to facts: Towards fidelity-oriented product description generation",
+      "authors": "Z Chan, X Chen, Y Wang, J Li, Z Zhang, K Gai, D Zhao, R Yan",
+      "venue": "EMNLP 2019",
+      "year": "2019",
+      "cited_by": 34,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:Y0pCki6q_DkC"
+    },
+    {
+      "title": "How to Write Summaries with Patterns? Learning towards Abstractive Summarization through Prototype Editing",
+      "authors": "S Gao, X Chen, P Li, Z Chan, D Zhao, R Yan",
+      "venue": "EMNLP 2019",
+      "year": "2019",
+      "cited_by": 33,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:LkGwnXOMwfcC"
+    },
+    {
+      "title": "From a tiny slip to a giant leap: An llm-based simulation for fake news evolution",
+      "authors": "Y Liu, Z Song, X Zhang, X Chen, R Yan",
+      "venue": "EMNLP main conference",
+      "year": "2025",
+      "cited_by": 29,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:pqnbT2bcN3wC"
+    },
+    {
+      "title": "Unveiling the power of language models in chemical research question answering",
+      "authors": "X Chen, T Wang, T Guo, K Guo, J Zhou, H Li, Z Song, X Gao, X Zhang",
+      "venue": "Communications Chemistry 8 (1), 4",
+      "year": "2025",
+      "cited_by": 29,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:b0M2c_1WBrUC"
+    },
+    {
+      "title": "Large language model based multi-agents: A survey of progress and challenges. arXiv",
+      "authors": "T Guo, X Chen, Y Wang, R Chang, S Pei, NV Chawla, O Wiest, X Zhang",
+      "venue": "arXiv preprint arXiv:2402.01680",
+      "year": "2024",
+      "cited_by": 29,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:t6usbXjVLHcC"
+    },
+    {
+      "title": "Selection and generation: Learning towards multi-product advertisement post generation",
+      "authors": "Z Chan, Y Zhang, X Chen, S Gao, Z Zhang, D Zhao, R Yan",
+      "venue": "Proceedings of the 2020 Conference on Empirical Methods in Natural Language …",
+      "year": "2020",
+      "cited_by": 29,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:UebtZRa9Y70C"
+    },
+    {
+      "title": "Towards a unified framework for reference retrieval and related work generation",
+      "authors": "Z Shi, S Gao, Z Zhang, X Chen, Z Chen, P Ren, Z Ren",
+      "venue": "Findings of the Association for Computational Linguistics: EMNLP 2023, 5785-5799",
+      "year": "2023",
+      "cited_by": 26,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:TFP_iSt0sucC"
+    },
+    {
+      "title": "Dialogue summarization with static-dynamic structure fusion graph",
+      "authors": "S Gao, X Cheng, M Li, X Chen, J Li, D Zhao, R Yan",
+      "venue": "Proceedings of the 61st Annual Meeting of the Association for Computational …",
+      "year": "2023",
+      "cited_by": 26,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:RHpTSmoSYBkC"
+    },
+    {
+      "title": "EZInterviewer: To Improve Job Interview Performance with Mock Interview Generator",
+      "authors": "M Li, X Chen, W Liao, Y Song, T Zhang, D Zhao, R Yan",
+      "venue": "WSDM 2023",
+      "year": "2023",
+      "cited_by": 26,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:7PzlFSSx8tAC"
+    },
+    {
+      "title": "A Cognitive Writing Perspective for Constrained Long-Form Text Generation",
+      "authors": "K Wan, H Mu, R Hao, H Luo, T Gu, X Chen",
+      "venue": "ACL finding 2025",
+      "year": "2025",
+      "cited_by": 25,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:CHSYGLWDkRkC"
+    },
+    {
+      "title": "Hazards in Daily Life? Enabling Robots to Proactively Detect and Resolve Anomalies",
+      "authors": "Z Song, G Ouyang, M Fang, H Na, Z Shi, Z Chen, Y Fu, Z Zhang, S Jiang, ...",
+      "venue": "NAACL main conference",
+      "year": "2024",
+      "cited_by": 23,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:ZHo1McVdvXMC"
+    },
+    {
+      "title": "The Style-Content Duality of Attractiveness: Learning to Write Eye-Catching Headlines via Disentanglement",
+      "authors": "M Li, X Chen, M Yang, S Gao, D Zhao, R Yan",
+      "venue": "AAAI",
+      "year": "2020",
+      "cited_by": 23,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:8k81kl-MbHgC"
+    },
+    {
+      "title": "Autobench-v: Can large vision-language models benchmark themselves?",
+      "authors": "H Bao, Y Huang, Y Wang, J Ye, X Wang, X Chen, Y Zhao, T Zhou, ...",
+      "venue": "arXiv preprint arXiv:2410.21259",
+      "year": "2024",
+      "cited_by": 22,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:HoB7MX3m0LUC"
+    },
+    {
+      "title": "Improving the Robustness of Summarization Systems with Dual Augmentation",
+      "authors": "X Chen, G Long, C Tao, M Li, X Gao, C Zhang, X Zhang",
+      "venue": "ACL 2023",
+      "year": "2023",
+      "cited_by": 21,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:4JMBOYKVnBMC"
+    },
+    {
+      "title": "Scientific Paper Extractive Summarization Enhanced by Citation Graphs",
+      "authors": "X Chen, M Li, S Gao, R Yan, X Gao, X Zhang",
+      "venue": "EMNLP 2022",
+      "year": "2022",
+      "cited_by": 21,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:QIV2ME_5wuYC"
+    },
+    {
+      "title": "Learning to Respond with Your Favorite Stickers: A Framework of Unifying Multi-Modality and User Preference in Multi-Turn Dialog",
+      "authors": "S Gao, X Chen, L Liu, D Zhao, R Yan",
+      "venue": "TOIS",
+      "year": "2020",
+      "cited_by": 21,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:hqOjcs7Dif8C"
+    },
+    {
+      "title": "The stepwise deception: Simulating the evolution from true news to fake news with llm agents",
+      "authors": "Y Liu, Z Song, J Zhang, X Zhang, X Chen, R Yan",
+      "venue": "Proceedings of the 2025 Conference on Empirical Methods in Natural Language …",
       "year": "2025",
       "cited_by": 20,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:WF5omc3nYNoC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:kRWSkSYxWN8C"
+    },
+    {
+      "title": "CulFiT: A Fine-grained Cultural-aware LLM Training Paradigm via Multilingual Critique Data Synthesis",
+      "authors": "R Feng, S Gao, X Chen, L Chen, S Shang",
+      "venue": "ACL 2025 main",
+      "year": "2025",
+      "cited_by": 20,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:OU6Ihb5iCvQC"
+    },
+    {
+      "title": "Breaking focus: Contextual distraction curse in large language models",
+      "authors": "Y Huang, Y Wang, Z Xu, C Gao, S Wu, J Ye, X Chen, PY Chen, X Zhang",
+      "venue": "NeurIPS",
+      "year": "2025",
+      "cited_by": 20,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:f2IySw72cVMC"
+    },
+    {
+      "title": "Path to medical agi: Unify domain-specific medical llms with the lowest cost",
+      "authors": "J Zhou, X Chen, X Gao",
+      "venue": "arXiv preprint arXiv:2306.10765",
+      "year": "2023",
+      "cited_by": 20,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:_Qo2XoVZTnwC"
+    },
+    {
+      "title": "A Topic-aware Summarization Framework with Different Modal Side Information",
+      "authors": "X Chen, M Li, S Gao, X Cheng, Q Yang, Q Zhang, X Gao, X Zhang",
+      "venue": "SIGIR 2023",
+      "year": "2023",
+      "cited_by": 19,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:hC7cP41nSMkC"
+    },
+    {
+      "title": "Keywords and Instances: A Hierarchical Contrastive Learning Framework Unifying Hybrid Granularities for Text Generation",
+      "authors": "M Li, XX Lin, X Chen, J Chang, Q Zhang, F Wang, T Wang, Z Liu, W Chu, ...",
+      "venue": "ACL 2022",
+      "year": "2022",
+      "cited_by": 19,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:qxL8FJ1GzNcC"
+    },
+    {
+      "title": "Reasoning in Dialog: Improving Response Generation by Context Reading Comprehension",
+      "authors": "X Chen, Z Cui, J Zhang, C Wei, J Cui, B Wang, D Zhao, R Yan",
+      "venue": "AAAI",
+      "year": "2020",
+      "cited_by": 17,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:5nxA0vEk-isC"
     },
     {
       "title": "Socialmaze: A benchmark for evaluating social reasoning in large language models",
@@ -51,39 +443,271 @@
       "venue": "arXiv preprint arXiv:2505.23713",
       "year": "2025",
       "cited_by": 16,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:ufrVoPGSRksC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:738O_yMBCRsC"
+    },
+    {
+      "title": "Evaluating and mitigating bias in AI-based medical text generation",
+      "authors": "X Chen, T Wang, J Zhou, Z Song, X Gao, X Zhang",
+      "venue": "Nature Computational Science 5 (5), 388-396",
+      "year": "2025",
+      "cited_by": 16,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:NhqRSupF_l8C"
     },
     {
       "title": "DyFlow: Dynamic Workflow Framework for Agentic Reasoning",
       "authors": "Y Wang, Z Xu, Y Huang, X Wang, Z Song, L Gao, C Wang, X Tang, ...",
       "venue": "NeurIPS 2025",
       "year": "2025",
+      "cited_by": 15,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:LPZeul_q3PIC"
+    },
+    {
+      "title": "Scholarchemqa: Unveiling the power of language models in chemical research question answering",
+      "authors": "X Chen, T Wang, T Guo, K Guo, J Zhou, H Li, M Zhuge, J Schmidhuber, ...",
+      "venue": "arXiv preprint arXiv:2407.16931",
+      "year": "2024",
+      "cited_by": 15,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:V3AGJWp-ZtQC"
+    },
+    {
+      "title": "Unify graph learning with text: Unleashing llm potentials for session search",
+      "authors": "S Wu, Q Tu, H Liu, J Xu, Z Liu, G Zhang, R Wang, X Chen, R Yan",
+      "venue": "Proceedings of the ACM Web Conference 2024, 1509-1518",
+      "year": "2024",
+      "cited_by": 15,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:ns9cj8rnVeAC"
+    },
+    {
+      "title": "Decouple knowledge from paramters for plug-and-play language modeling",
+      "authors": "X Cheng, Y Lin, X Chen, D Zhao, R Yan",
+      "venue": "Findings of the Association for Computational Linguistics: ACL 2023, 14288-14308",
+      "year": "2023",
+      "cited_by": 15,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:-f6ydRqryjwC"
+    },
+    {
+      "title": "Audio jailbreak: An open comprehensive benchmark for jailbreaking large audio-language models",
+      "authors": "Z Song, Q Jiang, M Cui, M Li, L Gao, Z Zhang, Z Xu, Y Wang, C Wang, ...",
+      "venue": "ACL 2026",
+      "year": "2026",
       "cited_by": 14,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:eQOLeE2rZwMC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:dshw04ExmUIC"
+    },
+    {
+      "title": "Peddet: Adaptive spectral optimization for multimodal pedestrian detection",
+      "authors": "R Zhao, Z Zhang, Y Xu, Y Yao, Y Huang, W Zhang, Z Song, X Chen, ...",
+      "venue": "ECAI",
+      "year": "2025",
+      "cited_by": 14,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:xtRiw3GOFMkC"
+    },
+    {
+      "title": "Beyond Profile: From Surface-Level Facts to Deep Persona Simulation in LLMs",
+      "authors": "Z Wang, D Zhang, I Agrawal, S Gao, L Song, X Chen",
+      "venue": "ACL finding 2025",
+      "year": "2025",
+      "cited_by": 14,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:P5F9QuxV20EC"
+    },
+    {
+      "title": "More is not always better? Enhancing Many-Shot In-Context Learning with Differentiated and Reweighting Objectives",
+      "authors": "X Zhang, A Lv, Y Liu, F Sung, W Liu, S Shang, X Chen, R Yan",
+      "venue": "ACL main 2025",
+      "year": "2025",
+      "cited_by": 14,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:_xSYboBqXhAC"
+    },
+    {
+      "title": "Automated bioinformatics analysis via autoba",
+      "authors": "J Zhou, B Zhang, X Chen, H Li, X Xu, S Chen, X Gao",
+      "venue": "arXiv preprint arXiv:2309.03242",
+      "year": "2023",
+      "cited_by": 14,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:j3f4tGmQtD8C"
     },
     {
       "title": "Do LLMs\" Feel\"? Emotion Circuits Discovery and Control",
       "authors": "C Wang, Y Zhang, R Yu, Y Zheng, L Gao, Z Song, Z Xu, G Xia, H Zhang, ...",
-      "venue": "ICML 2026",
-      "year": "2025",
+      "venue": "ICML",
+      "year": "2026",
       "cited_by": 13,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:LkGwnXOMwfcC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:J-pR_7NvFogC"
+    },
+    {
+      "title": "Leveraging professional radiologists’ expertise to enhance LLMs’ evaluation for radiology reports",
+      "authors": "Q Zhu, X Chen, Q Jin, B Hou, TS Mathai, P Mukherjee, X Gao, ...",
+      "venue": "ArXiv, arXiv: 2401.16578 v3",
+      "year": "2024",
+      "cited_by": 13,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:JV2RwH3_ST0C"
+    },
+    {
+      "title": "LLM-driven agents for influencer selection in digital advertising campaigns",
+      "authors": "X Zhang, X Chen, Y Liu, J Wang, Z Hu, R Yan",
+      "venue": "arXiv preprint arXiv:2403.15105",
+      "year": "2024",
+      "cited_by": 13,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:M05iB0D1s5AC"
+    },
+    {
+      "title": "How does Truth Evolve into Fake News? An Empirical Study of Fake News Evolution",
+      "authors": "M Guo, X Chen, J Li, D Zhao, R Yan",
+      "venue": "The Web Conference 2021, Workshop on News Recommendation and Intelligence",
+      "year": "2021",
+      "cited_by": 13,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:3fE2CSJIrl8C"
+    },
+    {
+      "title": "Towards personalized review summarization by modeling historical reviews from customer and product separately",
+      "authors": "X Cheng, S Gao, Y Zhang, Y Wang, X Chen, M Li, D Zhao, R Yan",
+      "venue": "arXiv preprint arXiv:2301.11682",
+      "year": "2023",
+      "cited_by": 12,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:IWHjjKOFINEC"
+    },
+    {
+      "title": "HeteroQA: Learning towards question-and-answering through multiple information sources via heterogeneous graph modeling",
+      "authors": "S Gao, Y Zhang, Y Wang, Y Dong, X Chen, D Zhao, R Yan",
+      "venue": "Proceedings of the Fifteenth ACM International Conference on Web Search and …",
+      "year": "2022",
+      "cited_by": 12,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:_kc_bZDykSQC"
+    },
+    {
+      "title": "Cross-Lingual Pitfalls: Automatic Probing Cross-Lingual Weakness of Multilingual Large Language Models",
+      "authors": "Z Xu, Y Wang, Y Huang, X Chen, J Zhao, M Jiang, X Zhang",
+      "venue": "ACL main 2025",
+      "year": "2025",
+      "cited_by": 11,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:u9iWguZQMMsC"
     },
     {
       "title": "Word Form Matters: LLMs' Semantic Reconstruction under Typoglycemia",
       "authors": "C Wang, T Gu, Z Wei, L Gao, Z Song, X Chen",
-      "venue": "ACL 2025 findings",
+      "venue": "ACL finding 2025",
       "year": "2025",
       "cited_by": 11,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:IjCSPb-OGe4C"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:1sJd4Hv_s6UC"
     },
     {
-      "title": "Adversarial Cooperative Rationalization: The Risk of Spurious Correlations in Even Clean Datasets",
-      "authors": "W Liu, Z Niu, L Gao, Z Deng, J Wang, H Wang, R Li",
-      "venue": "ICML 2025",
+      "title": "Large Language Model based Multi-Agents: A Survey of Progress and Challenges (arXiv: 2402.01680). arXiv",
+      "authors": "T Guo, X Chen, Y Wang, R Chang, S Pei, NV Chawla, O Wiest, X Zhang",
+      "venue": "",
+      "year": "2024",
+      "cited_by": 11,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:AXPGKjj_ei8C"
+    },
+    {
+      "title": "Unsupervised mitigating gender bias by character components: A case study of Chinese word embedding",
+      "authors": "X Chen, M Li, R Yan, X Gao, X Zhang",
+      "venue": "Proceedings of the 4th Workshop on Gender Bias in Natural Language …",
+      "year": "2022",
+      "cited_by": 11,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:Wp0gIr-vW9MC"
+    },
+    {
+      "title": "Trusteval: A dynamic evaluation toolkit on trustworthiness of generative foundation models",
+      "authors": "Y Wang, J Ye, S Wu, C Gao, Y Huang, X Chen, Y Zhao, X Zhang",
+      "venue": "Proceedings of the 2025 Conference of the Nations of the Americas Chapter of …",
+      "year": "2025",
+      "cited_by": 10,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:XiSMed-E-HIC"
+    },
+    {
+      "title": "A large-scale time-aware agents simulation for influencer selection in digital advertising campaigns",
+      "authors": "X Zhang, X Chen, Y Liu, J Wang, Z Hu, R Yan",
+      "venue": "arXiv preprint arXiv:2411.01143",
+      "year": "2024",
+      "cited_by": 10,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:EUQCXRtRnyEC"
+    },
+    {
+      "title": "Learning towards Selective Data Augmentation for Dialogue Generation",
+      "authors": "X Chen, M Li, J Zhang, X Xia, C Wei, J Cui, X Gao, X Zhang, R Yan",
+      "venue": "AAAI 2023",
+      "year": "2023",
+      "cited_by": 10,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:qUcmZB5y_30C"
+    },
+    {
+      "title": "CURE-Med: Curriculum-Informed Reinforcement Learning for Multilingual Medical Reasoning",
+      "authors": "E Onyame, A Ghosh, S Baidya, S Saha, X Chen, C Agarwal",
+      "venue": "ACL 2026",
+      "year": "2026",
+      "cited_by": 9,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:eMMeJKvmdy0C"
+    },
+    {
+      "title": "Unifying search and recommendation: A generative paradigm inspired by information theory",
+      "authors": "J Zhao, W Wang, C Xu, X Wang, Z Ren, S Verberne",
+      "venue": "arXiv e-prints, arXiv: 2504.06714",
+      "year": "2025",
+      "cited_by": 9,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:l7t_Zn2s7bgC"
+    },
+    {
+      "title": "Leveraging Professional Radiologists' Expertise to Enhance LLMs' Evaluation for AI-generated Radiology Reports",
+      "authors": "Q Zhu, X Chen, Q Jin, B Hou, TS Mathai, P Mukherjee, X Gao, ...",
+      "venue": "2024 IEEE 12th International Conference on Healthcare Informatics (ICHI …",
+      "year": "2024",
+      "cited_by": 9,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:ldfaerwXgEUC"
+    },
+    {
+      "title": "Mmac-copilot: Multi-modal agent collaboration operating copilot",
+      "authors": "Z Song, Y Li, M Fang, Y Li, Z Chen, Z Shi, Y Huang, X Chen, L Chen",
+      "venue": "arXiv preprint arXiv:2404.18074",
+      "year": "2024",
+      "cited_by": 9,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:VOx2b1Wkg3QC"
+    },
+    {
+      "title": "A Symbolic Adversarial Learning Framework for Evolving Fake News Generation and Detection",
+      "authors": "C Tian, Q Ho, X Chen",
+      "venue": "EMNLP main conference",
       "year": "2025",
       "cited_by": 8,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:zYLM7Y9cAGgC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:8AbLer7MMksC"
+    },
+    {
+      "title": "Thinking Before Running! Efficient Code Generation with Thorough Exploration and Optimal Refinement",
+      "authors": "X Zhang, Y Liu, F Sung, X Chen, R Yan",
+      "venue": "ACL finding 2025",
+      "year": "2024",
+      "cited_by": 8,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:KxtntwgDAa4C"
+    },
+    {
+      "title": "Stylized dialogue generation with feature-guided knowledge augmentation",
+      "authors": "J Li, Z Zhang, X Chen, D Zhao, R Yan",
+      "venue": "Findings of the Association for Computational Linguistics: EMNLP 2023, 7144-7157",
+      "year": "2023",
+      "cited_by": 8,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:bEWYMUwI8FkC"
+    },
+    {
+      "title": "Unleashing the power of large models: Exploring human-machine conversations",
+      "authors": "L Yuhan, C Xiuying, Y Rui",
+      "venue": "Proceedings of the 22nd Chinese National Conference on Computational …",
+      "year": "2023",
+      "cited_by": 8,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:70eg2SAEIzsC"
+    },
+    {
+      "title": "Infusing Sequential Information into Conditional Masked Translation Model with Self-Review Mechanism",
+      "authors": "P Xie, Z Cui, X Chen, X Hu, J Cui, B Wang",
+      "venue": "COLING",
+      "year": "2020",
+      "cited_by": 8,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:Se3iqnhoufwC"
+    },
+    {
+      "title": "FineState-Bench: A Comprehensive Benchmark for Fine-Grained State Control in GUI Agents",
+      "authors": "F Ji, J Yang, Z Song, Y Wang, Z Cui, Y Li, Q Jiang, M Fang, X Chen",
+      "venue": "arXiv preprint arXiv:2508.09241",
+      "year": "2025",
+      "cited_by": 7,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:XiVPGOgt02cC"
     },
     {
       "title": "Evaluate bias without manual test sets: A concept representation perspective for llms",
@@ -91,7 +715,23 @@
       "venue": "arXiv preprint arXiv:2505.15524",
       "year": "2025",
       "cited_by": 7,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:Tyk-4Ss8FVUC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:wbdj-CoPYUoC"
+    },
+    {
+      "title": "What affects the stability of tool learning? an empirical study on the robustness of tool learning frameworks",
+      "authors": "C Huang, Z Shi, Y Wen, X Chen, P Han, S Gao, S Shang",
+      "venue": "arXiv preprint arXiv:2407.03007",
+      "year": "2024",
+      "cited_by": 7,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:tOudhMTPpwUC"
+    },
+    {
+      "title": "Rethinking Scientific Summarization Evaluation: Grounding Explainable Metrics on Facet-aware Benchmark",
+      "authors": "X Chen, T Wang, Q Zhu, T Guo, S Gao, Z Lu, X Gao, X Zhang",
+      "venue": "TOIS",
+      "year": "2024",
+      "cited_by": 7,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:YFjsv_pBGBYC"
     },
     {
       "title": "Beyond Survival: Evaluating LLMs in Social Deduction Games with Human-Aligned Strategies",
@@ -99,31 +739,159 @@
       "venue": "arXiv preprint arXiv:2510.11389",
       "year": "2025",
       "cited_by": 6,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:roLk4NBRz8UC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:fQNAKQ3IYiAC"
+    },
+    {
+      "title": "From Individuals to Crowds: Dual-Level Public Response Prediction in Social Media",
+      "authors": "J Zhang, K Wan, L Xu, A Li, Z Liu, X Chen",
+      "venue": "ACM MM 2025",
+      "year": "2025",
+      "cited_by": 6,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:4fKUyHm3Qg0C"
+    },
+    {
+      "title": "Flipping Knowledge Distillation: Leveraging Small Models' Expertise to Enhance LLMs in Text Matching",
+      "authors": "M Li, J Xiang, Q Zhang, K Wan, X Chen",
+      "venue": "ACL main 2025",
+      "year": "2025",
+      "cited_by": 6,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:B3FOqHPlNUQC"
+    },
+    {
+      "title": "Invisible Entropy: Towards Safe and Efficient Low-Entropy LLM Watermarking",
+      "authors": "T Gu, Z Wang, K Huang, Y Yao, X Zhang, Y Yang, X Chen",
+      "venue": "EMNLP main conference",
+      "year": "2025",
+      "cited_by": 6,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:geHnlv5EZngC"
+    },
+    {
+      "title": "Unified multi-scenario summarization evaluation and explanation",
+      "authors": "S Shang, Z Yao, H Fu, C Tao, X Chen, F Wang, Y Wang, Z Ren, S Gao",
+      "venue": "IEEE Transactions on Knowledge and Data Engineering 37 (2), 991-1003",
+      "year": "2024",
+      "cited_by": 6,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:vRqMK49ujn8C"
+    },
+    {
+      "title": "Flexible and Adaptable Summarization via Expertise Separation",
+      "authors": "X Chen, M Li, S Gao, X Cheng, Q Zhu, R Yan, X Gao, X Zhang",
+      "venue": "SIGIR 2024",
+      "year": "2024",
+      "cited_by": 6,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:35N4QoGY0k4C"
+    },
+    {
+      "title": "Write Summary Step-by-Step: A Pilot Study of Stepwise Summarization",
+      "authors": "X Chen, S Gao, M Li, Q Zhu, X Gao, X Zhang",
+      "venue": "IEEE/ACM Transactions on Audio, Speech, and Language Processing 32, 1406-1415",
+      "year": "2024",
+      "cited_by": 6,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:k_IJM867U9cC"
+    },
+    {
+      "title": "Large language model based multi-agents: A survey of progress and challenges [J/OL]",
+      "authors": "T Guo, X Chen, Y Wang, R Chang, S Pei, NV Chawla, O Wiest, X Zhang",
+      "venue": "arXiv preprint arXiv:2402.01680",
+      "year": "2024",
+      "cited_by": 6,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:WA5NYHcadZ8C"
+    },
+    {
+      "title": "Modeling non-uniform uncertainty in Reaction Prediction via Boosting and Dropout",
+      "authors": "T Guo, C Ma, X Chen, B Nan, K Guo, S Pei, L Yu, NV Chawla, O Wiest, ...",
+      "venue": "",
+      "year": "2023",
+      "cited_by": 6,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:maZDTaKrznsC"
+    },
+    {
+      "title": "Large language model based multi-agents: A survey of progress and challenges. arXiv preprint, 2024",
+      "authors": "T Guo, X Chen, Y Wang, R Chang, S Pei, NV Chawla, O Wiest, X Zhang",
+      "venue": "arXiv preprint arXiv:2402.01680, 0",
+      "year": "",
+      "cited_by": 6,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=20&pagesize=80&citation_for_view=COUnAF4AAAAJ:Mojj43d5GZwC"
+    },
+    {
+      "title": "Large language model based multi-agents: A survey of progress and challenges. arXiv. 2024 doi: 10.48550",
+      "authors": "T Guo, X Chen, Y Wang, R Chang, S Pei, NV Chawla, O Wiest, X Zhang",
+      "venue": "arXiv preprint arXiv.2402.01680, 0",
+      "year": "",
+      "cited_by": 6,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:HE397vMXCloC"
     },
     {
       "title": "A fano-style accuracy upper bound for llm single-pass reasoning in multi-hop qa",
       "authors": "K Wan, L Gao, H Mu, P Nakov, Y Wang, X Chen",
-      "venue": "ICLR 2026",
-      "year": "2025",
+      "venue": "ICLR",
+      "year": "2026",
       "cited_by": 5,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:YsMSGLbcyi4C"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:eJXPG6dFmWUC"
     },
     {
-      "title": "M3MAD-Bench: Are Multi-Agent Debates Really Effective Across Domains and Modalities?",
-      "authors": "A Li, J Zhang, L Li, Y Duan, L Gao, M Chen, W Qin, S Li, F Ji, N Liu, L Cui, ...",
-      "venue": "arXiv preprint arXiv:2601.02854",
-      "year": "2026",
+      "title": "Multi-Intent Attribute-Aware Text Matching in Searching",
+      "authors": "M Li, X Chen, J Xiang, Q Zhang, C Ma, C Dai, J Chang, Z Liu, G Zhang",
+      "venue": "Proceedings of the 17th ACM International Conference on Web Search and Data …",
+      "year": "2024",
+      "cited_by": 5,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:hMod-77fHWUC"
+    },
+    {
+      "title": "BioGen: Generating biography summary under table guidance on Wikipedia",
+      "authors": "S Gao, X Chen, C Liu, D Zhao, R Yan",
+      "venue": "Findings of the Association for Computational Linguistics: ACL-IJCNLP 2021 …",
+      "year": "2021",
+      "cited_by": 5,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:KlAtU1dfN6UC"
+    },
+    {
+      "title": "VSCBench: Bridging the Gap in Vision-Language Model Safety Calibration",
+      "authors": "J Geng, Q Li, Z Chen, Y Wang, D Zhu, Z Xie, C Lyu, X Chen, P Nakov, ...",
+      "venue": "ACL 2025 findings",
+      "year": "2025",
       "cited_by": 4,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:Se3iqnhoufwC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:Tiz5es2fbqcC"
+    },
+    {
+      "title": "Adaptive Distraction: Probing LLM Contextual Robustness with Automated Tree Search",
+      "authors": "Y Wang, Z Xu, Y Huang, C Gao, S Wu, J Ye, PY Chen, X Chen, X Zhang",
+      "venue": "NeurIPS 2025, arXiv: 2502.01609",
+      "year": "2025",
+      "cited_by": 4,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:D_sINldO8mEC"
+    },
+    {
+      "title": "SAGraph: A Large-scale Text-Rich Social Graph Dataset for Advertising Campaigns",
+      "authors": "X Zhang, X Chen, Y Liu, J Wang, Z Hu, R Yan",
+      "venue": "SIGIR 2025 dataset track",
+      "year": "2024",
+      "cited_by": 4,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:4OULZ7Gr8RgC"
+    },
+    {
+      "title": "UMSE: Unified Multi-scenario Summarization Evaluation",
+      "authors": "S Gao, Z Yao, C Tao, X Chen, P Ren, Z Ren, Z Chen",
+      "venue": "ACL 2023 findings",
+      "year": "2023",
+      "cited_by": 4,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:hFOr9nPyWt4C"
+    },
+    {
+      "title": "QUIDS: Query intent generation via dual space modeling",
+      "authors": "Y Wang, X Chen, S Verberne",
+      "venue": "EMNLP main conference",
+      "year": "2025",
+      "cited_by": 3,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:WbkHhVStYXYC"
     },
     {
       "title": "Under the Shadow of Babel: How Language Shapes Reasoning in LLMs",
       "authors": "C Wang, Y Zhang, L Gao, Z Xu, Z Song, Y Wang, X Chen",
-      "venue": "EMNLP 2025 findings",
+      "venue": "EMNLP findings",
       "year": "2025",
       "cited_by": 3,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:Y0pCki6q_DkC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:sSrBHYA8nusC"
     },
     {
       "title": "Gta: Graph theory agent and benchmark for algorithmic graph reasoning with llms",
@@ -131,41 +899,169 @@
       "venue": "",
       "year": "2025",
       "cited_by": 3,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:UebtZRa9Y70C"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:bnK-pcrLprsC"
+    },
+    {
+      "title": "Iad: In-context learning ability decoupler of large language models in meta-training",
+      "authors": "Y Liu, X Chen, G Xing, J Zhang, R Yan",
+      "venue": "Proceedings of the 2024 Joint International Conference on Computational …",
+      "year": "2024",
+      "cited_by": 3,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:RGFaLdJalmkC"
+    },
+    {
+      "title": "Summarizing Procedural Text: Data and Approach",
+      "authors": "S Gao, H Zhang, X Chen, R Yan, D Zhao",
+      "venue": "Findings of the Association for Computational Linguistics: EMNLP 2022, 2216-2225",
+      "year": "2022",
+      "cited_by": 3,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:L8Ckcad2t8MC"
+    },
+    {
+      "title": "RPM-Oriented Query Rewriting Framework for E-commerce Keyword-Based Sponsored Search (Student Abstract)",
+      "authors": "X Chen, D Xiao, S Gao, G Liu, W Lin, B Zheng, D Zhao, R Yan",
+      "venue": "Proceedings of the AAAI Conference on Artificial Intelligence 34 (10), 13769 …",
+      "year": "2020",
+      "cited_by": 3,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:WF5omc3nYNoC"
+    },
+    {
+      "title": "New Paradigm for Evaluating Scholar Summaries: A Facet-aware Metric and A Meta-evaluation Benchmark",
+      "authors": "T Wang, X Chen, Q Zhu, T Guo, S Gao, Z Lu, X Gao, X Zhang",
+      "venue": "ACM Transactions on Information Systems 43 (4), 1-25",
+      "year": "2025",
+      "cited_by": 2,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:SP6oXDckpogC"
+    },
+    {
+      "title": "Selecting query-bag as pseudo relevance feedback for information-seeking conversations",
+      "authors": "X Zhang, X Chen, S Gao, S Li, X Gao, JR Wen, R Yan",
+      "venue": "arXiv preprint arXiv:2404.04272",
+      "year": "2024",
+      "cited_by": 2,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:J_g5lzvAfSwC"
+    },
+    {
+      "title": "Decomposing vision-based LLM predictions for auto-evaluation with GPT-4",
+      "authors": "Q Zhu, B Hou, TS Mathai, P Mukherjee, Q Jin, X Chen, Z Wang, R Cheng, ...",
+      "venue": "arXiv preprint arXiv:2403.05680",
+      "year": "2024",
+      "cited_by": 2,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:lSLTfruPkqcC"
     },
     {
       "title": "ServImage: An Image Generation and Editing Benchmark from Real-world Commercial Imaging Services",
       "authors": "F Ji, J Yang, Z Song, L Gao, J Liang, Z Chen, J Zhang, X Chen",
-      "venue": "ACL 2026",
+      "venue": "ACL",
       "year": "2026",
       "cited_by": 1,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:hqOjcs7Dif8C"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:PELIpwtuRlgC"
+    },
+    {
+      "title": "When Background Matters: Breaking Medical Vision Language Models by Transferable Attack",
+      "authors": "A Ghosh, S Baidya, S Saha, X Chen",
+      "venue": "ACL, oral",
+      "year": "2026",
+      "cited_by": 1,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:_B80troHkn4C"
+    },
+    {
+      "title": "Pastiche Novel Generation Creating: Fan Fiction You Love in Your Favorite Author's Style",
+      "authors": "X Han, Y Liu, M Li, W Liu, S Hu, R Yan, Z Xu, X Chen",
+      "venue": "ACL finding 2026",
+      "year": "2026",
+      "cited_by": 1,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:Y5dfb0dijaUC"
     },
     {
       "title": "When Personalization Tricks Detectors: The Feature-Inversion Trap in Machine-Generated Text Detection",
       "authors": "L Gao, X Li, C Wang, M Li, W Liu, Z Song, J Zhang, R Yan, P Nakov, ...",
-      "venue": "[Oral] ACL 2026",
-      "year": "2025",
+      "venue": "ACL 2026, oral",
+      "year": "2026",
       "cited_by": 1,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:_FxGoFyzp5QC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:BrmTIyaxlBUC"
     },
     {
-      "title": "One Model, Multiple Goals: Adaptive Multi-Objective Learning for E-commerce Dialogue Systems",
-      "authors": "M Li, J Xiang, E Zhou, L Gao, T Li, Q Zhang, X Zhang, X Chen",
-      "venue": "KDD 2026",
+      "title": "ReactionTeam: Teaming Experts for Divergent Thinking Beyond Typical Reaction Patterns",
+      "authors": "T Guo, C Ma, X Chen, B Nan, K Guo, S Pei, O Wiest, NV Chawla, X Zhang",
+      "venue": "2025 IEEE International Conference on Big Data (BigData), 520-529",
+      "year": "2025",
+      "cited_by": 1,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:mvPsJ3kp5DgC"
+    },
+    {
+      "title": "QUIDS: Query Intent Description for Exploratory Search via Dual Space Modeling",
+      "authors": "Y Wang, X Chen, S Verberne",
+      "venue": "Proceedings of the 2025 Conference on Empirical Methods in Natural Language …",
+      "year": "2025",
+      "cited_by": 1,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:eflP2zaiRacC"
+    },
+    {
+      "title": "Think as People: Context-Driven Multi-Image News Captioning with Adaptive Dual Attention",
+      "authors": "Q Yang, X Wu, X Chen, X Gao, X Zhang",
+      "venue": "ICASSP 2024-2024 IEEE International Conference on Acoustics, Speech and …",
+      "year": "2024",
+      "cited_by": 1,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:O3NaXMp0MMsC"
+    },
+    {
+      "title": "A Trend of AI Conference Convergence in Similarity: An Empirical Study Through Trans-Temporal Heterogeneous Graph",
+      "authors": "S Gao, H Zhang, X Chen, C Tao, D Zhao, R Yan",
+      "venue": "IEEE Transactions on Knowledge and Data Engineering 35 (9), 9642-9655",
+      "year": "2023",
+      "cited_by": 1,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:ZeXyd9-uunAC"
+    },
+    {
+      "title": "Distinguishable Deletion: Unifying Knowledge Erasure and Refusal for Large Language Model Unlearning",
+      "authors": "P Yang, J Yu, Q Wang, P Torr, B Han, X Chen",
+      "venue": "ICML",
       "year": "2026",
       "cited_by": 0,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:8k81kl-MbHgC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:JoZmwDi-zQgC"
     },
     {
       "title": "The Cylindrical Representation Hypothesis for Language Model Steering",
       "authors": "L Gao, J Zhang, W Liu, F Ji, C Wang, Z Song, A Ghosh, Y Mohamed, ...",
-      "venue": "ICML 2026",
+      "venue": "ICML",
       "year": "2026",
       "cited_by": 0,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:0EnyYjriUFMC"
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:dTyEYWd-f8wC"
+    },
+    {
+      "title": "Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm",
+      "authors": "J Zhao, W Wang, C Xu, X Chen, Z Ren, S Verberne",
+      "venue": "arXiv preprint arXiv:2504.06714",
+      "year": "2025",
+      "cited_by": 0,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:1qzjygNMrQYC"
+    },
+    {
+      "title": "Injecting domain-specific knowledge into large language models: a comprehensive survey",
+      "authors": "Z Song, B Yan, Y Liu, M Fang, M Li, R Yan, X Chen",
+      "venue": "EMNLP findings",
+      "year": "2025",
+      "cited_by": 0,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:bFI3QPDXJZMC"
+    },
+    {
+      "title": "Beyond the Typical: Modeling Rare Plausible Patterns in Chemical Reactions by Leveraging Sequential Mixture-of-Experts",
+      "authors": "T Guo, C Ma, X Chen, B Nan, K Guo, S Pei, NV Chawla, O Wiest, X Zhang",
+      "venue": "arXiv preprint arXiv:2310.04674",
+      "year": "2023",
+      "cited_by": 0,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:q3oQSFYPqjQC"
+    },
+    {
+      "title": "An Evolutionary Energy Prediction Model for Solar Energy-Harvesting Wireless Sensor Networks",
+      "authors": "G Yang, X Hu, X Chen",
+      "venue": "International Conference of Pioneering Computer Scientists, Engineers and …",
+      "year": "2018",
+      "cited_by": 0,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=COUnAF4AAAAJ&cstart=100&pagesize=100&citation_for_view=COUnAF4AAAAJ:d1gkVwhDpl0C"
     }
   ],
-  "publication_count": 19,
+  "publication_count": 131,
   "truncated": false
 }

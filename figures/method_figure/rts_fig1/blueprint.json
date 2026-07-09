@@ -1,0 +1,532 @@
+{
+  "version": "method-figure/blueprint/v1",
+  "figure_id": "route_then_steer_fig1",
+  "compiled_from_brief": {
+    "type": "route_then_steer_fig1"
+  },
+  "canvas": {
+    "width": 880,
+    "height": 1260,
+    "background": "#FFFFFF"
+  },
+  "render_policy": {
+    "label_policy": "baked",
+    "target_profile": "readme",
+    "max_rounds": 4
+  },
+  "nodes": [
+    {
+      "id": "dense",
+      "label_exact": "dense: one direction (LRH/CRH)",
+      "shape": "process",
+      "must_render": true,
+      "source": "brief:components/dense",
+      "expected_tokens": [
+        "CRH",
+        "LRH",
+        "concept",
+        "dense",
+        "direction",
+        "one",
+        "shared",
+        "single"
+      ],
+      "forbidden_tokens": [
+        "attention",
+        "self-attention",
+        "fine-tune",
+        "training"
+      ],
+      "desc_exact": "single shared concept direction",
+      "semantic_role": "contrast",
+      "group": "pA",
+      "accent": "blue_accent",
+      "pos": {
+        "x": 245,
+        "y": 269
+      },
+      "size": {
+        "w": 185,
+        "h": 66
+      }
+    },
+    {
+      "id": "router_a",
+      "label_exact": "MoE router",
+      "shape": "gate",
+      "must_render": true,
+      "source": "brief:components/router_a",
+      "expected_tokens": [
+        "E1..E5",
+        "MoE",
+        "experts",
+        "fans",
+        "router",
+        "to",
+        "token"
+      ],
+      "forbidden_tokens": [
+        "attention",
+        "self-attention",
+        "fine-tune",
+        "training"
+      ],
+      "desc_exact": "fans token to experts E1..E5",
+      "semantic_role": "gate",
+      "group": "pA",
+      "accent": "blue_accent",
+      "pos": {
+        "x": 245,
+        "y": 398
+      },
+      "size": {
+        "w": 250,
+        "h": 100
+      }
+    },
+    {
+      "id": "frag_low",
+      "label_exact": "Frag ≈ 0  (refusal)",
+      "shape": "process",
+      "must_render": true,
+      "source": "brief:components/frag_low",
+      "expected_tokens": [
+        "0",
+        "Frag",
+        "arrows",
+        "collinear",
+        "per-expert",
+        "refusal"
+      ],
+      "forbidden_tokens": [
+        "attention",
+        "self-attention",
+        "fine-tune",
+        "training"
+      ],
+      "desc_exact": "per-expert arrows collinear",
+      "semantic_role": "low fragmentation",
+      "group": "pA",
+      "accent": "blue_accent",
+      "pos": {
+        "x": 245,
+        "y": 544
+      },
+      "size": {
+        "w": 250,
+        "h": 100
+      }
+    },
+    {
+      "id": "frag_high",
+      "label_exact": "Frag high  (medical / legal)",
+      "shape": "process",
+      "must_render": true,
+      "source": "brief:components/frag_high",
+      "expected_tokens": [
+        "Frag",
+        "arrows",
+        "dispersed",
+        "high",
+        "legal",
+        "medical",
+        "per-expert"
+      ],
+      "forbidden_tokens": [
+        "attention",
+        "self-attention",
+        "fine-tune",
+        "training"
+      ],
+      "desc_exact": "per-expert arrows dispersed",
+      "semantic_role": "high fragmentation",
+      "group": "pA",
+      "accent": "blue_accent",
+      "pos": {
+        "x": 245,
+        "y": 690
+      },
+      "size": {
+        "w": 250,
+        "h": 100
+      }
+    },
+    {
+      "id": "router_b",
+      "label_exact": "router (gate)",
+      "shape": "gate",
+      "must_render": true,
+      "source": "brief:components/router_b",
+      "expected_tokens": [
+        "enters",
+        "gate",
+        "router",
+        "the",
+        "token"
+      ],
+      "forbidden_tokens": [
+        "attention",
+        "self-attention",
+        "fine-tune",
+        "training"
+      ],
+      "desc_exact": "token enters the gate",
+      "semantic_role": "gate",
+      "group": "pB",
+      "accent": "peach_accent",
+      "pos": {
+        "x": 605,
+        "y": 286
+      },
+      "size": {
+        "w": 250,
+        "h": 100
+      }
+    },
+    {
+      "id": "routed_away",
+      "label_exact": "✗ routed away",
+      "shape": "process",
+      "must_render": true,
+      "source": "brief:components/routed_away",
+      "expected_tokens": [
+        "away",
+        "experts",
+        "grey",
+        "lambda-v",
+        "non-expressing",
+        "routed",
+        "sent",
+        "to"
+      ],
+      "forbidden_tokens": [
+        "attention",
+        "self-attention",
+        "fine-tune",
+        "training"
+      ],
+      "desc_exact": "lambda-v sent to non-expressing experts (grey)",
+      "semantic_role": "failure",
+      "group": "pB",
+      "accent": "peach_accent",
+      "pos": {
+        "x": 605,
+        "y": 432
+      },
+      "size": {
+        "w": 250,
+        "h": 100
+      }
+    },
+    {
+      "id": "route_step",
+      "label_exact": "(1) route (δ)",
+      "shape": "process",
+      "must_render": true,
+      "source": "brief:components/route_step",
+      "expected_tokens": [
+        "1",
+        "E_c",
+        "bias",
+        "experts",
+        "expressing",
+        "route",
+        "router",
+        "toward"
+      ],
+      "forbidden_tokens": [
+        "attention",
+        "self-attention",
+        "fine-tune",
+        "training"
+      ],
+      "desc_exact": "bias router toward expressing experts E_c",
+      "semantic_role": "step 1",
+      "group": "pB",
+      "accent": "peach_accent",
+      "pos": {
+        "x": 605,
+        "y": 578
+      },
+      "size": {
+        "w": 250,
+        "h": 100
+      }
+    },
+    {
+      "id": "steer_step",
+      "label_exact": "(2) steer (λ v)",
+      "shape": "process",
+      "must_render": true,
+      "source": "brief:components/steer_step",
+      "expected_tokens": [
+        "2",
+        "add",
+        "concept",
+        "residual",
+        "steer",
+        "vector"
+      ],
+      "forbidden_tokens": [
+        "attention",
+        "self-attention",
+        "fine-tune",
+        "training"
+      ],
+      "desc_exact": "add residual concept vector",
+      "semantic_role": "step 2",
+      "group": "pB",
+      "accent": "peach_accent",
+      "pos": {
+        "x": 605,
+        "y": 724
+      },
+      "size": {
+        "w": 250,
+        "h": 100
+      }
+    },
+    {
+      "id": "lands",
+      "label_exact": "✓ steer lands",
+      "shape": "process",
+      "must_render": true,
+      "source": "brief:components/lands",
+      "expected_tokens": [
+        "E_c",
+        "experts",
+        "expressing",
+        "lands",
+        "reaches",
+        "steer",
+        "teal"
+      ],
+      "forbidden_tokens": [
+        "attention",
+        "self-attention",
+        "fine-tune",
+        "training"
+      ],
+      "desc_exact": "reaches expressing experts E_c (teal)",
+      "semantic_role": "success",
+      "group": "pB",
+      "accent": "peach_accent",
+      "pos": {
+        "x": 605,
+        "y": 870
+      },
+      "size": {
+        "w": 250,
+        "h": 100
+      }
+    }
+  ],
+  "title": {
+    "main": "Route-Then-Steer (CRH-in-MoE) Figure 1",
+    "sub": "When a concept's per-expert directions disperse (high fragmentation), a residual steer is routed away; biasing the router toward the expressing experts, then steering, makes it land."
+  },
+  "groups": [
+    {
+      "id": "pA",
+      "label_exact": "A · Routing fragmentation (diagnosis)",
+      "bounds": {
+        "x": 90,
+        "y": 190,
+        "w": 310,
+        "h": 610
+      },
+      "tone": "blue",
+      "order": 0,
+      "source": "brief:phases/pA"
+    },
+    {
+      "id": "pB",
+      "label_exact": "B · Route-Then-Steer (fix)",
+      "bounds": {
+        "x": 450,
+        "y": 190,
+        "w": 310,
+        "h": 790
+      },
+      "tone": "peach",
+      "order": 1,
+      "source": "brief:phases/pB"
+    }
+  ],
+  "edges": [
+    {
+      "from": "router_a",
+      "to": "frag_low",
+      "kind": "flow",
+      "must_render": true,
+      "source": "brief:flows/router_a->frag_low",
+      "label_exact": "collinear",
+      "expected_tokens": [
+        "collinear"
+      ]
+    },
+    {
+      "from": "router_a",
+      "to": "frag_high",
+      "kind": "flow",
+      "must_render": true,
+      "source": "brief:flows/router_a->frag_high",
+      "label_exact": "dispersed",
+      "expected_tokens": [
+        "dispersed"
+      ]
+    },
+    {
+      "from": "router_b",
+      "to": "routed_away",
+      "kind": "retry",
+      "must_render": true,
+      "source": "brief:flows/router_b->routed_away",
+      "label_exact": "no nudge",
+      "expected_tokens": [
+        "no",
+        "nudge"
+      ],
+      "direction": "back"
+    },
+    {
+      "from": "router_b",
+      "to": "route_step",
+      "kind": "flow",
+      "must_render": true,
+      "source": "brief:flows/router_b->route_step",
+      "label_exact": "δ",
+      "expected_tokens": []
+    },
+    {
+      "from": "route_step",
+      "to": "steer_step",
+      "kind": "flow",
+      "must_render": true,
+      "source": "brief:flows/route_step->steer_step",
+      "label_exact": "then",
+      "expected_tokens": [
+        "then"
+      ]
+    },
+    {
+      "from": "steer_step",
+      "to": "lands",
+      "kind": "keep",
+      "must_render": true,
+      "source": "brief:flows/steer_step->lands",
+      "label_exact": "lands",
+      "expected_tokens": [
+        "lands"
+      ]
+    }
+  ],
+  "callouts": [
+    {
+      "id": "punchline",
+      "title_exact": "A concept's steering direction fragments across experts; route-then-steer makes it land",
+      "lines_exact": [
+        "When a concept's per-expert directions disperse (high fragmentation), a residual steer is routed away; biasing the router toward the expressing experts, then steering, makes it land."
+      ],
+      "accent": "red",
+      "source": "brief:headline_claim+headline_number",
+      "expected_tokens": [
+        "When",
+        "across",
+        "away",
+        "biasing",
+        "concept",
+        "direction",
+        "directions",
+        "disperse",
+        "experts",
+        "expressing",
+        "fragmentation",
+        "fragments",
+        "high",
+        "is",
+        "it",
+        "land",
+        "land.",
+        "makes",
+        "per-expert",
+        "residual",
+        "route-then-steer",
+        "routed",
+        "router",
+        "steer",
+        "steering",
+        "the",
+        "then",
+        "toward"
+      ],
+      "pos": {
+        "x": 440,
+        "y": 1065
+      },
+      "size": {
+        "w": 420,
+        "h": 150
+      }
+    }
+  ],
+  "forbidden_tokens": [
+    "attention",
+    "self-attention",
+    "fine-tune",
+    "training"
+  ],
+  "style": {
+    "theme": "academic_flat",
+    "font_family": "Inter, Arial, sans-serif",
+    "palette": {
+      "text": "#1F2937",
+      "muted": "#6B7280",
+      "blue_fill": "#E5EEFB",
+      "blue_stroke": "#9DBDEB",
+      "blue_accent": "#2563EB",
+      "peach_fill": "#FDEBD8",
+      "peach_stroke": "#F4C18A",
+      "peach_accent": "#EA580C",
+      "green_fill": "#DEF5E6",
+      "green_stroke": "#9BD9B0",
+      "green_accent": "#0E9F6E",
+      "violet_fill": "#EDE9FE",
+      "violet_stroke": "#C4B5FD",
+      "violet_accent": "#7C3AED",
+      "amber_fill": "#FEF3C7",
+      "amber_stroke": "#FCD34D",
+      "amber_accent": "#D97706",
+      "red": "#DC2626",
+      "node_fill": "#FFFFFF",
+      "node_stroke": "#CBD2DC"
+    },
+    "arrow": {
+      "stroke": "#4B5563",
+      "width": 2.6
+    }
+  },
+  "rail": {
+    "label_exact": "max 4 rounds | blind cross-model diff | human backstop",
+    "source": "framework:rail_constant"
+  },
+  "acceptance": {
+    "min_core_score": 4,
+    "required_transcribers": [
+      "gemini",
+      "codex"
+    ],
+    "codex_policy": "required_not_sole",
+    "claude_structural_signoff_required": true,
+    "required_approvers": [
+      "gemini",
+      "claude"
+    ],
+    "veto_fields": [
+      "anomalies",
+      "missing_tokens",
+      "wrong_edges"
+    ],
+    "max_repeated_failure": 2
+  }
+}

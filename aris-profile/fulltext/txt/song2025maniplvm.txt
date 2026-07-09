@@ -1,0 +1,1236 @@
+ManipLVM-R1: Reinforcement Learning for
+Reasoning in Embodied Manipulation with Large
+Vision-Language Models
+
+arXiv:2505.16517v2 [cs.RO] 24 May 2025
+
+Zirui Song1∗ Guangxian Ouyang1∗ Mingzhe Li2 Yuheng Ji3 Chenxi Wang1 Zixiang Xu1
+Zeyu Zhang4 Xiaoqing Zhang5 Qian Jiang1 Zhenhao Chen1 Zhongzhi Li3
+Rui Yan6 Xiuying Chen1†
+1
+Mohamed bin Zayed University of Artificial Intelligence
+2
+ByteDance 3 Institute of Automation, Chinese Academy of Sciences
+4
+The Australia National University 5 Renmin University of China
+6
+Wuhan University
+
+Abstract
+Large Vision-Language Models (LVLMs) have recently advanced robotic manipulation by leveraging vision for scene perception and language for instruction
+following. However, existing methods rely heavily on costly human-annotated
+training datasets, which limits their generalization and causes them to struggle in
+out-of-domain (OOD) scenarios, reducing real-world adaptability. To address these
+challenges, we propose ManipLVM-R1, a novel reinforcement learning framework
+that replaces traditional supervision with Reinforcement Learning using Verifiable
+Rewards (RLVR). By directly optimizing for task-aligned outcomes, our method
+enhances generalization and physical reasoning while removing the dependence
+on costly annotations. Specifically, we design two rule-based reward functions
+targeting key robotic manipulation subtasks: an Affordance Perception Reward
+to enhance localization of interaction regions, and a Trajectory Match Reward
+to ensure the physical plausibility of action paths. These rewards provide immediate feedback and impose spatial-logical constraints, encouraging the model to
+go beyond shallow pattern matching and instead learn deeper, more systematic
+reasoning about physical interactions. Experimental results show that ManipLVMR1 achieves substantial performance gains across multiple manipulation tasks,
+using only 50% of the training data while achieving strong generalization to OOD
+scenarios. We further analyze the benefits of our reward design and its impact on
+task success and efficiency.
+
+1
+
+Introduction
+
+Large Vision Language Models (LVLMs) are accelerating progress toward artificial general intelligence (AGI) by combining self-supervised learning with large-scale multimodal data (Song et al.,
+2025; Xie et al., 2025). They exhibit strong visual perception and language understanding, and have
+achieved success in tasks such as visual question answering (Antol et al., 2015; Cai et al., 2024;
+Chen et al., 2024), image captioning (Li et al., 2022; Hao et al., 2023; Li et al., 2023a), and mobile
+assistants (Song et al., 2024a; Li et al., 2024c), demonstrating robust cross-modal reasoning.
+However, their use in robotics—especially in manipulation tasks involving complex physical interaction—remains limited due to a lack of fine-grained control and physical reasoning. Most existing
+∗
+†
+
+Equal Contribution
+Corresponding Author.
+
+Preprint. Under review.
+
+work focuses on high-level planning (Belkhale et al., 2024; Huang et al., 2023b; Song et al., 2024b),
+action sequencing (Brohan et al., 2023b,a), or visual reasoning (Liu et al., 2023, 2024d; Zhou et al.,
+2024; Azzolini et al., 2025; Zhang et al., 2025; Zhao et al., 2025), with limited attention to low-level
+decision-making and physical dynamics, making it difficult to tackle real-world robotic challenges.
+OOD-Pound
+OOD-Cut
+
+ManipLVM-R1
+RoboBrain-7B
+InternVL2-2B
+Qwen2.5-VL-3B-SFT
+Phi-4-multimodal
+LLaVA-1.6-7B
+Qwen2.5-VL-7B
+Qwen2.5-VL-3B
+Gemma-3-4b-it
+
+OOD-Scoop
+
+OOD-Grasp
+
+Trajectory Distance
+
+Affordance IoU
+ManipLVM-R1-3B
+
+40%
+
+RLVR
+SFT
+
+30%
+
+Qwen2.5-VL-3B-SFT
+
+20%
+ID-Affordance
+
+0
+
+ID-Trajectory
+
+100
+120
+140
+160
+
+10%
+OOD-Trajectory
+
+Affordance
+Trajectory
+
+180
+Qwen2.5-VL-3B(base)
+
+6000
+
+200
+8000 Training Data
+
+Figure 1: Left: Comparative evaluation of ManipLVM-R1 against baselines on In Domain (ID)
+dataset and Out of Domain (OOD) dataset. Right: Leveraging our proposed RLVR method,
+ManipLVM-R1 outperforms supervised fine-tuning on both affordance perception and trajectory
+prediction, using only 50% of the training data.
+Among existing studies, RoboBrain (Ji et al., 2025) is most closely related to our work, as it also
+leverages LVLMs for robotic manipulation through reasoning-augmented training. It constructs
+a supervised fine-tuning (SFT) dataset by combining expert demonstrations with language model
+generated reasoning. While this approach enhances alignment with task instructions, SFT-based
+methods suffer from two major limitations: the high cost of collecting high quality annotations,
+and limited generalization due to their reliance on fixed, supervised data. When transferred to new
+datasets or applied in out-of-distribution scenarios, their performance degrades significantly. These
+limitations reduce the scalability and adaptability of such systems, particularly when deployed in
+diverse or previously unseen environments.
+Given its success in domains such as mathematics and programming (Lambert et al., 2024; Team
+et al., 2025b; Liu et al., 2024f; Huang et al., 2025b; Wang et al., 2025b; Huang et al., 2025c;
+Chen et al., 2025; Han et al., 2024; Wang et al., 2025a), Reinforcement Learning with Verifiable
+Rewards(RLVR) offers a promising direction for addressing the challenges of data dependency and
+limited generalization in robotic manipulation. However, applying RLVR to robotic manipulation also
+presents two key challenges. First, reward signals in manipulation tasks are often sparse and delayed,
+making it difficult to deliver timely and informative feedback for effective optimization. Second,
+existing reward designs typically lack spatial and logical constraints, causing models to overfit to
+superficial patterns rather than learning grounded physical reasoning and systematic understanding.
+To address these challenges, we propose ManipLVM-R1, a novel reinforcement learning framework
+that leverages RLVR to provide timely and verifiable feedback for robotic manipulation. Instead of
+relying on sparse and delayed signals, ManipLVM-R1 introduces structured, task-aligned rewards
+for two key subtasks: affordance perception and trajectory prediction. For affordance perception,
+ManipLVM-R1 combines response format validation with IoU-based spatial localization to produce
+clear and prompt reward signals. For trajectory prediction, it incorporates a mixture of trajectory
+distance metrics, endpoint distance, and trajectory length constraints to evaluate both the quality and
+feasibility of action sequences. To overcome the limitations of shallow reward designs, ManipLVMR1 embeds spatial structure and path consistency into its objectives, encouraging the model to
+develop a systematic understanding of physical interactions rather than relying on superficial patterns.
+Experimental results demonstrate that ManipLVM-R1 substantially improves performance across
+diverse robotic manipulation tasks, including a 144% increase in Intersection over Union (IoU)
+over the strongest baseline in affordance perception and a 12.5% improvement in trajectory prediction—achieved using only 50% of the training data. Furthermore, in our OOD test, ManipLVM-R1
+surpassed all evaluated open-source and supervised fine-tuned models, including Qwen2.5-VL-32BInstruct and Robobrain-7B (Ji et al., 2025). Notably, we provide a detailed analysis of our reward
+design and demonstrate its impact on task success and efficiency.
+2
+
+Our contributions are threefold. First, we propose a novel adaptation of the RLVR paradigm
+for robotic manipulation, introducing a verifiable reward-based training framework that requires
+no human annotations. Second, we design structured reward mechanisms tailored to affordance
+perception and trajectory prediction, guiding the model to generate executable responses based on
+spatial precision and path alignment. Third, we conduct comprehensive evaluations on multiple
+challenging manipulation tasks, demonstrating that ManipLVM-R1 outperforms existing supervised
+fine-tuning approaches in terms of sample efficiency, task success rate, and generalization capability.
+
+2
+
+Related Work
+
+2.1
+
+RLVR for Large Vision Language Models
+
+LVMs have demonstrated remarkable reasoning capabilities across various visual tasks (Liu et al.,
+2024c,b; Li et al., 2024a; Wang et al., 2024a; Bai et al., 2023; Wang et al., 2024b). Recently, several
+works have explored the use of RLVR to further enhance visual reasoning performance. VisionR1 (Huang et al., 2025a) combines a human-annotation-free cold-start math reasoning dataset with
+a Progressive Thinking Suppression Training (PTST) strategy, achieving performance on par with
+much larger models. LMM-R1 (Peng et al., 2025) proposes a two-stage RLVR framework that first
+improves foundational reasoning using text data, then generalizes to vision-based and agent-centric
+reasoning domains. VLM-R1 (Shen et al., 2025) adapts R1-style reinforcement learning to visual
+grounding tasks, demonstrating improved performance and generalization in open-vocabulary object
+detection. Despite these promising results, RLVR remains underexplored in the context of robotic
+manipulation. To bridge this gap, we propose ManipLVM-R1—a novel RLVR-based framework
+designed to enhance both reasoning and manipulation capabilities.
+2.2
+
+Robot Manipulation
+
+Traditional state-based reinforcement learning methods (Geng et al., 2023; Andrychowicz et al., 2020)
+laid the foundation for early research in robotic manipulation. However, these methods often rely on
+low-dimensional sensor states and struggle to generalize to high-dimensional, real-world visual inputs.
+In recent years, research has increasingly shifted toward vision-centric manipulation tasks, leveraging
+the strong reasoning capabilities of Large Language Models (LLMs) to enhance the intelligence and
+generalization of manipulation strategies (Brohan et al., 2022, 2023a; Wan et al., 2023; Wang et al.,
+2023; Li et al., 2024b; Liu et al., 2024e). Specifically, VoxPoser (Huang et al., 2023a) utilizes LLMs
+to generate 3D value maps through Vision-Language Models (VLMs), enabling zero-shot synthesis
+of manipulation trajectories from language instructions. RoboFlamingo (Li et al., 2023b) fine-tunes
+models on vision-language manipulation datasets to perform language-conditioned manipulation
+tasks. ManipLLM (Li et al., 2024b) further incorporates the Chain-of-Thought (CoT) paradigm, finetuning adapters to integrate object understanding, affordance reasoning, and pose prediction into an
+interpretable, object-centric manipulation framework. Building on these approaches, OpenVLA (Kim
+et al., 2024) and RoboMamba (Liu et al., 2024e) construct more fine-grained CoT datasets and
+employ supervised fine-tuning strategies to further improve manipulation performance. In parallel,
+Embodied Reasoner (Zhang et al., 2025), Cosmos-Reason1 (Azzolini et al., 2025), and RoboBrain (Ji
+et al., 2025) focus on enhancing long-horizon reasoning and improving interpretability and logical
+consistency in the decision-making process. Despite recent advances, most manipulation VLMs still
+depend on large-scale, high-quality CoT datasets. In contrast, our proposed ManipLVM-R1 relies on
+a small set of labeled examples and adapts the RLVR paradigm to stimulate the inherent reasoning
+capabilities of the base model, enabling low-supervision and high-generalization manipulation.
+
+3
+
+Method
+
+In this section, we first present the preliminaries of RLVR. Subsequently, we introduce the training
+framework for ManipLVM-R1 and elucidate the rationale behind its design. The visualization of
+ManipLVM-R1 is shown in Figure 2.
+3
+
+ce
+on
+st
+o
+a
+d
+e
+w
+o
+e
+
+1]
+
+Lift the yellow cup
+Reasoning
+Input Image
+
+Instruction
+Reach for the spatula
+in the sink
+
+Trajectory
+Prediction
+
+<think>To reach for the spatula in the
+sink, I need to move from the current
+position near the stove to the sink
+area. The spatula is located on the
+right side of the sink, so I'll need to
+move diagonally across the counter
+towards the sink. Once there, I can
+then move directly towards the
+spatula to grasp it. </think>
+<answer> [179, 248], [356, 290],
+[492, 320], [530, 330], [530, 330],
+[530, 330], [530, 330], [530, 330]
+</answer>
+
+Instruction
+
+Image
+
+Optimization
+
+O1
+
+KL Divergence
+
+O2
+O3
+
+…
+
+Reference
+Model
+
+Trajectory Match Reward
+
+Instruction: place the knife on
+top of the blue towel
+
+Instruction: reach for the pot
+
+Endpoint & Path Reward
+
+Affordance Reward
+
+Policy
+Policy
+Model
+
+Spatial Perception Reward
+
+In order to pick
+up the knife, it is
+necessary to
+identify its
+graspable part
+(handle).
+
+𝑻∗
+
+𝒃∗
+
+෡
+𝒃
+
+𝑹𝐩𝐚𝐭𝐡 = exp(−𝒌(𝑫𝑭( ෡
+𝑻, 𝑻∗ ))
+𝑹𝐞𝐧𝐝 = exp(−𝒌||ෝ
+𝒑𝑵 − 𝒑∗𝑴 ||𝟐)
+
+෡ 𝒃∗ )
+𝑹𝐚𝐟𝐟 = 𝐈𝐨𝐔(𝒃,
+Forward Reward
+Format:
+<think>Reasoning</think>
+<answer>bbox: (w, x, y, z)</answer>
+
+OG
+
+෡
+𝑻
+
+𝑹𝐅𝐨𝐫𝐦𝐚𝐭 = ቊ
+
+𝒑∗𝑴 Predicted end point
+ෝ
+𝒑𝑵. GT end point
+𝑫𝑭(·) Path distance
+෡
+𝑻 Predicted trajectory
+𝑻∗ GT trajectory
+k Decay coefficient
+
+1,
+0,
+
+Forward Reward
+Format:
+<think>Reasoning</think>
+<answer>T{p1, …, pN}, 3≤ N ≤ 10</answer>
+
+if Answer adheres to format
+otherwise
+
+Move 2:
+the corn next
+to theof
+blue
+toy proposed ManipLVM-R1 framework. Given an image and an instruction,
+Figure
+Overview
+the
+the policy model generates multiple responses, which are optimized using structured rewards: the
+Affordance Perception Reward for affordance detection, and the Trajectory Match Reward based on
+multiple distance metrics, path similarity, and endpoint accuracy.
+
+3.1
+
+next to the bule toy
+Move towards
+Pick
+up the corn
+Preliminary of
+Reinforcement
+Learning
+withthe blue toy
+Verifiable Place it
+Rewards
+Move to the corn
+
+Wipe the table with yellow towel
+
+RLVR (Lambert et al., 2024; Guo et al., 2025; Team et al., 2025b) is a training paradigm designed to
+enhance language models in tasks where correctness can be objectively verified, such as mathematics
+and coding. Unlike reinforcement learning from human feedback (Liu et al., 2024a; Zang et al., 2025),
+RLVR derives its reward signal directly from a verifiable reward function. Given the input instruction
+q, the policy model πθ generates responses o and receives the verifiable reward. Concretely, RLVR
+optimizes the following objective:
+Move toward the dishcloth
+
+Pick up the dishcloth
+
+Sweep the table
+
+Return
+
+max Eo∼πθ (q) [RRLVR (q, o)] = [R(q, o) − β KL [πθ (o|q) ∥Timeline
+πref (o|q)]] ,
+πθ
+
+(1)
+
+where πref is the reference model before optimization, R is the verifiable reward function, and β is the
+hyperparameter to control the KL-divergence (Hershey, Olsen, 2007). The verifiable reward function
+R takes the instruction and output pair (q, o) as inputs, and checks if the ground-truth answer remains
+the same as the prediction o:
+
+1, if o = ground truth,
+R(q, o) =
+(2)
+0, otherwise.
+3.2
+
+ManipLVM-R1
+
+While RLVR has shown promise in domains like mathematics and programming, its application to
+robotic manipulation remains limited. This is primarily due to two challenges: (1) sparse and delayed
+reward signals in manipulation tasks, which hinder effective learning and optimization, and (2) the
+lack of spatial-logical constraints in reward design, causing models to rely on superficial pattern
+matching rather than learning grounded physical reasoning. To address these issues, we propose
+ManipLVM-R1, an RLVR-based framework that incorporates structured reward design and stable
+policy optimization. ManipLVM-R1 decomposes the overall manipulation task into two distinct
+subtasks: affordance perception and trajectory prediction. It trains separate models for each subtask,
+enabling more focused learning and better generalization in physically grounded environments.
+Policy Samples For a given input state (x, q), where x is the visual encoding of the input image
+and q is the textual encoding of the instruction, ManipLVM-R1 first generates G distinct responses
+{o1 , o2 , ..., oG } from the current policy πθ . Different from other work, to adapt this methodology for
+4
+
+robotic manipulation tasks involving affordance perception and trajectory prediction, ManipLVM-R1
+incorporates distinct sets of reward functions: Affordance Perception Reward and Trajectory Match
+Reward. For brevity, we omit the response index in the following introduction.
+Affordance Perception Reward For the affordance perception task, the Affordance Perception
+Reward Rspatial combines two components: a format reward Rformat and an affordance reward Raff .
+The format reward Rformat ensures that the model outputs follow a structured format—reasoning
+enclosed in ‘<think></think>’ and the final answer enclosed in ‘<answer></answer>’, with the
+‘<answer>’ field containing the coordinates of a predicted bounding box. This structure not only
+facilitates reliable reward extraction but also guides the model to organize its output in a way that
+aligns with downstream evaluation and training. Meanwhile, the affordance reward Raff focuses on
+the core objective of affordance perception: accurately identifying where an object interaction can
+occur. It evaluates spatial accuracy by comparing the predicted bounding box b∗ with the ground-truth
+box b̂ using the Intersection-over-Union (IoU) metric. By optimizing Raff = IoU(b∗ , b̂), the model is
+encouraged to generate spatially precise and semantically grounded predictions that directly support
+successful interaction planning. Taken together, the Affordance Perception Reward is defined as:
+Rspatial = Rformat + Raff .
+(3)
+Trajectory Match Reward For the trajectory prediction task, the model is expected to output a
+sequence of 2D coordinates, denoted as T̂ = {p̂1 , p̂2 , ..., p̂N }, where each p̂i ∈ R2 represents an
+(x, y) position in image space, with the origin at the top-left corner. The predicted trajectory is
+evaluated against a ground-truth sequence T ∗ = {p∗1 , p∗2 , ..., p∗M } using three components: a format
+reward Rformat , a path similarity reward Rpath , and an endpoint distance reward Rend .
+The format reward Rformat verifies structural correctness, including proper use of ‘<think>‘ and ‘<answer>‘ tags. Unlike in affordance perception, it enforces a trajectory-specific constraint: the predicted
+numbers must fall within a valid range (e.g., 3–10), ensuring both conciseness and interpretability.
+To encourage the model to generate physically plausible and goal-aligned trajectories, we design the
+path similarity reward Rpath . The motivation behind this design is that many supervised methods,
+such as behavioral cloning (Nazeri, Bohlouli, 2021), focus primarily on endpoint accuracy while
+overlooking the quality and feasibility of the trajectory itself. In robotic manipulation tasks, the shape,
+continuity, and alignment of the trajectory with respect to the ground truth are critical for ensuring
+robust and safe control strategies. To capture these aspects, we incorporate multiple geometric
+similarity metrics that evaluate how well the predicted trajectory matches the ground truth from
+different perspectives. Rpath is a weighted aggregation of rewards derived from three distinct metrics:
+Discrete Fréchet Distance (DFD) (Eiter, Mannila, 1994), Hausdorff Distance (HD) (Huttenlocher
+et al., 1993), and Root Mean Square Error (RMSE). The reward for each metric (RDFD , RHD , RRMSE )
+is obtained by normalizing the respective distance value to a score between 0 and 1. RDFD quantifies
+overall shape similarity and temporal alignment between trajectories; RHD captures the maximum
+pointwise deviation; RRMSE measures the average pointwise discrepancy. The final Rpath is as:
+Rpath = RDFD + RHD + RRMSE .
+(4)
+The endpoint distance reward Rend measures the proximity between the final predicted point p̂N and
+the ground-truth endpoint pM using Euclidean distance: Rend = exp(−k||pˆN − p∗M ||2 ). The overall
+trajectory match reward is defined as the sum of the three components:
+Rtrajectory = Rformat + Rpath + Rend .
+(5)
+Policy Update Inspired by Group Relative Policy Optimization (GRPO) (Guo et al., 2025), we
+select multiple responses from the current policy as candidate actions. Depending on the task type,
+either Rspatial or Rtrajectory assigns a scalar reward ri to each response, resulting in a reward set
+{r1 , r2 , . . . , rG }. To assess the quality of each response relative to others, we normalize the rewards
+by computing the mean and standard deviation:
+ri − mean({r1 , . . . , rG })
+Ai =
+,
+(6)
+std({r1 , . . . , rG })
+where Ai denotes the advantage of the i-th response. These advantages are then used to update the
+policy, increasing the likelihood of high-quality responses while suppressing lower-quality ones. To
+ensure stability during training, the update is constrained by minimizing the KL divergence between
+the updated policy and a reference model: KL [πθ (o|q) ∥ πref (o|q)].
+5
+
+4
+
+Experiment
+
+4.1
+
+Baselines
+
+To establish robust performance
+benchmarks, Table 1: Comparison of model performance on In-Domain dataset.
+we curated a compre- Bolded values indicate the best performance, and underlined values
+hensive suite of baseline indicate the second best. Task-specific metrics are color-coded: red for
+models. Specifically, we Affordance Perception and green for Trajectory Prediction.
+selected three of the most
+In-Domain
+Method
+recently released, highestIoU ↑ DFD ↓ HD ↓ RMSE ↓
+Avg↓
+Open-source Models
+performing open-source
+Phi-4-multimodal-Instruct
+0.58
+243.92 224.73
+189.27
+228.21
+multimodal language model
+Gemma-3-4b-it
+0.91
+266.62
+243.19
+210.48
+240.10
+series:
+Gemma-3-4B-it,
+Gemma-3-27b-it
+1.32
+257.42 230.29
+184.47
+224.00
+Gemma-3-12B-it, GemmaGemma-3-12b-it
+1.18
+206.72 190.64
+154.96
+184.10
+3-27b-it (Team et al.,
+6.15
+202.86 179.12
+144.14
+175.37
+Qwen2.5-VL-3B-Instruct
+2025a), Phi-4-multimodalQwen2.5-VL-7B-Instruct
+2.98
+262.80 243.03
+190.81
+232.21
+Qwen2.5-VL-32B-Instruct
+7.40
+125.54 113.00
+85.05
+107.86
+Insturct (Abouelenin et al.,
+Supervised Fine-Tuning
+2025), and Qwen2.5-VLLLaVA-1.6-7B
+3.98
+184.40 178.00
+133.28
+165.23
+3B-Instruct, Qwen2.5-VLInternVL2-2B
+6.74
+250.20 239.34
+194.74
+228.09
+7B-Instruct, Qwen2.5-VLQwen2.5-VL-3B-Instruct 12.69 147.38 138.90
+94.03
+126.77
+32B-Instruct (Team, 2024).
+RoboBrain-7B 11.79 156.10 136.52
+106.71
+133.11
+We implemented few-shot
+Our Proposed Model
+ManipLVM-R1-3B
+31.0
+134.18 111.14
+87.28
+110.87
+prompting to ensure they
+possessed fundamental perceptual capabilities.
+Furthermore, to validate the efficacy of our proposed training framework, we selected three models
+as baselines for supervised fine-tuning. These include InternVL2-2B (Chen et al., 2024), Qwen2.5VL-3B-Insturct (Team, 2024), LLaVA-1.6-7B (Liu et al., 2024c) and RoboBrain-7B (Ji et al., 2025).
+Notably, Qwen2.5-VL-3B-Instruct serves as our base model. RoboBrain is specifically designed for
+affordance perception and trajectory prediction, which was fine-tuned from its base model, LLaVA1.6-7B, using an extensive, meticulously prepared synthetic chain-of-thought dataset. All baseline
+models were fully fine-tuned on 100% of the ShareRoBot training set, while our proposed model,
+ManipLVM-R1, used only 50% of the data.
+4.2
+
+Dataset Setting
+
+In Domain Dataset Both our baseline models and the proposed ManipLVM-R1 were trained on the
+ShareRobot (Ji et al., 2025) dataset, a large-scale dataset designed to enhance affordance perception
+and trajectory prediction. The data was curated from Open X-Embodiment (O’Neill et al., 2024) using
+strict quality criteria and human verification. The dataset includes fine-grained, multi-dimensional
+annotations such as low-level planning instructions, object affordances, and end-effector trajectories.
+ShareRobot comprises over 1M planning QA pairs, 6.5k affordance-annotated images, and 6.8k
+trajectory-annotated images, covering diverse scenarios (102 scenes, 12 embodiments). Notably, our
+proposed model, ManipLVM-R1, was trained using only 50% of the training set. In contrast, all SFT
+baseline models used for comparison were trained on the entire training dataset.
+Out of Domain Dataset To evaluate the generalization ability of our model, we also conducted
+OOD experiments. For the affordance perception task, we employed subsets from the UMD Part
+Affordance dataset (Nguyen et al., 2017) as an out-of-domain benchmark for our affordance task
+evaluation. The UMD dataset consists of RGB-D images and 3D point clouds representing 105
+tools commonly used in gardening, kitchen, and workshop environments. Specifically, we selected
+the ‘grasp’, ‘cut’, ‘pound’, and ‘scoop’ categories. From these selected categories, we randomly
+sampled a total of 1200 data pairs/samples, ensuring an equal distribution across the four categories,
+to constitute our OOD test benchmark.
+For the trajectory prediction task, we designated a randomly selected subset of 500 samples from
+the validation data of LLARVA’s pre-training dataset, VAIT (Niu et al., 2024), as our OOD test set.
+VAIT, derived from the diverse Open X-Embodiment dataset, encompasses image-visual trace pairs
+across numerous robotic scenarios. Given that VAIT is a large-scale pre-training dataset, our manual
+6
+
+Table 2: Comparison of model performance in out-of-domain (OOD) dataset. Bolded values signify
+optimal outcomes and underlined values indicate suboptimal outcomes. Red cell for the Affordance
+Perception task and green cell for the trajectory prediction task.
+Out of Domain
+Method
+Grasp-IoU ↑
+Open-source Models
+Phi-4-multimodal-Instruct
+Gemma-3-4b-it
+Gemma-3-12b-it
+Gemma-3-27b-it
+Qwen2.5-VL-3B-Instruct
+Qwen2.5-VL-7B-Instruct
+Qwen2.5-VL-32B-Instruct
+Surpervised Fine-Tuning
+LLaVA-1.6-7B
+Qwen2.5-VL-3B-Instruct
+InternVL2-2B
+RoboBrain-7B
+Our Proposed Model
+ManipLVM-R1-3B
+
+UMD Affordance
+Cut-IoU ↑ Pound-IoU ↑
+
+Scoop-IoU ↑
+
+DFD↓
+
+VAIT Trajectory
+HD↓
+RMSE ↓
+
+Avg↓
+
+1.49
+2.29
+4.14
+10.29
+22.48
+18.64
+24.67
+
+2.53
+7.04
+5.25
+2.08
+24.50
+14.19
+25.84
+
+2.44
+2.24
+4.36
+6.27
+22.77
+10.07
+24.04
+
+2.22
+2.26
+4.66
+4.05
+26.09
+12.31
+25.99
+
+240.18
+295.48
+204.94
+273.86
+211.80
+228.04
+182.73
+
+235.44
+289.41
+200.89
+268.63
+205.04
+222.92
+176.51
+
+202.69
+232.21
+175.42
+209.52
+140.69
+170.94
+133.17
+
+226.10
+272.31
+193.75
+250.67
+250.67
+207.30
+164.14
+
+3.89
+7.39
+13.93
+23.86
+
+6.34
+7.11
+11.52
+25.37
+
+6.05
+7.50
+15.06
+12.75
+
+7.31
+7.81
+20.48
+26.35
+
+170.88
+186.48
+165.98
+220.94
+
+167.10
+184.95
+160.87
+214.14
+
+160.79
+166.92
+145.64
+173.02
+
+166.25
+179.45
+157.50
+202.70
+
+34.65
+
+25.58
+
+23.50
+
+28.27
+
+146.82
+
+140.52
+
+108.64
+
+131.99
+
+inspection revealed the presence of some noise and inaccuracies in annotations. To ensure rigorous
+testing, we visualized all trajectories within this randomly selected subset and conducted human
+verification of the data annotations. For instances exhibiting conspicuous deviations, we performed
+manual corrections.
+4.3
+
+Metric Setting
+
+For Affordance Perception: We use Intersection over Union (IoU) as the metric to quantify the
+spatial accuracy of the predicted affordance region by measuring the overlap between the predicted
+region and the ground truth annotation. A higher IoU value indicates better spatial alignment between
+the prediction and the ground truth. For Trajectory Prediction: We evaluate the concordance
+between ground truth and predicted trajectories. Following previous work (Chao et al., 2021; Wang
+et al., 2024a; Ji et al., 2025), the trajectory is represented as ordered sets of two-dimensional waypoints,
+normalized to a range of [0, 1000). The assessment of trajectory similarity incorporates three distinct
+metrics: the Discrete Fréchet Distance (DFD), the Hausdorff Distance (HD), and the Root Mean
+Square Error (RMSE). The DFD metric is utilized to quantify the overall resemblance in shape and
+temporal synchronization between trajectories. The HD serves to identify the maximal point of
+divergence. Concurrently, the RMSE provides a measure of the average pointwise discrepancy. The
+combined application of these metrics facilitates a comprehensive evaluation of trajectory prediction
+accuracy and similitude.
+4.4
+
+Quantitative Analysis
+
+We evaluate the performance of ManipLVM-R1-3B on both affordance perception and trajectory
+prediction tasks under in-domain and OOD settings.
+In the in-domain experiment (Table 1), our model achieves an IoU score of 31.0 on the affordance
+perception task, substantially outperforming all baselines, including the much larger RoboBrain-7B
+(11.79), despite using only 50% of the training data. This result highlights the effectiveness of our
+reward design in producing spatially grounded, semantically meaningful predictions under limited
+supervision, validating our motivation to align learning signals with task utility. On the trajectory
+prediction task, ManipLVM-R1 also has strong performance, with an average distance error of 110.87,
+competitive with models trained with full supervision and larger capacities, demonstrating that our
+trajectory reward captures core requirements for physical and goal-directed plausibility, as intended.
+In the OOD experiment (Table 2), ManipLVM-R1 continues to show robust generalization. It achieves
+the highest Grasp-IoU (34.65) and competitive performance on other UMD affordance subtasks.
+More notably, it achieves the lowest average trajectory error (131.99) on the VAIT benchmark, outperforming all open-source and supervised fine-tuned models, including Qwen2.5-VL-32B-Instruct
+and RoboBrain-7B. These results collectively demonstrate ManipLVM-R1’s ability to generalize
+under distribution shifts while maintaining high task accuracy across both perception and prediction.
+7
+
+Move the corn next to the blue toy
+
+Move to the corn
+
+Pick up the corn
+
+Move towards the blue toy
+
+Pick up the dishcloth
+
+Sweep the table
+
+Place it next to the bule toy
+
+Wipe the table with yellow towel
+
+Move toward the dishcloth
+
+Return
+
+Timeline
+
+Figure 3: Illustration of integrated affordance perception and trajectory prediction. This figure
+presents examples where potential interaction regions (affordances) are identified, indicated by red
+bounding boxes, and a corresponding predicted action trajectory is shown as orange points.
+
+4.5
+
+Qualitative Analysis
+
+To qualitatively assess the capabilities of ManipLVM-R1, we present visual examples of its performance in affordance perception and trajectory prediction. To better elucidate the practical significance
+of ManipLVM-R1 in real-world physical interactions, Figure 3 demonstrates its engagement of spatial
+perception and trajectory prediction capabilities in response to two high-level human instructions:
+“Move the corn next to the blue toy” and “Wipe the table with yellow towel”. Furthermore, we extend
+the qualitative analysis to more nuanced reasoning processes. As shown in Figure 4, we observe an
+“aha moment” where ManipLVM-R1 demonstrates emergent reasoning abilities without any CoT
+data. Take the first case, for example: when instructed to insert a round object into its slot, the model
+first identifies the object’s attributes (color and shape), then locates the matching slot—indicating
+implicit planning. This suggests that ManipLVM-R1 can spontaneously perform multi-step reasoning
+in structured tasks, consistent with recent findings on emergent behavior in LLMs (Guo et al., 2025).
+We also present error analysis in Figure 4. First, we identify instances of reasoning hallucinations
+during the model’s inference process, primarily stemming from a lack of commonsense knowledge.
+These hallucinations can accumulate over steps and ultimately lead to incorrect final predictions.
+In the first failure case, the model lacks commonsense understanding of uncommon doorknobs in
+the physical world. As a result, it fails to recognize the doorknob as an interactable region relevant
+to the instruction and instead incorrectly focuses on the lock in the image. This leads to a faulty
+reasoning path: “the end effector approaching the keyhole will open the door.” In another failure case,
+we observe that the model sometimes misperceives the gripper’s spatial position, which negatively
+impacts its reasoning. For example, the model mistakenly believes the gripper is next to the stove.
+Based on this incorrect perception, it generates a trajectory that moves from the stove to the right
+side of the sink—resulting in an action that deviates from the intended goal. These failure cases
+suggest that while ManipLVM-R1excels at structured tasks, it still lacks mechanisms for verifying
+its internal beliefs or correcting perceptual errors. Future work could explore incorporating external
+commonsense knowledge bases or self-monitoring modules to improve robustness in ambiguous or
+unfamiliar scenarios.
+4.6
+
+Analysis of Reward Design
+
+To better understand the impact of different reward components on model performance, we conduct
+an ablation study using the Trajectory Match Reward in Equation 5 as an example. As shown in
+8
+
+Input Image
+
+Instruction
+
+Insert round object
+into its slot
+Input Image
+
+Instruction
+
+Insert brown object
+into its slot
+
+Input Image
+
+Reasoning
+
+<think> The task requires inserting
+round object into its corresponding
+slot on the blue block. To achieve
+this, I need to identify an affordance
+area where the round object can be
+placed. Given that the round object
+is green and the block has circular
+shapes, it's likely that the round
+object fits into one of these circular
+slots. </think>
+<answer>[153, 46, 167, 60]
+</answer>
+
+Instruction
+
+329,
+
+567,
+
+<answer> [105, 46], [108, 59], [111,
+72] </answer>
+
+Lift the yellow cup
+
+Affordance
+Perception
+Reasoning
+<think>I need to determine the most
+likely location for the end effector to
+open the door. Given the door has a
+lock, it's logical to assume that the end
+effector would be positioned near the
+lock mechanism.
+This would allow
+the robot to apply force or pressure to
+the lock, potentially unlocking the
+door. </think>
+<answer>[534,
+</answer>
+
+Reasoning
+
+<think>To lift the yellow cup, I need to
+identify its position on the plate and
+then determine the path that will
+allow me to move it. The cup is located
+towards the center of the plate, so I
+'ll start by moving towards the cup
+and then lift it up. </think>
+
+Reasoning
+Input Image
+
+Instruction
+
+361]
+
+Reach for the spatula
+in the sink
+
+Trajectory
+Prediction
+
+<think>To reach for the spatula in the
+sink, I need to move from the current
+position near the stove to the sink
+area. The spatula is located on the
+right side of the sink, so I'll need to
+move diagonally across the counter
+towards the sink. Once there, I can
+then move directly towards the
+spatula to grasp it. </think>
+<answer> [179, 248], [356, 290],
+[492, 320], [530, 330], [530, 330],
+[530, 330], [530, 330], [530, 330]
+</answer>
+
+Figure 4: Case studies illustrate both successful “aha moments” and failure cases in ManipLVM-R1’s
+predictions. In each case, the final answer predicted by ManipLVM-R1 is enclosed in <answer> tags,
+while visualizations of the model’s prediction or ground truth are shown using green boxes and green
+points. The model’s reasoning process is shown within <think> tags, where green text highlights
+key reasoning steps in successful cases, and red text marks the part responsible for the final failure.
+Figure 5, we compare several variants of the reward formulation by evaluating their influence on task
+performance over training steps. Since distance-based metrics (e.g., DFD, HD, RMSE, Endpoint
+Error) are better when lower, we normalize and negate these values to convert them into a unified
+performance metric, which is used as the vertical axis in the plot.
+Performance%
+
+The orange curve represents the full reward configura1.0
+tion that combines DFD, HD, RMSE, and Endpoint ErDFD+HD+RMSE+END
+DTW+END
+ror, which consistently achieves the highest performance
+HD+END
+0.8
+RMSE+END
+across most training stages. This indicates that aggregating multiple complementary metrics provides a more
+0.6
+reliable and stable learning signal for trajectory alignment. The light blue curve (DTW + Endpoint) corre0.4
+sponds to a method that combines dynamic time warping (DTW) (Müller, 2007) with endpoint matching. This
+0.2
+method performs the worst, indicating that DTW is less
+effective for spatial reasoning in physical tasks. The green
+0.0
+(HD + Endpoint) and purple (RMSE + Endpoint) curves
+200
+400
+600
+800
+1000
+Steps
+show moderate performance, suggesting that single metrics capture limited aspects of trajectory quality compared
+Figure 5: Performance comparison
+to the full reward. These results highlight the importance
+across different reward designs.
+of multi-metric reward design in reinforcement learning
+for robotic manipulation. By integrating diverse geometric and temporal criteria, the full reward
+formulation enables the agent to develop a deeper understanding of spatial structure and action
+consistency.
+
+5
+
+Conclusion
+
+In this paper, we present ManipLVM-R1, a novel reinforcement learning framework that advances
+robotic manipulation by replacing expensive human supervision with verifiable, rule-based rewards.
+By introducing task-aligned reward functions, including Affordance Perception and Trajectory Match,
+our method enables more systematic physical reasoning and improved generalization, particularly in
+out-of-domain scenarios. Unlike prior approaches that depend heavily on annotated data, ManipLVM9
+
+R1 leverages immediate, structured feedback to guide learning, leading to shorter inference paths
+and improved computational efficiency. Our experiments demonstrate that ManipLVM-R1 not only
+reduces supervision costs but also achieves substantial performance gains with limited training data,
+establishing it as a promising paradigm for scalable and adaptable robot learning. We provide a
+detailed discussion of limitations in Appendix A.
+
+References
+Abouelenin Abdelrahman, Ashfaq Atabak, Atkinson Adam, Awadalla Hany, Bach Nguyen, Bao
+Jianmin, Benhaim Alon, Cai Martin, Chaudhary Vishrav, Chen Congcong, others . Phi-4-mini
+technical report: Compact yet powerful multimodal language models via mixture-of-loras // arXiv
+preprint arXiv:2503.01743. 2025.
+Andrychowicz OpenAI: Marcin, Baker Bowen, Chociej Maciek, Jozefowicz Rafal, McGrew Bob,
+Pachocki Jakub, Petron Arthur, Plappert Matthias, Powell Glenn, Ray Alex, others . Learning
+dexterous in-hand manipulation // The International Journal of Robotics Research. 2020. 39, 1.
+3–20.
+Antol Stanislaw, Agrawal Aishwarya, Lu Jiasen, Mitchell Margaret, Batra Dhruv, Zitnick C Lawrence,
+Parikh Devi. Vqa: Visual question answering // ICCV. 2015. 2425–2433.
+Azzolini Alisson, Brandon Hannah, Chattopadhyay Prithvijit, Chen Huayu, Chu Jinju, Cui Yin,
+Diamond Jenna, Ding Yifan, Ferroni Francesco, Govindaraju Rama, others . Cosmos-reason1:
+From physical common sense to embodied reasoning // arXiv preprint arXiv:2503.15558. 2025.
+Bai Jinze, Bai Shuai, Chu Yunfei, Cui Zeyu, Dang Kai, Deng Xiaodong, Fan Yang, Ge Wenbin, Han
+Yu, Huang Fei, others . Qwen technical report // arXiv preprint arXiv:2309.16609. 2023.
+Belkhale Suneel, Ding Tianli, Xiao Ted, Sermanet Pierre, Vuong Quon, Tompson Jonathan, Chebotar
+Yevgen, Dwibedi Debidatta, Sadigh Dorsa. Rt-h: Action Hierarchies Using Language // arXiv
+preprint arXiv:2403.01823. 2024.
+Brohan Anthony, Brown Noah, Carbajal Justice, Chebotar Yevgen, Chen Xi, Choromanski Krzysztof,
+Ding Tianli, Driess Danny, Dubey Avinava, Finn Chelsea, others . Rt-2: Vision-Language-Action
+Models Transfer Web Knowledge to Robotic Control // arXiv preprint arXiv:2307.15818. 2023a.
+Brohan Anthony, Brown Noah, Carbajal Justice, Chebotar Yevgen, Dabis Joseph, Finn Chelsea,
+Gopalakrishnan Keerthana, Hausman Karol, Herzog Alex, Hsu Jasmine, others . Rt-1: Robotics
+Transformer for Real-World Control at Scale // arXiv preprint arXiv:2212.06817. 2022.
+Brohan Anthony, Chebotar Yevgen, Finn Chelsea, Hausman Karol, Herzog Alexander, Ho Daniel,
+Ibarz Julian, Irpan Alex, Jang Eric, Julian Ryan, others . Do as I Can, Not as I Say: Grounding
+Language in Robotic Affordances // CoRL. 2023b. 287–318.
+Cai Rizhao, Song Zirui, Guan Dayan, Chen Zhenhao, Li Yaohang, Luo Xing, Yi Chenyu, Kot Alex.
+Benchlmm: Benchmarking cross-style visual capability of large multimodal models // European
+Conference on Computer Vision. 2024. 340–358.
+Chao Yu-Wei, Yang Wei, Xiang Yu, Molchanov Pavlo, Handa Ankur, Tremblay Jonathan, Narang
+Yashraj S, Van Wyk Karl, Iqbal Umar, Birchfield Stan, others . DexYCB: A benchmark for capturing
+hand grasping of objects // Proceedings of the IEEE/CVF conference on computer vision and
+pattern recognition. 2021. 9044–9053.
+Chen Xiuying, Wang Tairan, Guo Taicheng, Guo Kehan, Zhou Juexiao, Li Haoyang, Song Zirui, Gao
+Xin, Zhang Xiangliang. Unveiling the power of language models in chemical research question
+answering // Communications Chemistry. 2025. 8, 1. 4.
+Chen Zhe, Wu Jiannan, Wang Wenhai, Su Weijie, Chen Guo, Xing Sen, Zhong Muyan, Zhang Qinglong,
+Zhu Xizhou, Lu Lewei, others . Internvl: Scaling up vision foundation models and aligning for
+generic visual-linguistic tasks // CVPR. 2024. 24185–24198.
+Eiter Thomas, Mannila Heikki. Computing Discrete Fréchet Distance. 1994.
+10
+
+Geng Yiran, An Boshi, Geng Haoran, Chen Yuanpei, Yang Yaodong, Dong Hao. Rlafford: End-to-end
+affordance learning for robotic manipulation // 2023 IEEE International Conference on Robotics
+and Automation (ICRA). 2023. 5880–5886.
+Guo Daya, Yang Dejian, Zhang Haowei, Song Junxiao, Zhang Ruoyu, Xu Runxin, Zhu Qihao,
+Ma Shirong, Wang Peiyi, Bi Xiao, others . Deepseek-r1: Incentivizing reasoning capability in llms
+via reinforcement learning // arXiv preprint arXiv:2501.12948. 2025.
+Han Wenhan, Fang Meng, Zhang Zihan, Yin Yu, Song Zirui, Chen Ling, Pechenizkiy Mykola, Chen
+Qingyu. MedINST: Meta Dataset of Biomedical Instructions // arXiv preprint arXiv:2410.13458.
+2024.
+Hao Xiaoshuai, Zhu Yi, Appalaraju Srikar, Zhang Aston, Zhang Wanqian, Li Bo, Li Mu. Mixgen:
+A new multi-modal data augmentation // Proceedings of the IEEE/CVF winter conference on
+applications of computer vision. 2023. 379–389.
+Hershey John R, Olsen Peder A. Approximating the Kullback Leibler divergence between Gaussian
+mixture models // 2007 IEEE International Conference on Acoustics, Speech and Signal ProcessingICASSP’07. 4. 2007. IV–317.
+Huang Wenlong, Wang Chen, Zhang Ruohan, Li Yunzhu, Wu Jiajun, Fei-Fei Li. VoxPoser: Composable 3D Value Maps for Robotic Manipulation with Language Models // CoRL. 229. 2023a.
+540–562. (Proceedings of Machine Learning Research).
+Huang Wenlong, Xia Fei, Xiao Ted, Chan Harris, Liang Jacky, Florence Pete, Zeng Andy, Tompson
+Jonathan, Mordatch Igor, Chebotar Yevgen, others . Inner Monologue: Embodied Reasoning
+through Planning with Language Models // CoRL. 2023b. 1769–1782.
+Huang Wenxuan, Jia Bohan, Zhai Zijie, Cao Shaosheng, Ye Zheyu, Zhao Fei, Hu Yao, Lin Shaohui.
+Vision-r1: Incentivizing reasoning capability in multimodal large language models // arXiv preprint
+arXiv:2503.06749. 2025a.
+Huang Yue, Gao Chujie, Wu Siyuan, Wang Haoran, Wang Xiangqi, Zhou Yujun, Wang Yanbo, Ye Jiayi,
+Shi Jiawen, Zhang Qihui, others . On the trustworthiness of generative foundation models:
+Guideline, assessment, and perspective // arXiv preprint arXiv:2502.14296. 2025b.
+Huang Yue, Wang Yanbo, Xu Zixiang, Gao Chujie, Wu Siyuan, Ye Jiayi, Chen Xiuying, Chen Pin-Yu,
+Zhang Xiangliang. Breaking Focus: Contextual Distraction Curse in Large Language Models //
+arXiv preprint arXiv:2502.01609. 2025c.
+Huttenlocher Daniel P, Klanderman Gregory A., Rucklidge William J. Comparing images using the
+Hausdorff distance // IEEE Transactions on pattern analysis and machine intelligence. 1993. 15, 9.
+850–863.
+Ji Yuheng, Tan Huajie, Shi Jiayu, Hao Xiaoshuai, Zhang Yuan, Zhang Hengyuan, Wang Pengwei, Zhao
+Mengdi, Mu Yao, An Pengju, others . Robobrain: A unified brain model for robotic manipulation
+from abstract to concrete // arXiv preprint arXiv:2502.21257. 2025.
+Kim Moo Jin, Pertsch Karl, Karamcheti Siddharth, Xiao Ted, Balakrishna Ashwin, Nair Suraj,
+Rafailov Rafael, Foster Ethan, Lam Grace, Sanketi Pannag, others . OpenVLA: An Open-Source
+Vision-Language-Action Model // arXiv preprint arXiv:2406.09246. 2024.
+Lambert Nathan, Morrison Jacob, Pyatkin Valentina, Huang Shengyi, Ivison Hamish, Brahman
+Faeze, Miranda Lester James V, Liu Alisa, Dziri Nouha, Lyu Shane, others . T\" ULU 3: Pushing
+Frontiers in Open Language Model Post-Training // arXiv preprint arXiv:2411.15124. 2024.
+Li Bo, Zhang Yuanhan, Guo Dong, Zhang Renrui, Li Feng, Zhang Hao, Zhang Kaichen, Li Yanwei, Liu
+Ziwei, Li Chunyuan. Llava-onevision: Easy visual task transfer // arXiv preprint arXiv:2408.03326.
+2024a.
+Li Chenliang, Xu Haiyang, Tian Junfeng, Wang Wei, Yan Ming, Bi Bin, Ye Jiabo, Chen He, Xu Guohai,
+Cao Zheng, others . mPLUG: Effective and Efficient Vision-Language Learning by Cross-modal
+Skip-connections // EMNLP. 2022. 7241–7259.
+11
+
+Li Junnan, Li Dongxu, Savarese Silvio, Hoi Steven. Blip-2: Bootstrapping language-image pretraining with frozen image encoders and large language models // ICML. 2023a. 19730–19742.
+Li Xiaoqi, Zhang Mingxu, Geng Yiran, Geng Haoran, Long Yuxing, Shen Yan, Zhang Renrui, Liu
+Jiaming, Dong Hao. Manipllm: Embodied multimodal large language model for object-centric
+robotic manipulation // Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern
+Recognition. 2024b. 18061–18070.
+Li Xinghang, Liu Minghuan, Zhang Hanbo, Yu Cunjun, Xu Jie, Wu Hongtao, Cheang Chilam, Jing
+Ya, Zhang Weinan, Liu Huaping, others . Vision-language foundation models as effective robot
+imitators // arXiv preprint arXiv:2311.01378. 2023b.
+Li Yanda, Zhang Chi, Yang Wanqi, Fu Bin, Cheng Pei, Chen Xin, Chen Ling, Wei Yunchao. Appagent
+v2: Advanced agent for flexible mobile interactions // arXiv preprint arXiv:2408.11824. 2024c.
+Liao Yiyi, Xie Jun, Geiger Andreas. Kitti-360: A novel dataset and benchmarks for urban scene
+understanding in 2d and 3d // IEEE Transactions on Pattern Analysis and Machine Intelligence.
+2022. 45, 3. 3292–3310.
+Liu Chris Yuhao, Zeng Liang, Liu Jiacai, Yan Rui, He Jujie, Wang Chaojie, Yan Shuicheng, Liu Yang,
+Zhou Yahui. Skywork-Reward: Bag of Tricks for Reward Modeling in LLMs // arXiv preprint
+arXiv:2410.18451. 2024a.
+Liu Haotian, Li Chunyuan, Li Yuheng, Lee Yong Jae. Improved baselines with visual instruction
+tuning // Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition.
+2024b. 26296–26306.
+Liu Haotian, Li Chunyuan, Wu Qingyang, Lee Yong Jae. Visual Instruction Tuning // NeurIPS. 2024c.
+36.
+Liu Jiaming, Li Chenxuan, Wang Guanqun, Lee Lily, Zhou Kaichen, Chen Sixiang, Xiong Chuyan,
+Ge Jiaxin, Zhang Renrui, Zhang Shanghang. Self-Corrected Multimodal Large Language Model
+for End-to-End Robot Manipulation // arXiv preprint arXiv:2405.17418. 2024d.
+Liu Jiaming, Liu Mengzhen, Wang Zhenyu, Lee Lily, Zhou Kaichen, An Pengju, Yang Senqiao, Zhang
+Renrui, Guo Yandong, Zhang Shanghang. RoboMamba: Multimodal State Space Model for
+Efficient Robot Reasoning and Manipulation // arXiv preprint arXiv:2406.04339. 2024e.
+Liu Yu, Gao Lang, Yang Mingxin, Xie Yu, Chen Ping, Zhang Xiaojin, Chen Wei. VulDetectBench:
+Evaluating the Deep Capability of Vulnerability Detection with Large Language Models. 2024f.
+Liu Zeyi, Bahety Arpit, Song Shuran. REFLECT: Summarizing Robot Experiences for Failure
+Explanation and Correction // CoRL. 2023. 3468–3484.
+Müller Meinard. Dynamic time warping // Information retrieval for music and motion. 2007. 69–84.
+Nazeri Mohammad Hossein, Bohlouli Mahdi. Exploring reflective limitation of behavior cloning
+in autonomous vehicles // 2021 IEEE International Conference on Data Mining (ICDM). 2021.
+1252–1257.
+Nguyen Anh, Kanoulas Dimitrios, Caldwell Darwin G, Tsagarakis Nikos G. Object-based affordances
+detection with convolutional neural networks and dense conditional random fields // 2017 IEEE/RSJ
+International Conference on Intelligent Robots and Systems (IROS). 2017. 5908–5915.
+Niu Dantong, Sharma Yuvan, Biamby Giscard, Quenum Jerome, Bai Yutong, Shi Baifeng, Darrell
+Trevor, Herzig Roei. LLARVA: Vision-Action Instruction Tuning Enhances Robot Learning //
+arXiv preprint arXiv:2406.11815. 2024.
+O’Neill Abby, Rehman Abdul, Maddukuri Abhiram, Gupta Abhishek, Padalkar Abhishek, Lee Abraham, Pooley Acorn, Gupta Agrim, Mandlekar Ajay, Jain Ajinkya, others . Open x-embodiment:
+Robotic learning datasets and rt-x models: Open x-embodiment collaboration 0 // 2024 IEEE
+International Conference on Robotics and Automation (ICRA). 2024. 6892–6903.
+12
+
+Peng Yingzhe, Zhang Gongrui, Zhang Miaosen, You Zhiyuan, Liu Jie, Zhu Qipeng, Yang Kai,
+Xu Xingzhong, Geng Xin, Yang Xu. Lmm-r1: Empowering 3b lmms with strong reasoning abilities
+through two-stage rule-based rl // arXiv preprint arXiv:2503.07536. 2025.
+Shen Haozhan, Liu Peng, Li Jingcheng, Fang Chunxin, Ma Yibo, Liao Jiajia, Shen Qiaoli, Zhang
+Zilun, Zhao Kangjia, Zhang Qianqian, others . Vlm-r1: A stable and generalizable r1-style large
+vision-language model // arXiv preprint arXiv:2504.07615. 2025.
+Song Zirui, Li Yaohang, Fang Meng, Chen Zhenhao, Shi Zecheng, Huang Yuan. Mmac-copilot:
+Multi-modal agent collaboration operating system copilot // arXiv e-prints. 2024a. arXiv–2404.
+Song Zirui, Ouyang Guangxian, Fang Meng, Na Hongbin, Shi Zijing, Chen Zhenhao, Fu Yujie, Zhang
+Zeyu, Jiang Shiyu, Fang Miao, others . Hazards in Daily Life? Enabling Robots to Proactively
+Detect and Resolve Anomalies // arXiv preprint arXiv:2411.00781. 2024b.
+Song Zirui, Yang Jingpu, Huang Yuan, Tonglet Jonathan, Zhang Zeyu, Cheng Tao, Fang Meng,
+Gurevych Iryna, Chen Xiuying. Geolocation with Real Human Gameplay Data: A Large-Scale
+Dataset and Human-Like Reasoning Framework // arXiv preprint arXiv:2502.13759. 2025.
+Team Gemma, Kamath Aishwarya, Ferret Johan, Pathak Shreya, Vieillard Nino, Merhej Ramona,
+Perrin Sarah, Matejovicova Tatiana, Ramé Alexandre, Rivière Morgane, others . Gemma 3
+technical report // arXiv preprint arXiv:2503.19786. 2025a.
+Team Kimi, Du Angang, Gao Bofei, Xing Bowei, Jiang Changjiu, Chen Cheng, Li Cheng, Xiao
+Chenjun, Du Chenzhuang, Liao Chonghua, others . Kimi k1. 5: Scaling reinforcement learning
+with llms // arXiv preprint arXiv:2501.12599. 2025b.
+Team Qwen. Qwen2.5: A Party of Foundation Models. September 2024.
+Wan Weikang, Geng Haoran, Liu Yun, Shan Zikang, Yang Yaodong, Yi Li, Wang He. Unidexgrasp++: Improving dexterous grasping policy learning via geometry-aware curriculum and
+iterative generalist-specialist learning // Proceedings of the IEEE/CVF International Conference
+on Computer Vision. 2023. 3891–3902.
+Wang Chenxi, Gu Tianle, Wei Zhongyu, Gao Lang, Song Zirui, Chen Xiuying. Word Form Matters:
+LLMs’ Semantic Reconstruction under Typoglycemia // arXiv preprint arXiv:2503.01714. 2025a.
+Wang Peng, Bai Shuai, Tan Sinan, Wang Shijie, Fan Zhihao, Bai Jinze, Chen Keqin, Liu Xuejing,
+Wang Jialin, Ge Wenbin, others . Qwen2-vl: Enhancing vision-language model’s perception of the
+world at any resolution // arXiv preprint arXiv:2409.12191. 2024a.
+Wang Peng, Bai Shuai, Tan Sinan, Wang Shijie, Fan Zhihao, Bai Jinze, Chen Keqin, Liu Xuejing,
+Wang Jialin, Ge Wenbin, others . Qwen2-vl: Enhancing vision-language model’s perception of the
+world at any resolution // arXiv preprint arXiv:2409.12191. 2024b.
+Wang Qianxu, Zhang Haotong, Deng Congyue, You Yang, Dong Hao, Zhu Yixin, Guibas Leonidas.
+Sparsedff: Sparse-view feature distillation for one-shot dexterous manipulation // arXiv preprint
+arXiv:2310.16838. 2023.
+Wang Yanbo, Ye Jiayi, Wu Siyuan, Gao Chujie, Huang Yue, Chen Xiuying, Zhao Yue, Zhang Xiangliang.
+TRUSTEVAL: A Dynamic Evaluation Toolkit on Trustworthiness of Generative Foundation Models
+// Proceedings of the 2025 Conference of the Nations of the Americas Chapter of the Association
+for Computational Linguistics: Human Language Technologies (System Demonstrations). 2025b.
+70–84.
+Wen Xin, Zhou Junsheng, Liu Yu-Shen, Su Hua, Dong Zhen, Han Zhizhong. 3D shape reconstruction
+from 2D images with disentangled attribute flow // Proceedings of the IEEE/CVF conference on
+computer vision and pattern recognition. 2022. 3803–3813.
+Xie Yunfei, Zhou Ce, Gao Lang, Wu Juncheng, Li Xianhang, Zhou Hong-Yu, Liu Sheng, Xing Lei,
+Zou James, Xie Cihang, Zhou Yuyin. MedTrinity-25M: A Large-scale Multimodal Dataset with
+Multigranular Annotations for Medicine. 2025.
+13
+
+Xue Le, Gao Mingfei, Xing Chen, Martín-Martín Roberto, Wu Jiajun, Xiong Caiming, Xu Ran,
+Niebles Juan Carlos, Savarese Silvio. Ulip: Learning a unified representation of language, images,
+and point clouds for 3d understanding // Proceedings of the IEEE/CVF conference on computer
+vision and pattern recognition. 2023. 1179–1189.
+Yin Wei, Zhang Jianming, Wang Oliver, Niklaus Simon, Mai Long, Chen Simon, Shen Chunhua.
+Learning to recover 3d scene shape from a single image // Proceedings of the IEEE/CVF Conference
+on Computer Vision and Pattern Recognition. 2021. 204–213.
+Zang Yuhang, Dong Xiaoyi, Zhang Pan, Cao Yuhang, Liu Ziyu, Ding Shengyuan, Wu Shenxi, Ma Yubo,
+Duan Haodong, Zhang Wenwei, others . A Simple Yet Effective Multi-Modal Reward Model //
+arXiv preprint arXiv:2501.12368. 2025.
+Zhang Wenqi, Wang Mengna, Liu Gangao, Huixin Xu, Jiang Yiwei, Shen Yongliang, Hou Guiyang,
+Zheng Zhe, Zhang Hang, Li Xin, others . Embodied-Reasoner: Synergizing Visual Search,
+Reasoning, and Action for Embodied Interactive Tasks // arXiv preprint arXiv:2503.21696. 2025.
+Zhao Baining, Wang Ziyou, Fang Jianjie, Gao Chen, Man Fanhang, Cui Jinqiang, Wang Xin,
+Chen Xinlei, Li Yong, Zhu Wenwu. Embodied-R: Collaborative Framework for Activating Embodied Spatial Reasoning in Foundation Models via Reinforcement Learning // arXiv preprint
+arXiv:2504.12680. 2025.
+Zhou Enshen, Su Qi, Chi Cheng, Zhang Zhizheng, Wang Zhongyuan, Huang Tiejun, Sheng Lu, Wang
+He. Code-as-Monitor: Constraint-aware Visual Programming for Reactive and Proactive Robotic
+Failure Detection // arXiv preprint arXiv:2412.04455. 2024.
+
+A
+
+Limitation
+
+While ManipLVM-R1 demonstrates significant advancements in robotic manipulation through reinforcement learning with verifiable rewards, two limitations should be acknowledged. The current
+framework focuses on affordance perception and 2D trajectory prediction. Real-world robotic manipulation often involves more intricate, long-horizon tasks that require a broader range of skills,
+such as fine-grained force control, manipulation of deformable objects, and dynamic interaction
+with the environment. We anticipate that future access to larger-scale, more comprehensive expert
+datasets will facilitate the application of our proposed paradigm to address these complex real-world
+challenges. Meanwhile, the translation of predicted 2D image-space trajectories to precise and
+safe 3D robot movements in physical environments also presents challenges not fully captured by
+the existing evaluation metrics. However, recent advancements in 3D Shape Understanding and
+Reconstruction from 2D Images(Wen et al., 2022; Yin et al., 2021; Xue et al., 2023; Liao et al., 2022),
+which involve training deep learning models to directly predict the six-degree-of-freedom (6DoF)
+pose (i.e., position and orientation) and three-dimensional shape of objects from either 2D images or
+point cloud data, have demonstrated considerable potential for directly translating 2D projections
+into real-world applications.
+
+14
+
+

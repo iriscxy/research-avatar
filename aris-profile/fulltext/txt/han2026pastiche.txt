@@ -1,0 +1,2148 @@
+Pastiche Novel Generation: Creating Fan Fiction You Love in
+Your Favorite Author’s Style
+Xueran Han1 , Yuhan Liu2 , Mingzhe Li3 , Wei Liu4 , Sen Hu5 ,
+Rui Yan2 , Zhiqiang Xu1 , Xiuying Chen1∗
+1
+MBZUAI, 2 Renmin University of China, 3 ByteDance Inc., 4 Xiaomi, 5 Peking University
+
+Abstract
+
+arXiv:2502.15616v1 [cs.CL] 21 Feb 2025
+
+Great novels create immersive worlds with rich
+character arcs, well-structured plots, and nuanced writing styles. However, current novel
+generation methods often rely on brief, simplistic story outlines and generate details using
+plain, generic language. To bridge this gap,
+we introduce the task of Pastiche Novel Generation, which requires the generated novels to
+imitate the distinctive features of the original
+work, including understanding character profiles, predicting plausible plot developments,
+and writing concrete details using vivid, expressive language. To achieve this, we propose WriterAgent, a novel generation system
+designed to master the core aspects of literary pastiche. WriterAgent is trained through
+a curriculum learning paradigm, progressing
+from low-level stylistic mastery to high-level
+narrative coherence. Its key tasks include language style learning, character modeling, plot
+planning, and stylish writing, ensuring comprehensive narrative control. To support this, WriterAgent leverages the WriterLoRA framework,
+an extension of LoRA with hierarchical and
+cumulative task-specific modules, each specializing in a different narrative aspect. We evaluate WriterAgent on multilingual classics like
+Harry Potter and Dream of the Red Chamber,
+demonstrating its superiority over baselines in
+capturing the target author’s settings, character
+dynamics, and writing style to produce coherent, faithful narratives. We hope this work inspires literary creativity in NLP: WriteAgent.
+
+1
+
+Introduction
+
+Novels create rich, immersive worlds with intricate plots and distinct styles, captivating readers
+through complex storytelling (Bai et al., 2024).
+A significant amount of research (Ammanabrolu
+et al., 2020; Yao et al., 2019) has proposed
+new model architectures to improve story generation. With the emergence of LLMs, recent efforts
+∗
+
+Corresponding author
+
+Previous Novel Generation
+Human
+engineered:
+
+In the heart of the Roman
+Empire, General Lucius found
+himself torn between two
+irreconcilable paths… Plain and
+
+Background: xxx
+Persona: xxxx
+Theme: xxxx
+...
+Vague and
+too long!
+
+generic
+
+Our Pastiche Novel Generation
+Since the original ending of
+Dream of the Red Chamber is
+lost, I would like to know your
+prediction of what happens to
+the Jia family in the end?
+
+Decline of Family Power
+
+Plot Planning
+
+Confiscation of Family Assets
+Fates of the Main
+Characters Diverge
+
+Stylish Writing
+At dawn, a loud, sharp knock echoed through the
+grand front gate of the Jia Mansion. Outside, dozens
+of officials clad in deep blue official robes stood in
+formation, their voices booming… Rich in the original
+author’s style
+
+Figure 1: Comparison of traditional story generation and
+personalized long-form novel generation, showcasing
+enhanced narrative depth, character development, and
+stylistic fidelity.
+
+have shifted towards improved prompt-based techniques (Wang et al.; Han et al., 2024). For example,
+Ma et al. (2024) proposed modular premise synthesis, providing concrete information such as background, persona, and theme to guide the generation
+process. While these methods have enhanced novel
+generation performance (Hu et al., 2024b), they
+fall short in capturing the irreplaceable qualities of
+real-world literary classics: engaging plots, vivid
+characters, and distinctive language that immerse
+readers in complex and authentic storytelling.
+Hence, in this work, we propose the Pastiche
+Novel Generation task, which aims to generate
+novels that faithfully emulate the original author’s
+style and narrative depth. This task presents two
+key challenges: (1) plot planning that aligns with
+the novel’s established worldview and character
+dynamics, and (2) stylish writing that produces
+narrative text reflecting the target author’s personalized writing style. As illustrated in Figure 1,
+for instance, given the rich context of Dream of
+the Red Chamber, with its intricate interpersonal
+conflicts and lavish lifestyles, the model should pre-
+
+dict significant plot outcomes, such as the eventual
+downfall of the Jia family. Additionally, the model
+must accurately reproduce the linguistic and stylistic features of the original text, including evocative
+phrases like “rolled up their sleeves” and “please
+issue the decree”, which reflect the author’s unique
+writing style.
+To address these challenges, we propose WriterAgent, a novel generation model designed to emulate a target author’s writing style. The model is
+trained in sequence on four core tasks to master key
+narrative and stylistic elements of the author’s work.
+This sequential training follows the natural writing
+process, from conceptual elements like language
+style and world-building to high-level plotting and
+fine details: 1) Language Style Learning: Teaching
+the LLM to capture the author’s distinctive writing
+style through tasks like next-word prediction, ensuring consistent character voices. 2) World Building: Guiding the model to introduce characters and
+define their relationships, constructing an interconnected world aligned with the original narrative.
+3) Plot Planning: Enabling the model to generate
+coherent plotlines that evolve character arcs in line
+with the story’s structure. 4) Stylish Writing: Enhancing descriptive details of settings, character
+interactions, and events, ensuring immersive storytelling that reflects the author’s tone and depth. To
+train WriterAgent efficiently, we propose WriterLoRA, an extension of the Low-Rank Adaptation
+(LoRA) (Hu et al., 2021). The original LoRA A
+and B matrices act as a general expert, preserving
+the original text’s style as a reference. We augment
+this with specialized B matrices dedicated to specific aspects such as world-building, plot, and detail
+writing, trained sequentially in a curriculum-based
+approach from simple to complex tasks.
+We evaluated WriterAgent on the English Harry
+Potter series and the Chinese Dream of the Red
+Chamber. Given the absence of prior work on the
+personalized novel generation task, we developed
+a set of automatic metrics to assess writing style,
+including language style, expression methods, and
+sentence complexity, and plot development, covering the story mainline, character behavior, and
+emotions. Both automatic evaluations and human
+annotations demonstrate that WriterAgent effectively captures the target author’s style and constructs coherent, engaging narratives.
+Our main contributions are as follows: (1) We introduce the Pastiche Novel Generation task, which
+
+aims to generate novels that mimic a target author’s
+style, narrative structure, and character development. (2) We develop WriterAgent, an LLM with
+a WriterLoRA structure, trained to learn character
+profiles, predict future plotlines, and reconstruct
+full stories, enabling consistent and context-aware
+storytelling. (3) We demonstrate that WriterAgent
+outperforms baseline models in mimicking multilingual classics such as Harry Potter, which highlights new possibilities for literary creativity and
+personalized storytelling.
+
+2
+
+Related Work
+
+Story Generation. The task of long-form story
+generation has received significant attention in recent years due to advancements in LLMs. Early
+approaches primarily focused on developing new
+modules to enhance narrative coherence and consistency. For example, Ammanabrolu et al. (2020);
+Fan et al. (2019, 2018) leveraged graph structures
+to organize events more effectively and improve
+narrative consistency. Another example is Peng
+et al. (2018), which introduced an interface for
+human-computer interaction to generate personalized stories and applied it to RNN-based models for controlling story endings and storylines.
+However, these methods often struggled to maintain coherence and consistency over extended sequences. More recently, prompt engineering techniques have been adopted to tap into the generative
+power of LLMs (Giray, 2023). For instance, Han
+et al. (2024) proposed a director-actor agent collaboration framework for controllable and interactive
+drama script generation, while Huang et al. (2023)
+explored dynamic beam sizing and affective reranking to generate engaging narratives.
+Despite these advancements, existing methods
+lack a framework to emulate complex narratives
+and distinct authorial styles, essential for real-world
+long-form novel writing.
+Parameter-Efficient Fine-Tuning. Parameterefficient fine-tuning (PEFT) (He et al.) reduces
+the computational costs of fine-tuning LLMs
+by introducing additional modules, avoiding direct updates to the large-scale pretrained weights.
+Adapters (Houlsby et al., 2019) insert extra feature transformations between model blocks, while
+prefix tuning (Li and Liang, 2021) optimizes parameters through learnable prefixed embeddings
+without modifying the pretrained weights. More recently, LoRA (Hu et al., 2021) introduces low-rank
+
+matrix decomposition to efficiently fine-tune models by updating small, trainable parameter matrices.
+Extensions of LoRA have further explored taskspecific adapters, enabling specialization in distinct
+aspects of text generation (Zhou et al., 2023; Li
+et al., 2024a; ?; ?; Chen et al., 2024a). For example,
+MoELoRA (?) adopts a mixture-of-experts (MoE)
+approach, dynamically selecting different LoRA
+experts based on the input to improve adaptability.
+Unlike these works, our WriterLoRA combines advantages of a mixture-of-LoRA architecture but is
+specifically designed to handle the challenges of
+pastiche novel generation.
+Personalized LLMs. Personalization is crucial
+for enabling LLMs to adapt to individual user preferences and requirements. Existing approaches
+to personalization can be broadly categorized into
+prompt-based methods (Kang et al., 2023; Wang
+et al., 2024a) and PEFT-based methods (Cheng
+et al., 2023; Tan et al., 2024; Yu et al., 2024).
+Prompt-based methods encode user history and behaviors as contextual examples to guide the model’s
+response generation (Kang et al., 2023; Wang et al.,
+2024a). In contrast, PEFT-based methods focus
+on efficiently integrating user-specific preferences
+into LLMs. For example, Tan et al. (2024) introduced PEFT modules to capture and store userspecific behavior patterns and preferences. Further
+research has explored improving generalization and
+efficiency using techniques such as MoE-style gating (Yu et al., 2024), parameter merging strategies (Jang et al., 2023), and iterative learning (Li
+et al., 2023a). Building on these foundations, our
+work extends personalization to stylish novel generation, enabling the model to adapt to complex
+narrative styles and authorial preferences.
+
+3
+
+Problem Formulation
+
+We begin by introducing the notations and key
+concepts for the task of personalized long-form
+novel generation. Formally, the training dataset
+for a novel is hierarchically structured into character profiles, plots, and words. Each character
+profile Ci consists of the i-th character’s name and
+a detailed description, including key traits and relationships with other characters. The narrative text
+is divided into segments of words {xi1 , xi2 , . . . , xin },
+each corresponding to an individual plot summary
+Pj , where j represents the plot index within the
+chapter. These plots {Pj } capture the key story developments within their respective text segments.
+
+The task involves two core subtasks: (1) plot
+prediction, where the model predicts the next
+plot P̂t based on previous plots {P1 , . . . , Pt−1 }
+and ensures logical consistency by comparing
+it to the ground truth plot Pt ; (2) stylish writing, where the model generates a word sequence
+Ŷt = {x̂1 , x̂2 , . . . , x̂n } from the predicted plot
+P̂t and ensures coherence and stylistic alignment
+by comparing it to the ground truth text Yt =
+{x1 , x2 , . . . , xn }.
+
+4
+
+Method
+
+In this section, we first introduce the vanilla LoRA,
+then present our adapted WriterLoRA built on it,
+along with the overall WriterAgent framework, as
+shown in Figure 2.
+4.1
+
+Preliminaries
+
+LoRA fine-tunes LLMs efficiently by adding trainable low-rank matrices instead of updating all parameters, reducing computational cost. Concretely,
+a pre-trained weight matrix W0 ∈ Rd×k is updated
+using a low-rank decomposition W0 + ∆W =
+W0 + BA, where B ∈ Rd×r and A ∈ Rr×k , with
+r ≪ min(d, k). Here, B and A are the trainable
+low-rank matrices, and r represents the rank of the
+decomposition. During training, W0 is frozen and
+does not receive gradient updates, while A and B
+are optimized. Given an input x ∈ Rk , the forward
+pass through the modified weight matrix is:
+h′ = W0 x + ∆Wx = W0 x + BAx.
+
+(1)
+
+Here, A serves as an encoder-like transformation,
+mapping x ∈ Rk into a lower-dimensional representation z ∈ Rr , while B acts as a decoder-like
+transformation, projecting z back into output space.
+4.2
+
+Curriculum Learning Tasks
+
+Our training tasks are inspired by real-world observations of how authors create novels. Typically,
+an author begins by determining the work’s style,
+defining key characters and their traits, outlining
+interactions, and ultimately developing a complete
+narrative based on these plots. Following this natural progression, our model training tasks are designed to emulate this process. First, the model
+is pretrained on a next-word prediction task for
+learning the writing style. Then, we design three
+downstream fine-tuning tasks:
+
+Pretrain
+Stage
+
+Pretrained
+weights
+
++
+x
+
+Language style learning
+
+h
+
+World building
+
+Fine-tuning
+Stage
+
+Harry potter is known as "The Boy Who Lived"
+because he survived a deadly curse from the
+dark wizard Lord Voldemort as a baby....
+
+Pretrained weights
+
+Plot Planning
+freezing.png
+
+𝐵+,-./012,.
+𝐵'()$
+𝐴+,-./012,.
+
+The Worst Birthday
+1. Harry is neglected and
+mistreated…
+
+2. Harry reflects on his
+past…
+
+3. The Dursleys prepare
+for …
+
+He had never imagined such a
+strange, exciting, and wonderful
+year. But there were still so
+many questions left …
+
+Now, as we all know, today
+is a very important day.’
+Harry looked up, hardly
+daring to believe it….
+
+Stylish writing
+Harry was used to spiders,
+because the cupboard under
+the stairs was full of them, …
+
+Curriculum learning
+
+Hermione Granger is one of Harry's best friends and a
+brilliant student at Hogwarts....
+
+𝐵!)"(*
+
+𝐵!"#$#%&
+
+Figure 2: The entire training process can be divided into two parts: the pretraining phase and the fine-tuning phase.
+During the fine-tuning phase, tasks are divided into three stages of increasing complexity: world-building learning,
+plot structure learning, and stylish writing learning. These stages are integrated using curriculum learning.
+
+World-Building Learning In this task, the
+model maps character names, represented as N =
+{N1 , N2 , . . . , Nn }, to their corresponding profiles
+C = {C1 , C2 , . . . , Cn }. For each character name
+Ni , the model generates a detailed profile Ci , including the character’s attributes, relationships, and
+role in the narrative. This process is formulated as:
+Ĉi = fworld (Ni ).
+This task ensures that the model develops a comprehensive understanding of the story world, forming
+the foundation for subsequent tasks.
+Plot Structure Learning Building on the character profiles established in the previous task, this
+step focuses on predicting narrative progression.
+The model is trained to generate the next plot P̂t
+based on the most recent Np predicted plots:
+P̂t = fplot (Pt−Np , ..., Pt−1 ).
+Using the Np most recent plots, the model ensures narrative continuity and coherence within
+the story’s timeline.
+Stylish Writing Following plot prediction, the
+Stylish Writing task involves generating the narrative text based on the predicted plot P̂t .The
+model produces a sequence of words Ŷt =
+{x̂1 , x̂2 , . . . , x̂n } as follows:
+Ŷt = fwriting (P̂t ).
+
+The generated text is then compared with the
+ground truth Yt = {x1 , x2 , . . . , xn }, ensuring coherence with the plot and stylistic alignment with
+the author’s writing.
+4.3
+
+WriterLoRA
+
+A straightforward approach to train an LLM involves sequentially training it on the above tasks
+in a parameter-efficient manner using LoRA. However, this method may fail to optimize task-specific
+performance while maintaining cross-task synergy.
+To address this limitation, we propose WriterLoRA,
+a structured multi-task learning framework that
+maximizes efficiency through shared components
+while ensuring task-specific specialization.
+Shared Foundation Initially, the model undergoes next-word prediction training on the entire
+corpus, using a pair of LoRA matrices, AFdn. and
+BFdn. . Here, AFdn. serves as the shared matrix
+across all tasks, while BFdn. collaborates with taskspecific B-matrices. The motivation for sharing the
+A-matrix is to enhance learning efficiency and task
+synergy. As a compression matrix, AFdn. extracts
+core representations for language understanding
+and generation, ensuring consistency across tasks
+while reducing redundancy and improving crosstask transfer learning. After pretraining, AFdn. is
+fixed to maintain stable representations and prevent
+catastrophic forgetting.
+Task-Specific Adaptations The weight update
+process originally defined in Equation 1 is ex-
+
+tended to account for task-specific requirements,
+beginning with language style learning and progressing through subsequent tasks. The weight
+update process defined in Equation 1 is extended
+to meet task-specific requirements, starting with
+language style learning and progressing through
+world-building, plot structure, and stylish writing
+tasks. During language style learning, the model
+uses BFdn. and AFdn. for next-word prediction, capturing linguistic and stylistic nuances. For worldbuilding, the model maps character names to profiles using Bworld alongside BFdn. to define characters and relationships. In plot structure learning, both Bplot and Bworld are used, where Bplot
+controls narrative flow and Bworld ensures consistency. For stylish writing, Bwriting integrates with
+BFdn. , Bworld , and Bplot to generate coherent, stylistic text.
+The generalized weight update is:
+
+h′ = W0 x + (BFdn. AFdn. +
+
+P
+
+t αt Bt AFdn. ) x.
+
+The task-specific weights αt are computed using:
+exp(wt )
+,
+αt = P
+t′ exp(wt′ )
+where wt = 1 for the active task and wt′ = 0
+for others. This ensures the active task’s matrix
+Bt dominates, while others provide auxiliary contributions, enabling efficient task adaptation and
+knowledge sharing.
+
+5
+
+Experimental Setup
+
+5.1
+
+Dataset
+
+We selected two renowned literary works for our
+dataset: the classic Chinese novel Dream of the Red
+Chamber and the Harry Potter series, chosen for
+their rich narratives and literary significance. For
+Dream of the Red Chamber, the first 80 chapters
+were used for training and the last 40 for testing.
+Similarly, the first six Harry Potter books were used
+for training, with the final book for testing.
+In addition to the primary text, our dataset incorporates supplementary information to enhance its
+utility. First, we collected detailed, human-written
+introductions for the main characters. These character profiles provide valuable context for tasks
+such as role-playing and characterization. Specifically, profiles for Dream of the Red Chamber were
+sourced from Sohu website, while those for Harry
+Potter were obtained from Wikipedia. Secondly,
+
+we used GPT-4 to segment the text into sections
+and generate concise plot summaries for each section. A section is smaller than a chapter but longer
+than a paragraph, with the division based on selfcontained and relatively complete narrative events.
+These summaries offer structured descriptions of
+key narrative developments, supporting tasks such
+as plot-aware content generation.
+5.2
+
+Comparison Methods
+
+We selected ChatGLM and Qwen as backbone
+models for evaluating Chinese language performance, and Llama3 for English tasks. The key
+models included in our comparisons are as follows: (1) Qwen2-7B-Instruct (Bai et al., 2023): An
+instruction-tuned variant of Qwen2-7B, optimized
+for handling complex queries and interactive tasks.
+(2) ChatGLM2-6B (Zhang et al., 2023b): A bilingual LLM optimized for both English and Chinese
+languages. (3) Llama3-8B (Touvron et al., 2023):
+Excels in reasoning, creative writing, and coding
+tasks. We also include fine-tuned LLMs tailored
+for novel generation: (4) LoRA (Hu et al., 2021):
+An efficient fine-tuning method applying low-rank
+updates without modifying all model parameters.
+(5) MoELoRA (Liu et al., 2024a): Combines LoRA
+with MoE architecture, activating subsets of parameters. MoELoRA uses three pairs of A and B
+matrices, each specialized for world building, plot
+learning, or stylish writing.
+5.3
+
+Implementation Details
+
+We implemented our experiments using PyTorch
+and conducted them on an NVIDIA A100 GPU.
+All models were configured with a maximum sequence length and cutoff length of 2048 tokens. We
+trained the model for 3 epochs using the AdamW
+optimizer and BF16 precision for efficiency. The
+learning rate was set to 1.0e-4 and scheduled using
+a cosine decay strategy with a warmup ratio of 0.1.
+A dropout rate of 0.05 was applied to prevent overfitting. The rank r was set to 8 for both LoRA and
+each LoRA module within MoELoRA. To simulate
+a larger batch size, we set the batch size to 1 and
+applied gradient accumulation over 8 steps. More
+implementation details are in Appendix A.
+5.4
+
+Evaluation Metrics
+
+Novel Generation Evaluation: The primary
+goal of our task, novel generation, is evaluated
+using both traditional metrics and six advanced
+aspect-based metrics. Traditional metrics like
+
+Dataset
+
+Model
+
+Dream of the
+Red Chamber
+
+Qwen
+Pretrain(Qwen)
+LoRA(Qwen)
+MoELoRA(Qwen)
+WriterAgent(Qwen)
+
+Harry Potter
+
+ChatGLM
+Pretrain(ChatGLM)
+LoRA(ChatGLM)
+MoELoRA(ChatGLM)
+WriterAgent(ChatGLM)
+Llama
+Pretrain(Llama)
+Lora(Llama)
+MoELoRA(Llama)
+WriterAgent(Llama)
+
+Traditional Metrics
+ROUGE-1 ROUGE-2 ROUGE-L
+17.43
+3.70
+17.57
+20.98
+5.18
+18.83
+31.30
+9.55
+25.58
+23.54
+6.06
+16.30
+34.81
+9.73
+24.11
+15.87
+15.32
+14.58
+15.89
+16.29
+25.17
+26.30
+26.18
+25.43
+29.24
+
+2.32
+2.28
+2.21
+2.98
+3.21
+3.29
+4.29
+6.35
+7.93
+8.79
+
+13.18
+13.46
+12.53
+16.00
+16.01
+16.92
+18.71
+18.97
+20.23
+23.91
+
+LS
+2.80
+2.79
+3.14
+3.00
+3.58
+
+EX
+2.72
+2.68
+2.80
+2.98
+3.25
+
+2.08
+2.37
+2.54
+2.20
+3.03
+2.55
+2.42
+2.56
+2.68
+3.05
+
+1.96
+2.58
+2.60
+2.13
+2.96
+2.64
+2.32
+2.53
+2.58
+2.86
+
+Advanced Metrics
+SLC
+SM
+CBM
+2.96
+2.04
+2.28
+3.07
+2.10
+2.57
+2.78
+2.14
+2.21
+3.02
+2.20
+2.54
+3.27
+3.19
+3.15
+1.96
+2.43
+2.87
+2.31
+2.94
+3.03
+2.95
+2.95
+3.15
+3.29
+
+2.19
+2.23
+2.26
+2.46
+2.59
+3.03
+2.20
+2.53
+3.23
+3.54
+
+1.87
+2.12
+2.30
+1.95
+2.41
+3.04
+2.31
+2.46
+2.95
+3.03
+
+EM
+2.24
+2.53
+2.36
+2.58
+3.12
+1.79
+2.05
+2.23
+1.81
+2.40
+2.85
+2.26
+2.45
+2.53
+2.75
+
+Table 1: Performance comparison of baseline models and our WriterAgent on two classic literary datasets, Harry
+Potter (English) and Dream of the Red Chamber (Chinese), evaluated for personalized long-form novel generation.
+The scores are represented as follows: best and second . Numbers in bold mean that the improvement to the best
+baseline is statistically significant (a two-tailed paired t-test with p-value <0.01).
+
+Dataset
+
+Dream of the
+Red Chamber
+
+Harry Potter
+
+Qwen
+Pretrain(Qwen)
+LoRA(Qwen)
+MoELoRA(Qwen)
+WriterAgent(Qwen)
+
+Advanced Metrics
+SM
+CBM
+EM
+1.89
+2.17
+2.18
+1.94
+2.13
+2.26
+1.97
+2.14
+2.29
+2.01
+2.23
+2.35
+2.14
+2.54
+2.78
+
+ChatGLM
+Pretrain(ChatGLM)
+LoRA(ChatGLM)
+MoELoRA(ChatGLM)
+WriterAgent(ChatGLM)
+Llama
+Pretrain(Llama)
+LoRA(Llama)
+MoELoRA(Llama)
+WriterAgent(Llama)
+
+1.78
+1.86
+1.80
+1.88
+1.86
+1.97
+2.06
+2.03
+2.08
+2.10
+
+Model
+
+1.56
+1.75
+1.79
+1.83
+1.91
+1.86
+1.95
+2.01
+2.11
+2.13
+
+1.43
+1.53
+1.60
+1.72
+1.82
+1.49
+1.56
+1.76
+1.85
+1.87
+
+Table 2: Scores for plot prediction ability, with best
+highlighting and bold denoting statistically significant
+improvement (p-value <0.01).
+
+ROUGE-N and ROUGE-L (Lin, 2004) assess
+content coverage, fluency, and structural alignment. ROUGE-N measures n-gram overlap, while
+ROUGE-L evaluates the longest common subsequence to capture broader structural coherence.
+Beyond these traditional measures, we introduce
+six advanced aspect-based metrics to evaluate both
+writing style and plot development. These aspects
+are derived from human observations of a randomly
+selected set of 100 samples. Writing style evaluation includes: Language Style (LS), which assesses
+similarity in vocabulary choices, sentence structures, tone, and voice; Expression Methods (EX),
+which evaluates consistency in emotional expression, descriptive techniques, and use of metaphors;
+Sentence Length and Complexity (SLC), which
+
+compares sentence structures, their complexity, and
+overall paragraph organization. Plot development
+evaluation includes: Story Mainline (SM), which
+measures the alignment and coherence of the central plotline; Character Behavior and Motivation
+(CBM), which examines whether character actions
+and motivations are logically consistent with the
+story’s progression; Emotions (EM), which evaluates the emotional flow and conflict dynamics
+within the text. Given the high correlation of GPT4o with human judgments, particularly for creative
+NLG tasks (Wang et al., 2023), we adopt both GPT4o-based scoring and human evaluation. GPT-4o
+rates each generated text from 1 to 5, based on comparison with the ground truth. For the full content,
+please refer to Appendix E
+Plot Planning Evaluation: As an intermediate
+step crucial to creating a well-structured and engaging narrative, plot planning is evaluated using a
+subset of advanced aspect-based metrics centered
+on plot coherence. Specifically, SM, CBM, and
+EPM are applied. The evaluation follows the same
+GPT-4o-based scoring setup as described earlier.
+
+6
+
+Experimental Results
+
+6.1
+
+Main results
+
+Table 1 and Table 2 present the experimental results of Qwen-2, Pretrain, SFT, MoELoRA, and
+WriterAgent across two datasets.
+Firstly, evaluation results reveal that different
+metrics capture complementary aspects of writ-
+
+Analysis:
+• The characters in the article align with their original settings, and the concerns of Jia Lian,
+Lady Wang, and others about Jia Zheng's financial situation while serving as an official are
+correctly expressed.
+• However, some writing details and stylistic elements do not match the original text.
+• Additionally, certain plot developments in the article deviate from the original storyline.
+Curriculum1: world building
+
+Analysis:
+• The article correctly conveys the character relationships and highlights Feng
+Jie’s greedy nature.
+• The plot progression is more reasonable, such as Jia Zheng needing money for
+his official duties and Feng Jie lending money to improve the financial situation.
+• However, the writing style has declined compared to the full model.
+
+Curriculum1 + Curriculum2: plot prediction, w/o Curriculum3: stylish writing
+
+Generated: The following day, Jia Lian, accompanied by his family, visited the Ningguo
+Mansion to discuss the matter with Jia She. Knowing Jia Lian to be shrewd and capable, and
+possessing ample wealth himself, Jia She readily agreed to lend Jia Lian a sum of silver to serve
+as Jia Zheng's financial support during his tenure away from home. Jia Lian was deeply grateful
+and expressed his thanks repeatedly, while also proposing to mortgage part of the family's
+property as collateral…
+
+WriterAgent
+
+Generated: Furthermore, send for your wives and have each of them contribute one
+hundred taels of silver, making a total of one thousand taels. You go lend money at
+high interest. And the interest will naturally be yours."At that moment, Feng Jie
+was in the inner room. Upon hearing Jia Lian come in to report, she immediately
+understood his purpose and quickly ordered tea to be prepared…
+
+Figure 3: Demonstration of the model’s stepwise learning on Dream of the Red Chamber: from curriculum 1 to
+curriculum 1 & 2. The text colors indicate the corresponding problems. Chinese version is in Appendix 11.
+4.00
+
+w/o Curriculum Learn
+w/o WriterLora
+w/o freezed AFdn
+WriterAgent
+
+3.75
+3.50
+
+Score
+
+3.25
+3.00
+2.75
+2.50
+2.25
+2.00
+
+LS
+
+EM
+
+SLC
+
+SM
+
+CBM
+
+EM
+
+tured progression reduces the model’s effectiveness.
+Similarly, removing WriterLoRA with only one
+LoRA weakened task-specific adaptation, reducing
+the model’s ability to handle diverse constraints.
+Finetuning the foundation matrix Af dn. instead of
+keeping it fixed led to performance degradation,
+showing the importance of a stable foundation for
+consistent improvements.
+
+Figure 4: Ablation performance of WriterAgent.
+
+6.3
+ing quality. ROUGE favors models like LoRA
+for content coverage and structural alignment,
+while aspect-based metrics highlight Pretrain and
+MoELoRA’s strengths in plot coherence and emotional tone. This underscores the need for diverse
+evaluation frameworks to fully assess model performance. Secondly, MoELoRA, the best-performing
+baseline, benefits from specialized multi-task training, producing coherent plots and well-aligned
+emotional tones, but its language style is not wellpreserved due to the loss of pre-trained textual style
+during multi-task learning. Finally, our proposed
+WriterAgent consistently outperforms all baselines
+across datasets and metrics, achieving significant
+improvements in plot coherence, character development, emotional depth, and overall narrative quality.
+Additionally, it addresses MoELoRA’s language
+style limitation by freezing the matrix A, thereby
+preserving the pre-trained writing style and ensuring stylistic consistency in the generated narratives.
+6.2
+
+Ablation Study
+
+We conduct an ablation study on Dream of the
+Red Chamber to evaluate the impact of different
+learning strategies and LoRA configurations in our
+model, as shown in Figure 4. Removing the curriculum learning strategy led to a significant performance drop across all metrics, showing that
+learning all tasks simultaneously without a struc-
+
+Analysis of Curriculum Learning
+
+Our curriculum learning consists of three stages:
+world building, plot prediction, and stylish writing. Figure 3 presents a case study showing the
+model’s output after each stage. After curriculum 1
+(world building), the generated text demonstrates
+characters and traits that closely align with the original work’s character settings. However, the plot
+structure and textual details remain significantly
+different from the original. After curriculum 2 (plot
+prediction), the output retains the vivid character
+traits learned in the first stage. For instance, Wang
+Xifeng is depicted as highly fond of wealth and
+enthusiastic about managing the household, consistent with her original portrayal. However, since
+the plot construction relies on modern vernacular
+organization, the model’s ability to capture writing
+details and mimic the original literary style is insufficient. Finally, after incorporating the final step
+of curriculum learning, the overall performance improves significantly in terms of word choice, plot
+structure, and style, as shown in Figure 5. We
+present Chinese output in Figure 11.
+6.4
+
+Human Evaluation
+
+In addition to automatic evaluation, we conducted
+a human evaluation with two PhD annotators,
+both native speakers with strong literary backgrounds. They select the best-performed model
+on the Dream of the Red Chamber dataset. The re-
+
+Reference
+• Concise language with a classical Chinese style, avoiding
+excessive embellishment.
+Jia Lian went to see Lady Wang and reported everything in detail...
+Lady Wang said, "Have you confirmed it? If this is true, and the ministry of personnel agrees, the whole family can be at ease... Otherwise, I fear those scoundrels
+might bring disaster upon •him."
+Lady Wang is not Jia Lian’s mother.
+Jia Lian asked, "Madam, how your second uncle took an external post, he hasn’t brought back a single coin... Look at those who followed the master—after just a
+short time, their condo you know?"
+Lady Wang replied, "Ever since cubines are all adorned in gold and silver... If things go wrong, not only will he lose his position, but even our ancestors' official ranks
+might be erased."
+Jia Lian said, "Madam is absolutely right... It would be best for the master to serve as a capital official, living peacefully for a few years, so his reputation can be
+preserved for a lifetime..."
+• Restrained tone, focusing on family interests rather
+than emotional expression.
+• Lady Wang is not Jia Lian’s mother.
+Jia Lian waited at home for Lady Wang’s summons… He carefully adjusted his attire and cautiously stepped into Lady Wang’s study. After paying his respects, he slowly
+said, "Mother, I have come regarding the arrangements for my father’s appointment as a capital official."
+Lady Wang nodded slightly and said softly, “Your father has served in an external post for many years. Now that he is returning to the capital, proper arrangements
+must be made to ensure a smooth official career… However, I still have some doubts—can you uphold our family’s reputation in your position at the capital?"
+…She gently stroked the jade ruyi on the table, pondered for a moment, and then slowly said, "You are the hope of the Jia family."
+Qwen
+
+LoRA
+
+• Shifted focus from political risks to financial issues.
+
+• Modernized language deviate from the original style.
+
+Jia Lian, preparing to return to the capital for arrangements, went to Lady Wang and spoke briefly about the matters at hand.
+Lady Wang said, "I only worry that once you’re there, you won’t know where to get the money to handle things."
+Jia Lian smiled and replied, "There is now a way… The yamen in the capital is crowded, unlike the provinces, where most officials are from the same region and easier
+to negotiate with."
+Lady Wang said, "If that is the case, go back and inform your father immediately…" • Jia Zheng is not Jia Lian’s father.
+MoELoRA
+Jia Lian said, "While the master was away, I went to the yamen and spoke… They simply announced that he had been promoted again, so no one dared to challenge
+him. This not only enhances his prestige but also increases the household’s monthly stipend by several dozen taels of silver… In just half a year, we've earned far more
+• Lady Wang is too trusting, lacking the caution in the original.
+than the previous year."
+Upon hearing this, Lady Wang's worries turned to relief… She considered that capital officials had no official salary, but as long as the household had enough to cover
+living expenses, this extra income would help support the family. She quickly asked, "How much is the monthly stipend?"
+Jia Lian smiled and said, "The master himself doesn’t receive much, but an additional 130 taels have been added to the household stipend… With another 64 taels
+for daily expenses, the total now exceeds 1,100 taels per month. Besides, the master has no small responsibilities outside, and his men are loyal enough to serve
+him without hesitation, so there’s little to fear."
+• Shifted focus from political risks to financial issues.
+WriterAgent
+Jia Lian went to Lady Wang and reported, “I recently heard that the master has encountered financial shortfalls while serving in his outside post capital. I fear that
+once he returns to the imperial court, it may be difficult to handle the situation properly. That is why I have come to seek your advice… If the master serves as an
+• his
+Restrained
+tone, focusing on family interests rather than emotional expression.
+official in the capital, it would not only spare many troubles but also help preserve
+reputation."
+Lady Wang was momentarily stunned upon hearing this, then chuckled, "You child, what kind of ideas are you coming up with again? Do you mean to say that just
+because the master is serving outside, he must resort to corruption?"
+Jia Lian quickly smiled and replied, "Madam, how could I mean that! It is merely for the sake of appearances that I have come up with this suggestion… Besides, if the
+master is posted outside, there must be someone to assist him." • Correct character relationship
+Lady Wang nodded, "That is true. But the question is, who can be trusted with such matters?"
+
+Figure 5: Comparison of reference and generated texts from the baseline and our WriterAgent. We highlight
+the weaknesses of the baseline model and the strengths of our approach. Some linguistic nuances may be lost in
+translation; see Figure 10 in the Appendix (Chinese) for accuracy.
+
+sults indicate that our model was preferred in 73.1%
+of cases, achieving a Kappa score of 0.78, which
+signifies substantial agreement. See Figure 12 in
+the Appendix for details.
+In Figure 5, we present a case study of the generated novel text and categorize common errors
+in baseline models. First, character relationship
+errors frequently occur, leading to misinterpretations of key familial roles. For instance, baselines
+such as Qwen and LoRA misidentify Lady Wang
+as Jia Lian’s mother, distorting the intricate family
+dynamics in Dream of the Red Chamber. Second,
+plot inconsistencies arise, where baselines shift
+core narrative elements. For example, LoRA and
+MoELoRA prioritize financial matters over official duties, altering the intended thematic focus
+and disrupting the novel’s structured storytelling.
+Third, stylistic deviations are prevalent, as baselines modernize language, losing conciseness and
+tradition; for example, Qwen adds “hope of the
+Jia family”, disrupting the reserved tone. Additionally, errors in emotional tone make dialogues
+
+overly sentimental and expressive, diverging from
+the novel’s subtle and restrained emotional depth.
+In contrast, our model ensures plot consistency, preserves character relationships and power dynamics,
+and maintains classical language and restrained
+emotion, staying true to Lady Wang’s focus on
+political risks and family reputation. We present
+further analysis in Appendix C, with Harry Potter
+cases in Appendix B.
+
+7
+
+Conclusion
+
+We introduce WriterAgent, an LLM designed for
+novel generation by learning character profiles, predicting plotlines, and reconstructing full stories.
+Unlike traditional models reliant on prompt engineering, WriterAgent internalizes novel-related
+knowledge, reducing external dependencies. At its
+core, WriterLoRA employs LoRA modules and curriculum learning to progressively master narrative
+elements, enhancing coherence and stylistic consistency. Experiments on two datasets show that
+
+WriterAgent outperforms baselines in capturing
+complex settings and character dynamics. In the
+future, we aim to extend WriterAgent’s capabilities
+to broader literary genres and refine its adaptability
+across diverse storytelling styles.
+
+Limitation
+Despite the effectiveness of WriterAgent in generating pastiche novels, several limitations remain.
+First, while determining the plot before drafting is
+a natural part of the writing process, plots typically
+exist in the author’s mind rather than as explicit,
+structured data. As a result, we need to manually
+construct plot datasets, which introduces potential
+biases and may not fully capture the organic, evolving nature of storytelling. Second, automatic evaluation heavily relies on LLMs’ ability to understand
+an author’s style, yet current LLMs do not possess
+comprehensive knowledge of all literary nuances.
+To mitigate this, we incorporated few-shot prompting in our evaluation, allowing the model to refine
+its understanding of specific authors. However, this
+approach is still limited and cannot fully replace
+human judgment, as LLM-based evaluation may
+overlook deeper stylistic elements and narrative
+coherence that human readers naturally perceive.
+These limitations highlight the challenges in literary pastiche generation and evaluation, underscoring the need for future research on more refined
+plot modeling and improved evaluation frameworks
+that better align with human literary perception.
+Ethical Considerations The development of
+WriterAgent involves certain ethical considerations,
+primarily regarding intellectual property, authenticity, and responsible use. Our goal is to learn
+and emulate an author’s style rather than directly
+replicate their work, and we prioritize fairness and
+compliance when working with copyrighted texts.
+Additionally, generating text that closely resembles an author’s writing style may raise discussions
+about authenticity. Therefore, we encourage responsible usage and advocate for AI to function as
+an assistive tool in a collaborative creative environment, fostering literary diversity while respecting
+the original authors’ writing styles and creative
+spirit. To this end, we can implement measures
+such as limiting outputs to derivative or transformative works, providing transparency about AIgenerated content, and ensuring that the system
+serves as a tool for creative inspiration rather than
+a substitute for human authorship.
+
+References
+Nader Akoury, Shufan Wang, Josh Whiting, Stephen
+Hood, Nanyun Peng, and Mohit Iyyer. 2020. Storium: A dataset and evaluation platform for machinein-the-loop story generation. In Proc. of EMNLP,
+pages 6470–6484.
+Prithviraj Ammanabrolu, Wesley Cheung, Dan Tu,
+William Broniec, and Mark O. Riedl. 2020. Bringing
+stories alive: Generating interactive fiction worlds.
+CoRR.
+Jinze Bai, Shuai Bai, Yunfei Chu, Zeyu Cui, Kai Dang,
+Xiaodong Deng, Yang Fan, Wenbin Ge, Yu Han, Fei
+Huang, et al. 2023. Qwen technical report. arXiv
+preprint arXiv:2309.16609.
+Yushi Bai, Jiajie Zhang, Xin Lv, Linzhi Zheng, Siqi Zhu,
+Lei Hou, Yuxiao Dong, Jie Tang, and Juanzi Li. 2024.
+Longwriter: Unleashing 10,000+ word generation
+from long context llms.
+Dan Biderman, Jacob Portes, Jose Javier Gonzalez Ortiz,
+Mansheej Paul, Philip Greengard, Connor Jennings,
+Daniel King, Sam Havens, Vitaliy Chiley, Jonathan
+Frankle, et al. 2024. Lora learns less and forgets less.
+arXiv preprint arXiv:2405.09673.
+Yupeng Chang, Xu Wang, Jindong Wang, Yuan Wu,
+Linyi Yang, Kaijie Zhu, Hao Chen, Xiaoyuan Yi,
+Cunxiang Wang, Yidong Wang, et al. 2024. A survey on evaluation of large language models. ACM
+Transactions on Intelligent Systems and Technology,
+pages 1–45.
+Xiuying Chen, Mingzhe Li, Shen Gao, Xin Cheng,
+Qingqing Zhu, Rui Yan, Xin Gao, and Xiangliang
+Zhang. 2024a. Flexible and adaptable summarization
+via expertise separation. In Proceedings of the 47th
+International ACM SIGIR Conference on Research
+and Development in Information Retrieval, pages
+2018–2027.
+Xiuying Chen, Daorui Xiao, Shen Gao, Guojun Liu,
+Wei Lin, Bo Zheng, Dongyan Zhao, and Rui Yan.
+2019. Rpm-oriented query rewriting framework for
+e-commerce keyword-based sponsored search. Proc.
+of AAAI.
+Xuanting Chen, Junjie Ye, Can Zu, Nuo Xu, Rui Zheng,
+Minlong Peng, Jie Zhou, Tao Gui, Qi Zhang, and
+Xuanjing Huang. 2023. How robust is gpt-3.5 to predecessors? a comprehensive study on language understanding tasks. arXiv preprint arXiv:2303.00293.
+Zhipeng Chen, Kun Zhou, Wayne Xin Zhao, Junchen
+Wan, Fuzheng Zhang, Di Zhang, and Ji-Rong Wen.
+2024b. Improving large language models via finegrained reinforcement learning with minimum editing constraint. arXiv preprint arXiv:2401.06081.
+Xin Cheng, Shen Gao, Yuchi Zhang, Yongliang Wang,
+Xiuying Chen, Mingzhe Li, Dongyan Zhao, and
+Rui Yan. 2023. Towards personalized review summarization by modeling historical reviews from
+
+customer and product separately. arXiv preprint
+arXiv:2301.11682.
+Wei-Lin Chiang, Zhuohan Li, Zi Lin, Ying Sheng,
+Zhanghao Wu, Hao Zhang, Lianmin Zheng, Siyuan
+Zhuang, Yonghao Zhuang, Joseph E Gonzalez, et al.
+2023. Vicuna: An open-source chatbot impressing
+gpt-4 with 90%* chatgpt quality. See https://vicuna.
+lmsys. org (accessed 14 April 2023), page 6.
+Clement Christophe, Praveenkumar Kanithi, Prateek
+Munjal, Tathagata Raha, Nasir Hayat, Ronnie Rajan, Ahmed Al Mahrooqi, Avani Gupta, Muhammad Umar Salman, Marco AF Pimentel, et al.
+Med42-evaluating fine-tuning strategies for medical llms: Full-parameter vs. parameter-efficient approaches. In Proc. of AAAI.
+Shizhe Diao, Tianyang Xu, Ruijia Xu, Jiawei Wang,
+and Tong Zhang. 2023. Mixture-of-domain-adapters:
+Decoupling and injecting domain knowledge to pretrained language models’ memories. In Proc. of ACL,
+pages 5113–5129.
+Ning Ding, Yujia Qin, Guang Yang, Fuchao Wei, Zonghan Yang, Yusheng Su, Shengding Hu, Yulin Chen,
+Chi-Min Chan, Weize Chen, et al. 2023. Parameterefficient fine-tuning of large-scale pre-trained language models. Nature Machine Intelligence, pages
+220–235.
+Angela Fan, Mike Lewis, and Yann Dauphin. 2018.
+Hierarchical neural story generation. In Proc. of
+ACL.
+Angela Fan, Mike Lewis, and Yann N. Dauphin. 2019.
+Strategies for structuring story generation. CoRR.
+Lu Fan, Qimai Li, Bo Liu, Xiao-Ming Wu, Xiaotong
+Zhang, Fuyu Lv, Guli Lin, Sen Li, Taiwei Jin, and
+Keping Yang. 2022. Modeling user behavior with
+graph convolution for personalized product search.
+In Proceedings of the ACM Web Conference 2022,
+pages 203–212.
+Yingqiang Ge, Wenyue Hua, Kai Mei, Juntao Tan,
+Shuyuan Xu, Zelong Li, Yongfeng Zhang, et al. 2024.
+Openagi: When llm meets domain experts. Proc. of
+NeurIPS.
+Louie Giray. 2023. Prompt engineering with chatgpt:
+a guide for academic writers. Annals of biomedical
+engineering, pages 2629–2633.
+Yuxian Gu, Li Dong, Furu Wei, and Minlie Huang.
+2023. Knowledge distillation of large language models. arXiv preprint arXiv:2306.08543.
+Yuxian Gu, Li Dong, Furu Wei, and Minlie Huang. 2024.
+Minillm: Knowledge distillation of large language
+models. In Proc. of ICLR.
+Senyu Han, Lu Chen, Li-Min Lin, Zhengshan Xu, and
+Kai Yu. 2024. IBSEN: Director-actor agent collaboration for controllable and interactive drama script
+generation. In Proc. of ACL, pages 1607–1619.
+
+Junxian He, Chunting Zhou, Xuezhe Ma, Taylor BergKirkpatrick, and Graham Neubig. Towards a unified
+view of parameter-efficient transfer learning. In Proc.
+of ICLR.
+Neil Houlsby, Andrei Giurgiu, Stanislaw Jastrzebski,
+Bruna Morrone, Quentin De Laroussilhe, Andrea
+Gesmundo, Mona Attariyan, and Sylvain Gelly. 2019.
+Parameter-efficient transfer learning for nlp. In Proc.
+of ICML, pages 2790–2799.
+Beizhe Hu, Qiang Sheng, Juan Cao, Yuhui Shi, Yang
+Li, Danding Wang, and Peng Qi. 2024a. Bad actor,
+good advisor: Exploring the role of large language
+models in fake news detection. In Proc. of AAAI,
+pages 22105–22113.
+Edward J Hu, Phillip Wallis, Zeyuan Allen-Zhu,
+Yuanzhi Li, Shean Wang, Lu Wang, Weizhu Chen,
+et al. 2021. Lora: Low-rank adaptation of large language models. In Proc. of ICLR.
+Xiang Hu, Hongyu Fu, Jinge Wang, Yifeng Wang,
+Zhikun Li, Renjun Xu, Yu Lu, Yaochu Jin, Lili Pan,
+and Zhenzhong Lan. 2024b. Nova: An iterative planning and search approach to enhance novelty and
+diversity of llm generated ideas.
+Tenghao Huang, Ehsan Qasemi, Bangzheng Li,
+He Wang, Faeze Brahman, Muhao Chen, and
+Snigdha Chaturvedi. 2023. Affective and dynamic
+beam search for story generation. In Proc. of EMNLP
+Findings, pages 11792–11806.
+Joel Jang, Seungone Kim, Bill Yuchen Lin, Yizhong
+Wang, Jack Hessel, Luke Zettlemoyer, Hannaneh
+Hajishirzi, Yejin Choi, and Prithviraj Ammanabrolu.
+2023. Personalized soups: Personalized large language model alignment via post-hoc parameter merging.
+Wang-Cheng Kang, Jianmo Ni, Nikhil Mehta, Maheswaran Sathiamoorthy, Lichan Hong, Ed Chi, and
+Derek Zhiyuan Cheng. 2023. Do llms understand
+user preferences? evaluating llms on user rating prediction.
+Nitish Shirish Keskar, Bryan McCann, Lav R Varshney,
+Caiming Xiong, and Richard Socher. 2019. Ctrl: A
+conditional transformer language model for controllable generation. In Proc. of ICML.
+Cheng Li, Mingyang Zhang, Qiaozhu Mei, Yaqing
+Wang, Spurthi Amba Hombaiah, Yi Liang, and
+Michael Bendersky. 2023a. Teach llms to personalize – an approach inspired by writing education.
+Dengchun Li, Yingzi Ma, Naizheng Wang, Zhengmao
+Ye, Zhiyuan Cheng, Yinghao Tang, Yan Zhang, Lei
+Duan, Jie Zuo, Cal Yang, and Mingjie Tang. 2024a.
+Mixlora: Enhancing large language models finetuning with lora-based mixture of experts.
+Mingzhe Li, Xiuying Chen, Jing Xiang, Qishen Zhang,
+Changsheng Ma, Chenchen Dai, Jinxiong Chang,
+
+Zhongyi Liu, and Guannan Zhang. 2024b. Multiintent attribute-aware text matching in searching. In
+Proc. of WSDM, pages 360–368.
+Xiang Lisa Li and Percy Liang. 2021. Prefix-tuning:
+Optimizing continuous prompts for generation. ACL.
+Xuanlin Li, Yunhao Fang, Minghua Liu, Zhan Ling,
+Zhuowen Tu, and Hao Su. 2023b. Distilling large
+vision-language model with out-of-distribution generalizability. In Proc. of ICCV, pages 2492–2503.
+Chen Liang, Simiao Zuo, Qingru Zhang, Pengcheng He,
+Weizhu Chen, and Tuo Zhao. 2023. Less is more:
+Task-aware layer-wise distillation for language model
+compression. In Proc. of ICML, pages 20852–20867.
+
+Yijia Shao, Yucheng Jiang, Theodore A. Kanell, Peter
+Xu, Omar Khattab, and Monica S. Lam. 2024. Assisting in writing wikipedia-like articles from scratch
+with large language models.
+Michael Stewart, Melinda Hodkiewicz, and Sirui Li.
+2023. Large language models for failure mode
+classification: an investigation. arXiv preprint
+arXiv:2309.08181.
+Zhaoxuan Tan, Qingkai Zeng, Yijun Tian, Zheyuan Liu,
+Bing Yin, and Meng Jiang. 2024. Democratizing
+large language models via personalized parameterefficient fine-tuning. In Proc. of EMNLP, pages 6476–
+6491.
+
+Chin-Yew Lin. 2004. Rouge: A package for automatic
+evaluation of summaries. In Text summarization
+branches out, pages 74–81.
+
+Rohan Taori, Ishaan Gulrajani, Tianyi Zhang, Yann
+Dubois, Xuechen Li, Carlos Guestrin, Percy Liang,
+and Tatsunori B Hashimoto. 2023. Stanford alpaca:
+An instruction-following llama model.
+
+Tianwei Lin, Jiang Liu, Wenqiao Zhang, Zhaocheng
+Li, Yang Dai, Haoyuan Li, Zhelun Yu, Wanggui He,
+Juncheng Li, Hao Jiang, Siliang Tang, and Yueting
+Zhuang. 2024. Teamlora: Boosting low-rank adaptation with expert collaboration and competition.
+
+Inar Timiryasov and Jean-Loup Tastet. 2023. Baby
+llama: knowledge distillation from an ensemble of
+teachers trained on a small dataset with no performance penalty. arXiv preprint arXiv:2308.02019.
+
+Qidong Liu, Xian Wu, Xiangyu Zhao, Yuanshao Zhu,
+Derong Xu, Feng Tian, and Yefeng Zheng. 2024a.
+When moe meets llms: Parameter efficient finetuning for multi-task medical applications. In Proc.
+of SIGIR, pages 1104–1114.
+
+Hugo Touvron, Louis Martin, Kevin Stone, Peter Albert, Amjad Almahairi, Yasmine Babaei, Nikolay
+Bashlykov, Soumya Batra, Prajjwal Bhargava, Shruti
+Bhosale, et al. 2023. Llama 2: Open foundation and fine-tuned chat models. arXiv preprint
+arXiv:2307.09288.
+
+Qidong Liu, Xian Wu, Xiangyu Zhao, Yuanshao Zhu,
+Derong Xu, Feng Tian, and Yefeng Zheng. 2024b.
+When moe meets llms: Parameter efficient finetuning for multi-task medical applications.
+I Loshchilov. 2017. Decoupled weight decay regularization. arXiv preprint arXiv:1711.05101.
+Tongxu Luo, Jiahe Lei, Fangyu Lei, Weihao Liu, Shizhu
+He, Jun Zhao, and Kang Liu. 2024. Moelora:
+Contrastive learning guided mixture of experts on
+parameter-efficient fine-tuning for large language
+models.
+Yan Ma, Yu Qiao, and Pengfei Liu. 2024. Mops: Modular story premise synthesis for open-ended automatic
+story generation. ACL.
+Yubo Ma, Yixin Cao, Yong Hong, and Aixin Sun. 2023.
+Large language model is not a good few-shot information extractor, but a good reranker for hard samples!
+In Proc. of EMNLP Findings, pages 10572–10601.
+Nanyun Peng, Marjan Ghazvininejad, Jonathan May,
+and Kevin Knight. 2018. Towards controllable story
+generation. In Proceedings of the First Workshop on
+Storytelling, pages 43–49.
+Bhavani Shankar, Preethi Jyothi, and Pushpak Bhattacharyya. 2024. In-context mixing (icm): Codemixed prompts for multilingual llms. In Proc. of
+ACL, pages 4162–4176.
+
+Danqing Wang, Kevin Yang, Hanlin Zhu, Xiaomeng
+Yang, Andrew Cohen, Lei Li, and Yuandong Tian.
+2024a. Learning personalized alignment for evaluating open-ended text generation.
+Jiaan Wang, Yunlong Liang, Fandong Meng, Zengkui
+Sun, Haoxiang Shi, Zhixu Li, Jinan Xu, Jianfeng Qu,
+and Jie Zhou. 2023. Is chatgpt a good nlg evaluator?
+a preliminary study.
+Yichen Wang, Kevin Yang, Xiaoming Liu, and Dan
+Klein. Improving pacing in long-form story planning.
+In Proc. of EMNLP.
+Zheng Wang, Shu Xian Teo, Jieer Ouyang, Yongjun
+Xu, and Wei Shi. 2024b. M-rag: Reinforcing
+large language model performance through retrievalaugmented generation with multiple partitions. ACL.
+Jason Wei, Yi Tay, Rishi Bommasani, Colin Raffel,
+Barret Zoph, Sebastian Borgeaud, Dani Yogatama,
+Maarten Bosma, Denny Zhou, Donald Metzler, et al.
+2022. Emergent abilities of large language models.
+arXiv preprint arXiv:2206.07682.
+Zhiheng Xi, Wenxiang Chen, Xin Guo, Wei He, Yiwen
+Ding, Boyang Hong, Ming Zhang, Junzhe Wang,
+Senjie Jin, Enyu Zhou, et al. 2023. The rise and
+potential of large language model based agents: A
+survey. arXiv preprint arXiv:2309.07864.
+
+Can Xu, Qingfeng Sun, Kai Zheng, Xiubo Geng,
+Pu Zhao, Jiazhan Feng, Chongyang Tao, and Daxin
+Jiang. 2023. Wizardlm: Empowering large language models to follow complex instructions. arXiv
+preprint arXiv:2304.12244.
+
+Zhengyan Zhang, Zhiyuan Zeng, Yankai Lin, Huadong
+Wang, Deming Ye, Chaojun Xiao, Xu Han, Zhiyuan
+Liu, Peng Li, Maosong Sun, et al. 2023c. Plug-andplay knowledge injection for pre-trained language
+models. In Proc. of ACL, pages 10641–10658.
+
+Shicheng Xu, Liang Pang, Mo Yu, Fandong Meng,
+Huawei Shen, Xueqi Cheng, and Jie Zhou. 2024a.
+Unsupervised information refinement training of
+large language models for retrieval-augmented generation. ACL.
+
+Wayne Xin Zhao, Kun Zhou, Junyi Li, Tianyi Tang,
+Xiaolei Wang, Yupeng Hou, Yingqian Min, Beichen
+Zhang, Junjie Zhang, Zican Dong, et al. 2023. A
+survey of large language models. arXiv preprint
+arXiv:2303.18223.
+
+Xiaohan Xu, Ming Li, Chongyang Tao, Tao Shen,
+Reynold Cheng, Jinyang Li, Can Xu, Dacheng Tao,
+and Tianyi Zhou. 2024b. A survey on knowledge
+distillation of large language models. arXiv preprint
+arXiv:2402.13116.
+Hongyang Yang, Xiao-Yang Liu, and Christina
+Dan Wang. 2023. Fingpt: Open-source financial
+large language models. FinLLM at IJCAI.
+Lili Yao, Nanyun Peng, Ralph Weischedel, Kevin
+Knight, Dongyan Zhao, and Rui Yan. 2019. Planand-write: Towards better automatic storytelling. In
+Proc. of AAAI, pages 7378–7385.
+Junjie Ye, Xuanting Chen, Nuo Xu, Can Zu, Zekai Shao,
+Shichun Liu, Yuhan Cui, Zeyang Zhou, Chao Gong,
+Yang Shen, et al. 2023. A comprehensive capability
+analysis of gpt-3 and gpt-3.5 series models. arXiv
+preprint arXiv:2303.10420.
+Xiaoyan Yu, Tongxu Luo, Yifan Wei, Fangyu Lei, Yiming Huang, Hao Peng, and Liehuang Zhu. 2024.
+Neeko: Leveraging dynamic LoRA for efficient
+multi-character role-playing agent. In Proc. of
+EMNLP, pages 12540–12557.
+Zheng Yuan, Hongyi Yuan, Chuanqi Tan, Wei Wang,
+Songfang Huang, and Fei Huang. 2023. Rrhf:
+Rank responses to align language models with
+human feedback without tears. arXiv preprint
+arXiv:2304.05302.
+Cyril Zakka, Rohan Shad, Akash Chaurasia, Alex R
+Dalal, Jennifer L Kim, Michael Moor, Robyn Fong,
+Curran Phillips, Kevin Alexander, Euan Ashley,
+et al. 2024. Almanac—retrieval-augmented language models for clinical medicine. NEJM AI, page
+AIoa2300068.
+Qingru Zhang, Minshuo Chen, Alexander Bukharin,
+Nikos Karampatziakis, Pengcheng He, Yu Cheng,
+Weizhu Chen, and Tuo Zhao. 2023a. Adalora: Adaptive budget allocation for parameter-efficient finetuning. ICLR.
+Xiyuan Zhang, Xinyue Zhang, and Ying Yu. 2023b.
+Chatglm-6b fine-tuning for cultural and creative products advertising words. In 2023 International Conference on Culture-Oriented Science and Technology
+(CoST), pages 291–295.
+
+Juexiao Zhou, Xiuying Chen, and Xin Gao. 2023. Path
+to medical agi: Unify domain-specific medical llms
+with the lowest cost. medRxiv, pages 2023–06.
+Xiaoling Zhou, Wei Ye, Yidong Wang, Chaoya Jiang,
+Zhemg Lee, Rui Xie, and Shikun Zhang. 2024. Enhancing in-context learning via implicit demonstration augmentation. In Proc. of ACL, pages 2810–
+2828.
+Yicheng Zou, Hongwei Liu, Tao Gui, Junzhe Wang,
+Qi Zhang, Meng Tang, Haixiang Li, and Daniell
+Wang. 2022. Divide and conquer: Text semantic
+matching with disentangled keywords and intents. In
+Proc. of ACL Findings, pages 3622–3632.
+
+A
+
+Implementation Details
+
+The training progress was monitored every 10 steps,
+with checkpoints saved every 500 steps to enable
+recovery and evaluation. Loss curves were plotted to track convergence, with the output directory
+overwritten during updates to maintain consistency.
+To improve efficiency, data preprocessing utilized 8
+parallel workers. During training, we set the batch
+size to 1 and used gradient accumulation over 8
+steps to simulate a larger batch size. The number
+of samples was limited to 1000 to control training
+time. The training dataset followed the Alpaca format, and for the multi-task MoE model, a task_id
+field was added to the data to classify tasks during
+training.
+We used the AdamW (Loshchilov, 2017) optimizer for training, which decouples weight decay
+from gradient updates, improving both training stability and generalization. This makes it particularly
+effective for large-scale models, such as Transformers, by avoiding overfitting and enhancing optimization efficiency.
+The version of the Transformers library was chosen to match the architectures of the models being trained. For the ChatGLM2-6B model, which
+adopts a GLM (General Language Model) architecture with bidirectional and autoregressive training,
+version 4.30.2 of Transformers was used. However,
+for the Llama 3-8B and Qwen2-7B-Instruct models, the recommended version was 4.45.0 to ensure
+compatibility and optimal performance.
+
+B
+
+Case Study of Harry Potter
+
+In this case study, we evaluate different models
+on their ability to generate coherent plots and novels and maintain consistency with the world and
+character personalities of the Harry Potter series.
+As shown in Figure 6, the baseline models and
+our WriterAgent are tested on their performance in
+predicting plot progressions that align with prior
+story context. The results reveal significant differences in coherence, character consistency, and
+adherence to the magical world’s logic. The Base
+Llama model frequently generates plots disconnected from previous events, with characters behaving inconsistently with their established traits. For
+example, Harry’s decisions often lack continuity
+and conflict with his determined, courageous nature
+in the novels. The LoRA model improves slightly
+but suffers from repetitive content and omits key
+world-building knowledge, such as the importance
+
+of destroying Horcruxes to defeat Voldemort. By
+contrast, WriterAgent generates coherent plot progressions where Harry’s actions align with his character and successfully weaves in critical elements
+of the magical world, like his mission to destroy
+Horcruxes.
+Figure 7 further highlights differences in the generated text. The base Llama model produces incorrect content, including the claim that “Voldemort’s
+plan was to use Harry’s blood to gain immortality”,
+contradicting the established magical rule that his
+blood was only used for resurrection. The Llama
+model also introduces vague phrases like “leaving
+Harry to continue his journey”, failing to capture
+the tense, high-stakes atmosphere of the final battle. The LoRA model depicts the Dursley family
+as comforting Harry, which contradicts their antagonistic relationship in the novels, highlighting its
+limited understanding of character dynamics. The
+MoELoRA model generates overly extended content, introducing numerous ghost characters at Hogwarts and shifting the scene to a lakeside setting.
+While this adds richness, it strays from the original
+narrative’s focus. In contrast, WriterAgent accurately identifies Harry’s parents as the key figures
+providing emotional support, portraying their encouragement in a way that is faithful to the original
+story. The generated text reflects the original tone
+and concise writing style while capturing Harry’s
+inner strength. By producing contextually appropriate, emotionally resonant, and character-consistent
+content, WriterAgent demonstrates a clear advantage in simulating deep personas and generating
+coherent narratives.
+
+C
+
+Case Study of Red Chamber
+
+In Figure 8, we show a case of generated plot, and
+Chinese version in Figure 9. The QWen model
+continues the story directly, overlooking potential
+objections from the Jia family about Xichun becoming a nun, as well as the family’s power dynamics.
+Jia Mu, as the family matriarch, would likely not
+agree easily, making the model’s output feel oversimplified and lacking in emotional depth. The
+LoRA model generates a classical-style continuation but focuses on a specific detail, with Xichun’s
+tone becoming harsh and defiant. While emotional,
+this feels abrupt and lacks narrative coherence. In
+contrast, our WriterAgent model shows the Jia family’s complex reactions—shock, reluctance, and
+eventual acceptance—better fitting the worldview
+
+The spirits, looking like solid memories
+rather than ghosts, comfort Harry and
+express their pride in him, ready to
+accompany him to his end.
+
+Plott-1
+
+•The plot in the story does not align
+with the original storyline.
+•Before the final battle, Harry Potter
+still maintains his brave and
+determined attitude, which seems
+inconsistent with the character's
+traits in the direction of the story.
+
+Reference
+Plot
+t
+
+The Snitch reveals the Resurrection
+Stone. With a resolve, Harry uses it to
+summon the spirits of his parents, Sirius,
+and Lupin, who appear to support him.
+
+• This emotional output somewhat
+repeats the previous plot in Harry
+Potter. It does not reflect the
+diversity of magic in the wizarding
+world.
+• The result is overly detailed,
+making it difficult to understand the
+progression of the story.
+
+Llama
+
+Harry Potter meets the spirits of his
+family and shares with them the
+hardships of resisting the dark forces.
+
+Analysis
+
+• The predicted result aligns more
+closely with the story's direction and
+character setting, making the
+transition from the previous plot more
+coherent and logical.
+
+LoRA
+
+Lily protected Harry through a
+protective spell, creating an immunity
+effect against the influence of the dark
+magic.
+
+Generated plot
+
+WriterAgent
+
+After Harry uses the Resurrection
+Stone to summon the spirits of his
+loved ones, he feels a surge of strength
+and determination. With a sense of
+closure, he steps away from the stone
+
+Figure 6: Comparison of generated plot continuations for Harry Potter’s use of the Resurrection Stone.
+
+of Dream of the Red Chamber.
+
+D
+
+Analysis of Human Annotation Results
+
+In addition to automatic evaluation, we conducted
+human evaluation with two PhD annotators, both
+native speakers with strong literary backgrounds.
+They assessed the generated text by comparing
+it with the ground truth and selecting the bestperforming model on the Dream of the Red Chamber dataset.
+To analyze the results, we calculated the average
+hit rate for each model’s output and visualized it
+as a pie chart, as shown in Figure 12. The results
+indicate that our model was preferred in 73.1% of
+cases. The probability of experts selecting the base
+model’s output was 0%, the pre-trained model’s
+output 3.8%, the fine-tuned model’s output 15.4%,
+and the MoE-LoRA trained model’s output 7.7%.
+Accuracy
+
+Pretrain
+3.8%
+15.4%
+
+Lora
+
+73.1%
+
+WriterAgent
+
+7.7%
+MoELoRA
+
+Figure 12: Human Annotation Hit Rate.
+
+From the results, we observe that the hit rate of
+SFT is slightly higher than that of MoE-LoRA. This
+is because the model trained with the MoE-LoRA
+method exhibits improved instruction-following capability. However, in some cases, the MoE-LoRA-
+
+trained model did not effectively expand upon the
+given abstract, leading to more rigid or limited responses. In contrast, our model demonstrates a
+better balance between instruction adherence and
+contextual expansion, resulting in more comprehensive and coherent outputs that align closely with
+human expectations.
+
+E
+
+Evaluation Prompts
+
+Here, we provide the prompt for evaluating model
+output using ChatGPT-4o.First, here is the prompt
+for the English dataset.
+Evaluation Criteria:
+Stylistic Similarity:
+Language Style: Analyze the similarity in vocabulary
+choice, sentence structure, tone, and overall mood to determine whether the imitated text aligns with the writing
+style of the Harry Potter series.
+Expression Techniques: Examine whether emotional expressions, descriptive language, and the use of metaphors
+are consistent between the two texts.
+Sentence Length and Complexity: Compare sentence
+length, structural complexity, and paragraph organization
+in both texts.
+Plot Similarity:
+Main Storyline: Assess whether the core plotlines are similar and whether they present the same themes or narrative
+progression.
+Character Behavior and Motivation: Analyze whether the
+characters in the given text align with those in Harry Potter
+in terms of personality, actions, and motivations, ensuring
+they fit the story’s logical development.
+Emotions and Conflict Analysis: Evaluate whether the relationships between characters, emotional dynamics, and
+plot developments are consistent with those in Harry Potter.
+The following are two example evaluations:
+Example 1:
+original text: The two men appeared out of nowhere, a few
+yards apart in the narrow, moonlit lane. For a second they
+stood quite still, wands directed at each other’s chests;
+then, recognizing each other, they stowed their wands
+beneath their cloaks and started walking briskly in the
+same direction. "News?" asked the taller of the two. "The
+best," replied Severus Snape. The lane was bordered on
+the left by wild, low-growing brambles, on the right by
+
+Reference
+• Concise and straightforward language, as well as delicate emotional descriptions.
+They were neither ghost nor truly flesh, he could see that. They resembled most closely the Riddle that had escaped from the diary so long ago…. Less substantial than
+living bodies, but much more than ghosts, they moved toward him. And on each face, there was the same loving smile.
+James was exactly the same height as Harry. He was wearing the clothes in which he had died, and his hair was untidy and ruffled, and his glasses were a little lopsided
+Sirius was tall and handsome… He loped with an easy grace, his hands in his pockets and a grin on his face.
+Lupin was younger too, and much less shabby, and his hair was thicker and darker. He looked happy to be back in this familiar place…
+Lilys smile was widest of all. She pushed her long hair back as she drew closer to him, and her green eyes, so like his, searched his face hungrily, as though she would
+never be able to look at him enough.
+• The encouragement and support Harry Potter receives from his friends and
+“You’ve been so brave.” • Explores friendship, family, love, and sacrifice.
+family on the eve of the final battle.
+He could not speak. His eyes feasted on her, and he thought that he would like to stand and look at her forever, and that would be enough.
+Llama
+The Potters and the Weasleys, all of whom have been a part of Harry's life in some way, appear in this form. The memories of these people are not just their physical
+appearances, but also their personalities, voices, and mannerisms, making them seem as real as they did when they were alive. The spirits also reveal that they have
+• The storyline is hollow, and the plot logic is incorrect.
+been watching over Harry all along, even when he was unaware of it.
+They tell him that his destiny is not to die, but to live and to make a difference in the wizarding world. The spirits also reveal that Voldemort's plan was to use Harry's
+blood to gain immortality, but the plan failed and Harry survived. The spirits also reveal that Harry's scar is not just a symbol of his connection to Voldemort, but
+also a symbol of his connection to the wizarding world and his destiny. The spirits then disappear, leaving Harry to continue his journey.
+• The language style does not match the original text.
+• The appearance of the Dursley family does not align with the logic of the story..
+LoRA
+Harry sat in the darkness, the weight of his impending doom crushing him. The spirits, like solid memories rather than ghosts, appeared before him. They were the
+Potters, the Weasleys, and the Dursleys, all of whom had been a part of his life in some way. The memories of these people were not just their physical appearances,
+but also their personalities, voices, and mannerisms, making them seem as real as they did when they were alive. The Potters, Harry's parents, looked at him with a
+mix of sadness and pride. They told him that they had been watching over him all along, even when he was unaware of it. They revealed that their love for him had
+never wavered, and that they were proud of the person he had become. The Weasleys, Harry's friends and allies, also appeared, their faces filled with a sense of
+camaraderie and loyalty. They told Harry that they had always believed in him, and that they knew he had the power to make a difference in the wizarding world. The
+Dursleys, Harry's cruel and neglectful Muggle relatives, looked at him with a mix of shame and regret. They told Harry that they had been wrong to treat him poorly,
+and that they were sorry for their actions.
+• The behavior of the Dursleys does not align with their
+character portrayal in the original book. .
+MoELoRA
+•
+Overextending
+the
+characters
+that
+appear
+in
+the
+story.
+They all rise up into the air at once.
+Harry didn't understand what was happening until he heard them whispering over him; then he saw that they were back again around him -- but something about
+them seemed different.... He couldn't quite work out what it was.... "
+"You're really here,"" Harry said suddenly. ""You've never been able to be seen by anyone except me."
+"It is true!"" whispered Sir Cadogan's ghost. ""We have longed to appear before you!"" "He knew there'd be someone inside this castle who could help... one of your
+lot..."" "We'll follow where you lead us, Harry,"" moaned the Hufflepuff ghost, Dumble-dore's sister Ariana. "
+""Don't worry yourself about that, dear boy,"" said Nearly Headless Nick. ""Once you have made the decision to die, death stops being scary, doesn't it? So take your
+time... make sure You-Know-Who is properly punished first. We don't want to miss our cue."" Then, without another word, every last one of the ghosts rose right off
+the floor, drifted forward, and disappeared through the door behind Harry, leaving nothing but thin wraiths of cold mist in their wake.
+• Overthinking the story happens by the river..
+WriterAgent
+Harry stood in the darkness, and for a moment, he felt something shift in the air. Then, he saw familiar figures appearing around him—not ghosts, but something
+more like memories. It was the Potters and the Weasley, all people who had been• part
+his lifeofinJames
+one way
+another.
+Each oneconsistent
+of them looked
+as real
+as they had
+Theofactions
+andorLily
+are completely
+with their
+character
+when they were alive, and they surrounded him with warmth and comfort.
+development and the progression of the storyline.
+His parents, James and Lily, looked at him with pride and love. They told him that they had been watching over him all this time, even when he hadn’t known it.
+The Weasleys were there too, their faces full of encouragement and belief. They told Harry that they always knew he had it in him to make a difference in the
+wizarding world.
+These spirits made it clear that they hadn’t left him. He wasn’t alone. Their love and support were still with him, guiding him through whatever lay ahead.
+• Explores friendship, family, love, and sacrifice.
+
+Figure 7: Comparison of reference and generated texts from the baseline and our WriterAgent on the Harry Potter
+dataset. We highlight the weaknesses of the baseline model and the strengths of our approach.
+
+a high, neatly manicured hedge. The men’s long cloaks
+flapped around their ankles as they marched. "Thought I
+might be late," said Yaxley, his blunt features sliding in
+and out of sight as the branches of overhanging trees broke
+the moonlight. "It was a little trickier than I expected. But
+I hope he will be satisfied. You sound confident that
+your reception will be good?" Snape nodded, but did not
+elaborate. They turned right, into a wide driveway that led
+off the lane. The high hedge curved into them, running off
+into the distance beyond the pair of imposing wrought-iron
+gates barring the mens way. Neither of them broke step:
+In silence both raised their left arms in a kind of salute
+and passed straight through, as though the dark metal was
+smoke.
+The yew hedges muffled the sound of the mens footsteps.
+There was a rustle somewhere to their right: Yaxley drew
+his wand again pointing it over his companions head, but
+the source of the noise proved to be nothing more than a
+pure-white peacock, strutting majestically along the top
+of the hedge.
+He always did himself well, Lucius. Peacocks Yaxley
+thrust his wand back under his cloak with a snort.
+output text:As they walked, their footsteps echoed off the
+stone walls. The air was heavy with the scent of blooming
+
+flowers. A faint mist hung in the air, and the moon cast
+long shadows behind them.
+"The Dark Lord’s plans are moving ahead, Yaxley," Snape
+said, his voice low and even. "I’ve received a message
+from him. He will be returning to Hogwarts soon.”
+Yaxley’s eyes gleamed in the moonlight. "A wise move,
+sir. The time is ripe for the Dark Lord to assert his dominance over that...establishment." He paused, glancing up
+at Snape with a mixture of curiosity and wariness. "What
+do you make of it, Potter’s Chosen One and all?" Snape’s
+expression remained unreadable. "I think it wise to keep
+a low profile for the time being. The atmosphere at Hogwarts is...tense." He glanced around, as if ensuring they
+were alone. "Rumors are circulating about the Order of
+the Phoenix. I suspect Lord Voldemort will be looking to
+eliminate any threats to his power." As they approached
+Malfoy Manor’s gates, Snape raised his left arm and Yaxley followed suit. The gates swung open with a soft creak,
+revealing a path lined with peacocks strutting along manicured hedges. The pair made their way past the birds and
+hedges, the sound of their footsteps muffled by the thick
+grass. Ahead, the Manor’s imposing façade loomed, its
+windows like empty eyes staring back at them.
+
+Xichun converses with the nuns, firmly
+confirming her decision to become a
+nun. Caiping grows concerned and
+informs Lady You, but Lady You is
+unable to dissuade her.
+Plott-1
+
+Reference
+Plot
+t
+
+Baochai hosts the nuns from Dizang
+Temple, who discuss Miaoyu's master's
+experiences and the principles of
+spiritual cultivation. Xichun expresses
+her desire to become a nun.
+
+• The plot advances directly, bypassing
+potential opposition within the Jia
+household to Xichun’s decision.
+• Grandmother Jia, as the family authority,
+would not typically approve of a girl’s
+decision to become a nun so easily.
+QWen
+
+Grandmother Jia decides to arrange a
+grand tonsure ceremony for Xichun,
+formally initiating her as a nun and
+fulfilling her longing for a life devoted
+to Buddhism.
+
+• The model’s output has a classical
+Chinese style with emotional expression,
+reflecting Xichun’s intense resistance.
+• While it captures her emotions well,
+the continuation feels abrupt and lacks
+cohesion in the plot progression.
+LoRA
+
+Hearing this, Xichun became even
+angrier and said, “From now on, I will
+enter the monastic life, never marry,
+and I forbid you from arranging any
+marriages for me!”
+
+Analysis
+
+plot
+
+• The model captures the family's mixed
+reaction to Xichun's decision, showing
+shock, reluctance, and eventual acceptance.
+WriterAgent
+
+Though the Jia family is shocked and
+reluctant, they are powerless to change
+Xichun's decision. After attempting
+various methods to persuade her, Lady
+You ultimately accepts Xichun's choice.
+
+Figure 8: Comparison of generated plot continuations for Xichun’s decision to become a nun using different models.
+
+惜春与姑子对话，坚定出家决心，彩
+屏担心并告知尤氏，尤氏无法劝阻。
+
+Plott-1
+
+Plott
+
+宝钗接待地藏庵的姑子，姑子们谈论
+妙玉师父的遭遇和修行的道理，惜春
+表达出家意愿。
+
+•作为家族权威，贾母通常不会轻易
+同意一个女孩出家为尼。
+•剧情直接推进，绕过了贾府内部可
+能对惜春决定的反对。
+
+•模型的输出具有古典汉语风格，
+并带有情感表达，展现了惜春强
+烈的抗拒。
+•虽然很好地捕捉到了她的情绪，
+但后续发展显得突兀，缺乏情节
+上的连贯性。
+
+QWen
+
+LoRA
+
+在接下来的情节中，贾母决定为惜春
+安排一场隆重的剃度仪式，正式让她
+成为尼姑，以寄托她对佛门生活的向
+往。
+
+分析内容
+
+故事情节内容
+
+•模型捕捉到了家族对惜春决定的复
+杂反应，展现了震惊、不舍与最终
+接受。
+WriterAgent
+
+惜春听了这话，越发气愤起来，说： 贾府上下虽感震惊和不舍，却也无力
+“我从今以后，便入了空门，再不嫁 改变她的决定。尤氏在尝试了各种方
+人，也再不许你们说亲去！等我死了， 法劝说无果后，最终接受了惜春的选
+一概不管！
+择
+
+Figure 9: Comparison of generated plot continuations for Xichun’s decision to become a nun in Chinese using
+different models.
+
+Scoring Results: "Language Style Analysis": 1, "Expression Techniques Analysis": 1, "Sentence Length and Complexity Analysis": 2, "Main Storyline Analysis": 3, "Character Behavior and Motivation Analysis": 2, "Emotions
+and Conflict Analysis": 1
+Example2:
+original text:The two men appeared out of nowhere, a few
+yards apart in the narrow, moonlit lane. For a second they
+stood quite still, wands directed at each other’s chests;
+then, recognizing each other, they stowed their wands
+beneath their cloaks and started walking briskly in the
+same direction. "News?" asked the taller of the two. "The
+best," replied Severus Snape. The lane was bordered on
+the left by wild, low-growing brambles, on the right by
+a high, neatly manicured hedge. The men’s long cloaks
+flapped around their ankles as they marched. "Thought I
+might be late," said Yaxley, his blunt features sliding in
+and out of sight as the branches of overhanging trees broke
+the moonlight. "It was a little trickier than I expected. But
+I hope he will be satisfied. You sound confident that
+your reception will be good?" Snape nodded, but did not
+elaborate. They turned right, into a wide driveway that led
+off the lane. The high hedge curved into them, running off
+into the distance beyond the pair of imposing wrought-iron
+gates barring the mens way. Neither of them broke step:
+In silence both raised their left arms in a kind of salute
+and passed straight through, as though the dark metal was
+smoke.
+The yew hedges muffled the sound of the mens footsteps.
+There was a rustle somewhere to their right: Yaxley drew
+his wand again pointing it over his companions head, but
+the source of the noise proved to be nothing more than a
+pure-white peacock, strutting majestically along the top
+of the hedge.
+He always did himself well, Lucius. Peacocks Yaxley
+thrust his wand back under his cloak with a snort.
+output text: The lane was deserted and moonlit. Snape’s
+pale eyes flicked over Yaxley’s unshaven face, lingering
+
+upon the red scars that had been carved into his cheek.
+’I trust you are here for the same reason as I, Pucey?’ said
+Snape, his voice low and even.
+Yaxley, who had been examining Snape’s pointed black
+hat, looked up. ’What reason would that be?’ he said, his
+tone rather less smooth than Snape’s.
+‘I have reason to believe that the Ministry is going to send
+a group of Aurors to take my - to take the Dark Lord
+into custody,’ said Snape. ‘I am on my way to warn him.
+’Yaxley nodded. ’I’ve heard something similar. I’ve been
+sent to tell him the same thing.’
+He and Snape looked at each other. They raised their left
+arms simultaneously and strode off along the lane. The
+peacocks on the grounds of Malfoy Manor looked up at the
+sound of their footsteps. They passed beneath the lantern
+that hung outside the gates and proceeded up the drive,
+the manicured hedges glinting silver in the moonlight.
+They did not speak again until they reached the front door,
+which swung open with a slight creak. Snape led the way
+across the flagged entrance hall, his black robes sweeping
+across the stone floor. Yaxley followed him into the great
+hall.
+Scoring Results: "Language Style Analysis": 4, "Expression Techniques Analysis": 5, "Sentence Length and Complexity Analysis": 3, "Main Storyline Analysis": 5, "Character Behavior and Motivation Analysis": 4, "Emotions
+and Conflict Analysis": 3
+Based on the following two texts, evaluate their similarity
+in writing style and plot. Provide scores for each aspect
+(1 to 5, where 1 is completely different and 5 is identical).
+The original text is from Harry Potter, and the output text
+is a rewritten version. My goal is to assess whether the
+rewritten text aligns with the original’s writing style and
+plot."
+’Please do not provide any analytical information. Output results in the following JSON format: "Language
+Style Analysis":x,"Expression Analysis":x,"Sentence
+Length and Complexity Analysis":x,"Main Storyline
+
+Analysis":x,"Character Behavior and Motivation Analysis":x,"Emotion and Conflict Analysis":x’
+
+Below is the prompt for the Chinese dataset.
+评估要求： 文风相似性： 语言风格：分析两者在词
+汇选择、句式结构、语气和语调等方面的相似性，
+判断仿写文本是否与红楼梦文风相似。 表达方式：
+分析两者的情感表达、描述性语言、比喻使用等是
+否一致。 句子长度与复杂度：比较两者的句子长
+度、句型的复杂性、段落的组织方式等。
+情节相似性： 故事主线：比较两者的主要情节是否
+相似，是否呈现相同的主题或事件进展。 人物行为
+与动机：分析文本中的任务与红楼梦中的人物角色
+是否保持一致，以及主要人物是否在行为和动机上
+保持一致，是否符合故事情节的推展。 情感与冲突
+分析：分析情节中角色之间的人物关系是否与红楼
+梦中的设定保持一致，是否有相同的情感流动和情
+节变化。
+以下是两个示例评分： 实例1: 原文本: 话说金桂
+听了，将脖项一扭，嘴唇一撇，鼻孔里哧哧两声，
+冷笑道：“菱角花开，谁见香来？若是菱角香了，
+正经那些香花放在那里？可是不通之极！”香菱
+道：“不独菱花香，就连荷叶、莲蓬，都是有一
+般清香的。但他原不是花香可比，若静日静夜或清
+早半夜细领略了去，那一股清香比是花都好闻呢。
+就连菱角、鸡头、苇叶、芦根得了风露，那一股清
+香也是令人心神爽快的。”金桂道：“依你说，这
+兰花、桂花倒香的不好了？”香菱说到热闹头上，
+忘了忌讳，便接口道：“兰花、桂花的香，又非别
+的香可比。”一句未完，金桂的丫鬟名唤宝蟾的，
+忙指着香菱的脸说道：“你可要死，你怎么叫起姑
+娘的名字来？”香菱猛省了，反不好意思，忙陪笑
+说：“一时顺了嘴，奶奶别计较。”金桂笑道：“
+这有什么，你也太小心了。但只是我想这个‘香’
+字到底不妥，意思要换一个字，不知你服不服？”
+香菱笑道：“奶奶说那里话，此刻连我一身一体是
+奶奶的。何得换一个名字反问我服不服，叫我如何
+当得起。奶奶说那一个字好，就用那一个。”金桂
+冷笑道：“你虽说得是，只怕姑娘多心。”香菱笑
+道：“奶奶原来不知，当日买了我时，原是老太太
+使唤的，故此姑娘起了这个名字。后来伏侍了爷，
+就与姑娘无涉了。如今又有了奶奶，越发不与姑娘
+相干。且姑娘又是极明白的人，如何恼得这些呢？
+”金桂道：“既这样说，‘香’字竟不如‘秋’字
+妥当。菱角菱花皆盛于秋，岂不比香字有来历些？
+”香菱笑道：“就依奶奶这样罢了。”自此后遂改
+了“秋”字。宝钗亦不在意。 输出文本: 话说那日
+中秋佳节，大观园内众人齐聚，赏月饮酒，谈笑风
+生。其中，薛宝钗之妹薛宝琴与林黛玉、贾宝玉等
+人一同畅饮，欢声笑语不绝于耳。忽有一阵微风吹
+过，带来一阵清香，众人皆为之一怔，寻香而至，
+只见院落中一株古树下，立着两位女子，正是薛
+宝琴与香菱。 香菱自幼随母入贾府，虽非嫡系，
+却也颇得贾府上下喜爱。其人聪慧异常，且颇有才
+情，尤善诗文。此时，她正与薛宝琴谈论着园中菱
+花的香气，两人各抒己见，争论不休。金桂即薛蟠
+之妻，因性情泼辣，常在贾府中引起是非。她今日
+亦在此，听闻香菱与宝琴争执，便插嘴道：“菱花
+之香，自是天然，何须争论？然观其名，‘香菱’
+二字，过于俗气，不如改作‘秋菱’如何？” 香菱
+闻言，略一沉吟，随即笑道：“金姑姑所言极是，
+菱花虽香，却不及秋水长天，更添几分清雅之意。
+改作‘秋菱’，既符合此花之态，又显我之品格，
+甚好。”众人大赞金桂之智慧，皆认为此名更为合
+适，于是香菱便改名为“秋菱”。自此之后，“香
+菱”之名不再，取而代之的是“秋菱”，其名字之
+变，不仅象征着她内心对美好事物的追求与向往，
+
+亦反映出贾府中人物性格的多样性和复杂性。这
+一小插曲，虽不似大观园中其他情节般波澜壮阔，
+却也以细微之处见精神，展现了人物性格的微妙变
+化，以及家族生活的细腻情感。此番改名之事，虽
+只是一花一叶之小事，却也如同大观园中的一颗明
+珠，熠熠生辉，映照出人物命运的起伏与家族兴衰
+的缩影。而在这片繁华的世界里，每个人都在以自
+己的方式，书写着属于自己的故事，或悲或喜，或
+聚或散，皆是人生百态，尽在其中。" 打分结果：
+"语言风格分析":1,"表达方式分析":1,"句子长度与复
+杂度分析":1,"故事主线分析":4,"人物行为与动机分
+析":1,"情感与冲突分析":1
+实例2: 原文本: 话说贾琏到了王夫人那边，一一的
+说了。次日，到了部里，打点停妥，回来又到王
+夫人那边将打点吏部之事告知王夫人。王夫人便
+道：“打听准了么？果然这样，老爷也愿意，合
+家也放心。那外任何尝是做得的？不是这样回来，
+只怕叫那些混账东西把老爷的性命都坑了呢。”贾
+琏道：“太太怎么知道？”王夫人道：“自从你二
+叔放了外任，并没有一个钱拿回来，把家里的倒掏
+摸了好些去了。你瞧那些跟老爷去的人，他男人在
+外头不多几时，那些小老婆子们都金头银面的妆扮
+起来了，可不是在外头瞒着老爷弄钱？你叔叔就由
+着他们闹去。要弄出事来，不但自己的官做不成，
+只怕连祖上的官也要抹掉了呢。”贾琏道：“太
+太说的很是。方才我听见参了，吓的了不得，直等
+打听明白才放心。也愿意老爷做个京官，安安逸逸
+的做几年，才保得住一辈子的声名。就是老太太知
+道了，倒也是放心的。只要太太说的宽缓些。”王
+夫人道：“我知道，你到底再去打听打听。” 输
+出文本：话说贾琏至王夫人处，禀道：“近日闻得
+老爷在外任上，颇有亏空之弊，我恐将来回朝，不
+能善后，因此特来求太太。老爷在京做官，一则可
+以省却许多烦难，二则亦可保全声名。”王夫人听
+了，不觉一怔，随即笑道：“你这孩子，怎么又想
+出这些事来？难道老爷在外，就该贪污不成？”贾
+琏忙笑道：“太太何出此言！不过为的是体面，才
+想出这个主意来。再者，老爷在外，也须要有人照
+应才是。”王夫人点头道：“这话倒是。只是如今
+谁可托付呢？”贾琏笑道：“太太只管放心，我自
+有安排。” 打分结果：’"语言风格分析":5,"表达方
+式分析":5,"句子长度与复杂度分析":4,"故事主线分
+析":4,"人物行为与动机分析":4,"情感与冲突分析":4’
+请根据下面两个文本，对它们的文风相似性和情
+节相似性进行打分。请分别给出文风相似性和情
+节相似性的评分（1到5分，1为完全不同，5为完全
+相同）。其中原文本为红楼梦中的原文文本，输
+出文本为我微调大模型输出的仿写文本，我的目
+的在于让你给出仿写文本是否贴近原著文风和情
+节的打分。 请不要给我输出任何分析信息，请按
+以下json格式输出结果："语言风格分析":x,"表达方
+式分析":x,"句子长度与复杂度分析":x,"故事主线分
+析":x,"人物行为与动机分析":x,"情感与冲突分析":x’
+
+Reference
+话说贾琏到了王夫⼈那边，⼀⼀的说了……王夫⼈便道：‘打听准了么︖果然这样，⽼爷也愿意，合家也放⼼……不是这
+样回来，只怕叫那些混账东西把⽼爷的性命都坑了呢。’
+贾琏道：‘太太怎么知道︖’
+
+• 原⽂⽂本为半百话问形式，⽂中⼈物关
+系复杂，情节丰富有深度
+
+• 王夫⼈为贾琏婶娘
+
+王夫⼈道：‘⾃从你⼆叔放了外任，并没有⼀个钱拿回来……你瞧那些跟⽼爷去的⼈，他男⼈在外头不多⼏时，那些⼩⽼
+婆⼦们都⾦头银⾯的妆扮起来了……要弄出事来，不但⾃⼰的官做不成，只怕连祖上的官也要抹掉了呢。’
+贾琏道：‘太太说的很是……也愿意⽼爷做个京官，安安逸逸的做⼏年，才保得住⼀辈⼦的声名……
+• 语⽓克制，重视家族利益
+Qwen
+贾琏在家中静候王夫⼈的召见……他整理好衣冠，⼩⼼翼翼地步入王夫⼈的书房。⾏礼后缓缓开⼜道：‘母亲⼤⼈，⼉臣
+此来，是有关于⽗亲⼤⼈在京官任上的打点之事。’
+王夫⼈微微颔⾸，轻声道：‘你⽗亲在外任多年，如今要回京，⾃然是需要打点⼀番，⽅能确保仕途顺畅……只是我⼼中
+还有些疑惑，不知你在京官的职位上，是否能保全我们家族的声誉︖’
+• ⽩话⽂语⽓与原⽂⽂风不符
+……她轻轻抚了抚桌上的⽟如意，沉吟⽚刻后，才缓缓开⼜道：‘你是我贾家的希望。’
+• ⼈物关系错误，王夫⼈不是贾琏的母亲
+
+Pretrain(Qwen)
+
+贾琏来到王夫⼈处，禀报吏部之事……王夫⼈沉吟⽚刻，叹道：‘你⽗亲如今外任，家中的财务如何打点，你可曾想过︖’
+贾琏闻⾔，忙道：‘母亲放⼼，孩⼉⾃会安排妥当……只要⽼爷在京为官，保全声名，便是孩⼉最⼤的⼼愿。’
+王夫⼈听他如此说，⼼中略觉宽慰，但转念⼀想，又道：‘你⽗亲在外为官，家中事务繁多，财务问题不可不防……’
+• 情节偏移，此次讨论的重点在于政治问题⽽非财务问题
+
+LoRA(Qwen)
+
+贾琏因要回京去打点，又到王夫⼈跟前，说了⼏句打点的事。
+• 情节偏移，此次讨论的重点在于政治问题⽽非财务问题
+王夫⼈道：‘我只愁你去了，不知哪⾥弄钱使唤呢。’
+贾琏笑道：‘如今有了门路了……那京⾥衙门⾥⼈多，不比这外省，都是乡⾥的，容易说话。’
+王夫⼈道：‘既如此，你快回去告诉你⽗亲……’
+• ⼈物关系错误，语⾔风格依旧较为⽩话
+MoELoRA(Qwen)
+贾琏道：‘⽼爷不在家时，我到衙门去说了……只说⽼爷又升了，所以没⼈敢惹。⼀来体⾯⼤增︔再者府⾥每⽉添⼏⼗两
+⽉赏银……不过这半年⼯夫，比前⼀年挣的⼀把还多。’
+王夫⼈听了，不觉转忧为喜……又想到京官无俸，若问在家⽀⽉养⼜就是了，今又得了这点⼦利钱，亦⾜贴补家⽤。因
+忙问：‘⽉养有多少︖’
+• ⼈物⾏为不符合原⽂的设定，王夫⼈
+• 情节偏移，此次讨论的重点在
+⾏为逻辑较为跳跃
+于政治问题⽽非财务问题
+贾琏笑道：‘⽼爷到底没得利钱，不过添⽉养⼀百三⼗两……如今又添了六⼗四两养⼜。⼀个⽉就有⼀千⼀百余两了。况
+且⽼爷在外没有⼩事，奴才也肯舍命去为⽼爷效⼒，因此就不甚怕了。
+WriterAgent(Qwen)
+"贾琏至王夫⼈处，禀道：‘近⽇闻得⽼爷在外任上，颇有亏空之弊，奴才恐将来回朝，不能善后，因此特来求太太……
+⽼爷在京做官，⼀则可以省却许多烦难，⼆则亦可保全声名。’
+
+• ⼈物设定及形式逻辑与原⽂⼀致，
+家族利益和名声 放在第⼀位
+
+王夫⼈听了，不觉⼀怔，随即笑道：‘你这孩⼦，怎么又想出这些事来︖难道⽼爷在外，就该贪污不成︖’
+• ⼈物关系正确，贾琏称呼王夫⼈为太太
+贾琏忙笑道：‘太太何出此⾔！不过为的是体⾯，才想出这个主意来……再者，⽼爷在外，也须要有⼈照应才是。’
+王夫⼈点头道：‘这话倒是。只是如今谁可托付呢︖’贾琏笑道：“太太只管放⼼，我⾃有安排。”
+
+Figure 10: Comparison of reference and generated texts from the baseline and our WriterAgent on Dream of the
+Red Chamber in Chinese. We highlight the weaknesses of the baseline model and the strengths of our approach.
+
+分析:
+•文章中出现的人物符合人物设定，文章中正确表达了贾琏、王夫人等人物的对贾政出外
+做官财务状况的担忧
+•文章中出现一些写作细节和写作风格并不与原文相符
+•文章中的故事情节发展有些不符合原文设定
+Curriculum1: world building
+
+分析:
+•文中表达了正确的人物关系以及凤姐贪财的人物特征
+•剧情推进的细节更加合理、比如文章中出现贾政做官需要钱让凤姐放帐来改
+善财务等
+•写作细节仍需改善，写作风格有所下降。
+
+Curriculum1 + Curriculum2: plot prediction, w/o Curriculum3: stylish writing
+
+WriterAgent
+
+生成结果：贾琏便笑说：“老爷若做京官，不但老爷在京里花销不大，连家
+生成结果：话说贾琏入内回明王夫人，言及已将打点吏部之事宜悉数办妥，只待新命下启
+里也省些了。如今老爷若出京外任，一应公私出入费用甚多。”王夫人道：
+时便能上任。王夫人闻此，心中稍安，但随即又忧虑起贾政来…此次出京，难免在外耗费
+“如今我将你姐夫每月的月钱蠲了…王夫人道：“再着人去叫你媳妇们来，
+颇巨，而家中现有银两有限，恐难支撑长此以往的开销…
+每人拿出一百两银子来，凑着一千两，你拿去放帐，利钱自然归你了。”
+次日，贾琏携家眷赴宁国府，与贾赦商议此事。贾赦素知贾琏精明能干，且家中多有余财，
+此时凤姐在后房内，听见贾琏进来回话，便知其意，忙命人备茶。贾琏一面
+于是欣然应允，承诺可借给贾琏一笔银两，作为贾政外任期间的周转资金。贾琏感激不尽，
+吃茶，一面回道：“我进来，见老爷不在书房里，不知往那里去了。我想：
+连忙致谢，同时提出愿将家中部分房产抵押…
+他既出京，必得有人料理家务…
+
+Figure 11: Demonstration of the model’s stepwise learning on Dream of the Red Chamber in Chinese: from
+curriculum 1 to curriculum 1 & 2. The text colors indicate the corresponding problems.
+
+

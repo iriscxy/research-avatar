@@ -1,0 +1,1376 @@
+PedDet: Adaptive Spectral Optimization for Multimodal Pedestrian Detection
+
+arXiv:2502.14063v2 [cs.CV] 21 Feb 2025
+
+Rui Zhao1∗ , Zeyu Zhang23∗† , Yi Xu4 , Yi Yao5 , Yan Huang6 ,
+Wenxin Zhang7 , Zirui Song68 , Xiuying Chen8 , Yang Zhao3‡
+1
+JD.com 2 The Australian National University 3 La Trobe University
+4
+Central South University 5 NavInfo Co., Ltd. 6 University of Technology Sydney
+7
+University of Chinese Academy of Science 8 Mohamed bin Zayed University of Artificial Intelligence
+A. Traditional Multimodal Pedestrian Detection Methods
+
+Abstract
+Pedestrian detection in intelligent transportation
+systems has made significant progress but faces
+two critical challenges: (1) insufficient fusion of
+complementary information between visible and
+infrared spectra, particularly in complex scenarios,
+and (2) sensitivity to illumination changes, such as
+low-light or overexposed conditions, leading to degraded performance. To address these issues, we
+propose PedDet, an adaptive spectral optimization
+complementarity framework which specifically enhanced and optimized for multispectral pedestrian
+detection. PedDet introduces the Multi-scale Spectral Feature Perception Module (MSFPM) to adaptively fuse visible and infrared features, enhancing robustness and flexibility in feature extraction. Additionally, the Illumination Robustness
+Feature Decoupling Module (IRFDM) improves
+detection stability under varying lighting by decoupling pedestrian and background features. We further design a contrastive alignment to enhance intermodal feature discrimination. Experiments on
+LLVIP and MSDS datasets demonstrate that PedDet achieves state-of-the-art performance, improving the mAP by 6.6 % with superior detection accuracy even in low-light conditions, marking a significant step forward for road safety. Code will
+be available at https://github.com/AIGeeksGroup/
+PedDet.
+
+1
+
+Introduction
+
+Pedestrian detection, a critical component in ensuring road
+safety, has garnered significant attention from both academia
+and industry. With the advancement of intelligent transportation systems, pedestrian detection plays an essential role in
+scenarios such as autonomous driving and public transportation monitoring. However, the complexity of road environments presents significant challenges to pedestrian detection,
+including issues like occlusion, diverse target sizes, and varying illumination conditions. Addressing these challenges ne∗
+Equal contribution. † Project lead.
+(y.zhao2@latrobe.edu.au).
+
+‡
+
+Corresponding author
+
+Output
+
+RGB Image
+
+Fusion
+
+Neck
+
+Head
+Output
+
+Infrared Image
+
+B. PedDet (Our methods)
+Output
+
+RGB Image
+
+MSFPM
+
+IRFDM
+
+Contrastive
+Learning
+Module
+
+Head
+Output
+
+Infrared Image
+
+Figure 1: Modules A and B illustrate the distinctions between the existing pedestrian detection frameworks and our proposed approach.
+Methods in Module A identify and locate targets only by fusing
+features from multiple levels. Module B shows that our method
+takes advantage of the Multi-scale Spectral Feature Perception Module (MSFPM) and the Illumination Robustness Feature Decoupling
+Module (IRFDM) to improve detection performance
+
+cessitates more precise and robust detection algorithms to enhance traffic safety.
+Despite progress in pedestrian detection, current methods
+face two major challenges. First, existing algorithms struggle
+to fully exploit the complementary information between RGB
+and infrared spectra, resulting in suboptimal multimodal feature fusion. In complex scenarios, single-modal pedestrian
+detection often exhibits instability under unfavorable illumination conditions. Second, traditional methods [Ross and
+Dollár, 2017; Jocher et al., 2022; Wang et al., 2023] demonstrate a high sensitivity to environmental changes, particularly under low-light or overexposed conditions. This sensitivity hampers the models’ ability to extract reliable pedestrian features, leading to a significant decline in detection performance. These challenges hinder the widespread real-world
+deployment of existing pedestrian detection models.
+To address these challenges, we propose PedDet, an optimization framework tailored for all object detection models.
+PedDet is specifically designed to optimize pedestrian detection by leveraging the complementary information between
+RGB and infrared, thereby improving both robustness and accuracy in diverse lighting scenarios, as shown in Figure 1.
+First, we introduce the Multi-scale Spectral Feature Perception Module (MSFPM), which processes RGB and in-
+
+Adaptive Spectral Optimization Complementarity Framework
+
+Input
+
+Multi-Scale Spectral Feature
+Perception Module
+𝑓"
+
+Illumination Robustness Feature Decoupling Module
+𝑓! Background
+𝑓! Human
+𝑓" Background
+𝑓" Human
+
+RGB Image
+
+Contrastive
+Learning
+Module 𝑓! Human
+𝑓" Human
+
+Output
+
+Yolov10
+Head
+
+Fusion
+Weights Sharing
+
+Output
+
+Infrared Image
+
+𝑓!
+
+Figure 2: The overall pipeline of PedDet.
+
+frared spectral data in parallel. MSFPM
+adaptively ex• To address illumination
+challenges, we design the
+我们提出了自适应光谱互补特征优化框架（Adaptive
+Spectral
+tracts and fuses features from multiple spectral
+scales, dyIllumination Robustness
+Feature Decoupling Module
+Complementarity
+Optimization Framework,
+ASCOF），该框架基于YOLOv8的
+改进，专为应对行人检测中的复杂光照环境进行了优化。首先，框架中的多
+namically adjusting the feature weights of each modality
+(IRFDM), which isolates pedestrian features from back尺度光谱特征感知模块（Multi-scale
+Spectral Feature
+Module,
+based on illumination conditions. This enables the
+model to
+ground
+noise, Perception
+enhancing
+robustness across different
+maximize spectral complementarity andMSFPM）能够在不同尺度上自适应地提取与融合可见光与红外光谱的特征，
+maintain robustness
+lighting conditions.
+增强行人在多光谱条件下的可见性和特征表达的稳定性。与传统的融合方法
+across varying environmental complexities.
+In contrast to tra• A
+contrastive learning strategy is integrated to improve
+相比，MSFPM能够动态调整不同模态的特征权重，确保特征提取的灵活性
+ditional single-modal approaches, MSFPM
+effectively inte与鲁棒性，充分发挥光谱互补信息的优势。此外，为了解决光照变化对检测
+feature discrimination, helping the model better disgrates information from both spectra, significantly
+enhancing
+性能的影响，我们在框架中引入了光照鲁棒性特征解耦模块（Illumination
+tinguish pedestrians from background in both visible
+detection stability and accuracy.
+Robustness Feature Decoupling Module, IRFDM）。
+and infrared modalities, further enhancing robustness in
+Additionally, we design the Illumination Robustness Feacomplex environments.
+ture Decoupling Module (IRFDM) to address the adverse
+effects of extreme lighting conditions on detection perfor2 Related Works
+mance. IRFDM focuses on decoupling pedestrian-specific
+features from background noise, thereby mitigating interPedestrian detection in intelligent transportation systems has
+ference from complex environments. Traditional pedestrian
+made some strides, but existing studies continue to face two
+detection methods often struggle to differentiate pedestriprimary challenges: multimodal feature fusion and illumians from the background under extreme conditions, such as
+nation robustness. While various methods have been prostrong light, low light, or uneven illumination, where the acposed to address these issues, they still exist limitations in
+curacy significantly deteriorates due to occlusion, shadows,
+real-world scenarios. For related works, see Supplementary
+or light reflections. By incorporating IRFDM, our model efSection 1: Related Works.
+fectively separates illumination-induced disturbances during
+feature extraction, ensuring high detection accuracy even un3 Methodology
+der extreme lighting conditions. IRFDM learns robust feature
+representations across varying illumination scenarios, reduc3.1 Overview
+ing the negative impacts of environmental lighting variations.
+In this section, we present the proposed PedDet in detail.
+To further improve feature discrimination, we adopt a conAs illustrated in Figure 2, PedDet consists of four key comtrastive learning paradigm. This strategy compares the differponents: an MSFPM, an IRFDM, a contrastive learning
+ences between pedestrian and background features across visparadigm, and a detection head. The following subsections
+ible and infrared spectra, strengthening the discrimination beprovide an in-depth explanation of each component, concludtween pedestrian and background features and improving the
+ing with a description of the model’s optimization objectives.
+model’s performance in complex scenarios. Comprehensive
+experiments demonstrate that PedDet achieves state-of-the3.2 Feature Extractor
+art performance, significantly outperforming existing methods in accuracy and robustness under diverse and challenging
+We adopt the improved YOLOv10 [Wang et al., 2024] as the
+conditions.
+backbone network, as illustrated in Figure 3. YOLOv10 inThe primary contributions of this work are summarized as
+troduces systematic optimizations at multiple levels, signiffollows:
+icantly enhancing computational efficiency and feature ex• We propose PedDet, which uses a Multi-scale Spectral
+traction capability. By refining the backbone architecture,
+Feature Perception Module (MSFPM) to fuse visible
+YOLOv10 reduces computational complexity and memory
+and infrared features, adjusting weights based on lightconsumption while maintaining high model accuracy, making
+ing conditions for improved pedestrian detection and acit particularly suitable for real-time applications with strincuracy compared to single-modal methods.
+gent latency requirements.
+
+c
+c
+
+u
+C2f
+u
+C2f
+
+c
+
+C2f
+
+k=3,s=1,p=1
+
+Conv
+
+Conv
+
+k=3,s=1,p=1
+
+H×W×C
+
+Conv
+
+k=1,s=1,p=0
+
+H×W×C
+
+Split
+
+Conv
+
+H×W×C/2
+
+k=3,s=1,p=1
+
+Bottleneck
+
+BatchNorm2d
+SiLU
+
+Detect
+
+P3
+
+Conv2d
+
+k=3,s=1,p=0
+c=4 × reg_max
+
+Conv2d
+
+k=3,s=1,p=0
+c=nc
+
+Bbox
+Loss
+
+CIoU
++DFL
+
+c=4 × reg_max
+
+Cls
+Loss
+
+BCE
+c=nc
+(n+2)C
+2
+
+Conv
+
+H×W×C/2
+H×W×C/2
+H×W×C/2
+
+YOLOv10 serves as the backbone for feature extraction, processing RGB and infrared images through parallel
+branches, each generating modality-specific feature matrices.
+The RGB branch captures rich color details in daylight, while
+the infrared branch enhances object contours in low-light conditions. Feature extraction operates across multiple scales,
+producing feature maps at:
+F2 ∈ R40×40×512 ,
+
+F3 ∈ R20×20×512
+(1)
+where Fi represents feature maps at different scales.
+This multiscale approach ensures robust pedestrian detection
+across varying sizes and perspectives. The final feature representation Ffinal is obtained via fusion:
+Ffinal = wT · F
+(2)
+where wi are learnable weights, balancing contributions
+from different scales to enhance adaptability across detection
+scenarios.
+
+3.3
+
+Multi-Scale Spectral Feature Perception
+Module (MSFPM)
+
+The MSFPM plays a critical role in addressing the challenges
+of pedestrian detection under complex illumination conditions. Specifically designed to leverage the complementary
+information between RGB and infrared spectra, MSFPM effectively overcomes the limitations of existing methods in utilizing multimodal advantages in challenging scenarios. The
+core of multimodal feature fusion is to effectively integrate
+RGB and infrared features while maximizing their complementary strengths across diverse environments. MSFPM
+achieves this by stacking features along the depth dimension
+and dynamically adjusting their contribution weights:
+Ffused = wRGB FRGB + wIR FIR
+(3)
+where wRGB and wIR are adaptive weights that prioritize
+RGB features in well-lit conditions and infrared features in
+low-light scenarios, ensuring robustness.
+After fusion, MSFPM applies dimensionality reduction to
+enhance computational efficiency while preserving semantic
+richness:
+
+(4)
+
+where Wreduce is a learnable projection matrix that compresses feature dimensions while maintaining cross-modal
+synergy. The SiLU activation function is then applied to improve non-linear representation and robustness:
+NxNx3
+
+k=1,s=1,p=0
+
+N
+
+Figure 3: The Architecture of Feature Extractor.
+
+F1 ∈ R80×80×256 ,
+
+Freduced = Wreduce Ffused
+
+Detect
+
+P4
+
+H×W×
+H×W×C/2
+H×W×C/2
+Concat
+Bottleneck
+……
+
+Conv2d
+
+C2f
+
+P5
+
+C2f
+
+Conv
+
+Conv
+
+Conv
+
+Detect
+
+Conv
+
+c
+
+Detect
+k=3,s=1,p=1
+
+CONV
+operation
+
+Feature Pyramid
+
+FPN
+
+Backbone
+
+Factivated = Freduced · σ(Freduced )
+
+(5)
+
+where σ(x) = x · sigmoid(x). Finally, the fused features
+undergo multi-scale convolutional processing for pedestrian
+detection, leveraging modality complementarity to ensure accurate results under varying illumination conditions.
+
+3.4
+
+Illumination Robustness Feature Decoupling
+Module
+
+Feature decoupling [Tang et al., 2022] aims to decompose latent representations into independent factors, reducing redundancy and enhancing feature clarity. To improve detection accuracy, we propose the Illumination Robustness Feature Decoupling Module (IRFDM), which separates visible light image features into human-related and background-related components. This minimizes background interference, refining
+pedestrian detection.
+As shown in the middle of Figure 2, IRFDM employs two
+parallel processing paths to handle visible (fv ) and infrared
+(fi ) features separately, ensuring robust feature extraction under varying illumination conditions.
+Process of Visible Light Images (fv ). The IRFDM process enhances feature separation by sequentially applying
+pooling, convolution, and activation functions. Max Pooling
+highlights key human-related features, while Average Pooling captures background details. Then, 1 × 1 convolutions
+refine feature representations:
+F ′ = W1×1 ∗ F
+
+(6)
+
+where W1×1 is the learnable weight matrix. Convolution and pooling layers further reduce feature dimensionality
+while improving stability.
+Finally, a three-layer Multi-Layer Perceptron (MLP) refines the separation, producing decoupled human-related
+(fvH ) and background-related (fvB ) features:
+fv = fvH + fvB
+
+(7)
+
+This structured decoupling minimizes background interference, enhancing pedestrian detection accuracy.
+Process of Visible Light Images (fi ). The process begins
+with a Multi-Layer Perceptron (MLP), which captures complex nonlinear relationships for fine-grained feature differentiation. Max Pooling then reduces spatial dimensions while
+preserving the most relevant information. Next, the Sigmoid
+activation function normalizes feature values to [0, 1]: Finally, two 1 × 1 convolutional layers separate features into
+human-related (fvH ) and background-related (fvB ) components:
+fvH , fvB = WH ∗ Fnorm ,
+
+WB ∗ Fnorm
+
+(8)
+
+where WH and WB are learnable transformation matrices.
+This structured feature decoupling enhances pedestrian detection by reducing background interference.
+Orthogonal Regularization Loss Function. To ensure the
+independence of decoupled human and background features,
+an orthogonal regularization method be applied. This method
+involves adding a regularization term to the loss function to
+penalize the similarity between human features and background features. Specifically, this can be achieved by minimizing the dot product between these two sets of feature vectors, as orthogonal or uncorrelated vectors have a dot product
+of zero. The loss function can be formulated as:
+Lcon =
+
+N
+X
+i=1
+
+H
+B
+fv,i
+· fv,i
+
+2
+
++λ
+
+N
+X
+
+Figure 4: Example of RGB and Infrared Image Pairs. Left: RGB
+Image. Right: Infrared Image.
+Contrastive Learning Module
+
+H
+B
+fi,i
+· fi,i
+
+2
+
+(9)
+
+Human (Anchor)
+
+Human (Positive)
+
+A
+
+P
+
+Background (Negative)
+
+i=1
+
+where
+H
+B
+• fv,i
+and fv,i
+are the decoupled human and background
+features from visible light images, respectively.
+H
+B
+• fi,i
+and fi,i
+are the decoupled human and background
+features from infrared images, respectively.
+• λ is a hyperparameter that controls the weight of the infrared images term.
+• N is the number of samples. Each sample i contributes
+to the overall loss, ensuring that the regularization is applied across all the data.
+H
+B
+H
+B
+• The regularization terms fv,i
+· fv,i
+and fi,i
+· fi,i
+aim to
+minimize the correlation between human features and
+background features within the same image modality.
+
+This approach not only effectively separates the features
+but also ensures their independence, which is crucial for improving the accuracy and robustness of object detection systems.
+
+3.5
+
+Contrastive Learning Paradigm
+
+After decoupling human and background features, contrastive
+learning is essential to further enhance feature discrimination. This approach strengthens the model’s ability to distinguish humans from the background, improving recognition
+and classification across diverse lighting and environmental
+conditions.
+Selection of Visible Light and Infrared Image Pairs. We
+select visible and infrared image pairs from the MSDS and
+LLVIP Datasets (Figure 4) under similar scene conditions,
+enabling the model to recognize pedestrians across lighting
+variations. Careful pair selection ensures high-quality positive and negative samples, crucial for effective contrastive
+learning.
+For accurate multimodal pedestrian detection, visible and
+infrared image pairs must be strictly aligned in targets, background, and dimensions, sharing unified labels for seamless
+feature fusion. This alignment minimizes modality discrepancies and enhances robustness.
+We implement a contrastive learning framework (Figure 5)
+using visible and infrared features to distinguish humans from
+the background. Triplet Loss optimizes feature learning by
+
+Close
+
+𝑓" Human Features
+P 𝑓 Human Features
+!
+
+N
+𝑓" Human Features
+
+e
+os P 𝑓! Human Features
+Cl
+
+A
+
+A
+Apart
+
+N 𝑓! Background Features
+𝑓" Background Features
+
+Apart
+
+N 𝑓! Background Features
+𝑓" Background Features
+
+Figure 5: Contrastive learning paradigm.
+
+maximizing inter-class distances and minimizing intra-class
+distances, with a margin term defining decision boundaries.
+The model’s core components—Anchor (A), Positive (P), and
+Negative (N)—form the basis of the Triplet Loss function,
+ensuring effective feature discrimination.
+Triplet Loss Function. The triplet loss is used in the contrastive learning framework to train the model by increasing
+the distance between dissimilar features (negative samples)
+and decreasing the distance between similar features (positive samples). The triplet loss function is defined as:
+L=
+
+N
+X
+
+max (d (fa,i , fp,i ) − d (fa,i , fn,i ) + margin, 0)
+
+i=1
+
+Where:
+• fa,i is the feature vector of the anchor sample for the i-th
+triplet.
+• fp,i is the feature vector of the positive sample which is
+similar to the anchor.
+• fn,i is the feature vector of the negative sample which is
+dissimilar to the anchor.
+• d (x, y) represents the distance function, typically Euclidean distance, measuring the dissimilarity between
+two feature vectors.
+• margin is a predefined threshold that dictates the minimum difference required between the anchor-positive
+distance and the anchor-negative distance to encourage
+effective learning.
+
+For Background Features. For background features, the
+positive sample is the background-related feature, while the
+negative sample is the human feature (background-unrelated).
+Through contrastive learning, we minimize the distance between all positive samples (visible background and infrared
+background) and maximize the distance between positive and
+negative samples. This approach enhances the model to learn
+background features more effectively, thereby improving the
+distinction between human and background features.
+To minimize the distance between positive samples (fv
+background features to fi background features) and maximize
+the distance between negative samples and the anchor (Background to human), thereby enhancing the model’s ability to
+discern background features difference apart from human features. The triplet loss for background features can be mathematically represented as:
+Lbg =
+
+N
+X
+
+
+
+
+B
+B
+B
+H
+max d fa,i
+, fp,i
+− d fa,i
+, fn,i
++ margin, 0
+
+i=1
+
+For Human Features. Similarly, for human features, the
+positive sample is the human-related feature, and the negative sample is the background feature(human-unrelated).
+Through contrastive learning, we minimize the distance between all positive samples (human in visible images and human in infrared images), enabling the model to learn human
+features more effectively. By maximizing the distance between positive and negative samples, the model improves its
+ability to distinguish between human and background features.
+To reduce the feature distance among human instances
+(positive samples) while expanding the gap between humans
+and their backgrounds (negative samples), thus facilitating
+a clearer distinction between human and environmental features. The triplet loss for human features can be mathematically represented as:
+Lhuman =
+
+N
+X
+
+
+
+
+H
+H
+H
+B
+max d fa,i
+, fp,i
+− d fa,i
+, fn,i
++ margin, 0
+
+i=1
+
+3.6
+
+Detection Head
+
+The category prediction is responsible for classifying detected objects and outputting their category probabilities. As
+this study focuses on pedestrian detection, the module specifically predicts the probability of an object belonging to the
+pedestrian category. To achieve this, a fully connected layer
+is employed, followed by a softmax function to convert the
+raw predictions into a probability distribution. The formulation for category prediction is as follows:
+Cpred = Softmax (Wc · F + bc )
+Where Wc is the weight matrix for category prediction, F
+is the fused multimodal feature matrix, bc is the bias term,
+and Softmax is the activation function used to calculate the
+probability of the target belonging to each category.
+By integrating features from both RGB and infrared spectra, the category prediction module effectively addresses classification tasks under complex illumination conditions. This
+
+integration significantly enhances the accuracy of pedestrian
+detection by reducing false positives in low-light or cluttered
+background scenarios.
+Bounding Box Prediction. The bounding box prediction is
+responsible for localizing detected objects by predicting their
+center coordinates (x, y), width w, and height h. An anchorbased mechanism and regression to refine the bounding box
+parameters. The bounding box prediction is formulated as
+follows:
+Bpred = σ (tx ) + xcell , σ (ty ) + ycell , pw etw , ph eth
+
+
+
+Where (tx , ty , tw , th ) are the predicted adjustment parameters for the bounding box, (xcell , ycell ) are the top-left coordinates of the grid cell, (pw , ph ) are the width and height of
+the anchor box, and σ(·) is the Sigmoid activation function,
+which constrains the coordinates to the range [0, 1].
+Confidence Prediction. The confidence prediction evaluates whether a detected bounding box contains a pedestrian
+and assesses the precision of the box. The confidence score is
+determined by the probability of the object’s presence, Pobj ,
+and the Intersection over Union (IoU) between the predicted
+bounding box and the ground truth box. The formula is expressed as:
+Sconf = Pobj × IoU (Bpred , Btrue )
+Where Sconf is the probability that the predicted bounding
+box contains a target object, and IoU (Bpred , Btrue ) measures
+the overlap between the predicted bounding box Bpred and the
+ground truth box Btrue .
+By leveraging the enhanced features from the IRFDM, the
+confidence prediction effectively differentiates targets from
+complex backgrounds. This enhanced capability ensures accurate confidence scores even under challenging conditions,
+such as low-light or high-brightness environments, maintaining robustness and reliability in pedestrian detection tasks.
+Joint Loss Function. The overall prediction loss function integrates multiple components, including regularization
+constraints, the contrastive learning paradigm, classification,
+bounding box regression, and confidence prediction losses.
+To achieve comprehensive optimization of the model, we define a joint loss function, Ltotal , as follows:
+Ltotal = Lcls + Lbox + Lconf + λ1 Lcon + λ2 (Lbg + Lhuman )
+where Lcls is the classification loss, Lbox is the localization
+loss, Lconf is the confidence loss, Lcon is the decoupling constraint loss, and Lbg +Lhuman is the contrastive loss. The terms
+λ1 and λ2 are hyperparameters that control the relative importance of the decoupling constraint loss and the contrastive
+loss, respectively.
+The weights of these loss components can be adjusted to
+balance model performance. The choice of hyperparameters λ1 and λ2 depends on the specific characteristics of the
+dataset and the task requirements. By optimizing all these
+components, the overall prediction loss Ltotal ensures that the
+model performs robustly across all detection tasks. This design enables accurate and reliable pedestrian detection, even
+in complex illumination conditions and diverse scenarios.
+
+Algorithm 1 PedDet Algorithm Overview
+Require: RGB image Irgb , Infrared image Iir
+Ensure: Detection results Bpred , Cpred , Sconf
+1: Feature Extraction:
+2: Frgb ← YOLOv10(Irgb ) {Generate multi-scale RGB
+features}
+3: Fir ← YOLOv10(Iir ) {Generate multi-scale IR features}
+4: MSFPM Processing:
+5: Ff used ← wrgb Frgb + wir Fir {Dynamic fusion}
+6: Freduced ← Wreduce Ff used {Dimensionality reduction}
+7: Factivated ← SiLU(Freduced )
+8: IRFDM Processing:
+9: fvH , fvB ← DecoupleFeatures(Factivated ) {Visible
+
+branch}
+10: fiH , fiB
+
+← DecoupleFeatures(Factivated ) {Infrared
+branch}
+11: Contrastive Learning:
+12: Lbg ← ComputeTripletLoss(fvB , fiB , fvH )
+13: Lhuman ← ComputeTripletLoss(fvH , fiH , fvB )
+14: Detection Head:
+15: Cpred ← Softmax(Wc Factivated + bc )
+16: Bpred ← DecodeBox(tx , ty , tw , th )
+17: Sconf ← Pobj × IoU(Bpred , Btrue )
+18: Joint Optimization:
+19: Ltotal = Lcls + Lbox + Lconf + λ1 Lcon + λ2 (Lbg +
+Lhuman )
+
+4
+
+Experiments
+
+4.1
+
+Experimental Setup and Datasets
+
+Setup. During the training phase, we adopted transfer
+learning by initializing the model with pre-trained weights
+from the MS COCO dataset [Lin et al., 2014a]. By leveraging these pre-trained weights, the network could utilize general features from a large-scale dataset, significantly reducing
+training time and improving initial convergence speed. During validation, all input images were resized to a consistent
+resolution of 256×256 pixels. This resizing ensures uniformity in the input data, minimizing computational overhead
+while maintaining detection accuracy. The validation process
+strictly adhered to the hyperparameter configurations used
+during training, ensuring the reliability and consistency of
+evaluation results. For training and validation configuration
+and hyperparameters, see Supplementary Section 2: Implement Details.
+Datasets. We primarily evaluated our model on two benchmark datasets: the MSRS [Tang et al., 2022] and LLVIP [Jia
+et al., 2021] datasets. These datasets have become key benchmarks in the field as they reflect real-world scenarios. See
+Supplementary Section 3: Datasets.
+
+4.2
+
+Comparative Study
+
+To comprehensively evaluate the performance of PedDet, we
+compared its detection accuracy against several state-of-theart multimodal pedestrian detection algorithms, including:
+
+Figure 6: Comparison of traditional RGB-modal (a, b) and ours
+multi-modal (c) pedestrian detection result. (a) RGB image, (b) Infrared image, and (c) Detection result of the proposed multi-modal
+algorithm.
+
+SSD [Liu et al., 2016b], RetinaNet [Ross and Dollár, 2017],
+YOLOv10 [Wang et al., 2024], Faster R-CNN [Ren et al.,
+2016a], DDQ-DETR [Zhang et al., 2023], Halfway fusion
+[Liu et al., 2016a], ProbEn [Chen et al., 2022], ARCNNExtension [Zhang et al., 2021], PoolFuser [Cao et al., 2023],
+LENFusion [Chen et al., 2024]. The evaluation was conducted on two benchmark datasets, MSRS and LLVIP, with
+standard metrics including mean Average Precision (mAP)
+and its at 50% Intersection over Union (mAP@50). The experimental results are shown in Table 1 below.
+
+Method
+
+Backbone
+
+Dataset
+
+mAP@50↑
+
+mAP↑
+
+Modality
+
+90.2
+94.8
+93.1
+94.6
+93.9
+
+53.5
+55.1
+53.7
+54.5
+58.6
+
+Infrared
+Infrared
+Infrared
+Infrared
+Infrared
+
+82.6
+88.0
+87.8
+87.0
+86.1
+
+39.8
+42.8
+50.2
+47.5
+46.7
+
+RGB
+RGB
+RGB
+RGB
+RGB
+
+55.1
+51.5
+56.2
+38.4
+53.0
+56.8
+
+Infrared + RGB
+Infrared + RGB
+Infrared + RGB
+Infrared + RGB
+Infrared + RGB
+Infrared + RGB
+
+Infrared
+SSD
+RetinaNet
+YOLOv10
+Faster R-CNN
+DDQ-DETR
+
+VGG16
+ResNet50
+CSPDarknet
+ResNet50
+ResNet50
+
+LLVIP
+LLVIP
+LLVIP
+LLVIP
+LLVIP
+
+SSD
+RetinaNet
+YOLOv10
+Faster R-CNN
+DDQ-DETR
+
+VGG16
+ResNet50
+CSPDarknet
+ResNet50
+ResNet50
+
+LLVIP
+LLVIP
+LLVIP
+LLVIP
+LLVIP
+
+Halfway Fusion
+ProbEn
+ARCNN-Extension
+PoolFuser
+LENFusion
+PedDet (Ours)
+
+VGG16
+ResNet50
+VGG16
+ResNet-34s
+CSPDarknet
+CSPDarknet
+
+RGB
+
+Infrared + RGB
+LLVIP
+LLVIP
+LLVIP
+LLVIP
+LLVIP
+LLVIP
+
+91.4
+93.4
+89.2
+80.3
+81.6
+95.8
+
+Table 1: Comparison of detection performance of SOTA methods. The best values are in bold.
+
+The detection results as shown in Figure 6(a), visible-light
+images exhibit challenges in distinguishing humans from the
+background under poor illumination conditions. This limitation is evident in the low contrast between objects and
+their surroundings, which makes pedestrian detection difficult. In contrast, infrared images provide distinct object contours, enabling easier differentiation of pedestrians from the
+background. The proposed PedDet effectively integrates the
+complementary features of visible and infrared spectra, highlighting pedestrians in the fused feature representation. This
+integration results in robust detection performance, particularly in low-light scenarios as shown in Figure 7.
+
+Figure 7: Comparison of detection visualization effects with and
+without infrared assistance.
+
+4.3
+
+Ablation Study
+
+Effect of Contrastive Learning. In this section, we evaluate the impact of contrastive learning (CL) on the performance of different backbones. The results are presented in
+Table 2. As shown, the introduction of contrastive learning
+consistently improves the performance across all backbones.
+For instance, YOLOv10-S achieves a performance of 54.8 %
+with CL, which is an improvement of 1.6 % compared to its
+performance without CL. Similar improvements are observed
+for YOLOv10-M and YOLOv10-L, with performance gains
+of 1.6 % and 1.7 %, respectively. These results highlight the
+effectiveness of contrastive learning in enhancing the model’s
+capability.
+
+pling module, we performed t-SNE visualization. As shown
+in the Figure 8 below, the t-SNE visualization shows the
+model’s ability to distinguish between human relevant (green
+color) and human irrelevant (red color) features over different training epochs (100, 200, 500, 1000). In the initial stages
+of training, the human-relevant feature and human-irrelevant
+feature points are highly mixed, indicating the model’s initial
+weak capability in feature distinction.
+However, as training progresses to 200 epochs, the data
+points begin to show some clustering trends, although there is
+still a lot of overlap. By 500 epochs, the separation between
+human-relevant features and human-irrelevant features becomes more clearer, indicating a significant improvement in
+the model’s ability to discriminate features. At 1000 epochs,
+the clustering of human-relevant and human irrelevant features is very obvious, with minimal overlap, which shows
+that the model has effectively learned to differentiate between
+the two types of features, accurately separating and grouping
+them.
+This gradual improvement of the learning process indicates
+that the training strategy of the model is successful, enabling
+the model to accurately perform tasks such as classification,
+recognition in complex datasets.
+
+Table 2: Impact of different backbones on the task with and without
+contrastive learning.
+Backbone
+
+w/o CL
+
+w/ CL
+
+YOLOv10-S
+YOLOv10-M
+YOLOv10-L
+
+53.2 %
+55.1 %
+56.4 %
+
+54.8 % (↑ 1.6 %)
+56.7 % (↑ 1.6 %)
+58.1 % (↑ 1.7 %)
+
+Effect of Additional Modality. We further investigated the
+impact of different modalities (AM) on task performance,
+with the results summarized in Table 3. The inclusion of additional modalities significantly improved performance. After introducing MSFPM and IRFDM, PedDet achieved a performance of 95.8 %, representing an improvement of 1.1 %
+compared to when CL was not used. This demonstrates the
+importance of leveraging additional modalities to enhance the
+model’s effectiveness.
+Table 3: Performance comparison of different models.
+Models
+
+mAP@50
+
+mAP
+
+PedDet
+PedDet (w/o MSFPM)
+PedDet (w/o IRFDM)
+PedDet (w/o CL)
+PedDet (w/o MSFPM and IRFDM)
+PedDet (w/o MSFPM and CL)
+PedDet (w/o IRFDM and CL)
+
+95.8
+93.4
+94.1
+94.7
+91.2
+92.8
+93.0
+
+56.8
+54.3
+55.0
+55.5
+51.8
+53.1
+53.5
+
+T-SNE Visualization of Feature Decoupling Results. To
+further demonstrate the effectiveness of our feature decou-
+
+Figure 8: t-SNE visualization of feature decoupling results.
+
+5
+
+Conclusions
+
+In this paper, we propose PedDet, an adaptive framework
+that enhances pedestrian detection under complex illumination by leveraging spectral complementarity. It integrates
+the MSFPM and IRFDM to optimize detection across visible
+and infrared spectra. MSFPM adjusts feature weights, while
+IRFDM mitigates illumination noise by decoupling pedestrian and background features. A contrastive learning approach further improves feature discrimination. Experimental results show PedDet outperforms existing methods, establishing it as a reliable and effective solution for multimodal
+pedestrian detection and a benchmark in intelligent transportation systems.
+
+References
+[Cai et al., 2024a] Guohui Cai, Ying Cai, Zeyu Zhang,
+Yuanzhouhan Cao, Lin Wu, Daji Ergu, Zhinbin Liao, and
+Yang Zhao. Medical ai for early detection of lung cancer:
+A survey. arXiv preprint arXiv:2410.14769, 2024.
+[Cai et al., 2024b] Guohui Cai, Ying Cai, Zeyu Zhang, Daji
+Ergu, Yuanzhouhan Cao, Binbin Hu, Zhibin Liao, and
+Yang Zhao. Msdet: Receptive field enhanced multiscale detection for tiny pulmonary nodule. arXiv preprint
+arXiv:2409.14028, 2024.
+[Cao et al., 2023] Yue Cao, Yanshuo Fan, Junchi Bin, and
+Zheng Liu. Lightweight transformer for multi-modal object detection (student abstract). In Proceedings of the
+AAAI Conference on Artificial Intelligence, volume 37,
+pages 16172–16173, 2023.
+[Chen et al., 2022] Yi-Ting Chen, Jinghao Shi, Zelin Ye,
+Christoph Mertz, Deva Ramanan, and Shu Kong. Multimodal object detection via probabilistic ensembling. In
+European Conference on Computer Vision, pages 139–
+158. Springer, 2022.
+[Chen et al., 2024] Jun Chen, Liling Yang, Wei Liu, Xin
+Tian, and Jiayi Ma. Lenfusion: A joint low-light enhancement and fusion network for nighttime infrared and visible
+image fusion. IEEE Transactions on Instrumentation and
+Measurement, 2024.
+[Hussain, 2023] Muhammad Hussain. Yolo-v1 to yolo-v8,
+the rise of yolo and its complementary nature toward digital manufacturing and industrial defect detection. Machines, 11(7):677, 2023.
+[Hwang et al., 2015] Soonmin Hwang, Jaesik Park, Namil
+Kim, Yukyung Choi, and In So Kweon. Multispectral
+pedestrian detection: Benchmark dataset and baseline. In
+Proceedings of the IEEE conference on computer vision
+and pattern recognition, pages 1037–1045, 2015.
+[Jia et al., 2021] Xinyu Jia, Chuang Zhu, Minzhen Li, Wenqi
+Tang, and Wenli Zhou. Llvip: A visible-infrared paired
+dataset for low-light vision.
+In Proceedings of the
+IEEE/CVF international conference on computer vision,
+pages 3496–3504, 2021.
+[Jocher et al., 2022] Glenn Jocher, Ayush Chaurasia, Alex
+Stoken, Jirka Borovec, NanoCode012, Yonghye Kwon,
+TaoXie, Kalen Michael, Jiacong Fang, Imyhxy, Lorna,
+Colin Wong, ”Zeng Yifu” Zeng Yifu, Abhiram V,
+Diego Montes, Zhiqiang Wang, Cristi Fati, Jebastin
+Nadar, Laughing, UnglvKitDe, Tkianai, YxNONG, Piotr
+Skalski, Adam Hogan, Max Strobel, Mrinal Jain, Lorenzo
+Mammana, and Xylieong. ultralytics/yolov5: v6.2 YOLOv5 Classification Models, Apple M1, Reproducibility, ClearML and Deci.ai integrations, August 2022.
+[Konig et al., 2017] Daniel Konig, Michael Adam, Christian Jarvers, Georg Layher, Heiko Neumann, and Michael
+Teutsch. Fully convolutional region proposal networks
+for multispectral person detection. In Proceedings of the
+IEEE conference on computer vision and pattern recognition workshops, pages 49–56, 2017.
+
+[Li et al., 2018] Chengyang Li, Dan Song, Ruofeng Tong,
+and Min Tang. Multispectral pedestrian detection via simultaneous detection and segmentation. arXiv preprint
+arXiv:1808.04818, 2018.
+[Li et al., 2020] Xiang Li, Wenhai Wang, Lijun Wu, Shuo
+Chen, Xiaolin Hu, Jun Li, Jinhui Tang, and Jian Yang.
+Generalized focal loss: Learning qualified and distributed
+bounding boxes for dense object detection. Advances in
+Neural Information Processing Systems, 33:21002–21012,
+2020.
+[Liang et al., 2022] Tingting Liang, Xiaojie Chu, Yudong
+Liu, Yongtao Wang, Zhi Tang, Wei Chu, Jingdong Chen,
+and Haibin Ling. Cbnet: A composite backbone network
+architecture for object detection. IEEE Transactions on
+Image Processing, 31:6893–6906, 2022.
+[Lin et al., 2014a] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays, Pietro Perona, Deva Ramanan, Piotr
+Dollár, and C Lawrence Zitnick. Microsoft coco: Common objects in context. In Computer Vision–ECCV 2014:
+13th European Conference, Zurich, Switzerland, September 6-12, 2014, Proceedings, Part V 13, pages 740–755.
+Springer, 2014.
+[Lin et al., 2014b] Tsung-Yi Lin, Michael Maire, Serge Belongie, James Hays, Pietro Perona, Deva Ramanan, Piotr
+Dollár, and C Lawrence Zitnick. Microsoft coco: Common objects in context. In Computer Vision–ECCV 2014:
+13th European Conference, Zurich, Switzerland, September 6-12, 2014, Proceedings, Part V 13, pages 740–755.
+Springer, 2014.
+[Lin et al., 2017] Tsung-Yi Lin, Piotr Dollár, Ross Girshick,
+Kaiming He, Bharath Hariharan, and Serge Belongie. Feature pyramid networks for object detection. In Proceedings
+of the IEEE conference on computer vision and pattern
+recognition, pages 2117–2125, 2017.
+[Lin et al., 2020] Matthieu Lin, Chuming Li, Xingyuan Bu,
+Ming Sun, Chen Lin, Junjie Yan, Wanli Ouyang, and Zhidong Deng. Detr for crowd pedestrian detection. arXiv
+preprint arXiv:2012.06785, 2020.
+[Liu et al., 2016a] Jingjing Liu, Shaoting Zhang, Shu Wang,
+and Dimitris N Metaxas.
+Multispectral deep neural networks for pedestrian detection. arXiv preprint
+arXiv:1611.02644, 2016.
+[Liu et al., 2016b] Wei Liu, Dragomir Anguelov, Dumitru
+Erhan, Christian Szegedy, Scott Reed, Cheng-Yang Fu,
+and Alexander C Berg. Ssd: Single shot multibox detector.
+In Computer Vision–ECCV 2016: 14th European Conference, Amsterdam, The Netherlands, October 11–14, 2016,
+Proceedings, Part I 14, pages 21–37. Springer, 2016.
+[Liu et al., 2021] Ze Liu, Yutong Lin, Yue Cao, Han Hu,
+Yixuan Wei, Zheng Zhang, Stephen Lin, and Baining Guo.
+Swin transformer: Hierarchical vision transformer using
+shifted windows. In Proceedings of the IEEE/CVF international conference on computer vision, pages 10012–
+10022, 2021.
+[Liu et al., 2022] Jinyuan Liu, Xin Fan, Zhanbo Huang,
+Guanyao Wu, Risheng Liu, Wei Zhong, and Zhongx-
+
+uan Luo. Target-aware dual adversarial learning and a
+multi-scenario multi-modality benchmark to fuse infrared
+and visible for object detection. In Proceedings of the
+IEEE/CVF conference on computer vision and pattern
+recognition, pages 5802–5811, 2022.
+[Loveday and Breckon, 2018] Michael Loveday and Toby P
+Breckon. On the impact of parallax free colour and infrared image co-registration to fused illumination invariant adaptive background modelling. In Proceedings of the
+IEEE Conference on Computer Vision and Pattern Recognition Workshops, pages 1186–1195, 2018.
+[Mees et al., 2016] Oier Mees, Andreas Eitel, and Wolfram
+Burgard. Choosing smartly: Adaptive multimodal fusion
+for object detection in changing environments. In 2016
+IEEE/RSJ International Conference on Intelligent Robots
+and Systems (IROS), pages 151–156. IEEE, 2016.
+[Park et al., 2018] Kihong Park, Seungryong Kim, and
+Kwanghoon Sohn. Unified multi-spectral pedestrian detection based on probabilistic fusion networks. Pattern
+Recognition, 80:143–155, 2018.
+[Perot et al., 2020] Etienne Perot, Pierre De Tournemire, Davide Nitti, Jonathan Masci, and Amos Sironi. Learning to
+detect objects with a 1 megapixel event camera. Advances
+in Neural Information Processing Systems, 33:16639–
+16652, 2020.
+[Redmon, 2016] J Redmon. You only look once: Unified,
+real-time object detection. In Proceedings of the IEEE
+conference on computer vision and pattern recognition,
+2016.
+[Ren et al., 2016a] Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun. Faster r-cnn: Towards real-time
+object detection with region proposal networks. IEEE
+transactions on pattern analysis and machine intelligence,
+39(6):1137–1149, 2016.
+[Ren et al., 2016b] Shaoqing Ren, Kaiming He, Ross Girshick, and Jian Sun. Faster r-cnn: Towards real-time
+object detection with region proposal networks. IEEE
+transactions on pattern analysis and machine intelligence,
+39(6):1137–1149, 2016.
+[Ross and Dollár, 2017] T-YLPG Ross and GKHP Dollár.
+Focal loss for dense object detection. In proceedings of the
+IEEE conference on computer vision and pattern recognition, pages 2980–2988, 2017.
+[Takumi et al., 2017] Karasawa Takumi, Kohei Watanabe,
+Qishen Ha, Antonio Tejero-De-Pablos, Yoshitaka Ushiku,
+and Tatsuya Harada. Multispectral object detection for autonomous vehicles. In Proceedings of the on Thematic
+Workshops of ACM Multimedia 2017, pages 35–43, 2017.
+[Tang et al., 2022] Linfeng Tang, Jiteng Yuan, Hao Zhang,
+Xingyu Jiang, and Jiayi Ma. Piafusion: A progressive infrared and visible image fusion network based on illumination aware. Information Fusion, 83:79–92, 2022.
+[Wagner et al., 2016] Jörg Wagner, Volker Fischer, Michael
+Herman, Sven Behnke, et al. Multispectral pedestrian detection using deep fusion convolutional neural networks.
+In ESANN, volume 587, pages 509–514, 2016.
+
+[Wang et al., 2023] Chien-Yao Wang, Alexey Bochkovskiy,
+and Hong-Yuan Mark Liao. Yolov7: Trainable bag-offreebies sets new state-of-the-art for real-time object detectors. In 2023 IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pages 7464–7475,
+2023.
+[Wang et al., 2024] Ao Wang, Hui Chen, Lihao Liu, Kai
+CHEN, Zijia Lin, Jungong Han, and Guiguang Ding.
+YOLOv10: Real-time end-to-end object detection. In The
+Thirty-eighth Annual Conference on Neural Information
+Processing Systems, 2024.
+[Zhang et al., 2021] Lu Zhang, Zhiyong Liu, Xiangyu Zhu,
+Zhan Song, Xu Yang, Zhen Lei, and Hong Qiao. Weakly
+aligned feature fusion for multimodal object detection.
+IEEE Transactions on Neural Networks and Learning Systems, 2(2):1–15, 2021.
+[Zhang et al., 2023] Shilong Zhang, Xinjiang Wang, Jiaqi
+Wang, Jiangmiao Pang, Chengqi Lyu, Wenwei Zhang,
+Ping Luo, and Kai Chen. Dense distinct query for endto-end object detection. In Proceedings of the IEEE/CVF
+conference on computer vision and pattern recognition,
+pages 7329–7338, 2023.
+[Zhang et al., 2024] Zeyu Zhang, Nengmin Yi, Shengbo
+Tan, Ying Cai, Yi Yang, Lei Xu, Qingtai Li, Zhang Yi,
+Daji Ergu, and Yang Zhao. Meddet: Generative adversarial distillation for efficient cervical disc herniation detection. In 2024 IEEE International Conference on Bioinformatics and Biomedicine (BIBM), pages 4024–4027. IEEE,
+2024.
+
+PedDet: Adaptive Spectral Optimization for Multimodal Pedestrian Detection
+- Supplementary Materials 1
+
+Related Works
+
+Multimodal Fusion Challenges Multimodal information,
+such as RGB and infrared spectra, has been extensively studied for improving pedestrian detection performance. Despite
+its potential, many existing methods struggle to effectively
+harness the complementary advantages of multimodal features. The YOLO series, first introduced by Joseph et al.
+[Redmon, 2016], has demonstrated excellent performance in
+single-modal detection tasks. However, its original architecture lacks specific mechanisms for multimodal fusion. Subsequent versions, such as YOLOv3 [Redmon, 2016] and its
+successors [Hussain, 2023], focus primarily on structural optimization and speed improvements without addressing the
+challenges of multimodal integration.
+To address these limitations, researchers have proposed
+various solutions. For example, Hwang et al. [Hwang et al.,
+2015] introduced the KAIST dataset, a large-scale multispectral pedestrian benchmark with well-aligned visible and thermal images, along with dense pedestrian annotations. They
+also proposed a method that extracts Aggregated Channel
+Features (ACF+T+THOG) and employs Boosted Decision
+Trees (BDT) for classification. However, this approach relies
+on shallow feature fusion, limiting its adaptability to environmental changes and resulting in instability under complex
+scenarios.
+Wagner et al. [Wagner et al., 2016] pioneered the application of deep neural networks (DNNs) in multispectral pedestrian detection and compared early and late fusion strategies.
+Liu et al. [Liu et al., 2016a] extended this research by applying Faster R-CNN [Ren et al., 2016a] to multispectral pedestrian detection and designing four ConvNet-based fusion architectures. Among these, the Halfway Fusion model, which
+merges middle-layer convolutional features from dual-branch
+ConvNets, achieved the best results. König et al. [Konig et
+al., 2017] introduced the Fusion RPN+BDT model, integrating dual-stream DNNs at middle convolutional layers for enhanced fusion.
+Recently, Park et al. [Park et al., 2018] proposed a threebranch DNN architecture to handle multimodal inputs, incorporating a Channel Weighted Fusion (CWF) layer to enhance
+detection performance by adaptively weighting the contributions of each modality. Loveday et al. [Loveday and Breckon,
+2018] developed an orthogonal dual-camera imaging system
+to capture parallax-free, well-aligned multispectral images.
+Their findings demonstrated that combining visible and infrared data significantly improves foreground object detection
+compared to using single-modal data.
+Illumination Robustness Challenges With the advancement of object detection [Zhang et al., 2024; Cai et al., 2024a;
+Cai et al., 2024b], pedestrian detection methods have divided
+into two main methods: one-stage detectors [14], and twostage detectors [15-16],. However, these detectors predomi-
+
+nantly rely on RGB images, leading to performance degradation under low-light or extreme illumination conditions.
+The YOLO series [Hussain, 2023], while excelling under
+standard lighting conditions, exhibits significant limitations
+in handling complex illumination scenarios. Models such as
+YOLOv5 and YOLOv6 improved detection speed and accuracy through structural optimizations but struggled to maintain robustness in extreme lighting environments. These algorithms often fail to effectively distinguish pedestrian features
+from background noise under conditions like uneven lighting or occlusion. Although RGB images provide rich texture and detail information, achieving reliable detection results in challenging conditions—such as extreme lighting, occlusions, and complex backgrounds—requires incorporating
+multimodal data.
+Existing approaches have explored various fusion strategies for integrating multimodal information, including early
+fusion, late fusion, and intermediate fusion. Early fusion
+(pixel-level fusion) directly concatenates data from different
+modalities and processes it using conventional object detectors [Redmon, 2016; Ren et al., 2016b; Lin et al., 2017]. Late
+fusion involves feeding each modality into separate singlemodal detectors and subsequently merging the predicted
+bounding boxes using statistical methods [Chen et al., 2022;
+Li et al., 2018; Takumi et al., 2017]. While simple, both early
+and late fusion methods often overlook the interdependencies
+between modalities, limiting their ability to fully exploit complementary features.
+To address these limitations, recent studies have introduced illumination-aware feature fusion and attention-based
+feature fusion strategies. Illumination-aware fusion methods [Lin et al., 2017; Li et al., 2020; Liang et al., 2022;
+Lin et al., 2020] typically incorporate a classification branch
+to determine the significance of RGB features based on lighting conditions. However, classification-based approaches
+cannot accurately reflect the importance of individual regions
+within an image. In contrast, attention-based methods leverage spatial attention, channel attention, or cross-attention
+mechanisms derived from transformers to facilitate feature
+fusion [Liu et al., 2016a; Lin et al., 2014b; Liu et al., 2022;
+Liu et al., 2021; Mees et al., 2016; Perot et al., 2020]. Spatial and channel attention generate element-wise and channelwise weighting factors for multispectral features, respectively, while cross-attention models global contextual correlations to resolve feature misalignment between modalities.
+Although cross-attention provides superior fusion capabilities, it incurs high computational costs, posing challenges for
+real-time applications.
+
+2
+
+Implement Details
+
+Epochs and Batch Size. The training process was conducted for 50 epochs, with a batch size of 8 images per iteration.
+
+Optimizer and Learning Rate. We employed the Adam
+optimizer with an initial learning rate of 0.001. To address the
+issue of high learning rates during later training stages, we applied the Cosine Annealing learning rate scheduling strategy.
+This approach gradually decreases the learning rate throughout the training process, approaching zero at the end of each
+cycle. This dynamic decay effectively mitigates overfitting.
+Weight Decay. To further enhance model stability and generalization, a weight decay mechanism with a coefficient of
+0.0005 was introduced. This regularization technique suppresses overly complex parameter updates in the network, improving the model’s ability to generalize to unseen data.
+
+Figure 1: Training curves of LLVIP dataset.
+
+Warm-up Strategy. To ensure a smooth transition into optimal training conditions, a warm-up strategy was applied
+during the first three epochs. This gradually increased the
+learning rate, preventing instability caused by large parameter adjustments in the early stages of training.
+Multi-scale Training. To improve the model’s robustness
+and adaptability to varying object sizes, we incorporated a
+multi-scale training strategy. This involved randomly scaling
+images in different training batches, enhancing the network’s
+ability to detect objects of various scales. This strategy is particularly advantageous for multimodal pedestrian detection,
+improving the detection of small objects while maintaining
+performance on larger targets.
+The detailed configuration and hyperparameters are in Table 1.
+Object Detectors
+Hyperparameter
+
+Traditional YOLO
+
+PedDet (Ours)
+
+Learning Rate
+Epochs
+Batch Size
+Optimizer
+Weight Decay
+Warmup Epochs
+Scheduler
+
+0.001
+400
+16
+SGD
+0.0005
+3
+Cosine
+
+0.001
+50
+8
+AdamW
+0.0005
+5
+Cosine
+
+Table 1: Pedestrian detection training hyperparameters. Comparison of hyperparameters used in traditional YOLO variants and
+our approach.
+
+Training Analysis. As shown in Figure 1 and 2, in the evaluation of performance metrics, both precision and recall show
+a relatively fluctuating upward trend during the training process. As training progresses, both precision and recall gradually improve, indicating that the model becomes increasingly
+proficient at distinguishing targets from non-targets. The initial fluctuations observed in these metrics during certain training phases suggest the model’s iterative adjustments to optimize its detection performance.
+
+3
+
+Datasets
+
+Multi-Spectral Road Scenarios (MSRS). The MSRS
+dataset is a refined version of the MFNet dataset, specifically
+
+Figure 2: Training curves of MSRS dataset.
+
+designed for infrared-visible image fusion in multimodal applications. The original MFNet dataset comprises 1,569 image pairs (820 captured during the day and 749 at night) with
+a resolution of 480×640. However, it suffers from several
+limitations, including misaligned image pairs and low signalto-noise ratio (SNR) and contrast in most infrared images.
+To address these issues, the MSRS dataset enhances data
+quality through several steps:
+• Removal of Misaligned Image Pairs: 125 misaligned
+pairs were excluded, resulting in 715 daytime and 729
+nighttime image pairs.
+• Infrared Image Enhancement: A dark channel priorbased image enhancement algorithm was applied to improve the contrast and SNR of the infrared images.
+As a result, the MSRS dataset comprises 1,444 pairs of
+high-quality, aligned infrared and visible images, making it a
+reliable benchmark for multimodal pedestrian detection under diverse lighting conditions.
+LLVIP. The LLVIP dataset is a more challenging multimodal dataset, tailored for pedestrian detection under lowlight conditions. It includes a large number of pedestrians
+captured in various lighting environments, making it particularly valuable for testing low-light detection models.
+The dataset was collected with a dual-mode camera system that integrates visible and infrared cameras, ensuring
+temporal and spatial consistency between image pairs. Each
+pair was carefully registered and cropped to ensure identical
+fields of view and dimensions. This strict alignment makes
+the dataset especially suitable for image fusion and image-toimage translation tasks.
+
+The LLVIP dataset comprises 12,025 pairs of aligned
+visible-infrared images, with a training set of 3,463 pairs.
+Each image has a resolution of 1,024×1,280, providing highquality data for training and evaluation.
+
+4
+
+Visualization of Results
+
+Figure 3 showcases typical examples of pedestrian detection
+in various environments, with each image highlighting the
+detected objects (pedestrians or vehicles) through bounding
+boxes and displaying the corresponding confidence scores.
+The detection results reflect the model’s performance in handling complex visual scenes, especially its accuracy under
+different lighting conditions. In low-light or high-contrast environments, the model can still effectively identify pedestrians and exhibits strong robustness against background interference. This capability is made possible by the two core
+modules introduced in the paper: the Multi-scale Spectral
+Feature Perception Module (MSFPM) and the Illumination
+Robustness Feature Decoupling Module (IRFDM).
+
+Figure 3: Visualization of PedDet results.
+
+

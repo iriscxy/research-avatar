@@ -1,0 +1,1572 @@
+arXiv:2205.13339v1 [cs.CL] 26 May 2022
+
+Target-aware Abstractive Related Work Generation with
+Contrastive Learning
+Xiuying Chen
+
+Hind Alamro
+
+Mingzhe Li
+
+CBRC, KAUST
+CEMSE, KAUST
+xiuying.chen@kaust.edu.sa
+
+CBRC, KAUST
+CEMSE, KAUST
+hind.alamro@kaust.edu.sa
+
+Ant Group
+li_mingzhe@pku.edu.cn
+
+Shen Gao
+
+Rui Yan†
+
+Xin Gao
+
+Peking University
+shengao@pku.edu.cn
+
+Renmin University of China
+ruiyan@ruc.edu.cn
+
+CBRC, KAUST
+CEMSE, KAUST
+xin.gao@kaust.edu.sa
+
+Xiangliang Zhang†
+University of Notre Dame
+CEMSE, KAUST
+xzhang33@nd.edu
+
+ABSTRACT
+
+KEYWORDS
+
+The related work section is an important component of a scientific
+paper, which highlights the contribution of the target paper in the
+context of the reference papers. Authors can save their time and
+effort by using the automatically generated related work section
+as a draft to complete the final related work. Most of the existing
+related work section generation methods rely on extracting off-theshelf sentences to make a comparative discussion about the target
+work and the reference papers. However, such sentences need to be
+written in advance and are hard to obtain in practice. Hence, in this
+paper, we propose an abstractive target-aware related work generator (TAG), which can generate related work sections consisting of
+new sentences. Concretely, we first propose a target-aware graph
+encoder, which models the relationships between reference papers
+and the target paper with target-centered attention mechanisms.
+In the decoding process, we propose a hierarchical decoder that attends to the nodes of different levels in the graph with keyphrases as
+semantic indicators. Finally, to generate a more informative related
+work, we propose multi-level contrastive optimization objectives,
+which aim to maximize the mutual information between the generated related work with the references and minimize that with nonreferences. Extensive experiments on two public scholar datasets
+show that the proposed model brings substantial improvements
+over several strong baselines in terms of automatic and tailored
+human evaluations1 .
+
+Scientific document processing, Related work generation
+
+CCS CONCEPTS
+• Information systems → Summarization.
+1 https://github.com/iriscxy/Target-aware-RWG
+
+† Corresponding authors.
+This work is licensed under a Creative Commons Attribution
+International 4.0 License.
+SIGIR ’22, July 11–15, 2022, Madrid, Spain.
+© 2022 Copyright held by the owner/author(s).
+ACM ISBN 978-1-4503-8732-3/22/07.
+https://doi.org/10.1145/3477495.3532065
+
+ACM Reference Format:
+Xiuying Chen, Hind Alamro, Mingzhe Li, Shen Gao, Rui Yan, Xin Gao,
+Xiangliang Zhang. 2022. Target-aware Abstractive Related Work Generation with Contrastive Learning. In Proceedings of the 45th Int’l ACM SIGIR
+Conference on Research and Development in Information Retrieval (SIGIR
+’22), July 11–15, 2022, Madrid, Spain. ACM, New York, NY, USA, 11 pages.
+https://doi.org/10.1145/3477495.3532065
+
+1
+
+INTRODUCTION
+
+Good scientific papers often need to help readers comprehend the
+contribution by contextualizing the proposed work in the scientific
+fields. The related work section serves as a pivot for this goal,
+which compares and connects the innovation and novelty of the
+current work with previous studies. The task of Related Work section
+Generation (RWG) is thus proposed [17], which aims to generate a
+related work section for a target paper given multiple cited papers
+as reference. The generated related work section can be used as a
+draft for the author to complete his or her final related work section.
+Hence, RWG can greatly reduce the author’s time and effort when
+writing a paper [19].
+The unique characteristics of the task and the use of rare, technical terms in scientific articles make RWG challenging. Conventional
+extractive RWG methods rely on off-the-shelf sentences to generate
+a target-aware related work section. For example, Hu and Wan [19]
+split the sentences of the references and the target paper into different topic-biased parts, and then apply importance scores to each
+sentence. Subsequently, Chen and Zhuge [4] collected sentences
+from the target paper and papers that cite the reference papers to
+form a related work. In such cases, sentences that make comparative
+discussion need to be written in advance, which still require human
+efforts and are hard to obtain. Abstractive text generation technique is a natural solution to this problem, which has sophisticated
+abilities such as paraphrasing and generalization. Xing et al. [39]
+and Ge et al. [14] proposed to generate a short text to explain the
+
+...We introduce the novel problem of
+automatic related work summarization.
+Given multiple articles as input, a related
+work summarization system creates a
+topic-biased summary of related work ...
+
+[1]
+
+[2]
+
+[3]
+
+[4]
+
+[5]
+
+References
+
+Target Paper
+...Hence, in this paper, we propose
+a target paper aware relatedwork
+generator (TAG), which generates
+abstractive and contextual related
+work sections...
+
+...Conventional solutions to automatic
+related work summarization rely heavily
+on human engineered features.
+In this paper, we develop a neural datadriven summarizer by leveraging the
+seq2seq paradigm...
+
+Generated related work section:
+Baseline:
+Recently , there has been a surge of interest in automatic related work generation of
+scientific papers [1]. Most of the work on summarization has focused on extractive
+summarization. For example, [2] proposed a method to generate summaries based on a
+set of keywords. [3] proposed an automatic summarization system that generates
+summaries of scientific articles. However, [4] presented a method for generating
+abstractive summaries from a reference paper using a neural network. The method [5] is
+based on the work of [4].
+Our model:
+In recent years, there has been a great deal of work on automatic generation of related
+works [1][2]. [3] proposed an approach to generate topic-biased summaries for given
+papers by using a regression model to learn the importance of each sentence in a topicbiased way. For example, [4] proposed a neural method for summarization. [5] proposed
+an abstractive summarization approach to generate the citing citation
+summaries. However, our work is different from them in that we use a multi-document
+representation to capture the relationship between a target paper and the related works.
+
+Figure 1: Related work section generated by the baseline
+(RRG) and our model for this submission. Our model TAG
+successfully includes the keyphrase information and comparison of the references and the target paper (this submission), while the baseline model missed the comparison.
+connection between a pair of papers. However, they only considered sentences with a single citation, and their proposed model also
+hard-coded the setting of two input sources, instead of a variable
+number of input sources. Chen et al. [5] aimed to generate related
+work for a set of reference papers, but they didn’t consider the
+target paper information. Thus, the generated related work cannot
+describe how the target relates to the cited works.
+To tackle the above problems and generate a more comprehensive related work, we propose a target-aware related work generator
+(TAG), which generates abstractive and contextual related work
+sections. Concretely, we first propose a target-aware graph encoder,
+where the target paper interacts with the references papers under target-centered attention mechanisms. Herein, the interaction
+consists of direct information flow between papers and indirect
+flow with keyphrases as an intermediary. The former allows global
+information exchange, while the latter lets information interact
+under a specific topic. In the decoding phase, we introduce a hierarchical decoder that first attends to the keyphrase nodes in the
+graph and then projects the attention weights on the reference
+papers, and keyphrases. In this way, we let the keyphrases be the
+semantic indicator and guide the generation process as a more abstract summarization clue. To generate more informative related
+work sections with substantial content, we adapt the contrastive
+learning mechanism to the RWG task, where we aim to maximize
+the mutual information between the generated text with reference
+papers and minimize that with non-references.
+
+We evaluate our model on two large-scale benchmark scholar
+datasets collected from S2ORC and Delve. S2ORC consists of papers
+in multiple domains (physics, math, computer science, etc.), and
+Delve consists of computer science papers. We show that TAG
+outperforms the state-of-the-art summarization and RWG baselines
+on both datasets in terms of both ROUGE metrics and tailored
+human evaluations. Since our contrastive learning module can
+be an add-on module, we also demonstrate its effectiveness on
+various baseline models. A part of the generated related work for
+this submission of our model and the most recent baseline is shown
+in Figure 1, illustrating the advantage of TAG over the baseline.
+Our contributions can be summarized as follows:
+• We first propose to incorporate the target paper information
+into the abstractive related work generation task with multiple
+citations.
+• To solve this task, we propose a target-aware related work
+generator that first models the relationship between target paper
+and the cited papers by keyphrases, and then generates the related
+work guided by contrastive learning. The generated related work
+can contextualize the target work in related fields.
+• Experiments conducted on two benchmark datasets show that
+our model outperforms all the state-of-the-art approaches. Human
+evaluations also demonstrate that most of the generated related
+works are more constructive than those produced by the baseline
+methods.
+
+2
+
+RELATED WORK
+
+The task of RWG is pioneered by Hoang and Kan [17], who proposed
+a prototype extractive summarization system taking keywords as
+input to drive the creation of an extractive summary. Subsequently,
+Hu and Wan [19] proposed to split the sentences of the reference
+papers into different topic-biased parts for selection, and Chen and
+Zhuge [4] resorted to the papers that cite the reference papers of
+the writing paper and extracts the corresponding citation sentences
+to form a related work section. Deng et al. [9], Wang et al. [37] developed a data-driven neural summarizer by leveraging the seq2seq
+paradigm to extract sentences from references. These methods are
+either unable to make a comparative discussion or rely on comparative sentences to be written in advance. Such sentences still needed
+to be written by scientists and are hard to obtain in practice.
+Due to the development of neural network-based models [6, 12,
+13] for text generation, recent RWG focuses on generating new
+words and phrases to form related work. For example, Xing et al.
+[39] extended the Pointer-Generator Network [33] to propose a
+model with a cross-attention mechanism that takes both the citation
+context and the cited paper’s abstract as the input. Ge et al. [14]
+extended [39] by encoding citation network information using a
+graph attention network in addition to a hierarchical bidirectional
+LSTM [18]. However, these two works share the same limitation and
+are only applicable to citation texts with a single citation. Chen et al.
+[5] proposed an RWG model taking multiple citations as input, but
+did not consider the target paper information. Thus, it still cannot
+generate a comparative related work discussion on the target paper.
+The RWG task is similar to a multi-document summarization
+(MDS) task with multiple documents as input. Classic MDS methods are extractive over graph-based representations of sentences.
+
+For example, Zhao et al. [41] converted the original documents
+to a sentence graph, taking both linguistic and deep representation into account, and Liu et al. [23] constructed sentence graph
+based on both the similarities and relative distances in the neighborhood of each sentence. Due to the success of neural abstractive
+models on single-document summarization, abstractive models are
+adapted to multi-document summarization. Jin et al. [20] proposed a
+multi-granularity interaction network for extractive and abstractive
+multi-document summarization, and Zhou et al. [42] augmented
+the classical Transformer [35] with a heterogeneous graph consisting of entity nodes. However, MDS aims at synthesizing the similar
+and removing the redundant information among multiple input
+documents, while RWG needs to find the specific contributions of
+individual papers even if their research directions are the same and
+arrange them in comparative discussion [19].
+Our model is also related to contrastive learning, which has
+boosted unsupervised representation learning in recommendation
+[31, 40], computer vision [21, 30], and natural language processing
+[29, 43]. In text generation, Logeswaran and Lee [27] proposed to
+learn better sentence representations by using a classifier to distinguish context sentences from other contrastive sentences. Bui
+et al. [3] introduced contrastive learning into code summarization,
+where the model is asked to recognize similar and dissimilar code
+snippets through contrastive learning objectives. In scientific paper
+related studies, Cohan et al. [8] explored contrastive learning and
+designed a loss function that trains the Transformer model to learn
+closer representations for papers when one cites the other. The
+contrastive learning mechanism in our paper is also based on citation graph relatedness but is employed differently for generating
+comparative related work discussion.
+
+3
+
+THE PROPOSED TAG MODEL
+
+In this section, we first define the task of target-aware related work
+generation, then describe our TAG model in detail.
+
+3.1
+
+Problem Formulation
+
+Given the abstract section of the target paper 𝐴 and its |R|-size
+reference abstract collection R = {𝑟 1, ..., 𝑟 | R | }, we assume there is a
+ground truth related work 𝑌 = (𝑦1, ..., 𝑦𝐿𝑦 ). To be specific, the target
+paper 𝐴 is represented as a sequence of 𝐿𝑎 words (𝑤 0,1, ..., 𝑤 0,𝐿𝑎 ),
+and each reference 𝑟𝑖 ∈ R is (𝑤𝑖,1, ..., 𝑤𝑖,𝐿𝑟 ), where 𝑖 = 1, ..., |R|. 𝐿𝑎
+is the word number in the target paper, and 𝐿𝑟 is the word number in
+a reference. We choose the abstract section to represent each input
+paper because the abstract section is a natural summarization of
+the corresponding paper while other sections may contain extreme
+details of the specific work [19]. Given 𝐴 and R, our model generates
+a related work 𝑌ˆ = {𝑦ˆ1, 𝑦ˆ2, ..., 𝑦ˆ𝐿𝑦ˆ }. Finally, we use the difference
+between the generated 𝑌ˆ and the ground truth 𝑌 as the training
+signal to optimize the model parameters.
+
+3.2
+
+Model Overview
+
+Our model is illustrated in Figure 2, which follows the Transformerbased encoder-decoder architecture. We augment the encoder with
+a target-aware graph neural network, which models the relationship
+between target and reference papers 1) directly via their citation
+relations (red and green nodes in the middle of Figure 2); and 2)
+
+indirectly via the keyphrases of both target and reference papers
+(yellow nodes). Correspondingly, we design a hierarchical decoder
+to attend to the multi-granularity information in the graph encoder
+guided by the keyphrases. To generate an informative comparison
+to related papers, we also design a contrastive learning module to
+maximize the mutual information between the generated text with
+related papers and minimize that with unrelated papers.
+
+3.3
+
+Target-aware Graph Encoder
+
+Graph Construction. The related work section discusses the relations between the target paper and the related reference papers
+while encoding each paper separately cannot model the hierarchical
+structures and the relations that might exist among papers. Hence,
+we design a target-aware graph encoder, where we model the relation between papers through different channels, i.e., by direct edges
+and indirect edges through keyphrases. By direct edges, we let information flow globally in the graph, while by keyphrase edges,
+we only establish edges for references that are related to the target
+paper under a specific key topic. We choose the keyphrase as the
+basic semantic unit as it contains compact and salient information
+across different papers, whose representations can also be used to
+guide the decoding process later.
+Concretely, the graph is constructed with the target paper node
+in the center. Reference papers are linked with the target paper,
+and keyphrases are linked with reference papers if the reference
+contains a keyword in the keyphrases. All keyphrases are linked
+with the target paper via hyperlinks. The intuition is that the generated related work serves for the target paper, thus, the target paper
+should play a central role in the graph. Nodes in the same level
+are also pairwisely connected to enable information flow in each
+granularity, denoted by the circles in Figure 2.
+Node Initialization. Transformer [35] is an encoder-decoder framework that could well capture the deep interaction between words
+in a document. Hence, we use Transformer to initialize the node
+representations in the graph.
+We first employ a stack of 𝑁 1 token-level Transformer layers to
+obtain contextual word representations in each paper. Each layer
+has two sub-layers: a self-attention mechanism and a fully connected feed-forward network. We take the 𝑖-th reference paper to
+illustrate this process.
+For the 𝑙-th Transformer layer, we first use a fully-connected
+𝑙−1
+layer to project document state ℎ𝑙−1
+𝑤𝑖,𝑗 into the query, i.e., 𝑄𝑖,𝑗 =
+𝐹𝑞 (ℎ𝑙−1
+𝑤𝑖,𝑗 ). For self-attention mechanism, the key and value are ob𝑙−1 = 𝐹 (ℎ𝑙−1 ), 𝑉 𝑙−1 = 𝐹 (ℎ𝑙−1 ).
+tained in a similar way: i.e., 𝐾𝑖,𝑗
+𝑣 𝑤𝑖,𝑗
+𝑘 𝑤𝑖,𝑗
+𝑖,𝑗
+Then, the attention sub-layer is defined as:
+
+
+
+𝑙−1 𝐾 𝑙−1
+𝐿
+𝑟 𝛼 𝑉 𝑙−1
+exp 𝑄𝑖,𝑗
+∑︁
+𝑖,𝑗 𝑖,𝑗
+𝑖,𝑗
+
+ , 𝑎𝑖 =
+𝛼𝑖,𝑗 = Í
+,
+√
+𝐿𝑟
+𝑙−1
+𝑙−1
+𝑑𝑒
+𝑗=1
+𝑛=1 exp 𝑄𝑖,𝑛 𝐾𝑖,𝑛
+
+(1)
+
+where 𝑑𝑒 stands for hidden dimension. The above process is sum𝑙−1
+maized as MHAtt(ℎ𝑙−1
+𝑤𝑖,𝑗 , ℎ 𝑤𝑖,∗ ), where ∗ denotes index from 1 to 𝐿𝑟 .
+Intuitively, the updated representation of 𝑄 is formed by linearly
+combining the entries of 𝑉 with the weights.
+
+Add & Norm
+
+Target-aware
+Graph Encoder
+
+Feed-Forward
+
+Node initialization
+
+Target-level
+Attention
+
+Add & Norm
+×"#
+
+Word-level
+
+Document-level
+
+Target paper
+
+Related paper
+
+Keyphrase
+
+Non-related paper
+
+Self-Attention
+
+Reference-level
+Attention
+
+Guide
+
+Feed-Forward
+
+Keyphrase-level Attention
+
+Add & Norm
+Graph Encoding
+
+×
+
+√
+
+Contrastive Learning
+
+Add & Norm
+×"!
+
+Masked Self-Attention
+×""
+Decoder Input
+
+Inputs
+
+Figure 2: Overall architecture of our model, which consists of two parts: (1) Target-aware Graph Encoder (middle and left)
+relates one paper to another and obtains contextual representations for nodes in different levels (circles in different colors).
+The node initialization and graph encoding are shown in the middle and the left part, respectively. (2) Hierarchical Decoder
+(right) generates the related work by attending to multi-granular information in the graph guided by the keyphrases.
+Then, a residual feed-forward sub-layer takes the output of selfattention sub-layer as the input:
+
+
+
+𝑙−1
+𝑙−1 𝑙−1
+ℎˆ𝑙−1
+𝑤𝑖,𝑗 = LN ℎ 𝑤𝑖,𝑗 + MHAtt ℎ 𝑤𝑖,𝑗 , ℎ 𝑤𝑖,∗ ,
+
+
+
+ˆ𝑙−1 ,
+ℎ𝑙𝑤𝑖,𝑗 = LN ℎˆ𝑙−1
+𝑤𝑖,𝑗 + FFN ℎ 𝑤𝑖,𝑗
+where FFN is a feed-forward network with an activation function,
+LN is a layer normalization [2].
+From the word-level representation we obtain the documentlevel representation ℎ𝑑𝑖 for each reference paper by mean-pooling.
+Similarly, we obtain the word-level and paper-level representations
+for the target paper denoted as ℎ 𝑤0,∗ and ℎ𝑑0 , respectively.
+For the keyphrases, we utilize the keyword extraction tool KeyBERT [15] to extract keyphrases from both the target paper and
+reference papers, and use the same initialization method to obtain the keyphrase representations. The word-level representa𝑐 ,...,ℎ 𝑐
+tion for the 𝑖-th keyphrase is denoted as ℎ 𝑤𝑖,1
+, and the
+𝑤
+𝑖,𝐿𝑐
+
+overall representation for 𝑖-th keyphrase is obtained by ℎ𝑐𝑖 =
+𝑐 ,...,ℎ 𝑐
+MeanPooling(ℎ 𝑤𝑖,1
+), where 𝐿𝑐 is the word number in each
+𝑤
+𝑖,𝐿𝑐
+
+keyphrase. The total keyphrase number is denoted as |C|.
+Graph Encoding. The graph encoding is a stack of 𝑁 2 identical
+layers, starting from the learning of keyphrase representations, then
+the reference paper representation, and last the target paper representation. Concretely, the keyphrase representations are obtained
+by performing multi-head self-attention and cross-attention on the
+constructed graph. The query in cross-attention is a keyphrase
+node representation, and the key and value are the adjacent paper node representations. The attention results are concatenated
+and processed by a feed-forward network, outputting ℎˆ𝑙𝑐𝑖 for one
+keyphrase node, where 𝑙 denotes the layer index.
+The reference paper representation is updated from three sources:
+(1) performing multi-head self-attention across all references; (2)
+performing multi-head cross-attention to obtain the keyphraseaware reference paper representation. As shown in Figure 3(a), the
+
+reference representation is taken as the query, and the keyphrases
+representations are taken as the keys and values. (3) performing our
+designed target-centered attention mechanism to obtain reference
+paper representations, as shown in Figure 3(b). The target-centered
+attention starts with the application of self-attention mechanism
+on the reference papers:
+
+
+ℎ¤𝑑𝑙−1 = MHAtt ℎ𝑑𝑙−1, ℎ𝑑𝑙−1 .
+(2)
+𝑖
+
+∗
+
+𝑖
+
+Then, taking the target paper information ℎ𝑑𝑙−1 as condition, the
+0
+
+attention score 𝛽𝑖𝑙−1 on each original reference representation ℎ𝑑𝑙−1
+𝑖
+is calculated as:
+
+
+
+𝛽𝑖𝑙−1 = softmax FFN ℎ𝑑𝑙−1 (ℎ𝑑𝑙−1 )𝑇 .
+(3)
+0
+
+𝑖
+
+The target-aware reference representation is denoted as 𝛽𝑖𝑙−1ℎ¤𝑑𝑙−1 .
+𝑖
+In this way, we highlight the salient part of the references under
+the guidance of the target paper. Last, a feed-forward network
+is employed to integrate three information sources to obtain the
+updated reference representation ℎˆ𝑑𝑙 .
+𝑖
+The target paper representation is updated similarly with two
+cross-attention operations on references and keyphrases. The attention results are concatenated and processed by a feed-forward
+layer, denoted as ℎˆ𝑑𝑙 .
+0
+Finally, we update word-level representations for references with
+the graph encoder outputs by a feed-forward network:
+1
+ˆ𝑁2
+ℎ 𝑤𝑖,𝑗 = FFN(ℎ 𝑁
+𝑤𝑖,𝑗 + ℎ𝑑 ).
+
+(4)
+
+𝑖
+
+Word-level representation for the target paper ℎ 𝑤0,𝑗 and for the
+keyphrases ℎ𝑐𝑖,𝑗 are obtained in a similar way with the corresponding graph outputs.
+
+3.4
+
+Hierarchical Decoder
+
+In the previous graph encoder, we obtain contextual and polished
+representations for the target paper, the references, and the keyphrases.
+
+Sample
+
+Target paper node
+
+Related
+Papers
+
+Multi-head Attention
+
+Q
+
+K
+
+V
+
+Q
+
+K
+
+V
+
+Linear
+
+Linear
+
+Linear
+
+Linear
+
+Linear
+
+Linear
+
+Tile
+
+Mutual
+Information
+Generated Related
+Work Section
+
+(a)
+
+Sample
+
+-
+
+Non-related
+Papers
+
+MeanPooling
+
+Relevance
+Score
+
++
+
+Global
+Matching
+
+Multi-head Attention
+
++
+MI
+
+Matrix Multiply
+
+Keyphrase node
+
+Local
+Matching
+
+Related paper node
+
+MeanPooling
+Mutual
+Information
+
+-
+
+(b)
+
+Figure 3: (a) Cross attention mechanism for reference papers and the keyphrases. (b) Target-centered attention mechanism, which captures semantic information within references under the guidance of the target paper.
+
+Figure 4: The framework of the contrastive learning module.
+Mutual Information (MI) is applied to measure both global
+and local matching.
+
+3.5
+In the decoder part, we want to incorporate these information
+sources, where the target paper and the references are needed for
+generating a comparative related work. Note that we also have the
+representations for the keyphrases, which are natural guidance for
+the generation process, as the keyphrases can be viewed as a special
+type of summarization that “summarizes” texts into a more abstract
+format. Hence, we design a hierarchical decoder that firstly focuses
+on the keyphrases and then attends to the target paper and the
+other references. Our hierarchical decoder also follows the style of
+Transformer, consisting of 𝑁 3 identical layers.
+For each layer, at the 𝑡-th decoding step, we apply the selfattention on the masked summary embeddings (MMHAtt), obtaining 𝑔𝑡 . The masking mechanism ensures that the prediction of the
+position 𝑡 depends only on the output of the position before 𝑡.
+
+
+
+𝑔𝑡𝑙 = LN 𝑔𝑡𝑙−1 + MMHAtt 𝑔𝑡𝑙−1, 𝑔𝑙−1
+.
+∗
+Based on 𝑔𝑡𝑙 we compute the context vectors over keyphrases using
+cross-attention multi-head attention (MHAtt):
+
+
+𝑙
+𝑐𝑐,𝑡
+= MHAtt 𝑔𝑡𝑙 , ℎ𝑐 ∗ .
+(5)
+We then use the keyphrase context vectors to guide the attention on
+other two-level nodes. Take the target paper for example, another
+MHAtt layer is applied to select relevant parts of word sequence
+from the target paper:
+
+
+𝑙
+𝑙
+𝑐𝑎,𝑡
+= MHAtt 𝑐𝑐,𝑡
+, ℎ 𝑤0,∗ .
+(6)
+𝑙 on references.
+In a similar way, we obtain the context vectors 𝑐𝑟,𝑡
+These context vectors, treated as salient contents summarized
+from various sources, are concatenated with the decoder hidden
+state 𝑔𝑡𝑁3 to produce the distribution over the target vocabulary:
+
+h
+i
+𝑁3 𝑁3 𝑁3
+𝑃𝑡vocab = Softmax 𝑊𝑜 𝑔𝑡𝑁3 ; 𝑐𝑎,𝑡
+; 𝑐𝑟,𝑡 ; 𝑐𝑐,𝑡 ,
+(7)
+
+where [; ] denotes concatenation operation. All the learnable parameters are updated by optimizing the negative log likelihood
+objective function of predicting the target words:
+Í𝐿𝑦
+L𝑠 = − 𝑡 =1
+log 𝑃𝑡vocab (𝑦𝑡 ) .
+(8)
+
+Contrastive Learning
+
+As we found in preliminary experiments, the “safe response problem” [28] also exists in related work generation task, which means
+that the models are likely to generate templated sentences without
+concrete information about the related works. Thus, to generate
+more accurate related work sections that are consistent with the
+detailed facts in the references, we add a contrastive learning module on top of the sequence-to-sequence architecture to provide
+additional training signals. Naturally, we expect the relatedness of
+the generated text with the related paper references to be higher
+than that with the non-related works. In this way, we can avoid
+generating templated words that cannot distinguish the relevent
+papers and irrelevant papers. Following Hjelm et al. [16], we employ the mutual information estimator to estimate such relatedness.
+An overview of the module is shown in Figure 4.
+We first use a local matching network for the mutual information measured on the level of individual paper samples and the
+generated text. From the graph initialization in section 3.3, one ref𝑁1
+1
+erence paper is represented at word-level as [ℎ 𝑁
+𝑤𝑖,1 , ..., ℎ 𝑤𝑖,𝐿𝑟 ], and
+we omit the iteration index from now on for brevity. Non-related
+paper is similarly represented as [ℎ¯𝑤𝑖,1 , ..., ℎ¯𝑤𝑖,𝐿 𝑓 ]. The final decoder
+state of generator 𝑔𝐿𝑦 is concatenated with the word-level paper
+representation to calculate the local matching scores:
+𝜏𝑙𝑟 = SCORE([𝑔𝐿𝑦 ; ℎ 𝑤𝑖,1 ]...[𝑔𝐿𝑦 ; ℎ 𝑤𝑖,𝐿𝑟 ]),
+
+(9)
+
+where SCORE is implemented as a convolutional neural network
+followed by a feed-forward layer to output 𝜏𝑙𝑟 ∈ [0, 1], indicating
+the matching degree between the generated text with the related
+𝑓
+works. 𝜏𝑙 is obtained similarly. The optimization objective of the
+local matching network is to minimize:
+
+
+𝑓
+L𝑙𝑜𝑐𝑎𝑙 = − log(𝜏𝑙𝑟 ) + log(1 − 𝜏𝑙 ) .
+(10)
+We also have a global matching network to measure the global
+mutual information between the generated text with the references,
+as well as non-related works. By applying mean pooling on the
+paper encoding vectors of all references and non-related works, we
+obtain ℎ𝑑 and ℎ𝑑 . Then, we employ a feed-forward layer below:
+𝑓
+
+𝜏𝑔𝑟 = FFN([𝑔𝐿𝑦 ; ℎ𝑑 ]), 𝜏𝑔 = FFN([𝑔𝐿𝑦 ; ℎ𝑑 ]),
+
+Dataset
+
+# Pairs
+
+RWS [4]
+NudtRwG [36]
+S2ORC [5]
+Delve [5]
+TAS2 (ours)
+TAD (ours)
+
+25
+50
+136,655
+78927
+117,700
+218,255
+
+# words
+(references)
+5,496
+594
+1,079
+626
+788
+845
+
+# words
+(related work)
+367
+133
+148
+181
+126
+191
+
+# words
+(target)
+130
+147
+190
+183
+
+Table 1: Comparison of our datasets to other related work
+and multi-document datasets.
+𝑓
+
+which outputs 𝜏𝑔𝑟 ∈ [0, 1] and 𝜏𝑔 ∈ [0, 1], indicating the global
+mutual information between the generated text with the related
+works and with non-related works, respectively. The objective of
+this global matching network, similar to the local matching network,
+is to minimize:
+
+
+𝑓
+L𝑔𝑙𝑜𝑏𝑎𝑙 = − log(𝜏𝑔𝑟 ) + log(1 − 𝜏𝑔 ) .
+(11)
+Finally, we combine the local and global loss functions to obtain
+the overall loss L, whose gradients are used for updating all model
+parameters:
+L = L𝑔𝑙𝑜𝑏𝑎𝑙 + L𝑙𝑜𝑐𝑎𝑙 + L𝑠 .
+(12)
+
+4 EXPERIMENTS
+4.1 Datasets
+To evaluate our proposed method in related work generation, we
+collect the target paper-aware related work generation datasets
+from the public scholar corpora S2ORC [26] and Delve [1], named
+as TAS2 and TAD, respectively. TAS2 consists of scientific papers
+from multiple domains and TAD focuses on the computer science
+domain, respectively. For each case, the generation target is a paragraph in the related work section with more than two citations, as
+a comprehensive related work usually compares multiple works
+under the same topic. The abstract of each reference and the target
+paper are regarded as input, considering that the main idea of a paper is described in its abstract. To ensure the quality of the datasets,
+we ask three PhD students to evaluate 60 different randomly sampled cases from the datasets. They are asked to find the original
+paper content from the scholar websites and to check if the case
+content is consistent with the original paper. The result shows that
+out of 60 sampled cases, 57 are the same as the original paper. For
+the left cases, two related work sections of two cases are scattered
+in the original related work sections, and one abstract section of a
+case contains part of the introduction section content. This might
+be due to the update of the original paper, or mis-segmentation on
+the paper.
+Overall, TAS2 consists of 107,700 training cases, 5,000 validation
+cases, and 5,000 test cases. TAD consists of 208,255 training cases,
+5,000 validation cases, and 5,000 test cases. On average, there are
+4.26 references in TAS2 and 5.10 in TAD. Detailed statistics of the
+datasets and comparison with other related work datasets are given
+in Table 1. It can be seen that our datasets are the first large-scale
+related work dataset with the target paper.
+
+4.2
+
+Baselines
+
+We evaluate our models against popular and state-of-the-art multidocument summarization baselines and related work generation
+
+techniques. We adopt the LEAD baseline which selects the first sentence of each reference as the summary as a baseline, and ORACLE
+as an upper bound of extractive summarization systems.
+Our extractive baselines include:
+LexRank [11]: a graph-based extractive model that computes
+sentence importance based on the concept of eigenvector centrality
+in a graph representation of sentences.
+NES [37]: a neural data-driven summarizer that extracts sentences from reference papers based on target paper. A joint contextdriven attention mechanism is proposed to measure the contextual
+relevance within full texts.
+BertSumEXT [25]: an extractive summarization model with
+BERT encoder, which is able to express the semantics of a document
+and obtain representations for its sentences.
+Abstractive baseline models include:
+BertSumABS [25]: an abstractive summarization system built
+on BERT with a new fine-tuning schedule that adopts different
+optimizers for the encoder and the decoder.
+MGSum [20]: a multi-granularity interaction network for abstractive multi-document summarization. The multi granularities
+include document-level, sentence-level, and word-level.
+EMS [42]: an entity-aware model for abstractive multi-document
+summarization with BERT encoder. It augments the classical Transformer based encoder-decoder framework with a graph consisting
+of paragraph nodes and entity nodes. EMS uses the same keyphrase
+extraction tool as ours.
+RRG [5]: an abstractive related work generator based on reference papers. It augments the RNN encoder with a relation-aware
+graph between multiple references. The relation graph and the
+document representation are refined iteratively.
+The essential difference between our model and baselines is that
+we explicitly model the relationship between the target work and
+the references. To make a fair comparison, for baselines that have
+relatively good performance, we give an additional with.Target (w.T )
+version which takes references and target paper as input. Thus, the
+baseline models treat the references and the target paper as multiple
+inputs without distinguishing them.
+
+4.3
+
+Evaluation Metrics
+
+For both datasets, we evaluate standard ROUGE-1, ROUGE-2, ROUGEL, and ROUGE-SU [22] following [7] on full-length F1, which refer
+to the matches of unigram, bigrams, the longest common subsequence, and skip bigrams with a max distance of four words, respectively.
+Schluter [32] notes that only using the ROUGE metric to evaluate
+generation quality can be misleading. Therefore, we also evaluate
+our model by human evaluation. Since our datasets are scientific
+corpus with complicated concepts and rare, technical terms, the
+human evaluation should be conducted by professional annotators.
+Hence, we ask three PhD students majoring in computer science
+to rate 40 randomly sampled cases generated by models from the
+TAD dataset, since TAD consists of computer science papers. The
+evaluated models are EMS w.T, RRG w.T, and TAG, which achieve
+top performance in automatic evaluations.
+
+TAS2 Dataset
+Models
+
+TAD Dataset
+
+ROUGE-1
+
+ROUGE-2
+
+ROUGE-L
+
+ROUGE-SU
+
+ROUGE-1
+
+ROUGE-2
+
+ROUGE-L
+
+ORACLE
+
+37.50
+
+7.99
+
+32.49
+
+12.65
+
+37.89
+
+8.53
+
+33.28
+
+ROUGE-SU
+
+Sentence extraction methods
+LEAD
+LexRank [11]
+LexRank w.T [11]
+NES w.T [37]
+BertSumEXT [25]
+BertSumEXT w.T [25]
+
+19.63
+25.74
+27.04
+26.04
+25.85
+27.43
+
+1.75
+2.81
+3.18
+3.39
+2.90
+3.56
+
+16.88
+22.43
+23.48
+22.46
+22.66
+24.01
+
+3.73
+6.03
+6.55
+6.14
+6.21
+6.97
+
+22.74
+25.70
+27.29
+26.13
+25.95
+27.60
+
+2.32
+2.86
+3.50
+3.24
+2.92
+3.64
+
+20.15
+22.68
+24.06
+23.20
+23.05
+24.51
+
+4.87
+5.90
+6.61
+6.18
+6.25
+6.98
+
+Abstractive methods
+BertSumABS [25]
+MGSum [20]
+EMS [42]
+EMS w.T
+RRG [5]
+RRG w.T
+TAG
+
+25.45
+25.54
+26.17
+26.50
+26.31
+26.79
+28.04
+
+3.82
+3.75
+4.16
+4.22
+4.41
+4.43
+4.75
+
+23.04
+23.16
+23.63
+23.90
+24.05
+24.46
+25.33
+
+6.39
+6.49
+6.67
+6.84
+6.63
+6.85
+7.69
+
+27.42
+27.49
+28.21
+28.78
+28.44
+28.94
+30.48
+
+4.88
+4.79
+5.15
+5.36
+5.43
+5.59
+6.16
+
+25.15
+25.21
+25.74
+26.37
+25.97
+26.46
+27.79
+
+7.22
+7.29
+7.56
+7.89
+7.65
+7.92
+8.89
+
+Ablation models
+TAG w/o graph encoder
+TAG w/o hierarchical decoder
+TAG w/o contrastive learning
+
+27.03
+27.45
+27.27
+
+4.53
+4.66
+4.55
+
+24.47
+24.84
+24.72
+
+7.21
+7.38
+7.33
+
+29.34
+29.64
+29.48
+
+5.76
+5.88
+5.46
+
+26.85
+27.07
+26.93
+
+8.32
+8.43
+8.37
+
+Table 2: ROUGE scores comparison between TAG and baselines. All our ROUGE scores have a 95% confidence interval of at
+most ±0.24 as reported by the official ROUGE script. w.T denotes with.Target as input.
+
+Our first evaluation quantified the degree to which the models
+can retain the key information following a question-answering paradigm [24]. We created a set of questions based on the gold-related
+work and examined whether participants were able to answer these
+questions by reading generated text. The principle for writing a
+question is that the information to be answered is about factual description, and is necessary for the related work. Two PhD students
+majoring in computer science wrote three questions independently
+for each sampled case. Then they together selected the common
+questions as the final questions that they both consider to be important. Finally, we obtain 68 questions, where correct answers
+are marked with 1 and 0 otherwise. Our second evaluation study
+assessed the overall quality of the related works by asking participants to score them by taking into account the following criteria:
+Informativeness (does the related work convey important facts about
+the topic in question?), Coherence (is the related work coherent and
+grammatical?), and Succinctness (does the related work avoid repetition?). The rating score ranges from 1 to 3, with 3 being the best.
+Both evaluations were conducted by another three PhD students
+independently, and a model’s score is the average of all scores.
+
+4.4
+
+Implementation Details
+
+The Transformer in the graph initialization module is initialized by
+BERT base model [10], which can be more effective than that trained
+from scratch. We also equip baselines with BERT (if applicable) for
+better comparison. Both source and target texts were tokenized with
+BERT’s subwords tokenizer. We use hyperparameters suggested by
+Liu and Lapata [25]. The iteration numbers 𝑁 1 , 𝑁 2 , and 𝑁 3 are set
+to 6, 2, 6. The hidden size is 768 and the number of heads is 6, while
+
+the hidden size of feed-forward layers is 1,024. We use mini-batches
+of size 16, dropout with probability 0.1 before all linear layers, and
+label smoothing [34] with smoothing factor 0.1. For one generation,
+5 reference papers and 20 keyphrases are considered (with padding
+if not enough). For abstractive models, the first 200 words in the
+abstract are taken as paper content. For extractive baselines, the
+first 10 sentences with a maximum of 20 words per sentence in the
+abstract are taken as paper content. During decoding, we set the
+minimum decode length to 100 tokens, and the maximum length to
+150 tokens. We use Adam optimizers with learning rate of 0.0001.
+We apply beam search with beam size 5 and length penalty [38]
+with factor 0.4.
+
+4.5
+
+Experimental Results
+
+EMS w.T
+RRG w.T
+TAG
+
+QA(%)
+
+Info
+
+Coh
+
+Succ
+
+32.3
+36.7
+41.1
+
+2.14
+2.32
+2.49
+
+2.20
+2.29
+2.36
+
+2.05
+2.16
+2.28
+
+Table 3: Comparison of human evaluation in terms of QA
+task, informativeness (Info), coherence (Coh) and succinctness (Succ).
+Automatic evaluation. A comparison of the performance between TAG and state-of-the-art baselines is listed in Table 2. Firstly,
+it can be seen that for extractive models, adding target paper information can improve their performances by a large margin. For
+example, the ROUGE-L score increases by 2.70 on TAS2 dataset
+
+Reference Papers (trancated):
+[2] Distributed hash table (DHT) based overlay networks offer an administration-free and fault-tolerant storage space that maps “keys” to “values”. For these systems to function efficiently,
+their structures must fit that of the underlying network. Existing techniques for discovering network proximity information, such as landmark clustering and expanding-ring search are either
+inaccurate or expensive.
+[3] Distributed hash table (DHT)-based overlay networks, represented by Pastry, CAN, and Chord, offer an administration-free and fault-tolerant application-level overlay network. While
+elegant from a theoretical perspective, these systems have some disadvantages. First, they rely on application level routing, which may be inefficient with respect to network delays and bandwidth
+consumption. Second, they typically construct a homogeneously structured overlay even though nodes in these networks usually have varying physical connectivity and packet-forwarding
+capacities.
+Target Paper (truncated):
+Many solutions have been proposed to tackle the problem of load balancing in structured P2P systems. However, all these solutions either ignore the heterogeneity nature of the system, or reassign
+loads among nodes without considering proximity relationships, or both. In this paper, we propose an efficient scheme to ensure fair load distribution in such P2P systems by utilizing proximity
+information. To our knowledge, this is the first work to utilize the proximity information to guide load balancing.
+QA: What information has been used for DHT construction? [Proxitmity information]
+What is the task of this work? [Load balance]
+Ground Truth Related Work: Proximity information has been utilized in both topologically aware DHT construction [1] and proximity neighbor selection in P2P routing tables [2] [3]. The
+primary purpose of using the proximity information in both cases is to improve the performance of DHT overlays. However, the proximity information used in our work is to make load balancing
+fast and efficient.
+Baseline EMS with.Target: In [1], the authors propose a distributed hash table (DHT) scheme that uses proximity information to improve the performance of a DHT system. In this scheme,
+each node maintains a hash table for each node in the network. The hash table is used to determine the location of the nodes in the system, and the node is responsible for the hashing of the keys.
+A DHT-based system is proposed in [2]. This scheme is based on the assumption that the nodes are physically close to each other.
+Baseline RRG with.Target: In this paper, we focus on the analysis of wireless ad-hoc overlay network search, which is based on the proximity information. In [1], the authors propose a
+distributed topological model to model overlay networks. In [2], the authors discuss the problem of overlay networks with distributed hash table. In [3], the authors propose a similar approach.
+In this work, we are interested in the context of overlay networks.
+Our TAG model: Our work is also related to proximity information in P2P systems [1]. In [2], the authors propose to use proximity information to improve the performance of P2P systems.
+In [3], authors propose to use proximity information to improve the performance of distributed hash table (DHT)-based P2P networks. However, their work does not address the issue of load
+balancing in P2P networks.
+
+Figure 5: Selected examples of the related work section generated by the baselines and our model. The same color denotes the
+same key information.
+for LexRank. This demonstrates the effectiveness of the target paper information in related work generation task. However, such
+improvement is not obvious for abstractive baseline models. The
+ROUGE-L score of EMS only improves by 0.27 and the ROUGE-2
+score improves by 0.06 on TAS2 dataset. One potential reason is
+that it is hard to recognize the contribution of the target without explicitly modeling the relationship between the target paper with the
+references. Finally, our TAG outperforms various previous abstractive models on all metrics, which shows that our model can take advantage of the target paper better. Specifically, our model improves
+ROUGE-1 by 4.66% over RRG w.T on the TAS2 dataset, and improves
+ROUGE-L by 7.00% on the TAD dataset. We also conducted significant testing (t-test) on the improvements of our approaches over
+the best baseline. The results indicate that all the improvements are
+significant (p-value < 0.05). The above observation demonstrates
+the necessity of a tailored related work generation model compared
+with traditional multi-document summrization model. It also shows
+the effectiveness of our model on different types of corpora.
+Human evaluation. Table 3 summarizes the results of human
+evaluation on three baselines and the proposed model. TAG is the
+top performer over all the metrics. Specifically, in the QA task, our
+model answers 4.4% more questions than RRG w.T. our model outperforms RRG w.T by 0.17 on Informativeness, suggesting that TAG
+captures salient information in the references and the target paper.
+As for the Coherence metric, our model scores 0.07 higher than
+RRG w.T. This indicates that TAG manages to reduce grammatical
+errors and improve the readability of the generated related work.
+On the Succinctness metric, our model outperforms all baselines
+by a considerable margin, suggesting that the generated related
+work avoids redundancy. Note that the average Kappa statistics of
+human evaluation are 0.42, 0.45, and 0.41, respectively, indicating
+moderate agreement between annotators. The paired student t-test
+
+between our model and RRG w.T provides further proves of the
+significance of these results.
+
+5 ANALYSIS AND DISCUSSION
+5.1 Ablation Study
+We perform an ablation study on the development set to investigate
+the influence of different modules in our proposed TAG model.
+Modules are tested in four ways: (1) we remove the target-aware
+graph encoder to verify the effectiveness of the graph encoder (w/o
+graph encoder). Since there are no interactions between different
+documents without the graph encoder, we first obtain the documentlevel representations by taking the mean pooling of the word-level
+representations, and then apply cross-attention mechanism on these
+document representations. (2) we replace the hierarchical decoder
+with a naive Transformer decoder without the keyphrase-centered
+mechanism, to verify the effectiveness of the guidance of keyphrases
+(w/o graph encoder). (3) we remove the contrastive learning module
+to verify the effectiveness of the importance of non-related works
+(w/o contrastive learning).
+The last block of Table 2 presents the results. We find that
+the ROUGE-1 score drops by 1.14 after the graph encoder is removed on TAS2 dataset. The results confirm that employing the
+target-centered graphic interaction can generate better related
+work. ROUGE-L score drops by 0.72 after the hierarchical decoder
+is removed on TAG dataset. This indicates that the keyphrases do
+help the model identify high-level gist and guide the generation
+process. Last, there is a substantial drop in all metrics when the
+contrastive learning module is excluded. This demonstrates that
+introducing the information from negative samples can help the
+model generate text more related to the positive samples.
+
+Ground Truth Related Work: Numerous approaches for content-based image retrieval have been proposed in the literature. They are based on features like color [1], shape [2] or texture [3].
+In [4] a graph-based approach similar to the one described in section 3.2 is used, while in [5] an edit distance measure is used to measure similarity of topological arrangements. [6] gives a nice
+overview of the different approaches. However, all those approaches concentrate on single image features like color or texture. Our method differs from those proposed in the literature as
+we combine different approaches in order to achieve more meaningful results.
+Baseline EMS with.Target: A number of methods have been proposed for image retrieval. Some of these methods are based on the analysis of the image content [1] [2]. These methods can be
+classified into two categories: content-based and concept-based methods . Content based methods, such as [3], use a combination of content and content features. The content of the images is then
+used to determine the similarity between images. However, these methods do not deal with the problem of image segmentation.
+Baseline RRG with.Target: There has been a number of work in the field of image retrieval [1]. In [2], the authors propose an image retrieval system based on the content of the images. The
+system is based on a combination of color and texture features. A similar approach is used in [3] for image retrieval based on color, texture, and shape features. However, they are not directly
+applicable to image databases because they are limited to a single image, which is not the case in our case.
+Our TAG model: Content-based image retrieval (cbir) has been studied extensively in the last decade. Many approaches have been proposed for cbir. Some of them are based on color, texture ,
+and shape features [1][2][3]. Others use color and texture features to improve the performance of cbir systems. For example, the qbic system [4] uses color, shape, and texture as features for image
+retrieval. In [5], the authors use shape features for cbir. But they do not consider the spatial relationship between objects.
+
+Figure 6: Error analysis case of our model and baselines. Red denotes error information.
+
+5.3
+
+Case Study
+
+Figure 5 presents an example of the related work section generated
+by TAG and baseline models. We observe that most of the generated related work can capture the high-level key information in
+the references such as “proximity information” can improve the
+
+5.4
+
+Visualization Analysis
+
+di
+st
+r
+in ibu
+te te
+rn d
+et
+
+Note that our contrastive learning module is an add-on module,
+since it only takes the final representations of the inputs and the
+generated text, and does not have requirements on the internal
+structure of the model. Hence, we equip baselines with the contrastive learning module, to verify if our contrastive learning is
+effective in different scenarios. We choose EMS w.T and RRG w.T
+as baselines since they perform better than other baselines.
+The comparison result on TAS2 dataset is shown in Figure 7. It
+can be seen that with contrastive learning, both of EMS w.T and
+RRG w.T perform better substantially. Concretely, the ROUGE-1
+score of EMS w.T increase from 28.78 to 29.19, and the ROUGE-L
+score of RRG w.T increases from 26.46 to 26.96. This demonstrates
+the universality of our model with different generation structures.
+Besides, even equipped with the contrastive module, both baselines
+still underperform our TAG. This proves the superiority of our main
+generation model, which consists of a target-aware graph encoder
+and a target-aware decoder.
+
+0.68
+
+co
+n
+ns ne
+tru tw pro etw
+lan lo netw nod
+ct ork xim ork
+cin ad
+or es
+io
+ity
+ks
+n
+g
+
+Effectiveness of add-on Contrastive
+Learning
+
+0.66
+
+0.64
+
+0.62
+
+ba
+
+5.2
+
+Contrastive Loss
+
+Figure 7: Performances of baseline models equipped with
+our contrastive learning module.
+
+performance of “distributed hash table” construction (highlighted
+in color). However, most of the models except our TAG cannot
+address the “load balancing problem”. One possible reason is that
+this keyphrase obtains a refined representation output by the graph
+encoder, and then is recognized by the hierarchical decoder.
+Next, we give an error analysis in Figure 6. It can be seen that
+this case is about the image retrieval task, and most of the generated related works can give this key information and introduce
+that color, shape, and texture features can be used to improve the
+performance of the task. However, when introducing the difference
+between target work and related works, all models make some mistakes. EMS with.Target said that the contribution of the target work
+is to deal with the image segmentation problem. RRG with.Target
+said that existing works can only be applied to a single image. Our
+model describes that the target work is the first work considers
+spatial relationship between objects. In fact, the ground truth contribution of the target paper is that it combines different approaches
+including spatial features and textural features. Unfaithful problem
+is a common phenomenon in summarization models, and we are
+looking forward to bringing more advanced generation models.
+
+0
+
+20000
+
+40000
+
+60000
+
+80000
+
+Training Step
+
+100000
+
+120000
+
+0 3 6 9 12 15 18 21 24 27 30 33 36 39 42 45 48 51 54 57 60 63 66 69 72 75 78
+
+Decoding Step
+
+Figure 8: (a) Loss curve of the matching network in the contrastive learning module. (b) Visualizations of the attention
+weights on references.
+In this subsection, we give visualization analysis on the contrastive learning process and the decoding process. We first visualize the loss curve of the local matching network in Figure 8(a). It
+
+shows that the loss score fluctuates at the beginning of the training and gradually reaches convergence along with the training.
+This phenomenon demonstrates that the matching network can
+gradually identify the generated text with the related work, and
+mutual information is gradually maximized. The accuracy curve
+of the global matching network is similar and is omitted here. Be𝑁3
+sides, we visualize the attention weights 𝑧𝑐,𝑡
+on keyphrases for the
+case in Figure 5. The x-axis is the decoding step and the y-axis is
+the selected keyphrases. It can be seen that when generating the
+first several sentences, the keyphrase “network proximity” wins
+higher attention than others. It thus successfully leads the generated related work to describe the related works on “proximity
+information”. At the end of the generation, the keyphrase “load
+balancing” obtains higher attention. Subsequently, the generated
+text describes the key difference between the target work and the
+related works.
+
+6
+
+CONCLUSION
+
+In this paper, we propose to incorporate the target paper information into the abstractive related work generation task. Concretely,
+we propose a target-centered graph encoder and a target-guided
+hierarchical decoder on top of the Transformer framework. To generate a more substantial related work, we adapt the contrastive
+learning mechanism to our model. Experimental results demonstrate that our model outperforms the latest baselines by a large
+margin in automatic and tailored human evaluations. In the future,
+we target to bring a multi-lingual related work generation system.
+
+ACKNOWLEDGMENTS
+We would like to thank the anonymous reviewers for their constructive comments. The work was supported by National Key
+R&D Program of China (2020YFB1406702), National Natural Science Foundation of China (NSFC Grant No. 62122089 and No.
+61876196), and King Abdullah University of Science and Technology
+(KAUST) through grant awards Nos. BAS/1/1624-01, FCC/1/197618-01, FCC/1/1976-23-01, FCC/1/1976-25-01, FCC/1/1976-26-01.
+
+REFERENCES
+[1] Uchenna Akujuobi and Xiangliang Zhang. 2017. Delve: a dataset-driven scholarly
+search and analysis system. ACM SIGKDD Explorations Newsletter 19, 2 (2017),
+36–46.
+[2] Jimmy Lei Ba, Jamie Ryan Kiros, and Geoffrey E Hinton. 2016. Layer normalization. arXiv preprint arXiv:1607.06450 (2016).
+[3] Nghi DQ Bui, Yijun Yu, and Lingxiao Jiang. 2021. Self-Supervised Contrastive
+Learning for Code Retrieval and Summarization via Semantic-Preserving Transformations. In Proceedings of the 44th International ACM SIGIR Conference on
+Research and Development in Information Retrieval. 511–521.
+[4] Jingqiang Chen and Hai Zhuge. 2016. Summarization of related work through
+citations. In 2016 12th International Conference on Semantics, Knowledge and Grids
+(SKG). IEEE, 54–61.
+[5] Xiuying Chen, Hind Alamro, Mingzhe Li, Shen Gao, Xiangliang Zhang, Dongyan
+Zhao, and Rui Yan. 2021. Capturing Relations between Scientific Papers: An
+Abstractive Model for Related Work Section Generation. In Proceedings of the
+59th Annual Meeting of the Association for Computational Linguistics and the 11th
+International Joint Conference on Natural Language Processing (Volume 1: Long
+Papers). 6068–6077.
+[6] Xiuying Chen, Zhi Cui, Jiayi Zhang, Chen Wei, Jianwei Cui, Bin Wang, Dongyan
+Zhao, and Rui Yan. 2021. Reasoning in Dialog: Improving Response Generation
+by Context Reading Comprehension. In AAAI.
+[7] Xiuying Chen, Shen Gao, Chongyang Tao, Yan Song, Dongyan Zhao, and Rui
+Yan. 2018. Iterative Document Representation Learning Towards Summarization
+with Polishing. In Proceedings of the 2018 Conference on Empirical Methods in
+Natural Language Processing. 4088–4097.
+
+[8] Arman Cohan, Sergey Feldman, Iz Beltagy, Doug Downey, and Daniel S Weld.
+2020. SPECTER: Document-level Representation Learning using Citationinformed Transformers. In Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics. 2270–2282.
+[9] Zekun Deng, Zixin Zeng, Weiye Gu, Jiawen Ji, and Bolin Hua. 2021. Automatic
+Related Work Section Generation by Sentence Extraction and Reordering. (2021).
+[10] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2019. BERT:
+Pre-training of Deep Bidirectional Transformers for Language Understanding. In
+Proceedings of the 2019 Conference of the North American Chapter of the Association
+for Computational Linguistics: Human Language Technologies, Volume 1 (Long and
+Short Papers). 4171–4186.
+[11] Günes Erkan and Dragomir R Radev. 2004. Lexrank: Graph-based lexical centrality
+as salience in text summarization. Journal of artificial intelligence research 22
+(2004), 457–479.
+[12] Shen Gao, Xiuying Chen, Piji Li, Zhangming Chan, Dongyan Zhao, and Rui Yan.
+2019. How to Write Summaries with Patterns? Learning towards Abstractive
+Summarization through Prototype Editing. In EMNLP.
+[13] Shen Gao, Xiuying Chen, Zhaochun Ren, Dongyan Zhao, and Rui Yan. 2020.
+From Standard Summarization to New Tasks and Beyond: Summarization with
+Manifold Information. In IJCAI.
+[14] Yubin Ge, Ly Dinh, Xiaofeng Liu, Jinsong Su, Ziyao Lu, Ante Wang, and Jana
+Diesner. 2021. BACO: A Background Knowledge-and Content-Based Framework
+for Citing Sentence Generation. In Proceedings of the 59th Annual Meeting of
+the Association for Computational Linguistics and the 11th International Joint
+Conference on Natural Language Processing (Volume 1: Long Papers). 1466–1478.
+[15] Maarten Grootendorst. 2020. KeyBERT: Minimal keyword extraction with BERT.
+https://doi.org/10.5281/zenodo.4461265
+[16] R Devon Hjelm, Alex Fedorov, Samuel Lavoie-Marchildon, Karan Grewal, Phil
+Bachman, Adam Trischler, and Yoshua Bengio. 2019. Learning deep representations by mutual information estimation and maximization. In International
+Conference on Learning Representations.
+[17] Cong Duy Vu Hoang and Min-Yen Kan. 2010. Towards automated related work
+summarization. In International Conference on Computational Linguistics: Posters.
+427–435.
+[18] Sepp Hochreiter and Jürgen Schmidhuber. 1997. Long short-term memory. Neural
+computation 9, 8 (1997), 1735–1780.
+[19] Yue Hu and Xiaojun Wan. 2014. Automatic generation of related work sections in
+scientific papers: an optimization approach. In Proceedings of the 2014 Conference
+on Empirical Methods in Natural Language Processing (EMNLP). 1624–1633.
+[20] Hanqi Jin, Tianming Wang, and Xiaojun Wan. 2020. Multi-granularity interaction network for extractive and abstractive multi-document summarization.
+In Proceedings of the 58th Annual Meeting of the Association for Computational
+Linguistics. 6244–6254.
+[21] Wei Li, Can Gao, Guocheng Niu, Xinyan Xiao, Hao Liu, Jiachen Liu, Hua Wu,
+and Haifeng Wang. 2020. Unimo: Towards unified-modal understanding and
+generation via cross-modal contrastive learning. arXiv preprint arXiv:2012.15409
+(2020).
+[22] Chin-Yew Lin. 2004. Rouge: A package for automatic evaluation of summaries.
+Text Summarization Branches Out (2004).
+[23] Jingzhou Liu, Dominic JD Hughes, and Yiming Yang. 2021. Unsupervised Extractive Text Summarization with Distance-Augmented Sentence Graphs. In
+Proceedings of the 44th International ACM SIGIR Conference on Research and
+Development in Information Retrieval. 2313–2317.
+[24] Yang Liu and Mirella Lapata. 2019. Hierarchical Transformers for MultiDocument Summarization. In Proceedings of the 57th Annual Meeting of the
+Association for Computational Linguistics. 5070–5081.
+[25] Yang Liu and Mirella Lapata. 2019. Text Summarization with Pretrained Encoders.
+In Proceedings of the 2019 Conference on Empirical Methods in Natural Language
+Processing and the 9th International Joint Conference on Natural Language Processing. 3721–3731.
+[26] Kyle Lo, Lucy Lu Wang, Mark Neumann, Rodney Kinney, and Daniel S Weld.
+2020. S2ORC: The Semantic Scholar Open Research Corpus. In Proceedings of the
+58th Annual Meeting of the Association for Computational Linguistics. 4969–4983.
+[27] Lajanugen Logeswaran and Honglak Lee. 2018. An efficient framework for
+learning sentence representations. In International Conference on Learning Representations.
+[28] Zhengyi Ma, Zhicheng Dou, Yutao Zhu, Hanxun Zhong, and Ji-Rong Wen. 2021.
+One Chatbot Per Person: Creating Personalized Chatbots based on Implicit User
+Profiles. In SIGIR 2021: 44th international ACM SIGIR Conference on Research and
+Development in Information Retrieval (SIGIR’21).
+[29] Li Mingzhe, Xionglin Xie, Chen Xiuying, Chang Jinxiong, Zhang Qishen, Wang
+Feng, Wang Taifeng, Liu Zhongyi, Chu Wei, Zhao Dongyan, and Yan Rui. 2022.
+Keywords and Instances: A Hierarchical Contrastive Learning Framework Unifying Hybrid Granularities for Text Generation. In ACL.
+[30] Guoshun Nan, Rui Qiao, Yao Xiao, Jun Liu, Sicong Leng, Hao Zhang, and Wei
+Lu. 2021. Interventional Video Grounding with Dual Contrastive Learning. In
+Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition.
+2765–2775.
+
+[31] Yuqi Qin, Pengfei Wang, and Chenliang Li. 2021. The world is binary: Contrastive
+learning for denoising next basket recommendation. In Proceedings of the 44th
+International ACM SIGIR Conference on Research and Development in Information
+Retrieval. 859–868.
+[32] Natalie Schluter. 2017. The limits of automatic summarisation according to rouge.
+In Proceedings of the 15th Conference of the European Chapter of the Association
+for Computational Linguistics: Volume 2, Short Papers. 41–45.
+[33] Abigail See, Peter J Liu, and Christopher D Manning. 2017. Get To The Point:
+Summarization with Pointer-Generator Networks. In Proceedings of the 55th
+Annual Meeting of the Association for Computational Linguistics (Volume 1: Long
+Papers). 1073–1083.
+[34] Christian Szegedy, Vincent Vanhoucke, Sergey Ioffe, Jon Shlens, and Zbigniew
+Wojna. 2016. Rethinking the inception architecture for computer vision. In
+Proceedings of the IEEE conference on computer vision and pattern recognition.
+2818–2826.
+[35] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones,
+Aidan N Gomez, Łukasz Kaiser, and Illia Polosukhin. 2017. Attention is all
+you need. In Advances in neural information processing systems. 5998–6008.
+[36] Pancheng Wang, Shasha Li, Haifang Zhou, Jintao Tang, and Ting Wang. 2019.
+ToC-RWG: Explore the Combination of Topic Model and Citation Information
+for Automatic Related Work Generation. IEEE Access 8 (2019), 13043–13055.
+[37] Yongzhen Wang, Xiaozhong Liu, and Zheng Gao. 2018. Neural Related Work
+Summarization with a Joint Context-driven Attention Mechanism. In Proceedings
+of the 2018 Conference on Empirical Methods in Natural Language Processing.
+
+1776–1786.
+[38] Yonghui Wu, Mike Schuster, Zhifeng Chen, Quoc V Le, Mohammad Norouzi,
+Wolfgang Macherey, Maxim Krikun, Yuan Cao, Qin Gao, Klaus Macherey, et al.
+2016. Google’s neural machine translation system: Bridging the gap between
+human and machine translation. arXiv preprint arXiv:1609.08144 (2016).
+[39] Xinyu Xing, Xiaosheng Fan, and Xiaojun Wan. 2020. Automatic generation of
+citation texts in scholarly papers: A pilot study. In Proceedings of the 58th Annual
+Meeting of the Association for Computational Linguistics. 6181–6190.
+[40] Shengyu Zhang, Dong Yao, Zhou Zhao, Tat-Seng Chua, and Fei Wu. 2021.
+Causerec: Counterfactual user sequence synthesis for sequential recommendation. In Proceedings of the 44th International ACM SIGIR Conference on Research
+and Development in Information Retrieval. 367–377.
+[41] Jinming Zhao, Ming Liu, Longxiang Gao, Yuan Jin, Lan Du, He Zhao, He Zhang,
+and Gholamreza Haffari. 2020. SummPip: Unsupervised Multi-Document Summarization with Sentence Graph Compression. In Proceedings of the 43rd International ACM SIGIR Conference on Research and Development in Information
+Retrieval. 1949–1952.
+[42] Hao Zhou, Weidong Ren, Gongshen Liu, Bo Su, and Wei Lu. 2021. Entity-Aware
+Abstractive Multi-Document Summarization. In Findings of the Association for
+Computational Linguistics: ACL-IJCNLP 2021. 351–362.
+[43] Yutao Zhu, Jian-Yun Nie, Zhicheng Dou, Zhengyi Ma, Xinyu Zhang, Pan Du,
+Xiaochen Zuo, and Hao Jiang. 2021. Contrastive Learning of User Behavior
+Sequence for Context-Aware Document Ranking. In Proceedings of the 30th ACM
+International Conference on Information & Knowledge Management. 2780–2791.
+
+

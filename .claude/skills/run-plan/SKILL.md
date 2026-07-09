@@ -4,7 +4,7 @@ description: Execute an approved EXPERIMENT_PLAN.html — implement against the 
 allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob
 ---
 
-Execute the plan named in the arguments passed when invoking this skill (default `outputs/02_EXPERIMENT_PLAN.html`). Read the **English** `aris-profile/PROFILE_AUTO.md` (via `$ARIS_PROFILE`) for stack/OOM context — it is canonical (`PROFILE_AUTO.zh.md` is a human-facing Chinese mirror only, not for logic). Converse with the researcher in **Chinese**; keep code/logs/identifiers native. Drive the autonomous work with Claude Code's built-in **`/goal`** — but **you are NOT the judge of success; the researcher is.** Stop at every gate.
+Execute the plan named in the arguments passed when invoking this skill (default `outputs/03_EXPERIMENT_PLAN.html`). Read the **English** `aris-profile/PROFILE_AUTO.md` (via `$ARIS_PROFILE`) for stack/OOM context — it is canonical (`PROFILE_AUTO.zh.md` is a human-facing Chinese mirror only, not for logic). Converse with the researcher in **Chinese**; keep code/logs/identifiers native. Drive the autonomous work with Claude Code's built-in **`/goal`** — but **you are NOT the judge of success; the researcher is.** Stop at every gate.
 
 Set the `/goal` completion condition **mechanical and verifiable** — e.g. "every run in the plan has a result file under `results/` and a row in `outputs/04_EXPERIMENT_TRACKER.html`" — NOT "the experiments succeeded" (that's a human verdict).
 

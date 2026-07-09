@@ -1,0 +1,1131 @@
+ReactionTeam: Teaming Experts for Divergent
+Thinking Beyond Typical Reaction Patterns
+Taicheng Guo1 , Changsheng Ma3 , Xiuying Chen3 , Bozhao Nan2 , Kehan Guo1
+Shichao Pei1 , Olaf Wiest2 , Nitesh V. Chawla1 , Xiangliang Zhang1 *
+1 Department of Computer Science and Engineering, University of Notre Dame,
+2 Department of Chemistry and Biochemistry, University of Notre Dame
+3 King Abdullah University of Science and Technology
+{tguo2, xzhang33}@nd.edu
+
+arXiv:2310.04674v3 [cs.LG] 12 Nov 2025
+
+§ https://github.com/taichengguo/ReactionTeam
+Abstract—Reaction prediction, a critical task in synthetic
+chemistry, is to predict the outcome of a reaction based on given
+reactants. Generative models like Transformer have typically
+been employed to predict the reaction product. However, these
+likelihood-maximization models overlooked the inherent stochastic nature of chemical reactions, such as the multiple ways electrons can be redistributed among atoms during the reaction process. In scenarios where similar reactants could follow different
+electron redistribution patterns, these models typically predict the
+most common outcomes, neglecting less frequent but potentially
+crucial reaction patterns. These overlooked patterns, though rare,
+can lead to innovative methods for designing synthetic routes
+and significantly advance synthesis techniques. To address these
+limitations, we build a team of expert models to capture diverse
+plausible reaction outcomes for the same reactants, mimicking
+the divergent thinking of chemists. The proposed framework,
+ReactionTeam, is composed of specialized expert models, each
+trained to capture a distinct type of electron redistribution
+pattern in reaction, and a ranking expert that evaluates and
+orders the generated predictions. Experimental results across two
+widely used datasets and different data settings demonstrate that
+our proposed method achieves significantly better performance
+compared to existing state-of-the-art approaches.
+Index Terms—Reaction Prediction, Mixture-of-LoRA Experts
+
+I. I NTRODUCTION
+Reaction outcome prediction is one of the fundamental
+problems in computer-assisted organic synthesis. The aim
+of this task is to predict the products formed given a set
+of reactants and reagents [1]–[3]. Prior solutions for this
+task can be grouped into two main categories: templatebased [4], [5] and template-free [6]. Template-based methods
+are typically rule-based and rely heavily on expert knowledge
+for generalizing reaction patterns and mechanistic pathways.
+The knowledge requirement and the labor-intensive nature
+of template creation constrain these methods’ scalability and
+adaptability, struggling with novel or unconventional reactions.
+To tackle these limitations, template-free methods leverage
+deep generative models to predict products from reactants.
+Indeed, while generative models such as Seq2Seq [7], [8]
+are powerful for predicting chemical reaction products, their
+*Corresponding author.
+
+Fig. 1: Number of training samples whose loss > 0 over
+training epochs.
+capability is limited by the training objective: maximizing the
+likelihood of the correct output given a training dataset. As a
+result, common mapping patterns, those that appear frequently
+in the data, are effectively captured, while non-typical patterns,
+which may correspond to rare but chemically valid electron
+redistributions, are often overlooked. This limitation is particularly problematic in chemistry, where multiple valid products
+can arise from the same set of reactants due to alternative electron redistribution pathways, reaction conditions, or catalysts.
+A likelihood-based model tends to treat these less frequent
+outcomes as noise or anomalies, and thus systematically suppresses them during optimization. As shown in Fig. 1, training
+loss plateaus after a certain number of epochs, indicating that
+the model saturates on the easily learnable, high-frequency
+patterns. However, a long tail of “hard-to-learn” examples
+remains. They correspond to atypical reactions that the model
+fails to predict accurately.
+Crucially, many of these atypical reactions involve reactants
+that are structurally similar to those found in well-learned,
+typical reactions. This suggests that the model’s failure may
+be due to underexploration of alternative mechanistic possibilities. The log-likelihood objective, by penalizing uncertainty, discourages exploration of such alternatives, pushing
+the model toward overconfident, mode-seeking behavior.
+These limitations persist into inference time. Maximum-
+
+Fig. 2: Reactants that follow typical or atypical electron
+redistribution patterns are encoded into similar representations
+due to structural similarity. The decoder learns to favor highprobability tokens (e.g., C and N), while underrepresenting
+tokens necessary for atypical reactions (e.g., Li).
+likelihood trained models, such as Transformer-based encoders
+and decoders, generate outputs deterministically via greedy or
+beam search [9], further reinforcing high-probability, typical
+outcomes, as illustrated in Fig. 2. While introducing sampling temperature during decoding can inject randomness, this
+method uniformly perturbs token probabilities, often leading
+to chemically implausible products.
+This contrasts sharply with how expert chemists approach
+synthesis. They routinely consider multiple plausible reaction
+mechanisms, including low-probability pathways that may
+lead to novel or more efficient synthetic strategies. A model
+constrained by likelihood maximization lacks this divergent
+reasoning ability, and thus misses valuable opportunities for
+discovery and innovation.
+To overcome these limitations, we propose ReactionTeam,
+a novel framework that embraces the divergent thinking
+paradigm by constructing a team of specialized expert models. While mixture-of-experts (MoE) architectures have been
+widely explored, they are typically designed to partition distinct inputs to different experts using a learned gating function,
+where each expert handles a different region of the input space
+[10]. However, our goal in reaction prediction is to capture
+multiple valid outputs for the same input, reflecting the nondeterministic nature of chemical reactions.
+To this end, expert models in ReactionTeam share the majority of their parameters, encoding the common understanding of
+fundamental reaction behavior, but introduce minimal weight
+differences via lightweight adaptations (LoRA) to express
+diverse yet chemically plausible perspectives. This design
+reflects the intuition that chemists often agree on general
+reaction logic while differing in their views on rare or contextsensitive transformations. Furthermore, instead of training all
+experts in parallel, we adopt a sequential training strategy.
+Concretely, a primary expert is first trained to capture the
+typical reaction patterns. Samples that the primary model consistently mispredicts are then passed to a new expert (a LoRA
+module), trained to specialize in those challenging cases. This
+process is repeated, encouraging each expert to take responsibility for a distinct subset of atypical or underrepresented
+reaction patterns. This sequentially trained Mixture-of-LoRA
+Experts (Seq. MOLE) form a team of divergent experts, each
+specializing in a unique subset of reaction patterns across the
+
+full training set.
+During inference, all experts in our framework generate
+predictions from their own specialized perspectives, typical or
+atypical, reflecting the diverse reasoning pathways chemists
+might consider. This is different from traditional Mixture-ofLoRA Experts models [11], which use a gating function to
+assign similar reactants to the same expert and often resulting
+in only the most likely prediction. Our framework is akin to
+boosting-style ensemble methods, where later learners focus
+on the residual errors of earlier ones. However, rather than
+merely aggregating predictions to improve overall accuracy,
+we go further by explicitly encouraging diversity and structure in the output space. Specifically, we introduce two key
+enhancements during inference: 1) We encourage small-scale
+divergence within each expert by applying inference-time
+dropout, which introduces controlled stochasticity into the
+decoding process. This enforces subtle variations in predictions from the same expert, allowing it to explore multiple
+plausible product candidates even under a fixed input. 2) We
+employ a dedicated ranking expert to evaluate and prioritize
+the outputs from all experts. This model assesses chemical
+plausibility and synthetic relevance, selecting the most viable
+products from the diverse candidate set.
+Our main contributions are summarized as follows:
+To the best of our knowledge, we are the first to investigate the issue of divergent reaction prediction. This is a
+critical and specialized challenge presented to generative
+models when applied to scientific discovery where multiple plausible outcomes must all be considered for their
+underlying mechanistic validity. However, this requirement
+fundamentally conflicts with the behavior of most maxlikelihood based AI models, which are inherently biased
+toward predicting the most frequent outcome in the data.
+• We innovatively propose to solve these challenges by employing a team of experts. We detail this insight by designing
+Seq. MOLE and inference-time dropout to inclusively capture diverse reaction patterns by different experts, and then
+apply ranking expert to rank these predicted products.
+• We validate the effectiveness and generality of our method
+not only on standard USPTO-MIT and USPTO-STEREO
+datasets [6] but also under varied data settings, demonstrating consistent improvements in Top-N accuracy for both
+atypical reactions and the overall test sets.
+•
+
+II. R ELATED W ORK
+Reaction Prediction: Methods for reaction prediction can
+be categorized as template-based and template-free. Traditional Template-based methods [4], [5] rely heavily on expert
+knowledge and tend to be less generalizable. Current templatefree methods model reactions as a sequence of graph edits [2],
+[12] and current most state-of-the-art methods employ the
+Transformer as the decoder to generate the product (in the
+form of SMILES string) given the reactants [8], [13]–[16]. Our
+framework can be applied to any transformer-based method.
+In this paper, we equip our framework on Graph2Smiles [17],
+
+which achieves the best performance among all previous
+methods, to demonstrate the effectiveness of our approach.
+Mixture-of-Experts and Mixture-of-Lora Experts: MoE has
+long been studied in the machine learning community [18],
+[19], where multiple experts are trained to specialize on different parts of the input and their outputs are aggregated [10].
+Recent work on mixture of LoRA experts [11] extends this
+framework by applying multiple LoRAs at each layer. However, the key challenge in reaction prediction is capturing the
+diverse reaction patterns, which requires experts to specialize
+in learning distinct mappings from reactants to products,
+rather than being solely assigned to handle input reactants
+based on their surface-level features. Therefore, unlike previous MoE or MoLE experts methods that focus on routing the
+input (reactants) to different experts, we specially design a
+sequential MOLE training method that enables each expert
+to specialize in a unique subset of electron redistribution
+patterns. Collectively, the expert team models a wide range
+of plausible reaction pathways.
+Divergent Thinking: Divergent thinking is a fundamental
+aspect of creativity, characterized by the ability to generate
+multiple and varied responses to open-ended prompts [20].
+This concept is particularly well-suited for chemical reaction
+prediction, where a single set of reactants may lead to a range
+of plausible products depending on conditions, catalysts, or
+mechanistic pathways. By modeling a spectrum of plausible
+outcomes, divergent thinking more accurately mirrors how
+chemists reason multiple plausible products when extending
+beyond typical reaction patterns. To our knowledge, this is
+the first work to formally introduce divergent thinking into
+chemical reaction modeling, analyze specific types of divergence relevant to chemical reasoning, and design solutions to
+encourage reaction-level ideational diversity.
+III. T HE P ROPOSED R EACTION T EAM F RAMEWORK
+A. Preliminary: a Single Expert for Reaction Prediction
+Following the definition of previous reaction prediction
+work [17], we first introduce the Encoder-Decoder architecture
+of a single expert for reaction prediction. The reaction prediction task can be formulated as a transformation from reactants
+Gr = (V r , E r ) to product SMILES p = {s1 , s2 , . . . , sn },
+where Gr denotes the molecular graph of reactants, V r
+denotes the atoms, and E r denotes the number of shared
+electrons between atoms in the reactants and products. The input molecular graph is constructed from their SMILES strings
+using RDKit [21], which parses the SMILES and accurately
+reconstructs the molecular structure, including aromaticity,
+valency, and bond types. Such graph-based inputs can better
+capture the underlying molecular structure and connectivity,
+and facilitate the reaction outcome prediction. The output
+product p is a sequence of tokens {s1 , s2 , . . . , sn } which are
+obtained from canonical SMILES using the tokenizer in [14].
+Given reactants graph Gr , an encoder is applied to transform
+reactants as representation vectors. The Encoder could be
+
+implemented by a Directed Graph Convolutional Network (DGCN) [22], [23] and followed by a Transformer encoder [24],
+[25] to obtain atom-level hidden representations hr :
+hr = Transformer-Encoder(D-GCN(Gr )).
+
+(1)
+
+Then a Transformer decoder is applied to decode from the
+atom representations hr to product sequences p:
+p = {s1 , s2 , . . . , sn } = Transformer-Decoder(hr ).
+
+(2)
+
+The training objective is to learn a model f that maximizes
+the conditional likelihood of the output product SMILES
+sequence given the input reactants graph:
+max log f (p | Gr ) =
+f
+
+n
+X
+
+log f (si | s1 , . . . , si−1 , Gr ),
+
+(3)
+
+i=1
+
+where f denotes the full graph-to-sequence model (D-GCN,
+Transformer encoder and decoder). Note that the training
+set is typically composed of paired samples {Gr , p}. During
+inference, the model f predicts a ranked list of potential
+products, ordered by their predicted likelihood.
+B. Sequential Mixture-of-LoRA Experts (Seq. MOLE)
+1) The Training Pipeline: To encourage substantial divergence among experts, we adopt a sequential training strategy,
+as illustrated in Fig. 3. The pipeline begins by training a
+chief model fchief (e.g., a single expert model as described
+in subsection III-A) on the entail training dataset to capture
+the dominant and typical reaction patterns. As shown in Fig.
+1, the training loss plateaus after capturing these common
+patterns are learned, indicating that the model struggles to fit
+the remaining hard-to-learn cases.
+Then, a set of LoRA-based expert models F =
+{f1 , f2 , . . . , fn } is trained sequentially, each focusing on the
+subset of training samples that were consistently mispredicted
+by the previous experts. The core idea is that the reaction
+patterns learned by a model are directly reflected in its ability
+to predict the correct product sequences. If a model is wellsuited to a certain type of transformation, it will achieve high
+training accuracy on corresponding samples. Conversely, if a
+model struggles with certain patterns, it will produce incorrect
+outputs on samples exhibiting those patterns. Therefore, the
+training accuracy on each example serves as a proxy for evaluating how well a model captures specific reaction mechanisms.
+Based on this intuition, we partition the training data among
+experts by leveraging sample-level accuracy during training.
+Specifically, at the final epoch1 of training fchief , we collect
+the set of samples that it fails to predict, denoted as D1 :
+D1 = {(Gr , p) ∈ D | fchief (Gr ) ̸= p}.
+
+(4)
+
+This set of samples are then used to train a divergent expert
+f1 , which inherits the architecture and weights of the chief
+model fchief , keeps all base parameters frozen, and applies
+LoRA adaptation to introduce lightweight, trainable modules.
+This allows f1 to specialize in the mispredicted cases without
+1 The final epoch is determined when the training loss no longer decreases.
+
+Fig. 3: The overall framework of our proposed solution ReactionTeam.
+interfering with the core knowledge captured by the chief
+model, promoting targeted divergence with minimal parameter
+overhead. During the final epoch of training f1 , we similarly
+record the set of training samples that f1 fails to predict
+correctly, denoted as D2 :
+D2 = {(Gr , p) ∈ D1 | f1 (Gr ) ̸= p}.
+
+(5)
+
+We then save the LoRA weights of f1 and proceed to
+train the next expert f2 on D2 , using f1 as the initialization.
+The base model fchief remains frozen throughout, and only
+the LoRA parameters are updated. This process is repeated
+iteratively: at each step, the current expert is trained on the
+remaining subset of examples not yet well handled, and new
+experts are created until either the dataset is fully partitioned
+or a predefined number of experts is reached. For simplicity,
+each expert fi is trained over one iteration.
+This sequential training scheme effectively partitions the
+dataset based on sample-level prediction accuracy. As a result,
+each expert fi is trained on a distinct and progressively more
+challenging subset of the data, potentially representing conflicting or underrepresented reaction patterns. This encourages
+each expert to learn from different reaction patterns and thus
+acquire a unique perspective on the reaction landscape.
+Finally, we obtain the frozen base model fchief alongside a
+set of multi-perspective LoRA experts F = {f1 , f2 , . . . , fn }.
+While fchief captures the dominant, typical reaction patterns,
+the experts in F complement it by specializing in divergent and
+complex reaction patterns. Together, this ensemble enhances
+the system’s capacity to generalize across the reaction space
+while catching on both typical and atypical reaction patterns.
+2) LoRA Experts Configuration: As discussed above, during the training of LoRA experts, we freeze all parameters of
+
+the base model fchief and apply LoRA adaptation. This design
+choice is motivated by two key considerations:
+• Effectiveness: The LoRA experts are specifically intended
+to capture divergent reaction patterns. Since the datasets
+assigned to these experts are significantly smaller and more
+specialized than the full training set used for fchief , a limited
+number of trainable parameters is sufficient to model the
+underlying transformations.
+• Efficiency: Our framework maintains a set of diverse expert
+models, with LoRA adaptation reducing the memory and
+computation needed to train and store them, making the
+system scalable.
+For simplicity and implementation efficiency, we adopt
+standard LoRA adaptation on each attention layer within the
+Transformer decoder. Specifically, we apply LoRA updates to
+the query (Q), key (K), and value (V) projections prior to
+their use in the attention mechanism. This setup enables each
+expert to learn distinct reaction behaviors with minimal parameter overhead while preserving the foundational knowledge
+encoded in fchief .
+
+
+α
+Q̃ = Q + ∆Q = I + Bq Aq Q,
+r
+
+
+α
+K̃ = K + ∆K = I + Bk Ak K,
+r
+
+
+α
+Ṽ = V + ∆V = I + Bv Av V.
+r
+
+(6)
+
+Here, Aq , Ak , Av ∈ Rr×d and Bq , Bk , Bv ∈ Rd×r are
+the trainable low-rank matrices used to capture specialized
+reaction patterns in the query, key, and value projections,
+respectively. The hidden dimension is denoted by d, and
+r ≪ d is the LoRA rank. The scaling factor α controls the
+contribution of the LoRA update, and the ratio αr determines
+its effective scale. To ensure that the LoRA-augmented model
+initially behaves identically to the pre-trained backbone, we
+
+initialize the low-rank matrices with A drawn from a random
+uniform distribution and B initialized to zero.
+By leveraging LoRA adaptation, we are able to construct
+a set of effective and divergent experts, each requiring only
+a small number of trainable parameters. The efficiency and
+effectiveness of this approach are quantitatively demonstrated
+in the experimental results provided in Section IV-C2a.
+
+2) Ranking Expert: The list of candidate products need
+to be ranked based on the likelihood that each would be
+produced from the given reactants. Since product generation
+is modeled as a token-by-token sequence prediction process,
+the likelihood of a candidate product p = (s1 , s2 , . . . , sn ) can
+be quantified by its joint probability under the model:
+Score(p | Gr ) =
+
+n
+X
+
+log fscore (si | s1 , s2 , . . . , si−1 , Gr ).
+
+(7)
+
+i=1
+
+C. Inference-time Dropout
+To introduce controlled stochasticity into the decoding process, we explore dropout for creating small-scale divergence
+in each expert. An analogy of this approach (training largescale divergent experts and enabling small-scale divergence
+at inference) can be drawn from chess move prediction. A
+capable model should be able to predict actions for both
+common and rare board states (large-scale divergence), and it
+should also reflect the variability in human strategy (smallscale divergence) due to individual differences, emotional
+states, or situational nuances. In chemistry, similar variability
+arises from changes in reaction conditions such as temperature,
+solvent, or operator choice. We form a research question
+(RQ3) in Section IV to evaluate these two divergent thinking
+mechanisms. The results presented in section IV-C1 verify that
+these two mechanisms complement each other.
+By applying dropout at test time and running multiple
+forward passes with different dropout masks, our insight is
+to randomly deactivate model weights, thereby generating
+lightweight variants of each expert. These variants serve as
+low-divergence models, each reflecting a different but minor
+interpretation of electron flow. Each model varied in this way
+can be viewed as a different expert operating within a narrow
+space of plausible mechanistic alternatives.
+This technique, known as Monte Carlo Dropout [26], aligns
+well with our objective of capturing the inherent stochastic
+nature of chemical reactions. During the inference stage, we
+apply dropout to the full graph-to-sequence model (D-GCN,
+Transformer encoder and decoder). Since the dropout layers
+are influenced by the random seed, we vary the seed for each
+inference iteration to introduce variability in the predictions.
+For the chief expert fchief and each LoRA expert fi , the
+inference-time dropout is repeated five times with different
+seeds to create different model weights for candidate sampling
+(introduced next). To obtain models with minor variations
+while retaining general chemical reaction patterns, a low
+dropout rate (0.1) is applied in our experiments.
+D. Ranking During Inference
+1) Candidates Sampling: For each model (fchief or fi
+each with differently seeded dropout), we apply candidate
+sampling to generate predicted products. Specifically, we
+use beam search following previous methods [17]. For one
+given reactant, five candidate products are sampled from
+each expert, resulting a list of diverse candidate products
+P = {p1 , p2 , . . . , pn }.
+
+Since it is impractical to retrain a separate scoring model,
+we choose to reuse the chief model for scoring candidate
+products for several reasons. First, although the chief model
+is not designed to generate diverse outputs, it serves well as a
+reliable evaluator. It may operate within the dominant reaction
+space, but it has been trained on the entire training dataset,
+enabling it to judge how well a candidate product aligns with
+learned reaction patterns. In this sense, it acts as a strong
+“examiner” even if not a divergent “thinker.” Second, training
+a separate scoring model (such as a discriminative reranker)
+would require additional labeled data, which is often expensive
+or unavailable in chemistry. Third, our extensive evaluation
+(section IV-D2) demonstrates that this reuse strategy is both
+effective and efficient, achieving strong ranking performance
+without introducing additional training complexity.
+In the end, product candidates are ranked based on their
+scores. The top-ranked candidates represent the model’s most
+confident and chemically plausible predictions.
+IV. E XPERIMENTS
+We conducted extensive experiments to address the following research questions (RQs):
+• RQ1: Effectiveness and Generalization. Can ReactionTeam effectively encourage divergent thinking and consistently improve reaction prediction performance across
+different settings?
+• RQ2: In-Depth Analysis of Divergent-Thinking Mechanisms. How do the divergent-thinking Mechanisms within
+ReactionTeam contribute individually and collectively?
+• RQ3: Expert Behavior and Scoring. How do divergent
+LoRA experts behave during decoding, and why is the Chief
+Expert reasonable for scoring and ranking, even if it fails to
+generate atypical reaction patterns?
+A. Experiment Settings
+Datasets and preprocessing. Same as most previous
+work [14], [27], we mainly evaluate our method on the current
+widely public reaction prediction dataset USPTO-MIT [6].
+There are 480K reactions in this dataset, and the default traintest splits are widely adopted in all baselines and our method.
+To assess our model’s performance in capturing the “atypical”
+electron redistribution patterns, we specifically select reactions
+where the electron flow percentage is less than 1% and test
+our model on them. We also evaluate our methods on the
+full standard test set of USPTO-MIT to demonstrate their
+strong performance. To further validate the generalizability of
+our approach, we evaluate on USPTO-STEREO [28], which
+
+contains 900K training and 50K test reactions with types
+distinct from USPTO-MIT. In addition, since no other largescale datasets are publicly available, we apply random shuffling and splitting on USPTO-MIT, showing that our method
+consistently outperforms across different data distributions.
+Implementation details. We implement our model using
+Pytorch and conduct all the experiments on a Linux server
+with GPUs (4 Nvidia A100). As mentioned in the previous
+methodology, we reuse the encoder and decoder architectures
+from the current state-of-the-art Graph2Smiles model. To
+ensure a fair comparison to previous autoregressive methods,
+we follow the same detailed settings as the previous model.
+For D-GCN, the number of message updating steps is set to
+4. Following Molecular Transformer and Graph2Smiles, we
+fix the embedding and hidden sizes dmodel to 256, the filter
+size for the Transformer to 2048, the number of attention
+heads to 8, and the number of layers for the attention encoder
+and the Transformer decoder both to 6. We use the AdamW
+optimizer [29] with Noam learning rate scheduler [25]. For the
+sequential training, we set the maximum sequential training
+iteration to 150. For the LoRA settings, we set the rank to
+64, alpha to 32. For inference-time dropout, we randomly
+generate 10 dropout seeds and set a dropout out rate to 0.1.
+For each expert sampling, we select the top 5 products of
+the expert and apply the beam search size of 50, which is
+the same as the Graph2Smiles method. As shown in the
+Section IV-C2a, we find that although we obtain multiple
+experts from sequential training, the incremental performance
+remains unchanged after adding 3 experts, so actually we only
+use three experts (one chief expert and two specialized experts)
+to predict the products. All implementation code and model
+checkpoints to reproduce the results will be made publicly
+available upon acceptance of the paper.
+Evaluation Metrics. Following prior work [14], [27], [30],
+[31], we evaluate our model and baselines using Top-K accuracy, which measures the percentage of reactions where the
+ground-truth product appears among the top K predictions.
+It is important to note that our ReactionTeam framework is
+explicitly designed to promote divergent thinking and generate
+a broader set of plausible reaction outcomes, including those
+beyond typical patterns. Therefore, we aim to demonstrate that
+our method increases the coverage of chemically reasonable
+candidates. To reflect this goal, we evaluate Top-K accuracy at
+various values of K ∈ {1, 2, 5, 10, 20, 50}, which allows us to
+assess how well our method expands the reaction prediction
+space through ideational diversity. Note that we mainly focus
+on Top-20 and Top-50 accuracy, which are critical in real
+pipelines (e.g., synthesis planning, virtual screening, safety/IP
+checks), because the model only needs to place the true
+product in a small shortlist that downstream filters or chemists
+can evaluate, so higher top-K accuracy directly translates to
+higher end-to-end success in practical applications.
+Baselines. We compare our method with following SOTA
+baselines: Autoregressive. MT-based [14], Chemformer [32],
+
+Graph2Smiles [17] are various models for reaction prediction.
+MT-based treats the problem as SMILES string translation
+using transformers. Chemformer is also a transformer-based
+model and uses a pretrained SMILES encoder with selfsupervised tasks. Graph2Smiles combines graph encoding
+with transformer decoding to achieve permutation-invariant
+encoding of molecule graphs. Our framework can be applied to any Transformer decoder-based method. We employ
+Graph2Smiles in our experiments since it’s the current SOTA
+reaction prediction model. We demonstrate that our framework
+can work well and significantly boost performance for such
+strong model. Non-autoregressive. NERF [30] formulates
+reaction prediction as generating an electron redistribution
+matrix, producing its values in a non-autoregressive manner.
+B. RQ1: Effectiveness and Generalization
+1) RQ1.1 Does ReactionTeam achieve consistent improvements across different datasets and resamplings?: The performance of evaluated models for atypical reaction patterns and
+overall performance measured by Top-K accuracy is reported
+in Fig. 4 and Table I.
+We can observe: 1) Improvements of prediction on
+atypical reaction patterns. We observe that our approach
+consistently outperforms all baselines across Top-2 to Top50 accuracy, significantly improving upon the Graph2Smiles
+model and achieving the highest accuracy, from 92.4% to
+97.3%, as shown in Fig. 4(a). As noted in the Introduction,
+baseline methods show only marginal improvements as k
+increases, suggesting that they struggle with atypical reactions
+and lack the flexibility to model diverse mechanistic pathways.
+In contrast, our approach exhibits a steadily increasing performance curve with larger k, indicating its ability to generate
+multiple plausible products, particularly for atypical cases.
+This highlights the importance of diversifying reaction predictions to improve real-world reaction modeling. The observed
+gains can be attributed to the effectiveness of our divergent
+expert models and the ranking mechanism. 2) Improvements
+in prediction on all reactions across different datasets and
+distributions. Our approach also significantly outperforms
+all previous methods on both the full USPTO-MIT and full
+USPTO-STEREO test set (in Fig. 4(b) and (c)), which are two
+widely used reaction prediction benchmarks. The improvement
+trend mirrors that observed for atypical reaction patterns. Also,
+as shown in Table I, we can observe that our method consistently outperforms the best baseline across different settings
+(different train: test ratio and shuffle). All these experiments
+highlight the strong generalization ability of our approach and
+its effectiveness across the full spectrum of reaction types
+and different datasets and distributions. 3) Top-1 Accuracy.
+We also report Top-1 accuracy in all experiments. Although
+our method is designed to encourage divergent thinking and
+improve diversity (Top-2 to Top-50), it does not compromise
+Top-1 performance. In fact, it matches or is better than the
+baseline, showing that diversity gains come without sacrificing
+precision on the most likely prediction.
+
+(a) USPTO-480K atypical reactions
+
+(b) USPTO-480K Standard test reactions
+
+(c) USPTO-STEREO Standard test reactions
+
+Fig. 4: The Top-K Accuracy (%) of evaluated models in the USPTO-MIT and USPTO-STEREO datasets.
+TABLE I: Performance on USPTO-480K under different data
+splits and shuffles. The “Split Variant” reduces the train–test
+ratio, while the “Shuffle Variant” randomizes USPTO-480K
+while keeping the original ratio. Top-k accuracy (%) and
+average internal diversity (Avg. ID) are reported.
+Setting
+Standard split
+(Train:Test=10:1)
+Atypical subset
+Split Variant-1
+(Train:Test=3.33:1)
+Split Variant-2
+(Train:Test=6.66:1)
+Shuffle Variant-1
+(Train:Test=10:1)
+Shuffle Variant-2
+(Train:Test=10:1)
+
+Method
+Baseline
+Ours
+Baseline
+Ours
+Baseline
+Ours
+Baseline
+Ours
+Baseline
+Ours
+Baseline
+Ours
+
+Top-1↑
+90.7
+90.9
+88.3
+88.4
+84.6
+84.6
+86.1
+86.1
+90.3
+90.4
+90.1
+90.3
+
+Top-20↑
+95.7
+97.2
+94.4
+96.3
+94.6
+95.4
+95.1
+96.1
+96.0
+97.4
+96.2
+97.6
+
+Top-50↑
+95.8
+98.1 (↑2.4%)
+94.4
+97.3 (↑3.1%)
+95.1
+96.4 (↑1.4%)
+95.6
+97.2 (↑1.7%)
+96.2
+98.1 (↑2.0%)
+96.3
+98.3 (↑2.1%)
+
+Avg. ID↑
+0.48
+0.56 (↑17%)
+0.56
+0.60 (↑7%)
+0.47
+0.56 (↑19%)
+0.44
+0.52 (↑18%)
+0.44
+0.51 (↑16%)
+0.41
+0.51 (↑24%)
+
+2) RQ1.2 Does ReactionTeam generate predicted products
+with greater diversity and novelty compared to baselines?: To
+evaluate diversity and novelty, we conduct two experiments.
+(1) Diversity: As shown in Table I, we report the average
+internal diversity (Avg. ID) of predicted products, calculated
+as the mean Tanimoto similarity across all pairs of candidates
+per method. Our method consistently achieves higher Avg. ID
+under different settings, demonstrating improved diversity in
+product predictions. (2) Novelty: Given the 40K test samples,
+it is difficult to directly measure novelty. We therefore employ
+an LLM-as-judge strategy: GPT-5 is provided with the predictions from our method and from the best baseline, and asked
+to decide which set contains more novel and correct products.
+Each comparison is repeated three times, with averaged results
+shown in Fig. 5. Across both datasets, our method outperforms
+the strongest baseline, indicating its potential to generate novel
+and valid products. We note this is an auxiliary demonstration;
+the more critical evidence lies in our earlier results showing
+improved performance on atypical reactions.
+C. RQ2: Analysis of Divergent-Thinking Mechanisms
+1) RQ2.1 Individual contributions of Seq. MOLE and
+Inference-Time Dropout: To further investigate the contribution of each component in our approach, we conduct ablation
+
+Fig. 5: Our Method V.S. Previous Best Baseline on predicted
+candidate products novelty and diversity, as judged by GPT-5.
+TABLE II: The impact of Seq.MoLE, Inference-time Dropout,
+and their combination.
+Model Name
+Baseline (Graph2Smiles)
+Baseline+Seq. MOLE
+Baseline+Dropout
+Baseline+Seq. MOLE+Dropout
+
+Top-2↑
+91.7
+92.2
+92.4
+92.4
+
+Top-5↑
+93.2
+93.9
+94.2
+94.3
+
+Top-10↑
+93.8
+94.7
+94.9
+95.3
+
+Top-20↑
+94.4
+96.0
+95.9
+96.4
+
+Top-50↑
+94.4
+96.2 (↑1.8%)
+96.7 (↑2.4%)
+97.3 (↑3.1%)
+
+Avg.↑
+93.5
+94.6
+94.8
+95.2
+
+studies to isolate the effects of our designed two divergent
+thinking modules: Seq. MOLE and Inference-Time Dropout.
+The results of different variants are shown in Table II. For
+the Baseline+Seq. MOLE setting, we do not apply dropout;
+candidate products are generated solely using the chief expert
+and its associated LoRA experts. In contrast, for the Baseline
++ Dropout setting, we apply inference-time dropout with
+different random seeds exclusively on the chief expert to
+produce candidate products.
+We observe that Baseline+Seq. MOLE consistently improves performance across all Top-K accuracy metrics, achieving an average accuracy of 94.6% compared to 93.5% for
+the baseline. Similarly, Baseline+Dropout yields an average
+accuracy of 94.8%, also showing consistent gains over the
+baseline. The combination of both strategies (Baseline+Seq.
+MOLE+Dropout) achieves the best overall performance, with
+an average accuracy of 95.2%. This result demonstrates that
+each mechanism contributes positively and that the divergent
+candidate products generated by Seq. MOLE and InferenceTime Dropout are complementary. Together, they expand the
+reaction prediction space in a synergistic manner, resulting in
+more accurate and diverse product predictions.
+2) RQ2.2 How sensitive is ReactionTeam’s performance to
+the number of divergent experts and dropout trials?:
+a) The impact of the number of Experts: When sequentially training F = {f1 , . . . , fn }, several valid questions arise:
+How many LoRA experts would be enough? How much do they
+contribute to the overall performance? And do they introduce
+
+TABLE III: No. of parameters, with and without LoRA
+experts.
+Method
+Baseline
+Using Chief Expert
++1 LoRA Experts
++2 LoRA Experts
+
+Total Params (M)
+
+Increase Compare to Baseline (M)
+
+18.31M (18,305,666)
+18.31M (18,305,666)
+18.90M (18,895,490)
+19.49M (19,485,314)
+
+0.00M
+0.00M
++0.59M (589,824)
++1.18M (1,179,648)
+
+Fig. 7: Top-k accuracy improvements with an increasing
+number of Dropout runs. Accuracy improves steadily, with
+gains gradually diminishing beyond 7 dropouts.
+
+Fig. 6: Top-k Accuracy improvements with increasing number
+of LoRA experts. Adding the first two LoRA experts can
+introduce significant performance while no gain observed from
+adding the following LoRA experts.
+significant storage overhead? We address these questions by
+evaluating both the effectiveness and efficiency of the LoRA
+experts. First, we analyze the number of experts produced
+and quantify their individual and collective impact on model
+performance. Then, we examine their efficiency by measuring
+the storage cost and demonstrating how LoRA adaptation
+allows us to maintain a compact model footprint while still
+benefiting from expert-level specialization.
+The Effectiveness of MOLE. In Fig. 6, we show Top-k
+Accuracy when increasing LoRA experts. We observe: 1)
+There is a consistent increase in accuracy across all top-k
+metrics as more LoRA experts are added. 2) Adding even one
+LoRA expert gives a significant improvement. For instance,
+Top-50 accuracy jumps from 94.4% to 95.95%. Subsequent
+additions of LoRA experts (from 2 to 4) result in marginal
+improvements, with the performance plateauing from 2 experts onward. This is because filtering training samples using
+fi (Gr ) ̸= p results in most samples being assigned to the first
+two experts. Consequently, only a small portion of the training
+set remains for the remaining experts. Later LoRA experts thus
+contribute little and produce similar patterns. Hence, the first
+two LoRA experts are enough, and in our experiments, besides
+the chief expert, we use the additional two LoRA experts.
+The Parameter Efficiency of MOLE. In Table III, we show
+the total model parameters and the additional required parameters compared to the baseline. We can observe that although
+two LoRA experts are involved, the number of additional
+parameters is small (only 1.18M) and the performance gain
+is substantial (around 2% across all Top-k accuracy as shown
+in Fig. 6). This highlights the parameter efficiency of our
+approach alongside its improved performance.
+b) The impact of Inference-time dropout times:
+Inference-time dropout is introduced to encourage divergent
+thinking. We vary the number of dropout runs from 0 (base-
+
+line) to 10 (with different random seeds), and report results in
+Fig. 7. A consistent performance improvement is observed as
+the number of dropout runs increases, with gains gradually saturating beyond 7 runs. This validates our designed inferencetime dropout method can incentivize more small-scale divergent thinking of experts to generate diverse products.
+D. RQ3: Expert Behavior and Scoring
+1) RQ3.1 How divergent experts handle distinct and atypical reaction patterns?: While quantitative results show our
+approach excels, we next have a qualitative analysis to better
+understand how our divergent expert models behave in decoding for handling distinct reaction patterns.
+Handling Distinct Reaction Patterns: To assess whether
+divergent experts specialize in different reaction patterns, we
+analyze correctly predicted samples among the test set. For
+each correct prediction, we identify which expert produced the
+output. Fig. 9 distribution of correct generations contributed
+by each expert, as well as the incorrect ones. While 94%
+of correct predictions are attributed to the chief expert, the
+LoRA experts and the dropout variants of both chief and
+LoRA experts also contribute to the overall performance. We
+then input the corresponding reactants and predicted products
+into GPT-4.1 [33] to analyze the reaction type and the key
+compounds involved. This allows us to qualitatively assess
+the types of reactions each expert tends to specialize in. As
+shown in Fig. 8, GPT-generated descriptions reveal that these
+experts capture distinct reaction types and focus on different
+compound transformations. This confirms the effectiveness of
+our design in promoting divergent thinking across experts.
+Influence of Divergent Thinking on the Decoding Process:
+To illustrate how divergent thinking emerges in the decoding
+process, we present a case study in Fig. 10. Given the same
+reactants, we compare the first-token probabilities from the
+chief expert, LoRA experts, and their dropout variants. The
+results show significant differences in token selection between
+the chief and LoRA experts, indicating large-scale divergence
+in their generative behavior. Moreover, we observe smallscale divergence between each expert and its dropout-based
+variants, suggesting that inference-time dropout encourages
+
+(a) Chief Expert
+
+(b) LoRA Experts
+
+(c) Chief Expert Dropout
+
+(d) LoRA Experts Dropout
+
+Fig. 8: The reaction information explained by LLM based on the predictions of different experts. The Proportions of reaction
+types and related compounds differ across different experts and their variants.
+
+Fig. 9: Distribution of correct generations contributed by each
+expert (evaluated by Top-50 Accuracy), and the incorrect ones
+among the test set.
+
+Fig. 10: Examples of token probabilities from different experts
+during decoding. The variation encourages diverse perspectives on reactions and leads to different product generations.
+subtle yet meaningful variation in output. These findings
+reinforce our claim that both Seq. MOLE and inferencetime Dropout mechanisms contribute complementary forms of
+divergence, which collectively enhance the model’s capacity to
+generate plausible and diverse reaction outcomes.
+2) RQ3.2 Why does it remain valid to use the fChief for
+scoring and ranking?: As discussed in Section III-D, reusing
+the chief expert for scoring and ranking is a practically reasonable solution. In this section, we investigate how the chief
+expert can enhance decoding performance. One key insight
+drawn from our empirical evaluation is: The chief expert
+is a qualified evaluator of candidate products, capable
+of assigning higher scores to outputs generated by other
+specialized experts than to its own predictions.
+One case study is illustrated in Fig. 11, where we use a
+beam size of 2 and restrict each step to the top-2 next-token
+candidates. The chief expert may omit less likely initial tokens
+
+such as Br, N during its own generation process. In contrast,
+divergent LoRA experts, trained on different token distributions, may assign higher probabilities to these rare tokens,
+thus generating structurally different product candidates. More
+importantly, although the chief expert assigns lower probability
+to these tokens (e.g., Br) in the first step, it may assign
+higher conditional probabilities to the subsequent tokens in
+those sequences. When computing the joint likelihood over
+the full product SMILES, the total score for such candidates
+generated by LoRA experts, can exceed that of the chief
+expert’s own outputs. This explains why our method not only
+improves Top-50 accuracy through greater diversity, but also
+significantly boosts Top-2 and Top-5 accuracy by recovering
+plausible products that traditional methods often overlook.
+While one might attempt to capture such diversity by
+increasing the beam size or the number of considered tokens
+(Top-N) per step, this approach has a critical limitation in the
+chemical domain. Unlike natural language, where approximate
+correctness is often acceptable, chemical reaction prediction
+in SMILES format requires Exact Match, thus a single
+wrong token can invalidate the entire prediction. Consequently,
+simply increasing beam size or top-n often leads to a higher
+proportion of invalid outputs without substantially improving
+accuracy. This limitation is evident in Fig. 4, where increasing
+the beam size to 50 under the chief expert yields only marginal
+improvement from Top-20 to Top-50 accuracy. This highlights
+that traditional beam search fails to generate additional
+plausible products despite increased diversity. In contrast, our
+set of divergent expert models acts as a form of structured
+subsearch: they explore alternative token trajectories that are
+chemically valid yet missed by the base model. When scored
+by the chief expert, these candidates represent a refined and
+more effective decoding strategy that emphasizes plausibility
+over pure diversity. Thus, our divergent experts can be alternatively regarded as an effective subsearch mechanism for
+plausible products in the reaction space during decoding.
+E. Broader Impacts
+Our key contribution is being the first to highlight the
+importance of beyond the typical in reaction prediction. Prior
+methods emphasize only Top-1 performance, making models
+biased toward common patterns and suppresses novelty. Our
+work has the potential to benefit other science domains that
+seek “atypical” patterns, such as biology, material science,
+and so on. For instance, in biology, rare but functionally
+
+Fig. 11: One example illustrating why the chief model can be used for scoring and ranking (RQ2). Although the chief model
+ignores the Br token during beam search decoding with beam size 2, it assigns a higher score to candidate products starting
+with Br generated by LoRA experts, when acting as an evaluator.
+significant protein–ligand binding modes are often overlooked
+by models trained only on dominant interactions.
+V. C ONCLUSION
+Reaction prediction is a fundamental challenge. We identify
+a major limitation ignored by existing methods: atypical
+patterns, and introduce divergent thinking to address it. Our
+method assembles experts to generate diverse, plausible outcomes, mimicking reasoning of chemists. Experiments show
+it not only improves performance but also provides insights
+into the value of divergent thinking in reaction modeling.
+VI. ACKNOWLEDGMENTS AND D ISCLOSURE OF F UNDING
+This work was supported by the NSF Center for ComputerAssisted Synthesis (C-CAS), No. CHE-2202693.
+R EFERENCES
+[1] E. J. Corey and W. T. Wipke, “Computer-assisted design of complex
+organic syntheses: Pathways for molecular synthesis can be devised with
+a computer and equipment for graphical communication.” Science, vol.
+166, no. 3902, pp. 178–192, 1969.
+[2] C. W. Coley, R. Barzilay, T. S. Jaakkola, W. H. Green, and K. F. Jensen,
+“Prediction of organic reaction outcomes using machine learning,” ACS
+central science, vol. 3, no. 5, pp. 434–443, 2017.
+[3] A. Keto, T. Guo, M. Underdue, T. Stuyver, C. W. Coley, X. Zhang,
+E. H. Krenske, and O. Wiest, “Data-efficient, chemistry-aware machine
+learning predictions of diels–alder reaction outcomes,” Journal of the
+American Chemical Society, 2024.
+[4] M. H. Segler and M. P. Waller, “Modelling chemical reasoning to predict
+and invent reactions,” Chemistry–A European Journal, vol. 23, no. 25,
+pp. 6118–6128, 2017.
+[5] ——, “Neural-symbolic machine learning for retrosynthesis and reaction
+prediction,” Chemistry–A European Journal, vol. 23, no. 25, pp. 5966–
+5971, 2017.
+[6] W. Jin, C. Coley, R. Barzilay, and T. Jaakkola, “Predicting organic
+reaction outcomes with weisfeiler-lehman network,” NeurIPS, vol. 30,
+2017.
+[7] I. Sutskever, O. Vinyals, and Q. V. Le, “Sequence to sequence learning
+with neural networks,” NeurIPS, vol. 27, 2014.
+[8] T. Guo, B. Nan, Z. Liang, Z. Guo, N. Chawla, O. Wiest, X. Zhang et al.,
+“What can large language models do in chemistry? a comprehensive
+benchmark on eight tasks,” NeurIPS, 2023.
+[9] M. Freitag and Y. Al-Onaizan, “Beam search strategies for neural
+machine translation,” arXiv:1702.01806, 2017.
+[10] Z. Chen, Y. Deng, Y. Wu, Q. Gu, and Y. Li, “Towards understanding
+mixture of experts in deep learning,” arXiv:2208.02813, 2022.
+[11] X. Wu, S. Huang, and F. Wei, “Mixture of LORA experts,” arXiv
+preprint arXiv:2404.13628, 2024.
+[12] C. Shi, M. Xu, H. Guo, M. Zhang, and J. Tang, “A graph to graphs
+framework for retrosynthesis prediction,” in ICML, 2020, pp. 8818–
+8827.
+
+[13] B. Liu, B. Ramsundar, P. Kawthekar, J. Shi, J. Gomes, Q. Luu Nguyen,
+S. Ho, J. Sloane, P. Wender, and V. Pande, “Retrosynthetic reaction
+prediction using neural sequence-to-sequence models,” ACS central
+science, vol. 3, no. 10, pp. 1103–1113, 2017.
+[14] P. Schwaller, T. Laino, T. Gaudin, P. Bolgar, C. A. Hunter, C. Bekas, and
+A. A. Lee, “Molecular transformer: a model for uncertainty-calibrated
+chemical reaction prediction,” ACS central science, vol. 5, no. 9, pp.
+1572–1583, 2019.
+[15] J. Fang, S. Zhang, C. Wu, Z. Yang, Z. Liu, S. Li, K. Wang, W. Du, and
+X. Wang, “Moltc: Towards molecular relational modeling in language
+models,” arXiv:2402.03781, 2024.
+[16] H. Hu, Y. Jiang, Y. Yang, and J. X. Chen, “Enhanced template-free
+reaction prediction with molecular graphs and sequence-based data
+augmentation,” in CIKM, 2023, p. 813–822.
+[17] Z. Tu and C. W. Coley, “Permutation invariant graph-to-sequence model
+for template-free retrosynthesis and reaction prediction,” Journal of
+chemical information and modeling, vol. 62, no. 15, pp. 3503–3513,
+2022.
+[18] M. I. Jordan and R. A. Jacobs, “Hierarchical mixtures of experts and the
+em algorithm,” Neural computation, vol. 6, no. 2, pp. 181–214, 1994.
+[19] R. A. Jacobs, M. I. Jordan, S. J. Nowlan, and G. E. Hinton, “Adaptive
+mixtures of local experts,” Neural computation, vol. 3, no. 1, pp. 79–87,
+1991.
+[20] J. P. Guilford, “The structure of intellect.” Psychological bulletin, vol. 53,
+no. 4, p. 267, 1956.
+[21] RDKit, “RDKit,” https://github.com/rdkit/rdkit/releases, 2024.
+[22] V. R. Somnath, C. Bunne, C. Coley, A. Krause, and R. Barzilay,
+“Learning graph models for retrosynthesis prediction,” NeurIPS, vol. 34,
+pp. 9405–9415, 2021.
+[23] K. Yang, K. Swanson, W. Jin, C. Coley, P. Eiden, H. Gao, A. GuzmanPerez, T. Hopper, B. Kelley, M. Mathea et al., “Analyzing learned
+molecular representations for property prediction,” Journal of chemical
+information and modeling, vol. 59, no. 8, pp. 3370–3388, 2019.
+[24] D. Bahdanau, K. Cho, and Y. Bengio, “Neural machine translation by
+jointly learning to align and translate,” arXiv:1409.0473, 2014.
+[25] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez,
+Ł. Kaiser, and I. Polosukhin, “Attention is all you need,” NeurIPS,
+vol. 30, 2017.
+[26] Y. Gal and Z. Ghahramani, “Dropout as a bayesian approximation:
+Representing model uncertainty in deep learning,” in ICML, 2016, pp.
+1050–1059.
+[27] C. W. Coley, W. Jin, L. Rogers, T. F. Jamison, T. S. Jaakkola, W. H.
+Green, R. Barzilay, and K. F. Jensen, “A graph-convolutional neural
+network model for the prediction of chemical reactivity,” Chemical
+science, vol. 10, no. 2, pp. 370–377, 2019.
+[28] W. Jin and et al., “USPTO-STEREO: A large-scale dataset of 1.8m
+chemical reactions with stereochemistry,” accessed: 2025-08-21.
+[29] I. Loshchilov and F. Hutter, “Decoupled weight decay regularization,”
+arXiv:1711.05101, 2017.
+[30] H. Bi, H. Wang, C. Shi, C. Coley, J. Tang, and H. Guo, “Nonautoregressive electron redistribution modeling for reaction prediction,”
+in ICML, 2021, pp. 904–913.
+[31] Z. Meng, P. Zhao, Y. Yu, and I. King, “Doubly stochastic graph-based
+non-autoregressive reaction prediction,” arXiv:2306.06119, 2023.
+
+[32] R. Irwin, S. Dimitriadis, J. He, and E. J. Bjerrum, “Chemformer: a pretrained transformer for computational chemistry,” Machine Learning:
+Science and Technology, vol. 3, no. 1, p. 015022, 2022.
+[33] OpenAI, “GPT-4 Technical Report,” https://openai.com/research/gpt-4,
+2023, accessed via OpenAI API, May 2025.
+
+A PPENDIX
+In this appendix, we give a detailed gradient-based analysis
+to clarify why rare reaction patterns are hard to learn and how
+our method overcomes this limitation.
+A. Problem Setup: similar input reactants x, very different
+products y
+
+is small and 1 − crare is large. In that case, Pr2 (Y = yrare |
+X ∈ R) ≫ ε, Thus, the second model M2 is trained almost
+entirely on the rare patterns in R, i.e., on “similar x, totally
+different y” cases that f1 failed to learn, and the gradient for
+the second model will push the second model to satisfy:
+
+
+∇θ2 L2,R (θ2 ) ≈ Pr(Y = yrare | X ∈ R) EX∈R −∇θ2 log pθ2 (yrare | X) ,
+2
+
+which put more strong supervised signal for the rare datasets
+on the second expert.
+D. Why other scaling methods such as mixture-of-experts fail
+
+Our method scales up experts through sequential training,
+yielding diverse experts that can handle similar inputs x
+using different ways of thinking. Gated Mixture-of-Experts
+Pr(Y = ymajor | X = x) = 1−ε, Pr(Y = yrare | X = x) = ε, (MoE) pursues a similar goal, but in this section we show why
+for all x ∈ R, with small ε ≪ 1. Thus, we have “similar a standard gated MoE typically fails in this setting. A gated
+x, but sometimes a totally different y”. Different from most MoE with K experts has the form:
+natural language processing tasks that only focus on ymajor
+K
+X
+and ignore yrare , in chemistry reaction prediction or some
+pMoE (Y | X) =
+gk (X; ϕ) pk (Y | X; θk ),
+natural science areas, the yrare is more important since it can
+k=1
+boost scientific discover for breakthrough.
+where gk (X; ϕ) are gating weights (router parameters ϕ).
+B. Why Standard LM training struggles
+Let Z ∈ {1, . . . , K} denote the (latent) expert index selected
+Standard LMtraining minimizes the negative log-likelihood by the gate, with
+L(θ) = E(X,Y ) − log pθ (Y | X) . Restricted to R, this loss
+p(Z = k | X) = gk (X; ϕ).
+is
+As training converges, this implies that for X ∈ R, where
+
+
+LR (θ) = (1 − ε) EX∈R − log pθ (ymajor | X)
+inputs
+are nearly identical and only the labels Y differ, we
+
+
++ ε EX∈R − log pθ (yrare | X) .
+have
+Consider a chemical reaction region of inputs R where all
+x are very similar. In this region, labels follow
+
+Since ε ≪ 1, the gradient of LR is
+
+
+∇θ LR (θ) = (1 − ε) EX∈R − ∇θ log pθ (ymajor | X)
+
+
++ ε EX∈R − ∇θ log pθ (yrare | X)
+
+p(Z = k | X = x, Y = ymajor ) = p(Z = k | X = x) = gk (x; ϕ),
+p(Z = k | X = x, Y = yrare ) = p(Z = k | X = x) = gk (x; ϕ).
+Hence, considering x are nearly identical, we have:
+
+Since ε ≪ 1, the gradient of LR is dominated by the
+majority term and the model learns one “blurred” distribution
+for all similar x, and the rare, totally different label yrare , is
+weakly represented.
+C. Our Sequential Training Effectively Scales up a Diverse
+Mixture of Experts
+Formally, our method removes the samples correctly solved
+by the first model f1 and uses the remaining ones as the
+training set for the next model f2 . Let:
+
+cmajor = Pr f1 correct | X ∈ R, Y = ymajor ,
+
+crare = Pr f1 correct | X ∈ R, Y = yrare .
+Therefore, the effective probability of the rare label in the
+training data for f2 (restricted to R) is
+Pr(Y = yrare | X ∈ R) =
+2
+
+ε(1 − crare )
+.
+ε(1 − crare ) + (1 − ε)(1 − cmajor )
+
+Typically, f1 fits the easy majority much better than the rare
+cases, so cmajor is large and 1 − cmajor is very small, while crare
+
+p(Z = k | X = x, Y = ymajor ) ≈ p(Z = k | X = x, Y = yrare ).
+In this local region the routing expert index Z depends
+almost only on X, and barely on whether Y is the rare or
+majority outcome; the MoE cannot use Z to encode “this is
+a rare mode”, so the rare pattern does not receive a dedicated
+expert in R.
+
+

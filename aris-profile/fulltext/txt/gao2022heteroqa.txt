@@ -1,0 +1,1442 @@
+HeteroQA: Learning towards Question-and-Answering
+through Multiple Information Sources
+via Heterogeneous Graph Modeling
+Shen Gao1 , Yuchi Zhang2 , Yongliang Wang2 , Yang Dong2 , Xiuying Chen5 , Dongyan Zhao1 and Rui
+Yan3,4∗
+1 Wangxuan Institute of Computer Technology, Peking University
+
+arXiv:2112.13597v1 [cs.CL] 27 Dec 2021
+
+2 Ant Group
+3 Gaoling School of Artificial Intelligence, Renmin University of China
+4 Beijing Academy of Artificial Intelligence
+5 King Abdullah University of Science and Technology
+
+{shengao,zhaody}@pku.edu.cn,{yuchi.zyc,yongliang.wyl,doris.dy}@alibaba-inc.com
+xiuying.chen@kaust.edu.sa,ruiyan@ruc.edu.cn
+
+ABSTRACT
+Community Question Answering (CQA) is a well-defined task that
+can be used in many scenarios, such as E-Commerce and online user
+community for special interests. In these communities, users can
+post articles, give comment, raise a question and answer it. These
+data form the heterogeneous information sources where each information source have their own special structure and context
+(comments attached to an article or related question with answers).
+Most of the CQA methods only incorporate articles or Wikipedia to
+extract knowledge and answer the user’s question. However, various types of information sources in the community are not fully
+explored by these CQA methods and these multiple information
+sources (MIS) can provide more related knowledge to user’s questions. Thus, we propose a question-aware heterogeneous graph
+transformer to incorporate the MIS in the user community to automatically generate the answer. To evaluate our proposed method,
+we conduct the experiments on two datasets: MSMplus the modified version of benchmark dataset MS-MARCO and the AntQA
+dataset which is the first large-scale CQA dataset with four types of
+MIS1 . Extensive experiments on two datasets show that our model
+outperforms all the baselines in terms of all the metrics.
+
+CCS CONCEPTS
+• Information systems → Question answering.
+
+KEYWORDS
+Question answering system; Heterogeneous graph; Text generation
+∗ Corresponding Author: Rui Yan (ruiyan@ruc.edu.cn) and Dongyan Zhao
+(zhaody@pku.edu.cn)
+1 https://github.com/gsh199449/HeteroQA
+
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than ACM
+must be honored. Abstracting with credit is permitted. To copy otherwise, or republish,
+to post on servers or to redistribute to lists, requires prior specific permission and/or a
+fee. Request permissions from permissions@acm.org.
+WSDM ’22, February 21–25, 2022, Tempe, AZ, USA
+© 2022 Association for Computing Machinery.
+ACM ISBN 978-1-4503-9132-0/22/02. . . $15.00
+https://doi.org/10.1145/3488560.3498378
+
+ACM Reference Format:
+Shen Gao1 , Yuchi Zhang2 , Yongliang Wang2 , Yang Dong2 , Xiuying Chen5 ,
+Dongyan Zhao1 and Rui Yan3,4 . 2022. HeteroQA: Learning towards Questionand-Answering through Multiple Information Sources via Heterogeneous
+Graph Modeling. In Proceedings of the Fifteenth ACM International Conference
+on Web Search and Data Mining (WSDM ’22), February 21–25, 2022, Tempe,
+AZ, USA. ACM, New York, NY, USA, 9 pages. https://doi.org/10.1145/3488560.
+3498378
+
+1
+
+INTRODUCTION
+
+Online user community is widely adopted in many scenarios, such
+as software user communities (pytorch forum), interest groups
+(sub-reddit in Reddit and XueQiu), general communities (Quora
+and ZhiHu) and E-commerce websites (Taobao and AntFortune).
+To respond to user’s queries timely and improve the experience, researchers propose the Community Question Answering (CQA) [11,
+36, 46] which first reads the community article or Wikipedia and answers the user’s question. Most previous works focus on multi-hop
+retrieving [32] or modeling the fine-grained interaction between
+question and documents [43].
+However, most of the previous CQA models use a single information source (e.g., articles or knowledge base) and some of the
+information comes from an external source (e.g., Wikipedia), and it
+cannot cover the various aspects of user questions. In fact, there
+is various information in the online user community which has
+not been fully explored by existing CQA methods, such as article
+comments and related question-answer pairs. Moreover, the data
+structure and context of these multiple information sources (MIS)
+are very different: comments are associated with plain text articles and the related question-answering are pair-wise text data.
+Thus, these multiple information sources form a heterogeneous
+knowledge source which can help the CQA model improve the
+answer quality, as shown in Figure 1. The reason lies in that these
+information sources are supplements to the community articles
+and these sources from the same community are more relevant to
+the question than the retrieved external Wikipedia. Therefore, in
+this paper, we propose to incorporate four different types of MIS
+into the community question answering: (1) user articles; (2) article
+comments; (3) related questions; (4) their answers.
+
+Multiple Information Sources
+From Online Community
+Article #1
+
+Install PyTorch on Macbook
+First install pip, and then use the pip install
+Comment #1
+
+HeteroQA Model
+
+Comment
+#1
+
+BART Encoder
+
+Got an error when I using Macbook with M1
+
+Article #1
+
+Comment #2
+Comment
+#2
+
+It works!
+
+Article #2
+
+Compile PyTorch from source
+1. Install cmake; 2. Install CUDA;
+3. Get the source; 4. Compile using given
+script.
+
+MIS Graph
+Construction Article #2
+
+Related CQA #1
+
+Related Q
+#1
+
+Does PyTorch support Apple Silicon
+(M1)?
+Yes, but there is no binary, u should
+install it from source.
+
+Question
+
+Related A
+#1
+
+Question-aware
+Graph Transformer
+
+Answer Decoder
+
+Generated
+Answer
+
+Figure 1: Example of incorporating heterogeneous information sources in community question answering.
+Since MIS contains heterogeneous information form, we cannot
+simply treat them as plain text or model each type of MIS equally
+and independently, and each MIS should be modeled with its own
+structure and context. For example, the article comment cannot
+be understood without the semantic context of the article, and we
+should build an explicit connection between the comment and the
+article. To incorporate MIS into answer generation, there are two
+challenges that should be tackled: (1) How to unify the heterogeneous multiple information sources and extract useful knowledge
+according to the user question; (2) How to incorporate the knowledge learned from the heterogeneous MIS into the final answer generation process. Thus, we propose the Heterogeneous graph based
+Question Answering model (HeteroQA). We first construct a heterogeneous graph using the different types of sources as a different
+type of node, and the graph construction method is shown in Figure 1. Then, we propose a question-aware graph reasoning method
+on the MIS heterogeneous graph to extract question-related knowledge from MIS. Finally, we generate the answer by dynamically
+incorporating graph node based on a BART-based [25] pretrained
+text generation framework. To demonstrate the effectiveness of
+the proposed HeteroQA model, we conduct experiments on two
+datasets: (1) MSMplus dataset which is a modified version of the
+public benchmark CQA dataset MS-MARCO [3] and (2) a largescale CQA dataset AntQA with four types of MIS that we released
+in this paper. Experiments demonstrate that HeteroQA outperforms
+all the strong baselines on both datasets.
+To sum up, our contributions can be summarized as follows:
+• We propose to incorporate MIS in the online user community
+to facilitate the CQA model.
+• To leverage this heterogeneous information source, we propose the Heterogeneous graph-based Question Answering model
+(HeteroQA).
+• Experiments show that our HeteroQA outperforms all the
+strong baselines on two datasets: MS-MARCO and AntQA which
+is a large-scale CQA dataset with MIS proposed in this paper.
+
+2
+
+RELATED WORK
+
+Community Question Answering. The current CQA task aims
+to automate the process of finding appropriate answers to questions in a community-created discussion forum [33]. Recent researches [49, 52] often regard the CQA task as a text-matching
+problem and have proposed various deep learning networks to
+learn the semantic representation of question-answer pairs.
+Different from the answer selection and span extraction methods,
+researchers propose the generative-based CQA methods [4] which
+can generate the natural language answers. Answering the custom
+question on E-commerce website is an important CQA application
+which has been addressed by many researchers [5, 15, 16], and most
+of these methods tackle this task as a knowledge-grounded text
+generation that leverages the custom reviews and product attributes
+to generate the answer.
+However, existing CQA methods do not consider the MIS content
+in the community, which can provide more related knowledge than
+using the articles along to answer the question.
+Heterogeneous Graph Network. Heterogeneous graph is widely
+used in many structure data modeling tasks: recommendation [8, 22,
+30], social network modeling [9, 47, 50], text summarization [44],
+and knowledge-graph based tasks [21, 48]. In the CQA task, most
+of the researchers employ the homogeneous graph to model the
+contextual information, and only a few CQA methods leverage the
+heterogeneous graph model. Hu et al. [18, 19] propose to use the
+graph to model the multi-modal content of questions and answers
+with a graph neural network. Sun et al. [39] propose a graph-based
+model to route the newly posted questions to potential answers,
+which models the relationship between question, tags, and users
+using a heterogeneous graph. However, how to model the different
+types of MIS text using heterogeneous graph has not been studied in
+previous research, and most of the previous methods only retrieve
+existing answers or select answer from pre-defined candidates. In
+this paper, we focus on incorporating MIS from the user community
+and generate a proper answer from scratch.
+
+Table 1: Examples of the community QA and MIS.
+Question: 在支付宝上借款怎么还款(How to conduct repayment
+on Alipay?)
+Answer: 可以在支付宝里面进行还款(Use the Alipay mobile app
+to conduct the repayment.)
+MIS (Related QA): Q: 支付宝借呗怎么还？(How to repay for
+“Jiebei” (Ant Microloan)?) A: 进入支付宝借呗页面，就可以看到
+去借钱和去还钱，点击还款就可以看到还款数目，将足够的
+资金提前存入支付宝的余额(Login the “Jiebei” page, and you can
+see “Borrow money” and “Repayment”. Click on the “Repayment”
+button, and then you can see the amount you should pay back.
+Deposit enough money in your Alipay balance account.)
+MIS (Related Article): 借呗提前还款要收手续费吗？不需要，
+借呗提前还款暂时没有手续费，大家直接在借呗页面操作即
+可。登录手机支付宝，点击右下角，在借呗首页选择，按
+页面提示操作。(Do I have to charge a handling fee for early
+repayment? No, there is no handling fee for repayment in “Jiebei”.
+So you can directly conduct repayment on the “Jiebei”. First, log in
+to Alipay mobile version, click on the lower right corner, select on
+the home page of “Jiebei”, and follow the instructions on the page.)
+MIS (Related Article): 支 付 宝 信 用 卡 还 款 从3月26日 起 超
+出2000元部分将收取0.1%手续费的消息，自昨天起在各大平台
+传得沸沸扬扬。相信大家其实都已经早有了心理准备。(The
+news that Alipay credit card repayments will be charged a 0.1%
+handling fee for more than 2,000 yuan from March 26 has been
+circulated on major platforms since yesterday. I believe that everyone has already been mentally prepared.) Comments: #1. 谢谢分
+享！(Thanks for sharing!) #2. 自从微信收费以来，我一直是通
+过支付宝来还款(Since WeChat charges the handling fee, I have
+always used Alipay to repay)
+
+Text Generation Pretraining. Recently, large-scale language
+models based on transformer [41] pretrained with mask language
+modeling [7] or text infilling [25] have been explored further advanced the state-of-the-art on many language understanding and
+generation tasks [27]. We focus on improving the factual correctness and language fluency of the CQA model by using these pretraining models.
+
+3
+
+ANTQA DATASET
+
+In this paper, we propose a new large-scale community questionand-answering (CQA) dataset named AntQA, and the biggest difference compared to existing CQA datasets lies in that AntQA contains multiple types of information sources to support the questionanswering task. We will first introduce the data collection methods
+of AntQA, and then give some statistics of the QA pair and the
+multiple information sources.
+
+3.1
+
+Data Collection
+
+To construct a community question-answering dataset, we collect
+the textual data from the AntFortune 2 which is one of the largest
+financial forums in China. In this financial forums, users in community disscuss about the stock and mutual fund by publishing articles
+or sending tweets about their analysis of stock market. Other users
+2 https://antfortune.com
+
+can give comments to the articles and tweets. Most importantly, like
+most of online communities, users can pose a question and answer
+others question. In this community, practitioners in the financial
+industry can obtain verification by showing their credentials to the
+administration of the online community. Thus, we collect the QA
+pairs which are answered by the verification users.
+To build the multiple information sources (MIS), we collect four
+types of information sources including: (1) user articles; (2) article
+comments; (3) related questions and (4) its answers. For a community QA pair, we use the question as the query to retrieve the
+related question-answer from all the training QA samples using
+BM25 algorithm, and we use a popular information retrieval system
+ElasticSearch3 to implement distributed BM25 algorithm. And we
+also retrieve the user articles and its comments using the same
+method as the related QA pairs.
+Table 1 shows a randomly sampled example data from the test
+set of AntQA. In this example, we show the question, answer and
+three MIS item which contains one related QA pair and two user
+articles. And the second article has two user comments. This example question asks about the usage of Alipay app, which topic is not
+a popular topic disscussed by user articles. And how to repayment
+is a very common question espacially for new users of Alipay, thus
+we can find the useful knowledge from the related QA pairs in MIS.
+However, not all the questions are talked about the simple topics,
+for example, other questions ask the trend of stock market should
+be answered by incroporating the user articles.
+According to the user agreement and privacy policy of this online
+community, we are authorized to use and release the anonymous
+CQA and MIS data for research.
+To verify the generalization of our proposed method in this paper,
+we also propose to modify a benchmark dataset MS-MARCO [3]
+as a new dataset MSMplus . We employ the information retrieval
+system ElasticSearch to retrieve several similar QA pairs for each
+CQA sample and forming the new CQA dataset MSMplus with
+related QA pairs as MIS. Since the MS-MARCO leaderboard is
+closed, we use the development set as the test set for MSMplus . We
+will also introduce the statistics of MSMplus in the next section for
+comparison with AntQA.
+
+3.2
+
+Key Statistics
+
+We list some basic statistics for AntQA and MSMplus in Table 2.
+AntQA and MSMplus contain comparable number of training samples, and AntQA contains 376948 training samples, 1920 validation
+samples, and 2409 test samples. The AntQA contains more than
+three times supported articles than MSMplus dataset, and AntQA
+has more related QA pairs than MSMplus . In this paper, we use the
+character as the basic unit of Chinese and use the word unit for
+English. And the lengths of QA and articles in MSMplus dataset are
+also shorter than the AntQA dataset.
+To verify the correctness of the retrieved MIS in AntQA, we also
+conduct the human evaluation using scores 1-3 (3 means the MIS
+has completely correct information to answer the question). The
+average score is 2.12 and there are 72% samples that obtain a score
+equal to or greater than 2 which demonstrates the majority of MIS
+can support the model to give a correct answer.
+3 https://www.elastic.co/cn/elasticsearch/
+
+Table 2: Dataset Statistics. The MIS are associated with each
+QA sample. The number of articles denotes the retrieved articles for a QA sample. The number of comments denotes
+the total number for the associated articles of a QA sample.
+
+four basic edges: (1) user article to question; (2) related question
+to question; (3) related answer to related question; (4) comment to
+user article.
+
+5.3
+# of training samples
+# of test samples
+# of validation samples
+Avg. words of question
+Avg. words of answer
+Avg. number of articles
+Avg. sentences of articles
+Avg. words of articles
+Avg. number of comments
+Avg. words of comments
+Avg. number of related QA
+
+4
+
+AntQA
+
+MSMplus
+
+376948
+2409
+1920
+25.88
+83.89
+29.99
+3.87
+297.01
+11.63
+18.83
+9.01
+
+387774
+49230
+5.77
+16.27
+9.98
+5.04
+60.49
+6.37
+
+{h𝑖𝑗,1, · · · , h𝑖𝑗,𝐿𝑑 } = Enc(𝑑 𝑖𝑗,1, · · · , 𝑑 𝑖𝑗,𝐿𝑑 ),
+
+(1)
+
+𝑞
+𝑞
+𝑞
+𝑞
+{h1 , · · · , h𝐿 } = Enc(𝑤 1 , · · · , 𝑤 𝐿 ),
+𝑞
+𝑞
+
+(2)
+
+where Enc is the encoder module in BART which outputs the vector
+representation h𝑖𝑗,𝑘 of each input token 𝑑 𝑖𝑗,𝑘 in 𝑗-th document of
+MIS type 𝑖. To obtain a vector representation of each MIS document,
+we apply the mean-pooling operation to the hidden states of tokens
+in a document:
+
+
+h𝑖𝑗 = Mean-pooling {h𝑖𝑗,1, · · · , h𝑖𝑗,𝐿𝑑 } .
+(3)
+We use the document representation h𝑖𝑗 as the initial node representation of the heterogeneous graph.
+
+PROBLEM FORMULATION
+𝑞
+
+Node Encoder
+
+Next, we employ the pretrained BART model to encode each MIS
+document independently:
+
+𝑞
+
+Given a user question 𝑞 = {𝑤 1 , · · · , 𝑤 𝐿 } with 𝐿𝑞 tokens and 𝑇
+
+5.4
+
+types of related MIS 𝑢 = {𝑢 1, · · · , 𝑢𝑇 } which is retrieved from the
+database using the question as the query, our goal is to generate
+an answer 𝑎 = {𝑤 1𝑎 , · · · , 𝑤 𝐿𝑎 } with 𝐿𝑎 tokens according to the
+𝑎
+knowledge learned from the related MIS. In each type of MIS 𝑢𝑖 ,
+it contains 𝐿𝑢𝑖 documents 𝑢𝑖 = {𝑑 1𝑖 , · · · , 𝑑 𝑖 𝑖 }, and the document
+
+The GNN (Graph Neural Network) has been proven to offer better
+performance for the reasoning task in QA [10, 21, 51]. The graph
+structure allows messages to pass over the nodes with local contextual information, which can comprehensively consider clue words
+in a different document to achieve the purpose of reasoning. Previous works in QA show that GNNs have achieved promising results
+in reasoning tasks [24, 31]. Inspired by the heterogeneous graph
+transformer [20], in this paper, we propose a Question-aware Graph
+Transformer (QGT) which can aggregate question-related information from different type of MIS node by passing information among
+heterogeneous nodes. An overview of the question-aware graph
+transformer is shown in the left part of Figure 2.
+
+𝑞
+
+𝐿𝑢
+
+𝑑 𝑖𝑗 = {𝑑 𝑖𝑗,1, · · · , 𝑑 𝑖𝑗,𝐿 } contains 𝐿𝑑 tokens. In this paper, we retrieve
+𝑑
+four types of related MIS: (1) user articles; (2) article comments; (3)
+related questions and (4) its answers. Finally, we use the difference
+between generated answer 𝑎ˆ and the ground truth answer 𝑎 as the
+training objective.
+
+5 HETEROQA MODEL
+5.1 Overview
+In this section, we introduce the Heterogeneous graph based Question
+Answering model (HeteroQA). An overview of HeteroQA is shown
+in Figure 2, which has three main parts:
+• Node Encoder employs the BART [25] to encode the question
+and each node text, and then uses the output hidden state of BART
+encoder as the initial graph node representation.
+• Question-aware Graph Transformer encodes each type of
+MIS node and does reasoning among these nodes according to the
+question.
+• Answer Generator generates the answer by incorporating question and updated graph nodes.
+
+5.2
+
+MIS Graph Construction
+
+We first use the information retrieval system to retrieve related
+MIS as the knowledge source and construct a heterogeneous graph
+using these different types of MIS. We take each type of MIS as a
+different type of node, and the question as another type of node.
+Thus, we have five different types of nodes: (1) question; (2) user
+articles; (3) article comments; and (4) related questions and (5) its
+answers. Intuitively, we connect all types of MIS documents with
+
+Question-aware Graph Transformer
+
+5.4.1 Heterogeneous Question-aware Attention. Since the structure
+information stored in the MIS graph is important for capturing
+the relationship between different types of MIS, we should fuse
+the information in neighbor nodes into the target node representation. However, the salience of each node is not the same, and it
+is unreasonable to simply add all the information of all neighbor
+nodes into the target node. Therefore, we conduct the multi-head
+mechanism [41] to calculate the relevance score between the target
+node and the neighbor nodes. We first project the input node representation into two spaces using different parameters for different
+type of MIS node:
+𝑉 (𝑠) = MLP𝛾 (𝑠) (𝐷 [𝑠]) ,
+
+(4)
+
+𝐾 (𝑡) = MLP𝛾 (𝑡 ) (𝐷 [𝑡]) ,
+
+(5)
+
+where 𝛾 (·) denotes the type of node, 𝐷 [·] denotes the original node
+representation, 𝑠 denotes the index of one source node and 𝑡 denotes
+the index of the target node. Next, we employ a bi-linear function
+to calculate the relevance between these nodes as the attention
+scores, and we also incorporate the edge type into the attention
+score calculation:
+
+
+𝛼 (𝑠, 𝑒, 𝑡) = Softmax 𝐾 (𝑡)𝑊𝛿 (𝑒) 𝑉 (𝑠) ,
+(6)
+∀𝑠 ∈𝑁 (𝑡 )
+
+Article
+Related Question
+Comment #1
+
++
+
+(1) BART Encoder
+Questionaware
+Attention
+
+Related Answer
+
+Comment #2
+
+Question-aware
+Loss
+
+Question-aware
+Aggregation
+
++
+
+(2) Question-aware
+Graph Transformer
+Heterogeneous
+Message
+Passing
+
+Article
+Article Comment
+Related Question
+
+Question
+
+(1) BART Encoder
+
+Related Answer
+
+Heterogeneous
+Message Passing
+
+(3) Decoder
+Output
+Embedding
+
+SelfAttention
+
+Graph Edge
+
+Question-aware Graph Transformer Layer
+
+Question
+Attention
+
+Graph
+Attention
+
+Feed
+Forward
+
+Generated
+Answer
+
+Cross-Entropy Loss
+
+Figure 2: Overview of HeteroQA. We divide our model into three parts: (1) BART-based Node Encoder; (2) Question-aware
+Graph Transformer; (3) Answer Decoder.
+where 𝑒 is the edge between the node 𝑠 and node 𝑡, 𝑁 (𝑡) is the
+neighbour nodes of node 𝑡, and the 𝑊𝛿 (𝑒) is the edge type specific
+parameter.
+5.4.2 Heterogeneous Message Passing. Intuitively, the message
+passing behavior on different edge types should not be the same.
+For example, when passing a message between two user articles
+connected by an edge with the same entity words, we should pass
+the facts about the entity. And the message between the related
+question and its answer should be the extracted facts from the answer according to the related answer. Thus, the passed message
+from one node to other target nodes should not be the same when
+passing through a different type of edge. We need to extract the
+useful message from the source node by considering the edge type:
+msg
+
+msg
+
+𝑀 (𝑠, 𝑒, 𝑡) = MLP𝛾 (𝑠) (𝐷 [𝑠]) 𝑊𝛿 (𝑒) ,
+
+(7)
+
+msg
+
+where𝑊𝛿 (𝑒) is the edge type specific parameter matrix, and 𝑀 (𝑠, 𝑒, 𝑡)
+is the message of source node 𝑠 that will be passed through edge 𝑒
+to the target node 𝑡.
+5.4.3 Question-aware Aggregation. Since the aim of conducting
+the message passing between nodes is to extract useful knowledge
+from heterogeneous MIS to answer the question, only the questionrelated knowledge should be reserved when passing the message.
+Thus, first use the question relation score to re-scale the attention
+scores (calculated in Equation 6):
+𝛼ˆ (𝑠, 𝑒, 𝑡) = 𝛼 (𝑠, 𝑒, 𝑡) × 𝛽 (𝑠),
+
+(8)
+
+where 𝛽 (𝑠) ∈ R is the score for node 𝑠 which represents the semantic relevance between node 𝑠 and question 𝑞 calculated by a
+bi-linear layer:
+𝛽 (𝑠) = 𝐷 [𝑞]𝑊 𝑟 𝐷 [𝑠],
+(9)
+where 𝑊 𝑟 is a trainable parameter, and the 𝐷 [𝑞] and 𝐷 [𝑠] are node
+representations for question 𝑞 and source node 𝑠 respectively. Then,
+
+we apply a weighted sum over all the messages passed from all the
+source nodes:
+∑︁
+(𝛼ˆ (𝑠, 𝑒, 𝑡) · 𝑀 (𝑠, 𝑒, 𝑡)) .
+𝐷˜ [𝑡] =
+(10)
+∀𝑠 ∈𝑁 (𝑡 )
+
+Finally, we apply a linear projection with non-linear activation and
+a residual connect on the source nodes messages:
+
+
+𝐷ˆ [𝑡] = gelu MLP𝛾 (𝑡 ) 𝐷˜ [𝑡] + 𝐷 [𝑡],
+(11)
+where 𝐷ˆ [𝑡] is the updated node representation for target node 𝑡.
+In this way, we obtain the contextualized vector representation of
+the target node which fuses the question-related information from
+neighborhood MIS nodes.
+Inspired by the multi-layer mechanism of Transformer [41], we
+also conduct this question-aware graph transformer several times.
+In each layer, the input is the output of the previous layer and the
+output will be used in the next layer as input. The first layer uses
+the initial node representation as the input which is illustrated in
+§ 5.3. After using the multi-layer heterogeneous graph transformer
+to encode the target node in the graph, we obtain the final vector
+representation of the target node. For brevity, we omit the layer
+notion in our notion and equations, and use g𝑖𝑗 = 𝐷ˆ [𝑡] as the notion
+of final node representation for the node 𝑡 which is the 𝑗-th node
+in 𝑖-th MIS type.
+
+5.5
+
+Answer Generator
+
+HeteroQA generates the answer based on the knowledge learned
+from the MIS. We employ the pretrained BART decoder as our base
+framework. However, generating a good answer should incorporate
+the input question and the knowledge from MIS simultaneously,
+and the original BART decoder can only attend to the hidden states
+produced by the BART encoder. We introduce a new graph attention
+layer and insert this layer into the original BART decoder, and
+
+preserve other layers in the BART. We first apply the self-attention
+on the masked output embeddings of previous decoding steps which
+is same as the Transformer [41], and we obtain the output p𝑠 for
+each decoding step. Then we use the output p𝑠 to cross-attend to
+the question hidden states:
+𝑞
+
+𝑞
+
+p𝑞 = MHAtt(p𝑠 , {h1 , · · · , h𝐿 }),
+
+(12)
+
+𝑞
+
+where MHAtt is the standard multi-head attention layer [41] and
+this procedure is the same as the original BART decoder. After
+the self-attention and cross-attention layer, we apply a multi-head
+attention layer which aggregate useful knowledge from the updated
+graph nodes according to the state of each decoding step:
+p𝑔 = MHAtt(p𝑠 , {g11, · · · , g𝑇𝑇 }).
+𝐿𝑢
+
+(13)
+
+Finally, we combine the question and knowledge from MIS:
+p 𝑓 = p𝑞 + p𝑔 .
+
+(14)
+
+We use the fused representation p 𝑓 to predict the distribution over
+the vocabulary of the generated answer, and use the cross-entropy
+loss L𝑒 as the training objective to optimize the parameters.
+5.5.1 Loss Function. To facilitate the question-aware graph transformer to capture the semantic relationship between each retrieved
+MIS and question, we propose an auxiliary question-aware loss
+function. In detail, we employ a linear layer that uses the updated
+node representation as input to predict the BM25 score of each
+MIS node, and we calculate the mean squared error between the
+predicted score and the BM25 score produced by the information
+retrieval system as an auxiliary loss L𝑞 . Finally, we combine text
+generation cross-entropy loss L𝑒 and question-aware loss L𝑞 as
+the final loss function L = L𝑒 +𝜓 L𝑞 where 𝜓 is a hyper-parameter.
+
+6 EXPERIMENTAL SETUP
+6.1 Research questions
+
+6.3
+
+Comparisons
+
+To prove the effectiveness of each module, we conduct ablation
+studies which remove each key module in HeteroQA, and then
+form three baseline methods (1) HeteroQA-QGT uses the original
+HGT [20] instead of our proposed question-graph transformer; (2)
+HeteroQA-GL removes the graph auxiliary loss L𝑞 ; (3) HeteroQA-HG
+uses the homogeneous graph model GAT [42] as the graph encoder.
+Apart from the ablation study, we also compare with the following
+baselines:
+• Retrieved1 uses the top-1 retrieved document as the answer for
+the user question.
+• S2SA is the Sequence-to-Sequence framework [40] which is equipped
+with the attention mechanism [1] and copy mechanism [17, 37] as a
+baseline method. The input sequence is a question and the ground
+truth output sequence is the answer.
+• S2SAU is a simple method that can incorporate the MIS information when generating the answer, we concatenate all types of MIS
+after the question as the input of S2SA.
+• CVAE [53] is a text generation framework based on conditional
+variational autoencoder that uses latent variables to generate diverse sentences, and this framework has been applied in many
+knowledge-grounded text generation tasks [23, 28].
+• BART [25] is a denoising autoencoder for pretraining sequence-tosequence models, and it is particularly effective when fine-tuned
+for text generation but also works well for comprehension tasks.
+• RAG [26] is general-purpose fine-tuning recipe for retrieval-augmented
+generation models which combine pretrained non-parametric memory for knowledge-intensive NLP tasks. RAG outperforms many
+strong Open-Domain QA and CQA methods.
+• OAAG [6] is a generative community question answering model
+which jointly models opinionated and interrelated information
+between the question and contextual document.
+
+6.4
+
+Implementation Details
+
+We list four research questions that guide the remainder of the
+paper:
+(1) RQ1 (See §7.1): What is the overall performance of HeteroQA?
+(2) RQ2 (See §7.2): What is the effect of each module in HeteroQA?
+(3) RQ3 (See §7.3): Does every type of MIS help the CQA model
+to generate better answer?
+(4) RQ4 (See §7.4): What is the effect of using more or less MIS
+in each type?
+
+We implement our experiments using PyTorch [35] based on the
+Transformers [45]. We train our model on two NVIDIA V100 GPU
+for four days. We employ the pretrained BART-base model (with
+6 layers for encoder and decoder, the number of attention head is
+12, and the hidden size is 768) to initialize part of the parameters.
+The hyper-parameter 𝜓 is set to 0.01. Since there is not a public
+pretrained Chinese BART, we pretrain the BART-base from scratch
+using the text infilling objective on 7GB Chinese text data, and train
+the model for two weeks using 8 NVIDIA V100 GPU.
+
+6.2
+
+7 EXPERIMENTAL RESULTS
+7.1 Overall Performance
+
+Evaluation Metrics
+
+To evaluate the methods, following existing text generation methods [12–14], we employ the automatic word overlap-based BLEU [34],
+METEOR [2] and ROUGE-L [29] to measure the lexical unit overlapping (e.g., unigram, bigram) between the generated answer and
+ground truth. Since only using automatic evaluation metrics can
+be misleading [38], we also conduct the human evaluation. Three
+well-educated and full-time professional annotators are invited to
+judge 200 randomly sampled answers. The statistical significance
+of two runs is tested using a two-tailed paired t-test and is denoted
+using ▲ (or ▼ ) for strong significance for 𝛼 = 0.01.
+
+We compare our model with the baselines listed in Table 3. Our
+model performs consistently better on two datasets than other
+CQA and conditional text generation models with improvements
+of 13.73%, 9.68%, and 13.22% on the AntQA dataset, and achieves
+33.09%, 12.00% and 27.63% improvements on the MSMplus dataset
+compared with RAG in terms of BLEU, BLEU1, and BLEU2 respectively. This demonstrates that MIS in the user community provides
+useful knowledge for answer generation that cannot be replaced
+by other complicated baselines without this information. And our
+
+Table 3: Automatic metrics comparison between baselines.
+MSMplus
+
+AntQA
+Method
+
+BLEU BLEU1 BLEU2 BLEU3 BLEU4 ROUGE-L METEOR BLEU BLEU1 BLEU2 BLEU3 BLEU4 ROUGE-L METEOR
+
+Retrieved1
+S2SA
+SASAU
+CVAE
+OAAG
+BART
+RAG
+
+1.11
+13.40
+14.80
+13.15
+2.19
+16.47
+17.33
+
+8.35
+24.54
+25.14
+23.10
+3.77
+27.93
+29.04
+
+1.95
+14.01
+15.14
+13.54
+2.32
+16.99
+17.93
+
+0.52
+10.57
+11.98
+10.55
+1.77
+13.37
+14.11
+
+0.18
+8.88
+10.53
+9.07
+1.49
+11.61
+12.27
+
+7.32
+19.42
+19.73
+18.44
+17.07
+22.06
+22.51
+
+0.15
+0.18
+0.18
+0.17
+0.13
+0.21
+0.21
+
+0.21
+0.39
+0.57
+0.38
+1.56
+6.66
+6.95
+
+4.82
+7.36
+8.60
+7.45
+8.61
+21.06
+21.58
+
+0.25
+0.82
+1.09
+0.80
+1.25
+8.28
+8.76
+
+0.04
+0.13
+0.20
+0.13
+0.78
+4.34
+4.60
+
+0.03
+0.03
+0.05
+0.03
+0.70
+2.60
+2.68
+
+3.78
+10.08
+11.23
+10.37
+8.49
+28.82
+29.47
+
+0.07
+0.06
+0.07
+0.05
+0.06
+0.19
+0.23
+
+HeteroQA
+HeteroQA-QGT
+HeteroQA-GL
+HeteroQA-HG
+
+19.71
+18.31
+18.90
+18.20
+
+31.85
+29.97
+30.80
+30.29
+
+20.30
+18.83
+19.46
+18.79
+
+16.28
+15.04
+15.53
+14.87
+
+14.35
+13.25
+13.71
+12.98
+
+22.78
+21.84
+22.26
+21.78
+
+0.22
+0.20
+0.20
+0.20
+
+9.25
+7.18
+7.20
+5.36
+
+24.17
+21.10
+21.06
+17.93
+
+11.18
+8.85
+8.85
+6.69
+
+6.50
+4.83
+4.85
+3.42
+
+4.17
+2.95
+2.97
+2.01
+
+34.63
+32.90
+32.96
+28.40
+
+0.28
+0.26
+0.26
+0.22
+
+Fluency
+
+Correctness
+
+AntQA
+
+OAAG
+BART
+RAG
+HeteroQA
+
+2.49
+2.58
+2.44
+2.61▲
+
+1.84
+1.96
+2.11
+2.25▲
+
+OAAG
+BART
+RAG
+HeteroQA
+
+2.68
+2.89
+2.88
+2.90▲
+
+1.56
+1.65
+1.55
+1.83▲
+
+HeteroQA method has a greater performance improvement compared to the methods that do not use the pretrained language model.
+Sun et al. [39] also propose a retrieval-based CQA method, which
+leverages heterogeneous graph to route the cold question to the
+exiting QA nodes in the CQA graph and they did not incorporate
+the MIS in the user community. Since they did not release their
+source code, we use a simple and intuitive method Retrieved1 to
+verify the basic performance of these retrieval-based methods. From
+Table 3 we can find that the retrieval-based method achieves the
+worse performance among all the baselines, which demonstrates
+the retrieval-based method is not suitable for the generative CQA.
+For the human evaluation, we asked annotators to rate each summary according to its factual correctness and language fluency. The
+rating score ranges from 1 to 3, with 3 being the best. Table 4 lists
+the average scores of each model, showing that HeteroQA outperforms the other baseline models in both fluency and correctness. To
+prove the significance of these results, we also conduct the paired
+student t-test between our model and RAG and obtain 𝑝 < 0.05 for
+fluency and consistency, respectively. From this experiment, we find
+that the BART achieves a comparable fluency score as HeteroQA,
+the correctness score is significantly lower than HeteroQA. We also
+find that there are 22% samples generated by our model obtain a
+low score (1) for correctness. To verify the reason for generating
+these bad cases, we find that in the input MIS of these bad cases,
+there are 86.36% samples that obtain a score 1 for the quality of
+MIS. This phenomenon demonstrates that the misleading MIS input
+leads our HeteroQA model to generate an answer with wrong facts.
+
+Dataset
+
+Method
+
+BLEU
+
+ROUGE-L
+
+METEOR
+
+AntQA
+
+Method
+
+Table 5: Effective of using different type of MIS.
+
+HeteroQA
+HeteroQA-QA
+HeteroQA-COM
+HeteroQA-ART
+
+19.71
+17.76
+18.56
+17.91
+
+22.78
+20.95
+21.81
+21.55
+
+0.22
+0.20
+0.21
+0.19
+
+MSMplus
+
+Dataset
+
+MSMplus
+
+Table 4: Human Evaluation Results.
+
+HeteroQA
+HeteroQA-QA
+HeteroQA-COM
+HeteroQA-ART
+
+9.25
+7.08
+5.31
+
+34.63
+32.73
+28.47
+
+0.28
+0.25
+0.22
+
+Although our HeteroQA model achieves 13.73% improvement in
+terms of BLEU over RAG model on AntQA, the increment is smaller
+than the performance on the MSMplus dataset which achieves
+33.09% improvement in terms of BLEU. The reason is that AntQA
+is more similar to the real-world scenario where the supported
+MIS are all retrieved by an information retrieval system using the
+BM25 algorithm and we did not employ any labor-intensive human
+annotation to filter the data which contains some noisy samples.
+Conversely, the supporting document in MSMplus is filtered by a
+human annotator, which has less noisy data in their dataset.
+
+7.2
+
+Ablation Studies
+
+The performance of different ablation models are shown in Table 3.
+All ablation models perform worse than HeteroQA in terms of all
+metrics, which demonstrates the preeminence of HeteroQA. The
+experiment shows that our HeteroQA achieves 7.65% and 28.83%
+increments compared with HeteroQA-QGT in terms of BLEU score
+on AntQA and MSMplus respectively, which verifies the effectiveness of our proposed QGT. In the method HeteroQA-HG, we employ
+the GAT [42] as the graph encoder and there is a slight decrement
+from HeteroQA-HG to HeteroQA-QGT of 0.28% and 15.85% in terms
+of ROUGE-L on AntQA and MSMplus , which demonstrates the effectiveness of treating each type of MIS as different nodes and using
+the heterogeneous graph to model these MIS. Thus, we can verify
+the contributions of each module in HeteroQA.
+
+MSM plus
+9.0
+
+19.6
+
+BLEU Score
+
+8.5
+
+BLEU Score
+
+Table 6: Examples of the context and answers. We only show
+two MIS due to the limited space. We use red text to indicate
+wrong facts in generated answers.
+
+AntQA
+
+8.0
+7.5
+7.0
+
+19.4
+19.2
+
+Question: 在支付宝上借款怎么还款(How to conduct repayment
+on Alipay?)
+MIS (Related QA): Q: 支付宝借呗怎么还？(How to repay for
+“Jiebei” (Ant Microloan)?) A: 进入支付宝借呗页面，就可以看到
+去借钱和去还钱，点击还款就可以看到还款数目，将足够的
+资金提前存入支付宝的余额(Login the “Jiebei” page, and you can
+see “Borrow money” and “Repayment”. Click on the “Repayment”
+button, and then you can see the amount you should pay back.
+Deposit enough money in your Alipay balance account.)
+MIS (Related Article): 借呗提前还款要收手续费吗？不需要，
+借呗提前还款暂时没有手续费，大家直接在借呗页面操作即
+可。登录手机支付宝，点击右下角，在借呗首页选择，按
+页面提示操作。(Do I have to charge a handling fee for early
+repayment? No, there is no handling fee for repayment in “Jiebei”.
+So you can directly conduct repayment on the “Jiebei”. First, log in
+to Alipay mobile version, click on the lower right corner, select on
+the home page of “Jiebei”, and follow the instructions on the page.)
+BART: 登录支付宝，点击我的，点击借款，点击还款就可以
+了(Login Alipay, then click on “My Apps”, then click on “Borrow
+some money”, then click on “Repayment” and that’s it.)
+RAG: 支付宝借呗借款的步骤，打开支付宝钱包，点击借呗，
+然后点击还款，选择借款方式，就可以还款了(The steps of
+borrowing money from “Jiebei” (Ant Microloan). Login “Pocket”
+and click on “Jiebei”. Then click on “Repayment” and select the way
+of making a loan.)
+HAG: 进入支付宝，点击借呗，然后点击还款就可以了(Login
+Alipay, click on “Jiebei” (Ant Microloan), and then click on “Repayment”.)
+
+19.0
+18.8
+
+6.5
+6.0
+
+18.6
+1.0
+
+1.5
+
+2.0
+
+2.5
+
+3.0
+
+3.5
+
+4.0
+
+Numbers of MIS
+
+4.5
+
+5.0
+
+1.0
+
+1.5
+
+2.0
+
+2.5
+
+3.0
+
+Numbers of MIS
+
+3.5
+
+4.0
+
+Figure 3: Visualization of BLEU score with different MIS document number.
+
+7.3
+
+Effect of Different Type of MIS
+
+To verify the effectiveness of each MIS type, we remove each type of
+MIS from our heterogeneous graph. We employ three experiments
+that remove the MIS type one-by-one: HeteroQA-QA (w/ comment,
+article), HeteroQA-COM (w/ article, related question and answer)
+and HeteroQA-ART (w/ related question and answer). Since the
+comment of the documents in MSMplus can not be obtained, we omit
+this experiment. Table 5 shows the performance of these ablation
+models, and we only show three metrics of each model due to the
+limited space. From this table, we find that the related QA produces
+the greatest contribution (10.98% decline in terms of the BLEU) on
+AntQA, and the related articles produce the greatest contribution on
+MSMplus with a 74.20% decline in terms of the BLEU. Although the
+contribution of using comment of articles is minimum compared
+to other MIS types, it also increases the BLEU score for 6.20%.
+
+7.4
+
+Effect of Using Different Number of MIS
+
+We investigate the influence of the document number for each MIS
+type incorporated by the HeteroQA model. Figure 3 illustrates the
+relationship between the document number in each type of MIS and
+the BLEU score. On the MSMplus dataset, the performance keeps
+growing when the number of document reaches 5, and due to the
+hardware limitation, we did not conduct experiments for more MIS.
+Since the document in MSMplus is filtered by humans and all the related articles can support answering the question, the performance
+of the model can keep increasing when the model reads more MIS.
+On the AntQA dataset, the BLEU score first increases with the
+number of MIS, and after reaching an upper limit it then begins to
+drop. This phenomenon demonstrates that incorporating several
+relevant MIS can help the model to achieve better performance. In
+the real-world application, we cannot filter the contextual information case-by-case. And excessive MIS which contains not relevant
+information will confuse the model to extract useful knowledge to
+generate correct answers.
+
+8
+
+CONCLUSION
+
+In this paper, we propose the Heterogeneous graph-based Question
+Answering model (HeteroQA) to tackle the community question
+answering task, which extracts useful knowledge from Multiple
+Information Sources (MIS) which contains four types documents in
+the user community. Since MIS have different contexts and structures, we treat MIS as heterogeneous information and propose a
+question-aware heterogeneous graph transformer to model the
+relationship between these nodes. To generate correct and fluent
+answer text, we leverage the pretrain language model as an answer
+generator and introduce a graph attention layer to fuse the knowledge into the answer generation. Experiments conducted on two
+datasets verify the effectiveness of our HeteroQA model.
+
+ACKNOWLEDGMENTS
+7.5
+
+Case Study
+
+Table 6 shows an example of the generated answer and MIS context
+with useful knowledge to answer the user question. Although all
+the methods generate fluent answers, the facts described in BART
+and RAG are wrong (the wrong facts are shown in red text in Table 6).
+And HeteroQA generates refined and correct repayment steps for
+the user question according to the related QA and user article.
+
+We would like to thank the anonymous reviewers for their constructive comments. We would also like to thank Nan Su for her help on
+this project. This work was supported by the National Key Research
+and Development Program of China (No. 2020AAA0106600), the
+National Science Foundation of China (NSFC No. 62122089 and
+No. 61876196). Rui Yan is supported as a young fellow at Beijing
+Academy of Artificial Intelligence (BAAI).
+
+REFERENCES
+[1] Dzmitry Bahdanau, Kyunghyun Cho, and Yoshua Bengio. 2015. Neural Machine
+Translation by Jointly Learning to Align and Translate. CoRR abs/1409.0473
+(2015).
+[2] Satanjeev Banerjee and Alon Lavie. 2005. METEOR: An Automatic Metric for MT
+Evaluation with Improved Correlation with Human Judgments. In Proceedings
+of the ACL Workshop on Intrinsic and Extrinsic Evaluation Measures for Machine
+Translation and/or Summarization. Association for Computational Linguistics,
+Ann Arbor, Michigan, 65–72. https://www.aclweb.org/anthology/W05-0909
+[3] Daniel Fernando Campos, T. Nguyen, M. Rosenberg, Xia Song, Jianfeng Gao,
+Saurabh Tiwary, Rangan Majumder, L. Deng, and Bhaskar Mitra. 2016. MS
+MARCO: A Human Generated MAchine Reading COmprehension Dataset. ArXiv
+abs/1611.09268 (2016).
+[4] Yang Deng, Wai Lam, Yuexiang Xie, Daoyuan Chen, Yaliang Li, Min Yang, and
+Ying Shen. 2020. Joint Learning of Answer Selection and Answer Summary
+Generation in Community Question Answering. In AAAI.
+[5] Yang Deng, Wenxuan Zhang, and Wai Lam. 2020. Opinion-aware Answer Generation for Review-driven Question Answering in E-Commerce. In Arxiv.
+[6] Yang Deng, Wenxuan Zhang, and Wai Lam. 2020. Opinion-aware Answer Generation for Review-driven Question Answering in E-Commerce. In CIKM ’20: The
+29th ACM International Conference on Information and Knowledge Management,
+Virtual Event, Ireland, October 19-23, 2020. 255–264. https://doi.org/10.1145/
+3340531.3411904
+[7] Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2019. BERT:
+Pre-training of Deep Bidirectional Transformers for Language Understanding. In
+NAACL.
+[8] Shaohua Fan, Junxiong Zhu, Xiaotian Han, Chuan Shi, Linmei Hu, Biyu Ma, and
+Yongliang Li. 2019. Metapath-guided Heterogeneous Graph Neural Network for
+Intent Recommendation. In KDD.
+[9] Wenqi Fan, Yao Ma, Qing Li, Yuan He, Eric Zhao, Jiliang Tang, and Dawei Yin.
+2019. Graph Neural Networks for Social Recommendation. In WWW.
+[10] Yuwei Fang, Siqi Sun, Zhe Gan, Rohit Pillai, Shuohang Wang, and Jingjing Liu.
+2020. Hierarchical Graph Network for Multi-hop Question Answering. In EMNLP.
+[11] Jinlan Fu, Yi Li, Qi Zhang, Qinzhuo Wu, Renfeng Ma, Xuanjing Huang, and
+Yugang Jiang. 2020. Recurrent Memory Reasoning Network for Expert Finding
+in Community Question Answering. In WSDM.
+[12] Shen Gao, Xiuying Chen, Piji Li, Zhangming Chan, Dongyan Zhao, and Rui Yan.
+2019. How to Write Summaries with Patterns? Learning towards Abstractive
+Summarization through Prototype Editing. In EMNLP.
+[13] Shen Gao, Xiuying Chen, Piji Li, Zhaochun Ren, Lidong Bing, Dongyan Zhao,
+and Rui Yan. 2019. Abstractive Text Summarization by Incorporating Reader
+Comments. In AAAI.
+[14] Shen Gao, Xiuying Chen, Zhaochun Ren, Dongyan Zhao, and Rui Yan. 2020.
+From Standard Summarization to New Tasks and Beyond: Summarization with
+Manifold Information. In IJCAI.
+[15] Shen Gao, Xiuying Chen, Zhaochun Ren, Dongyan Zhao, and Rui Yan. 2021.
+Meaningful Answer Generation of E-Commerce Question-Answering. ACM
+Trans. Inf. Syst. 39, 2, Article 18 (Feb. 2021), 26 pages. https://doi.org/10.1145/
+3432689
+[16] Shen Gao, Zhaochun Ren, Yihong Zhao, Dongyan Zhao, Dawei Yin, and Rui Yan.
+2019. Product-Aware Answer Generation in E-Commerce Question-Answering.
+In WSDM.
+[17] Jiatao Gu, Zhengdong Lu, Hang Li, and Victor O. K. Li. 2016. Incorporating
+Copying Mechanism in Sequence-to-Sequence Learning. CoRR abs/1603.06393
+(2016).
+[18] Jun Hu, Quan Fang, Shengsheng Qian, and Changsheng Xu. 2020. Multi-modal
+Attentive Graph Pooling Model for Community Question Answer Matching. In
+MM.
+[19] Jun Hu, Shengsheng Qian, Quan Fang, and Changsheng Xu. 2019. Hierarchical
+Graph Semantic Pooling Network for Multi-modal Community Question Answer
+Matching. In MM.
+[20] Ziniu Hu, Yuxiao Dong, Kuansan Wang, Yizhou Sun, Ziniu Hu, Yuxiao Dong,
+Kuansan Wang, and Yizhou Sun. 2020. Heterogeneous Graph Transformer. In
+WWW.
+[21] Pin Jiang and Yahong Han. 2020. Reasoning with Heterogeneous Graph Alignment for Video Question Answering. In AAAI.
+[22] Zhuoren Jiang, Yue Yin, Liangcai Gao, Yao Lu, and Xiaozhong Liu. 2018. Crosslanguage Citation Recommendation via Hierarchical Representation Learning
+on Heterogeneous Graph. In SIGIR.
+[23] Byeongchang Kim, Jaewoo Ahn, and Gunhee Kim. 2020. Sequential Latent
+Knowledge Selection for Knowledge-Grounded Dialogue. In ICLR.
+[24] Yunshi Lan and Jing Jiang. 2020. Query Graph Generation for Answering Multihop Complex Questions from Knowledge Bases. In ACL.
+[25] Mike Lewis, Yinhan Liu, Naman Goyal, Marjan Ghazvininejad, Abdelrahman
+Mohamed, Omer Levy, Veselin Stoyanov, and Luke Zettlemoyer. 2020. BART:
+Denoising Sequence-to-Sequence Pre-training for Natural Language Generation,
+Translation, and Comprehension. In ACL.
+
+[26] Patrick Lewis, Ethan Perez, Aleksandra Piktus, Fabio Petroni, Vladimir Karpukhin,
+Naman Goyal, Heinrich Kuttler, Mike Lewis, Wen tau Yih, Tim Rocktaschel,
+Sebastian Riedel, and Douwe Kiela. 2020. Retrieval-Augmented Generation for
+Knowledge-Intensive NLP Tasks. In NIPS.
+[27] Jinpeng Li, Yingce Xia, Rui Yan, Hongda Sun, Dongyan Zhao, and Tie-Yan Liu.
+2021. Stylized Dialogue Generation with Multi-Pass Dual Learning. In NeurIPS.
+[28] Rongzhong Lian, Min Xie, Fan Wang, Jinhua Peng, and Hua Wu. 2019. Learning
+to Select Knowledge for Response Generation in Dialog Systems. In IJCAI.
+[29] Chin-Yew Lin. 2004. Rouge: A package for automatic evaluation of summaries.
+Text Summarization Branches Out (2004).
+[30] Siwei Liu, Iadh Ounis, Craig Macdonald, and Zaiqiao Meng. 2020. A Heterogeneous Graph Neural Model for Cold-start Recommendation. In SIGIR.
+[31] Shangwen Lv, Daya Guo, Jingjing Xu, Duyu Tang, Nan Duan, Ming Gong, Linjun
+Shou, Daxin Jiang, Guihong Cao, and Songlin Hu. 2020. Graph-Based Reasoning
+over Heterogeneous External Knowledge for Commonsense Question Answering.
+In AAAI.
+[32] Sewon Min, Danqi Chen, Luke Zettlemoyer, and Hannaneh Hajishirzi. 2020.
+Knowledge Guided Text Retrieval and Reading for Open Domain Question Answering. In Arxiv.
+[33] Preslav Nakov, Lluís Màrquez i Villodre, Alessandro Moschitti, Walid Magdy,
+Hamdy Mubarak, Abed Alhakim Freihat, James R. Glass, and Bilal Randeree. 2016.
+SemEval-2016 Task 3: Community Question Answering. ArXiv abs/1912.01972
+(2016).
+[34] Kishore Papineni, Salim Roukos, Todd Ward, and Wei-Jing Zhu. 2002. Bleu: a
+Method for Automatic Evaluation of Machine Translation. In ACL.
+[35] Adam Paszke, S. Gross, and el. al. 2019. PyTorch: An Imperative Style, HighPerformance Deep Learning Library. In NeurIPS.
+[36] Andreas Ruckle, Krishnkant Swarnkar, and Iryna Gurevych. 2019. Improved
+Cross-Lingual Question Retrieval for Community Question Answering. In
+WWW.
+[37] Abigail See, Peter J. Liu, and Christopher D. Manning. 2017. Get To The Point:
+Summarization with Pointer-Generator Networks. In ACL.
+[38] Amanda Stent, Matthew Marge, and Mohit Singhai. 2005. Evaluating Evaluation
+Methods for Generation in the Presence of Variation. In CICLing.
+[39] Jiankai Sun, Jie Zhao, Huan Sun, and Srinivasan Parthasarathy. 2020. EndCold:
+An End-to-End Framework for Cold Question Routing in Community Question
+Answering Services. In IJCAI.
+[40] Ilya Sutskever, Oriol Vinyals, and Quoc V. Le. 2014. Sequence to Sequence
+Learning with Neural Networks. In NIPS.
+[41] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones,
+Aidan N. Gomez, Lukasz Kaiser, and Illia Polosukhin. 2017. Attention is All
+you Need. In NIPS.
+[42] Petar Velickovic, Guillem Cucurull, Arantxa Casanova, Adriana Romero, Pietro
+Lio, and Yoshua Bengio. 2018. Graph Attention Networks. In ICLR.
+[43] Bingning Wang, Ting Yao, Qi Zhang, Jingfang Xu, Zhixing Tian, Kang Liu, and
+Jun Zhao. 2019. Document Gated Reader for Open-Domain Question Answering.
+In SIGIR.
+[44] Danqing Wang, Pengfei Liu, Yining Zheng, Xipeng Qiu, and Xuanjing Huang.
+2020. Heterogeneous Graph Neural Networks for Extractive Document Summarization. In ACL.
+[45] Thomas Wolf, Lysandre Debut, and et. al. 2020. Transformers: State-of-the-Art
+Natural Language Processing. In Proceedings of the 2020 Conference on Empirical
+Methods in Natural Language Processing: System Demonstrations. Association for
+Computational Linguistics, Online, 38–45.
+[46] Wei Wu, Xu Sun, and Houfeng Wang. 2018. Question Condensing Networks for
+Answer Selection in Community Question Answering. In ACL.
+[47] Yongji Wu, Defu Lian, Shuowei Jin, and Enhong Chen. 2019. Graph Convolutional Networks on User Mobility Heterogeneous Graphs for Social Relationship
+Inference. In IJCAI.
+[48] Yuting Wu, Xiao Liu, Yansong Feng, Zheng Wang, Rui Yan, and Dongyan Zhao.
+2019. Relation-Aware Entity Alignment for Heterogeneous Knowledge Graphs.
+In IJCAI.
+[49] Yuexiang Xie, Ying Shen, Yaliang Li, Min Yang, and Kai Lei. 2020. Attentive
+User-Engaged Adversarial Neural Network for Community Question Answering.
+In AAAI.
+[50] Xiaoyu Yang, Yuefei Lyu, Tian Tian, Yifei Liu, Yudong Liu, and Xi Zhang. 2020.
+Rumor Detection on Social Media with Graph Structured Adversarial Learning.
+In IJCAI.
+[51] Michihiro Yasunaga, Hongyu Ren, Antoine Bosselut, Percy Liang, and Jure
+Leskovec. 2021. QA-GNN: Reasoning with Language Models and Knowledge
+Graphs for Question Answering. In NAACL.
+[52] Xiaodong Zhang, Sujian Li, Lei Sha, and Houfeng Wang. 2017. Attentive Interactive Neural Networks for Answer Selection in Community Question Answering.
+In AAAI.
+[53] Tiancheng Zhao, Ran Zhao, and Maxine Eskenazi. 2017. Learning Discourse-level
+Diversity for Neural Dialog Models using Conditional Variational Autoencoders.
+In ACL.
+
+

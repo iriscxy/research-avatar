@@ -1,0 +1,1375 @@
+arXiv:2301.00972v1 [cs.CL] 3 Jan 2023
+
+EZInterviewer: To Improve Job Interview Performance with
+Mock Interview Generator
+Mingzhe Li∗†
+
+Xiuying Chen*
+
+Weiheng Liao
+
+Peking University
+li_mingzhe@pku.edu.cn
+
+CBRC, KAUST
+CEMSE, KAUST
+xiuying.chen@kaust.edu.sa
+
+Made by DATA
+Liaoweiheng@gmail.com
+
+Yang Song
+
+Tao Zhang
+
+Dongyan Zhao
+
+BOSS Zhipin NLP Center
+songyang@kanzhun.com
+
+BOSS Zhipin
+kylen.zhang@kanzhun.com
+
+Peking University
+zhaody@pku.edu.cn
+
+Rui Yan‡
+Gaoling School of AI
+Renmin University of China
+ruiyan@ruc.edu.cn
+
+ABSTRACT
+Interview has been regarded as one of the most crucial step for
+recruitment. To fully prepare for the interview with the recruiters,
+job seekers usually practice with mock interviews between each
+other. However, such a mock interview with peers is generally far
+away from the real interview experience: the mock interviewers are
+not guaranteed to be professional and are not likely to behave like
+a real interviewer. Due to the rapid growth of online recruitment in
+recent years, recruiters tend to have online interviews, which makes
+it possible to collect real interview data from real interviewers. In
+this paper, we propose a novel application named EZInterviewer,
+which aims to learn from the online interview data and provides
+mock interview services to the job seekers. The task is challenging
+in two ways: (1) the interview data are now available but still of
+low-resource; (2) to generate meaningful and relevant interview
+dialogs requires thorough understanding of both resumes and job
+descriptions. To address the low-resource challenge, EZInterviewer
+is trained on a very small set of interview dialogs. The key idea is
+to reduce the number of parameters that rely on interview dialogs
+by disentangling the knowledge selector and dialog generator so
+that most parameters can be trained with ungrounded dialogs as
+well as the resume data that are not low-resource. Specifically, to
+keep the dialog on track for professional interviews, we pre-train
+a knowledge selector module to extract information from resume
+in the job-resume matching. A dialog generator is also pre-trained
+with ungrounded dialogs, learning to generate fluent responses.
+* Both authors contributed equally to this research.
+† Work done during an internship at BOSS Zhipin.
+‡ Corresponding author: Rui Yan (ruiyan@ruc.edu.cn).
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior specific permission
+and/or a fee. Request permissions from permissions@acm.org.
+WSDM ’23, February 27-March 3, 2023, Singapore, Singapore
+© 2023 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 978-1-4503-9407-9/23/02. . . $15.00
+https://doi.org/10.1145/3539597.3570476
+
+Then, a decoding manager is finetuned to combine information
+from the two pre-trained modules to generate the interview question. Evaluation results on a real-world job interview dialog dataset
+indicate that we achieve promising results to generate mock interviews. With the help of EZInterviewer, we hope to make mock
+interview practice become easier for job seekers.
+
+CCS CONCEPTS
+• Computing methodologies → Natural language generation.
+
+KEYWORDS
+EZInterviewer, mock interview generation, knowledge-grounded
+dialogs, online recruitment, low-resource deep learning
+ACM Reference Format:
+Mingzhe Li, Xiuying Chen, Weiheng Liao, Yang Song, Tao Zhang, Dongyan
+Zhao, Rui Yan. 2023. EZInterviewer: To Improve Job Interview Performance
+with Mock Interview Generator. In Proceedings of the Sixteenth ACM International Conference on Web Search and Data Mining (WSDM ’23), February
+27-March 3, 2023, Singapore, Singapore. ACM, New York, NY, USA, 9 pages.
+https://doi.org/10.1145/3539597.3570476
+
+1
+
+INTRODUCTION
+
+To make better preparations, job seekers practice mock interviews,
+which aims to anticipate interview questions and prepare them
+for what they might get asked in their real turn. However, the
+outcome of such an approach is unsatisfactory, since those “mock
+interviewers” do not have interview experience themselves, and
+do not know what the real recruiters would be interested in. Mock
+Interview Generation (MIG) represents a plausible solution to this
+problem. Not only makes interviews more cost-effective, but mock
+interview generators also appear to be feasible, since much can be
+learned about the job seekers from their resumes, as can the job
+itself from the job description (JD). An illustration of MIG task is
+shown in Figure 1.
+There are two main challenges in this task. One is that the
+knowledge-grounded interviews are extremely time-consuming
+and costly to collect. Without a sufficient amount of training data,
+
+WSDM ’23, February 27-March 3, 2023, Singapore, Singapore
+
+Mingzhe Li et al.
+
+• We propose a novel model to jointly process dialog contexts,
+candidate resumes, and job descriptions and generate highly relevant, knowledge-aware interview dialogs.
+
+2
+
+Figure 1: An example of the Mock Interview Generation task.
+Based on the candidate’s work experience and the current dialog on the experience of web page development, the system
+generates an interview question “If a product needs a threelevel classification selection, which component would you
+use and how to achieve it?”.
+
+the performance of such dialog generation models drops dramatically [37]. The second challenge is to make the knowledge-grounded
+dialog relevant to the candidate resume, job description, and previous dialog utterances. This makes MIG a complex task involving
+text understanding, knowledge selection, and dialog generation.
+In this paper, we propose EZInterviewer, a novel mock interview
+generator, with the aim of making interviews easier to prepare. The
+key idea is to train EZInterviewer in a low-resource setting: the
+model is first pre-trained on large-scale ungrounded dialogs and
+resume data, and then fine-tuned on a very small set of resumegrounded interview dialogs. Specifically, the knowledge selector
+consists of a resume encoder to encode the resume, and a key-value
+memory network with mask self-attention mechanism, responsible
+for selecting relevant information in the resume to focus on to help
+generate the next interview utterance. The dialog generator also
+has two components, a context encoder which encodes the current
+dialog context, and a response decoder, responsible for generating
+the next dialog utterance without knowledge from the resumes.
+This knowledge-insensitive dialog generator is coordinated with
+the knowledge selector by a decoding manager that dynamically
+determines which component is activated for utterance generation.
+It is noted that the number of parameters in the decoding manager can be small, therefore it only requires a small number of
+resume-grounded interview dialogs. Extensive experiments on realworld interview dataset demonstrate the effectiveness of our model.
+To summarize, our contributions are three-fold:
+• We introduce a novel Mock Interview Generation task, which
+is a pilot study of intelligent online recruitment with potential
+commercial values.
+• To address the low-resource challenge, we propose to reduce
+the number of parameters that rely on interview dialogs by disentangling knowledge selector and dialog generator so that the
+majority of parameters can be trained with large-scale ungrounded
+dialog and resume data.
+
+RELATED WORK
+
+Multi-turn response generation aims to generate a response that is
+natural and relevant to the entire context, based on utterances in its
+previous turns. [36] concatenated multiple utterances into one sentence and utilized RNN encoder or Transformer to encode the long
+sequence, simplifying multi-turn dialog into a single-turn dialog.
+To better model the relationship between multi-turn utterances,
+[4, 10] introduced interaction between utterances after encoding
+each utterance.
+As human conversations are almost always grounded with external knowledge, the absence of knowledge grounding has become
+one of the major gaps between current open-domain dialog systems
+and real human conversations [8, 24, 35]. A series of work [20, 29]
+focused on generating a response based on the interaction between
+context and unstructured document knowledge, while a few others [22, 33] introduced knowledge graphs into conversations. These
+models, however, usually under-perform in a low-resource setting.
+To address the low resource problem, [16] proposed to enhance
+the context-dependent cross-lingual mapping upon the pre-trained
+monolingual BERT representations. [28] extended the meta-learning
+algorithm, which utilized knowledge learned from high-resource
+domains to boost the performance of low-resource unsupervised
+neural machine translation. Different from the above methods, [37]
+proposed a disentangled response decoder in order to isolate parameters that depend on knowledge-grounded dialogs from the
+entire generation model. Our model takes a step further, taking
+into account the changes in attention on knowledge in multi-turn
+dialog scenarios.
+
+3 MODEL
+3.1 Problem Formulation
+For an input multi-turn dialog context 𝑈 = {𝑢 1, 𝑢 2, . . . , 𝑢𝑚 } between a job candidate and an interviewer, where 𝑢𝑖 represents the
+𝑖-th utterance, we assume there is a ground truth textual interview
+question 𝑌 = {𝑦1, 𝑦2, . . . , 𝑦𝑛 }. 𝑚 is the utterance number in the
+dialog context and 𝑛 is the total number of words in question 𝑌 .
+In the 𝑖-th utterance, 𝑢𝑖 = {𝑥 1𝑖 , 𝑥 2𝑖 , . . . , 𝑥 𝑖 𝑖 }. Meanwhile, there is a
+𝑇𝑢
+
+candidate resume 𝑅 = {(𝑘 1, 𝑣 1 ), (𝑘 2, 𝑣 2 ), . . . , (𝑘𝑇𝑟 , 𝑣𝑇𝑟 )} corresponding to the candidate in the interview, which has 𝑇𝑟 key-value pairs,
+and each of which represents an attribute in the resume. For the
+job-resume matching pre-training task, there is an external job
+description 𝐽 = { 𝑗1, 𝑗2, . . . , 𝑗𝑇𝑗 }, which has 𝑇 𝑗 words. The goal is to
+′
+generate an interview question 𝑌 that is not only coherent with the
+dialog context 𝑈 but also pertinent to the job candidate’s resume 𝑅.
+
+3.2
+
+System Overview
+
+In this section, we propose our Low-resource Mock Interview Generator (EZInterviewer) model, which is divided into three parts as
+shown in Figure 2:
+
+EZInterviewer: To Improve Job Interview Performance with Mock Interview Generator
+
+Dialog Generator (Pretraining)
+
+WSDM ’23, February 27-March 3, 2023, Singapore, Singapore
+
+Decoding Manager
+
+Utterance
+States
+
+Updated
+Distribution
+
+One-hot
+Target
+
+Self Attention
+
+Position-Wise FeedForward
+Add & Norm
+
+Add & Norm
+
+Self Attention
+
+Position-Wise FeedForward
+
+updated output
+Fusion gate
+Cross
+Attention
+
+[CLS] ... [CLS]
+
+Job Desc
+
+Job Encoder
+
+Masked
+Self-attention
+Visible Matrix
+
+Cross
+Attention
+
+Transfer
+
+Cross Attention Manager
+[CLS] ...
+
+Resume
+
+Resume Encoder
+
+Pretrained
+Soft Target
+
+xN
+
+Knowledge Selector (Pretraining)
+
+Linear
+
+...
+
+Linear
+
+Cross
+Attention
+
+Linear
+
+Masked Self Attention
+Utterance Decoder
+States
+State
+
+xN
+Multi-turn
+Interview History
+
+Decoder Input
+
+Key-Value
+Memory Network
+
+Memory
+
+Job-resume
+Matching
+
+Figure 2: Overview of EZInterviewer, which consists of three parts: (1) Knowledge Selector selects salient knowledge information from the candidate resume; (2) Dialog Generator predicts the next word without knowledge of resumes; (3) Decoding
+Manager coordinates the output from knowledge selector and dialog generator to produce the interview question.
+• Dialog Generator predicts the next word of a response based on
+the prior sub-sequence. In our model, we pre-train it by large-scale
+ungrounded dialogs.
+• Knowledge Selector selects salient knowledge information from
+the candidate resume for interview question generation. In our
+model, we augment the ability of the knowledge selector by employing it to perform job-resume matching.
+• Decoding Manager coordinates the output from knowledge
+selector and dialog generator to predict the interview question.
+It is important to note that to train an EZInterviewer model,
+two pre-train techniques are employed. Firstly, we pre-train the
+knowledge selector in a job-matching task. This is because while
+it is hard to attend to appropriate content in a resume just on its
+own, the salient information in a resume can be identified in a
+job-resume matching task [13, 34]. Secondly, the context encoder
+and response decoder of the dialog generator are pre-trained with
+a large scale of ungrounded dialogs, so as to predict the next word
+of response based on the prior sub-sequence. Finally, the decoding
+manager, which relies on a few parameters, coordinates the two
+components to generate knowledge grounded interview utterance.
+
+3.3
+
+Dialog Generator
+
+Context Encoder. Instead of processing the dialog context as a
+flat sequence, we employ a hierarchical encoder [3] to capture intraand inter-utterance relations, which is composed of a local sentence
+encoder and a global context encoder. For the sentence encoder, to
+model the semantic meaning of the dialog context, we learn the
+representation of each utterance 𝑢𝑖 by a self-attention mechanism
+(SAM) initialized by BERT [5]:
+ℎ𝑖𝑗 = SAMu (𝑒 (𝑥 𝑖𝑗 ), ℎ𝑖∗ ).
+
+(1)
+
+We extract the state at “[cls]” position to denote the utterance state,
+abbreviated as ℎ𝑖 . Apart from the local information exchange in
+each utterance, we let information flow across multi-turn context:
+ℎ𝑐𝑡 = SAMc (ℎ𝑡 , ℎ𝑐∗ ),
+
+(2)
+
+where ℎ𝑐𝑡 denotes the hidden state of the 𝑡-th utterance in SAMc .
+
+Response Decoder. Response decoder is responsible for understanding the previous dialog context and generates the response
+without the knowledge of resume information [19]. Our decoder
+also follows the style of Transformer.
+Concretely, we first apply the self-attention on the masked decoder input, obtaining 𝑑𝑡 . Based on 𝑑𝑡 we compute the cross-attention
+scores over previous utterances:
+𝛼𝑡𝑐 = ReLU([𝑑𝑡 𝑊𝑑 (ℎ𝑐𝑖𝑊ℎ )𝑇 ]).
+
+(3)
+
+The attention weights 𝛼𝑡𝑐 is then used to obtain the context vectors
+Í
+𝑐 𝑐
+as 𝑐𝑡 = 𝑚
+𝑖=1 𝛼𝑡 ℎ𝑖 . The context vectors 𝑐 𝑡 , treated as salient contents
+of various sources, are concatenated with the decoder hidden state
+𝑑𝑡 to produce the distribution over the target vocabulary:
+𝑃 𝑣𝑤 = Softmax (𝑊𝑜 [𝑑𝑡 ; 𝑐𝑡 ]) .
+
+(4)
+
+Pre-training process. While interview dialogs are hard to come
+by, online conversation is abundant on the internet, and can be
+easily collected. Hence, we pre-train the dialog generator on ungrounded conversations. Concretely, during pre-training process,
+we employ the context encoder to first encode the multi-turn previous dialog context. Then, at the 𝑡-th decoding step, we use the
+response decoder to predict the 𝑡-th word in the response. We set
+the loss as the negative log likelihood of the target word 𝑦𝑡 :
+1 Í𝑛
+𝐿𝑜𝑠𝑠𝑔 = −
+log 𝑃 𝑣𝑤 (𝑦𝑡 ).
+(5)
+𝑛 𝑡 =1
+
+3.4
+
+Knowledge Selector
+
+Resume Encoder. As shown in Figure 2, a resume contains several
+key-value pairs (𝑘𝑖 , 𝑣𝑖 ). Most of key and value fields include a single
+word or a phrase such as “skills” or “gender”, and we can obtain the
+feature representation through an embedding matrix. Concretely,
+for each key or value field with a single word or a phrase, we establish a corresponding resume embedding matrix 𝑒𝑟𝑖 that is different
+from the previous one. Then we use the resume embedding matrix
+to map each field word 𝑘𝑖 or 𝑣𝑖 into to a high-dimensional vector
+space, denoted as 𝑒𝑟𝑖 (𝑘𝑖 ) or 𝑒𝑟𝑖 (𝑣𝑖 ). For fields with more than one
+word such as “work experience” or “I used to...”, we denote them as
+𝑣𝑖 = (𝑣𝑖1, ...𝑣𝑖𝑙𝑖 ), where 𝑙𝑖 denotes the word number of the current
+
+WSDM ’23, February 27-March 3, 2023, Singapore, Singapore
+
+Mingzhe Li et al.
+
+field. We first process them through the previous word embedding
+matrix 𝑒, then there is an SAMR , similar with SAMu in Section 3.3,
+to model the temporal interactions between words:
+𝑗
+
+ℎ𝑟𝑡 𝑖 = SAMR (𝑒 (𝑣𝑖 ), ℎ𝑟𝑡 𝑖−1 ).
+
+(6)
+
+We use the last hidden state of the SAMR , i.e., ℎ𝑙𝑟𝑖 to denote the
+𝑖
+overall representation for field 𝑣𝑖 .
+For brevity, in the following sections, we use ℎ𝑘𝑖 and ℎ𝑖𝑣 to denote
+the encoded key-value pair (𝑘𝑖 , 𝑣𝑖 ) in the resume.
+Masked Self-attention. Traditional self-attention can be used
+to update representation of each resume item due to its flexibility in
+relating two elements in a distance-agnostic manner [17]. However,
+as shown in [21], too much knowledge incorporation may divert the
+representation from its correct meaning, which is called knowledge
+noise (KN) issue. In our scenario, the information in the resume
+is divided into several parts, i.e., basic personal information, work
+experiences and extended work, each of which contains variable
+number of items. The items within each part are closely connected,
+while different parts can be considered as different domains, and
+the interaction may introduce a certain amount of noise. To overcome this problem, we introduce a visible matrix, in which items
+belonging to the same part are visible to each other, while the visibility degree between items is determined by the cosine similarity
+of semantic representations, i.e., 𝐶𝑖,𝑗 = cos_sim(ℎ𝑖𝑣 , ℎ 𝑣𝑗 ). Then, the
+scaled dot-product masked self-attention is defined as:
+
+
+exp (ℎ𝑘𝑖𝑊𝑞 )𝐶𝑖,𝑗 (ℎ𝑘𝑗𝑊𝑘 )𝑇
+
+,
+𝛼𝑖,𝑗 = Í
+(7)
+𝑇𝑟
+𝑘
+𝑘
+𝑇
+𝑛=1 exp (ℎ𝑖 𝑊𝑞 )𝐶𝑖,𝑛 (ℎ 𝑗 𝑊𝑘 )
+∑︁𝑇𝑟 𝛼𝑖,𝑗 ℎ 𝑣𝑗
+ℎˆ𝑖𝑣 =
+√ ,
+𝑗=1
+𝑑
+
+(8)
+
+where 𝑑 stands for hidden dimension and 𝐶 is the visible matrix.
+ℎˆ𝑖𝑣 is then utilized as the updated resume value representation.
+Key-Value Memory Network. The goal of key matching is to
+calculate the relevance between each attribute of the resume and
+the previous dialog context. Given dialog context ℎ𝑖 , for the 𝑗-th
+attribute pair (𝑘 𝑗 , 𝑣 𝑗 ), we calculate the probability of ℎ𝑖 over 𝑘 𝑗 ,
+i.e., 𝑃 (𝑘 𝑗 |ℎ𝑖 ), as the matching score 𝛽𝑖,𝑗 . To this end, we exploit the
+context representation ℎ𝑖 to calculate the matching score:
+
+
+exp ℎ𝑖𝑊𝑎 ℎ𝑘𝑗
+.
+
+𝛽𝑖,𝑗 = Í
+(9)
+𝑇𝑟
+𝑖 𝑊 ℎ𝑘
+exp
+ℎ
+𝑎
+𝑛
+𝑛=1
+Since context representation ℎ𝑖 and resume key representation ℎ𝑘𝑗
+are not in the same semantic space, we use a trainable key matching
+parameter 𝑊𝑎 to transform these representations into a same space.
+As the relevance between context ℎ𝑖 and each pair in the resume
+table (𝑘 𝑗 , 𝑣 𝑗 ), the matching score 𝛽𝑖,𝑗 can help to capture the most
+relevant pair for generating a correct question. Therefore, as shown
+in Equation 10, the knowledge selector reads the information 𝑀𝑖
+from KVMN via summing over the stored values, and guides the
+follow-up response generation, so we have:
+∑︁𝑇𝑟
+𝑀𝑖 =
+𝛽𝑖,𝑗 ℎˆ𝑣𝑗 ,
+(10)
+𝑗=1
+
+where ℎˆ𝑣𝑗 is the representation of value 𝑣 𝑗 , and 𝛽𝑖,𝑗 is the matching
+score between dialog context ℎ𝑖 and key 𝑘 𝑗 .
+Pre-training Process. In practice, the resume knowledge contains a variety of professional and advanced scientific concepts such
+as “Web front-end”, “HTML”, and “CSS”. These technical terms are
+difficult to understand for people not familiar with the specific
+domain, not to mention for the model that is not able to access
+a large-scale resume-grounded dialog dataset. Hence, it would be
+difficult for the knowledge selector to understand the resume content and previous context about the resume, so as to select the next
+resume pair to focus on.
+On the other hand, we notice that in job-resume matching task,
+it is crucial to capture the decisive information in the resume to
+perform a good matching. For example, recruiters may tend to hire
+the candidate with particular experiences among several candidates
+with similar backgrounds [34]. Intuitively, the key-value pair that is
+important for job-resume matching is also the key factor to consider
+in a job interview. Hence, if we can let the model learn the salient
+information in the resume by performing the job-resume matching
+task on large-scale job-resume data, then it would also bring benefits
+for selecting salient information in interview question generation.
+Concretely, we use the job description to attend to the resume to
+perform a job-resume matching task, as a pre-training process for
+knowledge selector module. As shown in Figure 2, the Job Encoder
+encodes the job description by a SAMjd :
+𝑗𝑑
+
+𝑗𝑑
+
+ℎ𝑖 = SAMjd (𝑒 ( 𝑗𝑖 ), ℎ𝑖−1 ),
+
+(11)
+
+where 𝑗𝑖 denotes the 𝑖-th word in the job description, and 𝑒 ( 𝑗𝑖 )
+is mapped by the previous embedding matrix 𝑒. We use the final
+𝑗𝑑
+hidden state of the SAMjd , i.e., ℎ𝑇 as the overall representation
+𝑗
+
+for the description, abbreviated as ℎ 𝑗𝑑 . ℎ 𝑗𝑑 plays a similar part as
+the context representation ℎ𝑖 , which first attends to the keys in the
+resume, and then is used to “weightedly” read the values in the
+resume. We use 𝑚 𝑗𝑑 to denote the weighted read result.
+In the training process, we first pre-train the knowledge selector
+by job-resume matching task, which can be formulated as a classification problem [26]. The objective is to maximize the scores of
+positive samples while minimizing that of the negative samples.
+Specifically, we concatenate ℎ 𝑗𝑑 and 𝑚 𝑗𝑑 since vector concatenation
+for matching is known to be effective [27]. Then the concatenated
+vector is fed to a multi-layer, fully-connected, feed-forward neural
+network, and the job-resume matching score 𝑠 𝑗𝑟 is obtained as:
+
+
+𝑠 𝑗𝑟 = 𝜎 𝐹𝑠 ([ℎ 𝑗𝑑 ; 𝑚 𝑗𝑑 ]]) ,
+
+(12)
+
+where [; ] denotes concatenation operation, and the outputs are the
+probabilities of successfully matching. We use the job-resume pairs
+in interviews as positive samples, and then use the job-resume pairs
+without interviews as negative instances.
+After pre-training, the job description is replaced by the context
+representations, while the key matching and value combination
+processes remain the same. We use a knowledge memory 𝑀 to store
+the selection result, where each slot stores the value combination
+result 𝑀𝑖 in Equation 10.
+
+EZInterviewer: To Improve Job Interview Performance with Mock Interview Generator
+
+3.5
+
+Table 1: Statistics of the datasets used in the experiments.
+
+Decoding Manager
+
+The decoding manager is supposed to generate the proper word
+based on the knowledge memory and the response decoder. Our
+idea is inspired by an observation on the nature of interview dialogs:
+despite the fact that a dialog is based on the resume, words and utterances in the dialog are not always related to resume. Therefore, we
+postulate that formation of a response can be decomposed into two
+uncorrelated actions: (1) selecting a word according to the context
+to make the dialog coherent (corresponding to the dialog generator);
+(2) selecting a word according to the extra knowledge memory to
+ground the dialog (corresponding to the knowledge selector). The
+two actions can be independently performed, which becomes the
+key reason why the large resume-job matching and ungrounded
+dialog datasets, although seemingly unrelated to interview dialogs,
+can be very useful in an MIG task.
+Note that in Section §3.4, we store the selected knowledge 𝑀𝑖 in
+a knowledge memory 𝑀. To select a word based on it, similar to
+the response decoder, we use 𝑑𝑡 to attend to each slot of knowledge
+memory, and we can obtain the knowledge context vector 𝑔𝑡𝑘 and
+the output decoder state 𝑑𝑡𝑘𝑜 .
+The response decoder and knowledge selector are controlled by
+the decoding manager with a “fusion gate” to decide how much
+information from each side should be focused on at each step of
+interview question prediction.
+𝛾 𝑓 = 𝜎 (𝐹𝑚 (𝑑𝑡 )) ,
+
+(13)
+
+where 𝑑𝑡 is the 𝑡-th decoder hidden state. Then, the probability to
+predict word 𝑦𝑡 can be formulated as:
+𝑑𝑡𝑜 = 𝛾 𝑓 𝑑𝑡𝑤𝑜 + (1 − 𝛾 𝑓 )𝑑𝑡𝑘𝑜 ,
+
+𝑃 𝑣 = softmax 𝑊𝑣 𝑑𝑡𝑜 + 𝑏 𝑣 .
+
+(14)
+(15)
+
+As for the optimization goal, generation models that use onehot distribution optimization target always suffer from the overconfidence issue, which leads to poor generation diversity [32].
+Hence, aside from the ground truth one-hot label 𝑃, we also propose
+a soft target label 𝑃 𝑣𝑤 (see Equation 4), which is borrowed from the
+pre-trained Dialog Generator in Section 3.3. Forcing the decoding
+manager to simulate the pre-trained decoder can help it learn the
+context of the interview dialog. We combine the one-hot label with
+the soft label by an editing gate 𝜆, as shown in Figure 2. Concretely,
+a smooth target distribution 𝑃 ′ is proposed to replace the hard
+target distribution 𝑃 as:
+𝑃 ′ = 𝜆𝑃 + (1 − 𝜆)𝑃 𝑣𝑤 .
+
+WSDM ’23, February 27-March 3, 2023, Singapore, Singapore
+
+(16)
+
+where 𝜆 ∈ [0, 1] is an adaption factor, 𝑃 𝑣𝑤 is obtained from Equation 4, and 𝑃 is the hard target as one-hot distribution which assigns
+a probability of 1 for the target word 𝑦𝑡 and 0 otherwise.
+
+4 EXPERIMENTAL SETUP
+4.1 Dataset
+In this paper, we conduct experiments on a real-world dataset provided by “Boss Zhipin” 1 , the largest online recruiting platform
+in China. To protect the privacy of candidates, user records are
+anonymized with all personal identity information removed. The
+
+Statistics
+
+Total number of resumes
+Total number of dialog utterances
+Avg turns # per dialog context
+Avg words # per utterance
+
+12,666
+49,214
+4.47
+13.18
+
+Job-Resume Dataset
+Key-value pairs # per resume
+Avg words # per work experience in resume
+Avg words # per self description in resume
+Avg words # per job description
+
+22
+72.80
+51.13
+74.26
+
+Ungrounded Dialog Dataset
+Total number of context-response pairs
+Avg turns # per dialog context
+Avg words # per utterance
+
+2,995,000
+4
+15.15
+
+dataset includes 12,666 resumes, 8,032 job descriptions, and 49,214
+interview dialog utterances. The statistics of the dataset is summarized in Table 1. We then tokenize each sentence into words with
+the benchmark Chinese tokenizer toolkit “JieBa” 2 .
+To pre-train the knowledge selector module, we use a job-resume
+matching dataset [34], again from “Boss Zhipin”. The training
+set and the validation set include 355,000 and 1,006 job-resume
+pairs, respectively. To pre-train dialog generator, we choose Weibo
+dataset [2], which includes a massive number of multi-turn conversations collected from “Weibo”3 . The data includes 2,990,000
+context-response pairs for training and 5,000 pairs for validation.
+The details are also summarized in Table 1.
+
+4.2
+
+Comparisons
+
+We compare our proposed model against traditional knowledgeinsensitive dialog generation baselines, and knowledge-aware dialog generation baselines.
+• Knowledge-insensitive dialog generation baselines:
+Transformer [30]: is based solely on attention mechanisms.
+BERT [5]: initializes Transformer with BERT as the encoder. DialoGPT [36]: proposes a large, tunable neural conversational response generation model trained on more conversation-like exchanges. T5-CLAPS [14]: generates samples for contrastive learning by adding small and large perturbations, respectively.
+• Knowledge-aware dialog generation baselines:
+TMN [6]: is built upon a transformer architecture with an external memory hosting the knowledge. ITDD [20]: incrementally
+encodes multi-turn dialogs and knowledge and decodes responses
+with a deliberation technique. DiffKS [38]: utilizes the differential
+information between selected knowledge in multi-turn conversation for knowledge selection. DRD [37]: tackles the low-resource
+challenge with pre-training techniques using ungrounded dialogs
+and documents. DDMN [31]: dynamically keeps track of dialog
+context for multi-turn interactions and incorporates KB knowledge
+2 https://github.com/fxsjy/jieba
+
+1 https://www.zhipin.com
+
+Values
+
+Interview Dialog Dataset
+
+3 https://www.weibo.com
+
+WSDM ’23, February 27-March 3, 2023, Singapore, Singapore
+
+Mingzhe Li et al.
+
+Table 2: Comparing model performance on full dataset: automatic evaluation metrics.
+BLEU-1
+
+BLEU-2
+
+BLEU-3
+
+BLEU-4
+
+Extrema
+
+Average
+
+Greedy
+
+Dist-1
+
+Dist-2
+
+Entity F1
+
+Cor
+
+0.2836
+0.2735
+0.3004
+0.3020
+
+0.2530
+0.2583
+0.2697
+0.2783
+
+0.4859
+0.4861
+0.4858
+0.4837
+
+0.7673
+0.7669
+0.7670
+0.7851
+
+0.6803
+0.6792
+0.6814
+0.6674
+
+0.0928
+0.0947
+0.1001
+0.0970
+
+0.3157
+0.3558
+0.3620
+0.3702
+
+0.3606
+0.3711
+0.3843
+0.3549
+
+0.2711
+0.2894
+0.3002
+0.2870
+
+Knowledge-insensitive dialog generation
+Transformer [30]
+BERT [5]
+DialoGPT [36]
+T5-CLAPS [14]
+
+0.5339
+0.5671
+0.5722
+0.5846
+
+0.3811
+0.3864
+0.4015
+0.4126
+
+Knowledge-aware dialog generation
+TMN [6]
+ITDD [20]
+DiffKS [38]
+DRD [37]
+DDMN [31]
+Persona [9]
+
+0.5437
+0.5484
+0.5617
+0.5711
+0.5693
+0.5532
+
+0.3891
+0.4009
+0.3898
+0.4001
+0.4065
+0.3829
+
+0.2963
+0.2929
+0.2776
+0.2914
+0.2968
+0.2715
+
+0.2630
+0.2656
+0.2441
+0.2548
+0.2694
+0.2377
+
+0.4841
+0.4833
+0.4826
+0.4824
+0.4831
+0.4823
+
+0.7655
+0.7650
+0.7830
+0.7813
+0.7655
+0.7822
+
+0.6811
+0.6859
+0.6752
+0.6783
+0.6811
+0.6783
+
+0.0996
+0.1055
+0.0937
+0.0867
+0.0944
+0.0911
+
+0.3299
+0.3703
+0.3612
+0.3661
+0.3640
+0.3598
+
+0.3830
+0.3661
+0.3672
+0.3825
+0.3754
+0.3833
+
+0.2652
+0.2715
+0.2750
+0.2883
+0.2869
+0.2928
+
+EZInterviewer
+No Pre-train
+w/o KM
+w/o KS
+w/o LS
+
+0.6106
+0.5738
+0.5795
+0.5775
+0.6007
+
+0.4320
+0.4029
+0.4127
+0.4122
+0.4232
+
+0.3284
+0.2929
+0.3069
+0.3067
+0.3176
+
+0.2917
+0.2599
+0.2754
+0.2746
+0.2821
+
+0.4893
+0.4846
+0.4847
+0.4781
+0.4869
+
+0.7884
+0.7833
+0.7841
+0.7668
+0.7863
+
+0.6886
+0.6831
+0.6762
+0.6787
+0.6832
+
+0.1071
+0.0981
+0.0979
+0.1003
+0.0969
+
+0.3747
+0.3673
+0.3685
+0.3691
+0.3664
+
+0.3927
+0.3819
+0.3803
+0.3848
+0.3902
+
+0.3145
+0.3007
+0.3010
+0.2994
+0.3127
+
+into generation. Persona [9]: introduces personal memory into
+knowledge selection to address the personalization issue.
+
+4.3
+
+Implementation Details
+
+We implement our experiments in TensorFlow [1] on an NVIDIA
+GTX 1080 Ti GPU. For our model and all baselines, we follow the
+same setting as described below. We truncate input dialog to 100
+words with 20 words in each utterance, as we did not find significant
+improvement when increasing input length from 100 to 200 tokens.
+The minimum decoding step is 10, and the maximum step is 20.
+The word embedding dimension is set to 128 and the number of
+hidden units is 256. Experiments are performed with a batch size
+of 256, and the vocabulary is comprised of the most frequent 50k
+words. We use Adam optimizer [12] as our optimizing algorithm.
+We selected the 5 best checkpoints based on performance on the
+validation set and report averaged results on the test set. Note that
+for better performance, our model is built based on BERT, and the
+decoding process is the same as Transformer [30]. Finally, due to
+the limitation of time and memory, small settings are used in the
+pre-trained baselines.
+
+4.4
+
+Table 3: Human evaluation results on: Readability (Read),
+Informativeness (Info), Meaningfulness (Mean), Usefulness
+(Use), Relevance (Rel), and Coherence (Coh).
+
+Evaluation Metrics
+
+To evaluate the performance of EZInterviewer against baselines,
+we adopt the following metrics widely used in existing studies.
+Overlap-based Metric. Following [18], we utilize BLEU score
+[25] to measure n-grams overlaps between ground-truth and generated response. In addition, we apply Correlation (Cor) to calculate
+the words overlap between generated question and job description,
+which measures how well the generated questions line up with the
+recruitment intention.
+Embedding Metrics. We compute the similarity between the
+bag-of-words (BOW) embeddings of generated results and reference
+to capture their semantic matching degrees [11]. In particular we
+adopt three metrics: 1) Greedy, i.e., greedily matching words in two
+
+Model
+
+Dialog-level
+Read
+Info
+
+Mean
+
+Interview-level
+Use
+Rel
+
+Coh
+
+DiffKS
+DDMN
+DRD
+EZInterviewer
+
+1.79
+1.97
+2.05
+2.42▲
+
+1.87
+1.63
+2.09
+2.39▲
+
+2.03
+2.12
+2.08
+2.46▲
+
+2.10
+1.91
+2.02
+2.38▲
+
+2.01
+1.83
+2.11
+2.51▲
+
+1.99
+2.14
+2.17
+2.57▲
+
+utterances based on cosine similarities; 2) Average, cosine similarity
+between the averaged word embeddings in two utterances [23];
+3) Extrema, cosine similarity between the largest extreme values
+among the word embeddings in the two utterances [7].
+Distinctness. The distinctness score [15] measures word-level
+diversity by calculating the ratio of distinct uni-gram and bi-grams
+in generated responses.
+Entity F1. Entity F1 is computed by micro-averaging precision
+and recall over knowledge-based entities in the entire set of system responses, and evaluates the ability of a model to generate
+relevant entities to achieve specific tasks from the provided knowledge base [31]. The entities we use are extracted from an entity
+vocabulary provided by “Boss Zhipin”.
+Human Evaluation Metrics. We further employ human evaluations aside from automatic evaluations. Three well-educated
+annotators from different majors are hired to evaluate the quality
+of generated responses, where the evaluation is conducted in a
+double-blind fashion. In total 100 randomly sampled responses generated by each model are rated by each annotator on both dialog
+level and interview level. We adopt the Readability (is the response
+grammatically correct?) and Informativeness (does the response
+include informative words?) to judge the quality of the generated
+
+EZInterviewer: To Improve Job Interview Performance with Mock Interview Generator
+
+WSDM ’23, February 27-March 3, 2023, Singapore, Singapore
+
+responses on the dialog level. On the interview level, we adopt
+Meaningfulness (is the generated question meaningful?), Usefulness
+(is the question worth the job candidate preparing in advance?),
+Relevance (is the question relevant to the resume?) and Coherence (is
+the generated text coherent with the context?) to assess the overall
+performance of a model and the quality of user experience. Each
+metric is given a score between 1 and 3 (1 = bad, 2 = average, 3 =
+good).
+
+5 EXPERIMENTAL RESULT
+5.1 Overall Performance
+Automatic evaluation. The comparison between EZInterviewer
+and state-of-the-art generative baselines is listed in Table 2.
+We take note that the knowledge-aware dialog generation models outperform traditional dialog models, suggesting that utilizing
+external knowledge introduces advantages in generating relevant
+response. We also notice the pre-train based model DRD outperforms other baselines, showing that initializing parameters by pretraining on large-scale data can lead to a substantial improvement
+in performance. It is worth noting some models achieve better Entity F1 but a lower BLEU score; this suggests that those models tend
+to copy necessary entity words from the knowledge but are not
+able to use them properly.
+EZInterviewer outperforms baselines on all automatic metrics.
+Firstly, our model improves BLEU-1 by 6.92% over DRD. On the Distinctness metric Dist-1, our model outperforms DialoGPT by 6.99%,
+suggesting that the generated interview questions are diversified
+and personalized with different candidates’ resumes. Moreover our
+model attains a good score of 0.3927 on entity F1, which evaluates
+the degree to which the generated question is grounded on the
+knowledge base. Finally, Cor score of 0.3145 suggests the questions generated by EZInterviewer is in line with the job description,
+hence reflect the intention of the recruiters. Overall the metrics
+demonstrate that our model successfully learns an interviewer’s
+points of interest in a resume, and incorporates this knowledge into
+interview questions properly.
+Human evaluation. The results of human evaluations on all
+models are listed in Table 3. EZInterviewer is the top performer on
+all the metrics. Specifically, our model outperforms DiffKS by 35.20%
+on Readability, suggesting that EZInterviewer manages to reduce
+the grammatical errors and improve the readability of the generated
+response. As for the Informativeness metric, our model scores 0.68
+higher than DDMN. This indicates that EZInterviewer captures
+salient information in the resume. On the interview level, EZInterviewer’s Usefulness score is 18.27% better than DRD, demonstrating
+its capabilities to help job seekers to pick the right questions to
+prepare. On Relevance metric, our model outperforms all baselines
+by a considerable margin, suggesting that the generated questions
+are closely related to the interview process. Our model also performs better than other baselines in Meaningfulness and Coherence
+metrics, suggesting the overall higher quality of our model.
+The above results demonstrate the competence of EZInterviewer
+in producing meaningful and useful interview questions whilst
+keeping the interview dialog flowing smoothly, just like a human
+recruiter. Note that the average kappa statistics of human evaluation
+are 0.51 and 0.48 on dialog level and interview level, respectively,
+
+Figure 3: Visualization of key matching between dialog context and selected resume keys, i.e., work experiment (Exp),
+self description (Desc), skills (Ski), work years (Year), expected position (Pos), school (Sch), and major (Maj). 𝑈𝑖 denotes the 𝑖-th utterance.
+which indicates moderate agreement between annotators. To prove
+the significance of these results, we also conduct the two-tailed
+paired student t-test between our model and DRD (row with shaded
+background). The statistical significance of observed differences is
+denoted using ▲ (or ▼ ) for strong (or weak) significance for 𝛼 = 0.01.
+Moreover, we obtain an average p-value of 5 × 10−6 and 3 × 10−4
+for both levels, respectively.
+
+5.2
+
+Ablation Study
+
+We conduct an ablation study to assess the contribution of individual components in the model. The results are shown in Table 2.
+To verify the effectiveness of knowledge memory, we omit the
+knowledge selection of dialog context history and directly use the
+last utterance representation to select knowledge. The results (see
+row w/o KM) confirm that employing each turn of historical dialog
+to select knowledge and saving it in memory contribute to generating better responses. To confirm whether selecting knowledge
+helps with the response generation process, we remove it from the
+model, then simply add the representation of each utterance with
+all resume values, and store it into the memory. This results in a
+drop of 5.42% in BLEU-1 (see row w/o KS), suggesting that selecting
+resume knowledge is beneficial in response generation.
+
+5.3
+
+Analysis of Knowledge Selector
+
+In Section § 3.4, we introduce the selecting mechanism of knowledge selector, where the final attention (matching) score is obtained
+in Equation 9. To study what specific information is attended by
+the knowledge selector, and whether the selected information is
+suitable for the next interview question, we conduct a case study to
+visualize the matching score produced by the knowledge selector,
+as shown in Table 4 and Figure 3. The first utterance in the history
+is “Have you been engaged in front-end development work before?”,
+and the knowledge selector learns that this utterance focuses on the
+work experience in the resume. Accordingly, the fourth utterance “I
+have more than 10 years of work experience.” pays more attention
+to work years and work experience than other items in the resume.
+This demonstrates that the knowledge selector learns which item
+in the resume to focus on when generating each utterance. Hence,
+when we want to ask the candidate to “introduce a React related
+project”, the knowledge selector focuses on the work experience in
+the resume and generates the mock interview question.
+
+WSDM ’23, February 27-March 3, 2023, Singapore, Singapore
+
+Mingzhe Li et al.
+
+Table 4: Translated interview questions generated by baselines and EZInterviewer: an example.
+denotes information
+extracted and words generated by knowledge selector, whereas
+denotes words generated from dialog generator.
+
+Gender
+Age
+Education
+Major
+Work Years
+Expected Position
+Low Salary
+High Salary
+Skills
+Experience
+
+Resume
+Male
+28
+Undergraduate
+Computer Science
+10
+Front-end Engineer
+5
+6
+Vue, Node.js, Java
+I was engaged in front-end design and was responsible for the project development based
+on the React front-end framework and participated in the system architecture process.
+
+Interview
+Job Description:
+The main content of this work includes design and development based on the React
+front-end framework. It requires the ability to efficiently complete front-end
+development work and serve customers well.
+Context:
+U1: Have you been engaged in front-end development work before?
+U2: Yes, I am good at Vue, Node.js and some other skills.
+U3: Okay, so do you have any React related experience?
+U4: Yes, I have more than 10 years of work experience.
+Ground Truth: So can you introduce a React related project you have done?
+DDMN: What other front-end frameworks would you use?
+DRD: Hello, can you tell us about your previous work?
+EZInterviewer: Well, can you introduce the experience based on React framework?
+
+Figure 4: Automatic evaluation metrics of DDMN, DRD and EZInterviewer on training data of different scales.
+
+5.4
+
+Impact of Training Data Scales
+
+To understand how our model and baseline models perform in a lowresource scenario, we first evaluate them on the full training dataset,
+then on smaller portions of the training dataset. Figure 4 presents
+the performance of the models, DDMN, DRD, and EZInterviewer,
+on the full, 1/2, 1/4, 1/8 and 1/10 of the training dataset (data scale),
+respectively. It is observed that as the size of training dataset reduces, DDMN suffers a massive drop across all metrics, whereas the
+scores of pre-training based models, i.e., DRD and EZInterviewer,
+stay relatively stable. This demonstrates pre-training as an effective
+strategy to tackle the low-resource challenge. Moreover, our model
+outperforms DRD on all data scales, demonstrating the superiority
+of our model. Figure 4 shows EZInterviewer eventually achieves the
+best performance on all metrics and outperforms (albeit slightly),
+with only 1/10 training data against all state-of-the-art baselines
+trained with the full training dataset.
+
+5.5
+
+Case Study
+
+Table 4 presents a translated example of EZInterviewer and baseline
+models. We observe that the question from EZInterviewer not only
+catches the context, but also expands the conversation with proper
+knowledge. This is highlighted in color codes: pink-colored words,
+i.e., “experience” and “React framework”, are what knowledge selector extracts from resume knowledge, whereas blue-colored words,
+i.e., “Well, can you introduce the...” and “based on”, which closely
+connect to the context, are generated by dialog generator. In contrast, the questions from the baselines respond to the dialog but fail
+to make connection with the resume knowledge.
+
+6
+
+CONCLUSION
+
+In this paper, we conduct a pilot study for the novel application of
+intelligent online recruitment, namely EZInterviewer, which aims
+to serve as mock interviewers for job-seekers. The mock interview
+is generated with thorough understanding of the candidate’s resume, the job requirements, the previous utterances in the context,
+as well as the selected knowledge for grounded interviews. To address the low-resource challenge, EZInterviewer is trained on a very
+small set of interview dialogs. The key idea is to reduce the number
+of parameters that rely on interview dialogs by disentangling the
+knowledge selector and dialog generator so that most parameters
+can be trained with ungrounded dialogs as well as the resume data
+that are not low-resource. We conduct extensive experiments to
+demonstrate the effectiveness of the proposed solution EZInterviewer. Our model achieves the best results using full training data
+as well as small subsets of the training data in terms of various
+metrics such as BLEU, embedding based similarity and diversity,
+as well as human judgments. In particular, the human evaluation
+indicates that our solution EZInterviewer can provide satisfactory
+mock interviews to help the job-seekers prepare the real interview,
+making the interview preparation process easier.
+
+ACKNOWLEDGMENTS
+We would like to thank the anonymous reviewers for their constructive comments. This work was supported by National Natural
+Science Foundation of China (NSFC Grant No. 62122089). Rui Yan
+is supported by Beijing Academy of Artificial Intelligence (BAAI).
+
+EZInterviewer: To Improve Job Interview Performance with Mock Interview Generator
+
+REFERENCES
+[1] Martín Abadi, Paul Barham, Jianmin Chen, Zhifeng Chen, Andy Davis, Jeffrey
+Dean, Matthieu Devin, Sanjay Ghemawat, Geoffrey Irving, Michael Isard, Manjunath Kudlur, Josh Levenberg, Rajat Monga, Sherry Moore, Derek Gordon Murray,
+Benoit Steiner, Paul A. Tucker, Vijay Vasudevan, Pete Warden, Martin Wicke,
+Yuan Yu, and Xiaoqiang Zhang. 2016. TensorFlow: A System for Large-Scale
+Machine Learning. In OSDI.
+[2] Zhangming Chan, Juntao Li, Xiaopeng Yang, Xiuying Chen, Wenpeng Hu,
+Dongyan Zhao, and Rui Yan. 2019. Modeling personalization in continuous
+space for response generation via augmented wasserstein autoencoders. In Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing
+(EMNLP-IJCNLP). 1931–1940.
+[3] Xiuying Chen, Hind Alamro, Mingzhe Li, Shen Gao, Rui Yan, Xin Gao, and
+Xiangliang Zhang. 2022. Target-aware Abstractive Related Work Generation
+with Contrastive Learning. arXiv preprint arXiv:2205.13339 (2022).
+[4] Xiuying Chen, Zhi Cui, Jiayi Zhang, Chen Wei, Jianwei Cui, Bin Wang, Dongyan
+Zhao, and Rui Yan. 2020. Reasoning in Dialog: Improving Response Generation
+by Context Reading Comprehension. arXiv preprint arXiv:2012.07410 (2020).
+[5] J. Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2019. BERT:
+Pre-training of Deep Bidirectional Transformers for Language Understanding. In
+NAACL-HLT.
+[6] Emily Dinan, Stephen Roller, Kurt Shuster, Angela Fan, Michael Auli, and Jason
+Weston. 2019. Wizard of wikipedia: Knowledge-powered conversational agents.
+ICLR (2019).
+[7] Gabriel Forgues, Joelle Pineau, Jean-Marie Larchevêque, and Réal Tremblay. 2014.
+Bootstrapping dialog systems with word embeddings. In Nips, workshop, Vol. 2.
+[8] Chenpeng Fu, Zhixu Li, Qiang Yang, Zhigang Chen, Junhua Fang, Pengpeng Zhao,
+and Jiajie Xu. 2019. Multiple Interaction Attention Model for Open-World Knowledge Graph Completion. In Web Information Systems Engineering–WISE 2019:
+20th International Conference, Hong Kong, China, January 19–22, 2020, Proceedings.
+630–644.
+[9] Tingchen Fu, Xueliang Zhao, Chongyang Tao, Ji-Rong Wen, and Rui Yan.
+2022. There Are a Thousand Hamlets in a Thousand People’s Eyes: Enhancing
+Knowledge-grounded Dialogue with Personal Memory. ACL (2022).
+[10] Shen Gao, Xiuying Chen, Chang Liu, Li Liu, Dongyan Zhao, and Rui Yan. 2020.
+Learning to Respond with Stickers: A Framework of Unifying Multi-Modality in
+Multi-Turn Dialog. In Proceedings of The Web Conference 2020. 1138–1148.
+[11] Xiaodong Gu, Kyunghyun Cho, Jung-Woo Ha, and Sunghun Kim. 2019. DialogWAE: Multimodal Response Generation with Conditional Wasserstein AutoEncoder. In International Conference on Learning Representations. https://
+openreview.net/forum?id=BkgBvsC9FQ
+[12] Diederik P Kingma and Jimmy Ba. 2015. Adam: A method for stochastic optimization. ICLR (2015).
+[13] Ran Le, Wenpeng Hu, Yang Song, Tao Zhang, Dongyan Zhao, and Rui Yan.
+2019. Towards effective and interpretable person-job fitting. In Proceedings of the
+28th ACM International Conference on Information and Knowledge Management.
+1883–1892.
+[14] Seanie Lee, Dong Bok Lee, and Sung Ju Hwang. 2021. Contrastive Learning with
+Adversarial Perturbations for Conditional Text Generation. In 9th International
+Conference on Learning Representations, ICLR 2021, Virtual Event, Austria, May
+3-7, 2021. OpenReview.net.
+[15] J. Li, Michel Galley, Chris Brockett, Jianfeng Gao, and W. Dolan. 2016. A DiversityPromoting Objective Function for Neural Conversation Models. NAACL (2016).
+[16] Juntao Li, Chang Liu, Jian Wang, Lidong Bing, Hongsong Li, Xiaozhong
+Liu, Dongyan Zhao, and Rui Yan. 2020. Cross-Lingual Low-Resource Set-toDescription Retrieval for Global E-Commerce. AAAI (2020).
+[17] Mingzhe Li, Xiuying Chen, Shen Gao, Zhangming Chan, Dongyan Zhao, and Rui
+Yan. 2020. VMSMO: Learning to Generate Multimodal Summary for Video-based
+News Articles. In Proceedings of the 2020 Conference on Empirical Methods in
+Natural Language Processing (EMNLP). 9360–9369.
+[18] Mingzhe Li, Xiuying Chen, Min Yang, Shen Gao, Dongyan Zhao, and Rui Yan. 2021.
+The Style-Content Duality of Attractiveness: Learning to Write Eye-Catching
+Headlines via Disentanglement. AAAI (2021).
+[19] Mingzhe Li, Xiexiong Lin, Xiuying Chen, Jinxiong Chang, Qishen Zhang, Feng
+Wang, Taifeng Wang, Zhongyi Liu, Wei Chu, Dongyan Zhao, et al. 2022. Keywords
+
+WSDM ’23, February 27-March 3, 2023, Singapore, Singapore
+
+and Instances: A Hierarchical Contrastive Learning Framework Unifying Hybrid
+Granularities for Text Generation. In Proceedings of the 60th Annual Meeting of
+the Association for Computational Linguistics (Volume 1: Long Papers). 4432–4441.
+[20] Zekang Li, Cheng Niu, Fandong Meng, Yang Feng, Qian Li, and Jie Zhou. 2019.
+Incremental Transformer with Deliberation Decoder for Document Grounded
+Conversations. In Proceedings of the 57th Annual Meeting of the Association for
+Computational Linguistics. 12–21.
+[21] Weijie Liu, Peng Zhou, Zhe Zhao, Zhiruo Wang, Qi Ju, Haotang Deng, and Ping
+Wang. 2020. K-bert: Enabling language representation with knowledge graph. In
+Proceedings of the AAAI Conference on Artificial Intelligence, Vol. 34. 2901–2908.
+[22] Zeming Liu, Haifeng Wang, Zheng-Yu Niu, Hua Wu, Wanxiang Che, and Ting
+Liu. 2020. Towards Conversational Recommendation over Multi-Type Dialogs.
+arXiv preprint arXiv:2005.03954 (2020).
+[23] Jeff Mitchell and Mirella Lapata. 2008. Vector-based models of semantic composition. NAACL-HLT (2008), 236–244.
+[24] Lei Niu, Chenpeng Fu, Qiang Yang, Zhixu Li, Zhigang Chen, Qingsheng Liu,
+and Kai Zheng. 2021. Open-world knowledge graph completion with multiple
+interaction attention. World Wide Web 24, 1 (2021), 419–439.
+[25] Kishore Papineni, Salim Roukos, Todd Ward, and Wei-Jing Zhu. 2002. BLEU: a
+method for automatic evaluation of machine translation. In ACL. ACL, 311–318.
+[26] Chuan Qin, Hengshu Zhu, Tong Xu, Chen Zhu, Liang Jiang, Enhong Chen, and
+Hui Xiong. 2018. Enhancing person-job fit for talent recruitment: An abilityaware neural network approach. In The 41st International ACM SIGIR Conference
+on Research & Development in Information Retrieval. 25–34.
+[27] Aliaksei Severyn and Alessandro Moschitti. 2015. Learning to rank short text pairs
+with convolutional deep neural networks. In Proceedings of the 38th international
+ACM SIGIR conference on research and development in information retrieval. 373–
+382.
+[28] Yunwon Tae, Cheonbok Park, Taehee Kim, Soyoung Yang, Mohammad Azam
+Khan, Eunjeong Park, Tao Qin, and Jaegul Choo. 2020. Meta-Learning
+for Low-Resource Unsupervised Neural MachineTranslation. arXiv preprint
+arXiv:2010.09046 (2020).
+[29] Zhiliang Tian, Wei Bi, Dongkyu Lee, Lanqing Xue, Yiping Song, Xiaojiang Liu, and
+Nevin L Zhang. 2020. Response-Anticipated Memory for On-Demand Knowledge
+Integration in Response Generation. arXiv preprint arXiv:2005.06128 (2020).
+[30] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones,
+Aidan N Gomez, Łukasz Kaiser, and Illia Polosukhin. 2017. Attention is all
+you need. In Advances in neural information processing systems. 5998–6008.
+[31] Jian Wang, Junhao Liu, Wei Bi, Xiaojiang Liu, Kejing He, Ruifeng Xu, and Min
+Yang. 2020. Dual Dynamic Memory Network for End-to-End Multi-turn Taskoriented Dialog Systems. In Proceedings of the 28th International Conference on
+Computational Linguistics. 4100–4110.
+[32] Yida Wang, Yinhe Zheng, Yong Jiang, and Minlie Huang. 2021. Diversifying
+Dialog Generation via Adaptive Label Smoothing. arXiv preprint arXiv:2105.14556
+(2021).
+[33] Hongcai Xu, Junpeng Bao, and Junqing Wang. 2020. Knowledge-graph based
+Proactive Dialogue Generation with Improved Meta-Learning. arXiv preprint
+arXiv:2004.08798 (2020).
+[34] Rui Yan, Ran Le, Yang Song, Tao Zhang, Xiangliang Zhang, and Dongyan Zhao.
+2019. Interview choice reveals your preference on the market: To improve jobresume matching through profiling memories. In Proceedings of the 25th ACM
+SIGKDD International Conference on Knowledge Discovery & Data Mining.
+[35] Xiangliang Zhang, Qiang Yang, Somayah Albaradei, Xiaoting Lyu, Hind Alamro,
+Adil Salhi, Changsheng Ma, Manal Alshehri, Inji Ibrahim Jaber, Faroug Tifratene,
+et al. 2021. Rise and fall of the global conversation and shifting sentiments during
+the COVID-19 pandemic. Humanities and social sciences communications 8, 1
+(2021), 1–10.
+[36] Yizhe Zhang, Siqi Sun, Michel Galley, Yen-Chun Chen, Chris Brockett, Xiang
+Gao, Jianfeng Gao, Jingjing Liu, and Bill Dolan. 2019. Dialogpt: Large-scale
+generative pre-training for conversational response generation. arXiv preprint
+arXiv:1911.00536 (2019).
+[37] Xueliang Zhao, Wei Wu, Chongyang Tao, Can Xu, Dongyan Zhao, and Rui Yan.
+2020. Low-resource knowledge-grounded dialogue generation. ICLR (2020).
+[38] Chujie Zheng, Yunbo Cao, Daxin Jiang, and Minlie Huang. 2020. Differenceaware Knowledge Selection for Knowledge-grounded Conversation Generation.
+In Findings of the Association for Computational Linguistics: EMNLP 2020. 115–125.
+
+

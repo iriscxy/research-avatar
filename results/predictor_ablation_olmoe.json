@@ -1,0 +1,25 @@
+{
+  "synthetic": true,
+  "warning": "FABRICATED PLACEHOLDER DATA — pipeline test only, not a real experiment.",
+  "model": "OLMoE-1B-7B-Instruct",
+  "seeds": 5,
+  "C4_predictor": {
+    "claim": "C4",
+    "experiment": "4.4 gain predicted by fragmentation + refusal ties",
+    "correlation_dispersion_vs_rts_gain_over_residual": {"pearson_r": 0.74, "p_value": 0.0002},
+    "binned_gain_over_residual_pp": {"low_frag": 1.2, "mid_frag": 9.8, "high_frag": 25.6},
+    "refusal_tie": {"residual_success_pct": 88.1, "rts_success_pct": 87.4, "within_noise": true}
+  },
+  "ablations": {
+    "experiment": "4.5 ablations on high-fragmentation subset (one variable each)",
+    "metric": "steering success rate (%)",
+    "full_route_then_steer": 66.9,
+    "A1_no_route_residual_only": 41.3,
+    "A2_no_steer_router_only": 28.6,
+    "A3_random_expert_nudge": 39.1,
+    "A4_metric_variant_top_direction_variance": {"success_rate_pct": 65.8, "predictor_pearson_r": 0.71},
+    "A5_top1_nudge": 58.2,
+    "A5_topk_nudge": 66.9,
+    "reading": "route (A1) and steer (A2) both necessary; the RIGHT experts matter (A3 ~= residual); metric is robust (A4); more expressing experts help (A5)"
+  }
+}

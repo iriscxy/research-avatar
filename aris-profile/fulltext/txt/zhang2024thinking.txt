@@ -1,0 +1,1511 @@
+Thinking Before Running! Efficient Code Generation with
+Thorough Exploration and Optimal Refinement
+Xiaoqing Zhang1,2 *
+Xiuying Chen3
+
+Yuhan Liu1†
+Shuo Shang4
+
+Flood Sung2
+Rui Yan1,5,6†
+
+1
+
+Gaoling School of Artificial Intelligence, Renmin University of China 2 Moonshot AI
+3
+Mohamed bin Zayed University of Artificial Intelligence
+4
+University of Electronic Science and Technology of China 5 School of Artifcial Intelligence, Wuhan University
+6
+Engineering Research Center of Next-Generation Intelligent Search and Recommendation, MoE
+{xiaoqingz, yuhan.liu, ruiyan}@ruc.edu.cn floodsung@moonshot.cn
+xy-chen@pku.edu.cn jedi.shang@gmail.com
+
+Abstract
+
+able capabilities in various programming-related
+domains, such as code generation (Zheng et al.,
+2023; Chaudhary, 2023; Dong et al., 2024; Li et al.,
+2024a), code refinement (Chen et al., 2023; Guo
+et al., 2024; Zheng et al., 2024; Ridnik et al., 2024;
+Liu et al., 2024a; Zhang et al., 2024), and software
+testing (Li et al., 2023; Jalil et al., 2023; Wang
+et al., 2024; Jones et al., 2024). By utilizing extensive training data, LLMs can understand complex
+programming tasks, generate syntactically accurate code, and even enhance the quality of their
+solutions through iterative improvement.
+In the context of code generation, researchers
+have made significant progress in improving
+prompts to encourage LLMs to generate higherquality answers. This includes two main directions:
+optimizing the path for answer exploration and incorporating rich reflection information. In the first
+direction of path optimization, for example, SelfPlanning (Jiang et al., 2024) reduces problem complexity in code generation by introducing a planning phase, which refines the solution generation
+process. Similarly, CodeCoT (Huang et al., 2023a)
+improves the exploration by employing a Chain-ofThought(CoT) prompt, enabling models to reason
+through each step systematically. In the second
+direction, the integration of reflection, test cases,
+and feedback is progressively being used to steer
+and enhance the generation process. For instance,
+RethinkMCTS (Li et al., 2024b) integrates verbal
+feedback into its Monte Carlo Tree Search framework to correct errors and improve code generation.
+Similarly, AgentCoder (Huang et al., 2023b) boosts
+efficiency and accuracy by using interactions between multiple agents to provide valuable input.
+Despite the significant potential of using CoT for
+planning code improvements, the thought process
+incurs a substantial token overhead. To enhance
+efficiency and minimize trial-and-error costs, it is
+crucial to clarify the optimization direction before
+implementing refinement. Existing methods, such
+
+arXiv:2502.17442v2 [cs.SE] 27 May 2025
+
+Code generation is crucial in software engineering for automating the coding process efficiently. While test-time computation methods show promise, they suffer from high latency due to multiple computation rounds. To
+overcome this, we introduce ThinkCoder, a
+framework that combines thorough exploration
+with optimal refinement. The exploration phase
+diversifies the solution space by searching
+for potential solutions, followed by a refinement phase that enhances precision. This approach allows us to select the best solution
+through careful consideration before taking action, avoiding excessive trial and error. To further minimize test-time computation overhead,
+we introduce preference-driven optimization
+with Reinforced Self-Training (ReST), which
+uses exploration trajectories from ThinkCoder
+to guide LLM’s evolution. This approach enhances LLM’s exploration efficiency via preference learning, cutting costs while maintaining accuracy. ThinkCoder boosts the performance with a single LLM, excelling on
+benchmarks like HumanEval and MBPP. Compared to SOTA models, it improves Pass@1
+by 3.0% over MapCoder with just 6.4% of
+the computation cost. Against AgentCoder,
+ThinkCoder achieves a 0.5% higher Pass@1
+after 2 rounds, outperforming AgentCoder’s 5
+rounds. Additionally, ReST with success trajectories enhances efficiency, allowing models
+like LLaMA2-7B to achieve competitive results
+using only 20% of the computational resources.
+These results highlight the framework’s effectiveness and scalability. 1
+
+1
+
+Introduction
+
+Recent research advances indicate that large language models (LLMs) have demonstrated remark* This work was done during the internship at Moonshot
+
+AI.
+†
+
+Corresponding authors.
+The code is available at https://github.com/
+xiaoqzhwhu/ThinkCoder
+1
+
+1
+
+as MapCoder, which leverages four LLM-based
+agents, consume a considerable amount of computational resources.
+Based on these insights, we propose ThinkCoder,
+a novel framework for efficient code generation
+that combines thorough exploration and optimal
+refinement. First, we simplified the multi-agent
+framework into a single Exploration Agent and a
+CodeVerifier. The Exploration Agent is responsible
+for in-depth analysis and generating various codes,
+while exploring diverse test cases to build a robust
+testing pool. The CodeVerifier, using the testing
+pool, independently determines the optimization direction without relying on LLMs. By continuously
+improving the testing pool throughout the refinement process, ThinkCoder ensures accurate verification of generated code in each round, providing
+efficient guidance for subsequent optimizations.
+Second, to tackle the additional computational load resulting from extensive exploration,
+we incorporate a preference-driven optimization
+phase using Reinforced Self-Training (ReST) in
+ThinkCoder. ReST leverages successful exploration trajectories to train LLM, enabling it to generate optimal solutions more efficiently during exploration. This approach significantly reduces the
+computational cost of test-time computations, enabling models like LLaMA2-7B to achieve notable
+improvements in both performance and efficiency.
+Our contributions are as follows:
+• We introduce ThinkCoder, an efficiency framework for code generation that integrates an LLMbased exploration agent with a non-LLM-based
+CodeVerifier. We utilize a self-evolving testing
+pool, significantly enhancing the speed of code
+verification and improvement.
+• We introduce preference-driven optimization
+with ReST, using exploration trajectories from
+ThinkCoder to enhance LLMs’ generation and verification capabilities, further reducing computational overhead during testing.
+• We have demonstrated the effectiveness of
+ThinkCoder on multiple benchmark datasets and
+across different scales of LLMs, achieving stateof-the-art performance in code generation while
+optimizing computational efficiency.
+
+2
+
+For example, training a Verifier with Preference
+Reward Model data and combining strategies like
+Best-of-N Weighted, Beam Search, and Lookahead
+Search can help (Snell et al., 2024). ToolLLM (Qin
+et al., 2023) evaluates tool usage by comparing success rates and solution quality to ChatGPT-ReACT,
+employing ToolEval as a Verifier for optimal API
+calls using depth-first search. However, API-based
+Verifiers are limited by training data and struggle
+with generalization. In contrast, our approach employs a task-based testing tool as a Verifier, offering
+a simpler and more effective solution that is closely
+aligned with the specific task requirements.
+Multi-Agent Code Generation. Deriving multiple agents by mimicking the different stages of human programming can effectively improve both the
+quality and efficiency of code generation, as agents
+based on large language models possess strong reasoning capabilities (Liu et al., 2024b,c; Zhang et al.,
+2025). For instance, AgentCoder (Huang et al.,
+2023b) introduces programmer agents, test design
+agents, and test execution agents during the code
+generation process. Similarly, MapCoder (Islam
+et al., 2024) introduces retrieval agents, planning
+agents, coding agents, and debugging agents, iterating on code generation quality through more
+frequent agent communication and reflection. However, MapCoder incurs higher computational overhead and relies solely on sample I/O for code execution, limiting test case coverage and robustness. In contrast, our framework, ThinkCoder, addresses these limitations by self-verification efficiently without excessive computational costs.
+Instruction Tuning for Code. High-quality
+code generation models often require instruction fine-tuning based on large-scale pre-trained
+language models. The fine-tuning data generally comes from real-world collections or is artificially synthesized. For example, Code Alpaca (Chaudhary, 2023) combines the SELFINSTRUCT strategy with code fine-tuning,
+CODELLAMA (Roziere et al., 2023) generates questions, solutions, and test cases through
+prompts, and OctoPack (Muennighoff et al., 2023)
+directly collects data from Git. LLMs fine-tuned
+with instructions possess stronger code generation
+capabilities. However, existing methods often lack
+comprehensive guidelines for data collection, volume management, and fine-tuning strategies. To
+address this gap, we present a detailed fine-tuning
+strategy for Llama2-7B using instruction-tuning
+data collected via CodeQwen (Bai et al., 2023), pro-
+
+Related Work
+
+Test-time Compute. Test-time computing methods use self-play and additional verifiers to enhance
+performance, despite the computational overhead.
+2
+
+Figure 1: The end-to-end process of ThinkCoder involves k thorough exploration steps followed by n optimal
+refinement cycles. The Exploration Agent generates k codes and tests simultaneously during self-exploration,
+storing results in a Testing Pool. The optimal refinement phase includes self-verification that selects the optimal
+solution with the CodeVerifier and aggregate reflection for the instruction update. The optimal refinement will be
+repeated recursively for n cycles, ultimately leading to the final solution.
+
+greater than θ, the refinement process is terminated,
+and the code gs is returned as the final solution.
+For more details of ThinkCoder please refer to the
+algorithm 1 in Appendix A.1. Below, we detail the
+implementation of Thorough Exploration, Optimal
+Refinement, Exploration Agent&CodeVerifier, and
+Testing Pool.
+
+viding a transparent and reproducible methodology
+that supports the advancement of instruction-tuned
+code generation models.
+
+3
+
+ThinkCoder
+
+3.1
+
+Overall Architecture
+
+Figure 1 illustrates the structure of ThinkCoder.
+Given an instruction I = [p, prompt] for problem
+p, where prompt is the task description for code
+generation, the Exploration Agent produces k candidate solutions. Each solution is paiblue with
+m test cases, and the temperature t of the LLM’s
+generation is adjusted to promote diversity. These
+test cases are then aggregated into a Testing Pool
+T P . We define the exploration results as E =
+[G, T P ], where G = {gi | gi = LLM(p, t) for i ∈
+{1, 2, . . . , k}}, and T P ∈ Tk×m , where T represents each test. The CodeVerifier sequentially
+executes each candidate solution in G using the
+test cases from T P to compute pass rates. The
+code gs with the highest pass rate is selected for
+further refinement. Here we define the pass rate
+passed by gi
+of gi as rgi = number of tests
+and gs =
+|T P |
+arg maxi rgi . Feedback f from failed test case
+ft , along with the current code gs , generated test
+cases tests, and problem p, is used to update the
+instructions I = [p, gs , ft , f, tests, prompt] for the
+next exploration. This iterative process allows the
+Exploration Agent to generate improved solutions
+and test cases over n iterations. To avoid unnecessary computation on well-solved problems, if rgi is
+
+3.2
+
+Thorough Exploration
+
+During the thorough exploration phase,
+ThinkCoder conducts extensive thinking before running code and performing corrections.
+The self-exploration process generates k answers
+simultaneously to expand the search area by
+increasing the LLM’s temperature, which flattens
+the probability distribution and enhances diversity.
+The first iteration of self-exploration aims to
+generate diverse code and comprehensive test
+cases, including regular tests, boundary tests, and
+performance tests. While the subsequent iterations,
+focus on the exploration of code correction for
+specific errors. The only LLM-based agent
+conducts self-exploration with prompt design
+detailed in Appendix A.4.
+3.3
+
+Optimal Refinement
+
+To solve the problem efficiently, it is essential to
+first identify the optimal solution through careful
+consideration before making any code corrections.
+Therefore, optimal refinement involves selecting
+the best solution via self-verification and gathering
+the necessary information for deeper exploration
+3
+
+Figure 2: Trajectory collection with ThinkCoder and its application in ReST training for LLMs. We collect
+success trajectories offline based on the verification with ground truth tests, ensuring the solution aligns with human
+preferences. For reflection, we use LLM-generated tests, ensuring LLMs specifically address their own mistakes.
+
+and improvement in the next exploration. During
+self-verification, code quality is assessed by the
+pass rate, calculated by the CodeVerifier running
+candidate code against all test cases. The code with
+the highest pass rate is chosen for refinement. We
+then randomly select an unresolved error to target
+in the current round of improvements, ensuring
+all errors are eventually addressed. The refinement instruction is generated based on the problem, the current best solution, feedback, and test
+cases. After each refinement, the solution’s pass
+rate is evaluated. If it exceeds previous solutions,
+it becomes the new best. Through multiple iterations, the best solution is continuously corrected
+and optimized, resulting in a gradual increase in the
+pass rate within the testing pool. For more details,
+please refer to the Appendix A.4.
+3.4
+
+tion, the testing pool only selects test cases that can
+improve the code’s pass rate, thus enhancing the
+diversity and accuracy of the pool. Finally, the testing pool will select test cases with distinct errors
+and use feedback to update the code’s improvement
+goals, driving continuous optimization.
+
+4
+
+In ThinkCoder, the generated code evolves as the
+pass rate on the testing pool improves. Each increase in the pass rate signifies the development
+of better codes. This progression demonstrates
+that the exploration agent is gradually producing
+higher-quality outputs. By collecting the trajectory of these improvements, we aim to fine-tune
+the model, enabling the LLM to generate superior
+code and test cases more effectively. This approach
+helps to refine the exploration process, clarify its
+direction, and reduce the time required for exploration. Figure 2 describes the process of trajectory
+collection and fine-tuning of the LLM. We will explain this process from the perspectives of Data
+Collection, the Model Training and Inference.
+
+Exploration Agent& CodeVerifier
+
+ThinkAgent consists of a single exploration agent
+and a CodeVerifier. The exploration agent uses
+LLMs to search for diversity code and test cases,
+while the CodeVerifier runs the provided code snippets and test cases in a local environment to generate feedback. To improve the efficiency of the
+CodeVerifier, we leverage multiprocessing to validate the code in parallel.
+3.5
+
+Preference-driven Optimization
+
+4.1
+
+Data Collection
+
+The process of data collection for LLM fine-tuning
+involves two key steps. First, an exploration agent,
+denoted as M0 , generates diverse low-probability
+data DM0 by sampling at various temperatures.
+Second, this data is further refined using reflection to produce an enhanced dataset RM0 . In our
+data generation task, offline data collection starts
+with a training set D = {xi }N
+i=1 , where N is
+the number of instances in the dataset. We generate high-quality preference data DM0 ∪ RM0 for
+LLM fine-tuning through the temperature-based
+and reflection-based generation process.
+Temperature-based Generation.
+During
+temperature-based generation, we obtain DM0
+to enhance the diversity of responses. For a
+given problem x, the language model M0 is used
+
+Testing Pool
+
+The Testing Pool includes numerous test cases generated by the exploration agent, categorized into
+regular, boundary, and performance tests. Our goal
+is to create a robust pool to assess complex situations beyond simple cases. A higher pass rate
+indicates stronger code robustness, so we ensure
+test case diversity and accuracy. Several key operations contribute to achieving this. Abstract Syntax
+Tree (AST) (Backus et al., 1960) is applied to identify and remove duplicate test cases in the testing
+pool, eliminating unnecessary time costs associated
+with redundant tests. Additionally, after each itera4
+
+Model
+
+LLama2-7B-Chat
+
+CodeQwen1.5-7B-Chat
+
+Kimi
+
+GPT-4-Turbo
+
+GPT-4o
+
+n
+0
+1
+2
+5
+0
+1
+2
+5
+0
+1
+2
+5
+0
+1
+2
+5
+0
+1
+2
+5
+
+MBPP↑
+27.8
+35.3(27.0%)
+37.5(34.9%)
+38.1(37.1%)
+73.1
+80.2(9.7%)
+84.4(15.5%)
+86.0(17.6%)
+70.0
+77.2(10.3%)
+78.7(12.4%)
+79.5(13.6%)
+81.2
+89.5(5.1%)
+89.5(5.1%)
+89.5(5.1%)
+84.9
+88.5(4.2%)
+89.6(5.5%)
+90.0(6.0%)
+
+MBPP-ET↑
+22.9
+29.0(26.6%)
+29.5(28.8%)
+29.8(30.1%)
+67.8
+74.7(10.2%)
+75.0(10.6%)
+75.0(10.6%)
+67.4
+73.5(9.1%)
+74.5(10.5%)
+74.8(11.0%)
+74.4
+78.2(5.1%)
+79.9(7.4%)
+80.0(7.5%)
+78.2
+79.9(2.2%)
+79.2(1.3%)
+79.2(1.3%)
+
+HumanEval↑
+12.9
+15.9(23.3%)
+17.1(32.6%)
+21.3(65.1%)
+79.5
+90.9(14.3%)
+92.1(15.8%)
+93.3(17.4%)
+81.6
+87.2(6.9%)
+87.2(6.9%)
+86.6(6.1%)
+85.7
+90.2(5.3%)
+90.8(6.0%)
+91.5(6.8%)
+92.5
+96.3(4.1%)
+97.0(4.9%)
+97.0(4.9%)
+
+HumanEval-ET↑
+11.2
+11.6(3.6%)
+12.2(8.9%)
+12.9(15.2%)
+71.0
+80.5(13.4%)
+80.5(13.4%)
+80.5(13.4%)
+73.4
+79.9(8.9%)
+79.3(8.4%)
+79.3(8.4%)
+81.0
+84.8(4.7%)
+84.8(4.7%)
+84.8(4.7%)
+85.8
+87.8(2.3%)
+89.0(3.7%)
+89.6(4.4%)
+
+Avg↑
+18.7
+23.0(23.0%)
+24.1(28.9%)
+25.5(35.4%)
+72.9
+81.6(11.9%)
+83.0(13.9%)
+83.7(14.8%)
+73.1
+79.5(8.8%)
+79.9(9.3%)
+80.1(9.6%)
+80.6
+85.7(6.3%)
+86.3(7.1%)
+86.5(7.3%)
+85.4
+88.1(3.2%)
+88.7(3.9%)
+89.0(4.2%)
+
+Table 1: ThinkCoder performance of various LLMs. n = 0 indicates results without the framework. n > 0 indicates
+results after n iterations of ThinkCoder, with each exploration generating k = 5 solutions for optimal refinement at
+temperature t = 0.5. Percentages in parentheses show improvement over the base LLMs.
+
+to explore k times, generating {y j }kj=1 , where
+y j ∼ M0 (y|x). During exploration, a relatively large temperature value t is set for M0 .
+The generated outputs are then evaluated using
+the CodeVerifier, which computes E(x, y j ) =
+(pass_rate, feedback). For any sample where
+pass_rate == 1, the corresponding instance (x, y j )
+is added to the training dataset DM0 .
+Reflection-based Generation. The primary purpose of generating RM0 is to enhance the ability
+of error correction. For a given sample x and the
+feedback E(x, y j ) = (pass_rate, feedback) from
+the CodeVerifier, for samples with pass_rate = 0,
+we add the feedback to x and use the language
+model M0 to perform temperature-based exploration on the input x′ = (x, feedback) and get
+the output y ′j . Then we also use the CodeVerifier to obtain the right correction answer with
+E(x′ , y ′j ) = (pass_rate′ , feedback′ ). Finally, we
+add the instance (x′ , y ′j ) with the pass_rate′ == 1
+to the reflection-based trajectories RM0 .
+4.2
+
+sue effectively by collecting offline data aligned
+with human preferences for online training (Gulcehre et al., 2023). We train the base model M
+with the success trajectory dataset DM0 ∪ RM0 :
+LM LE (θM ) = −E(x,y)∼DM0 ∪RM0 log pθM (y | x)
+In inference, we compare the performance with
+baselines at two configurations. The first uses a
+fine-tuned base model, feeding input x directly to
+generate text at temperature t = 0. This setup
+tests if ThinkCoder data improves output quality.
+The second configuration uses the fine-tuned base
+model as the exploration agent in ThinkCoder. It
+generates and refines solutions with k explorations
+and n refinements, using different temperature settings t. This aims to assess the framework’s ability
+to improve solutions through successful trajectories
+and the ThinkCoder framework.
+
+5
+
+Experiments
+
+5.1
+
+Dataset
+
+We utilized the MBPP (Austin et al., 2021) and
+HumanEval (Chen et al., 2021) datasets to evaluate
+the effectiveness of our approach. To ensure a comprehensive assessment, we tested their enhanced
+versions—MBPP-ET and HumanEval-ET (Dong
+et al., 2023)—which include 80 and 35 times more
+
+Model Training and Inference
+
+Generating high-probability text does not necessarily align well with human preferences, which may
+lead to biases in various tasks (Becker et al., 2024).
+Reinforced Self-Training(ReST) mitigates this is5
+
+Model
+
+MBPP↑
+
+MBPP-ET↑
+
+HumanEval↑
+
+HumanEval-ET↑
+
+Avg↑
+
+GPT-3.5-Turbo
+
+MapCoder
+AgentCoder
+ThinkCoder(Ours)
+
+78.3
+89.9
+90.9
+
+54.4
+89.1
+78.8
+
+80.5
+79.9
+89.0
+
+70.1
+77.4
+81.0
+
+70.8
+84.1
+84.9
+
+GPT-4-Turbo
+
+MapCoder
+AgentCoder
+ThinkCoder(Ours)
+
+83.1
+91.4
+90.5
+
+57.7
+91.4
+80.5
+
+93.9
+89.6
+93.9
+
+82.9
+76.2
+86.0
+
+79.4
+87.2
+87.7
+
+Table 2: Pass@1 for MapCoder, AgentCoder, and ThinkCoder on MBPP, MBPP-ET, HumanEval, and HumanEvalET benchmarks with GPT-3.5-Turbo and GPT-4-Turbo as the backbone.
+
+GPT-4o
+
+Model
+
+MBPP↑
+
+MBPP-ET↑
+
+HumanEval↑
+
+HumanEval-ET↑
+
+CodeContests↑
+
+Avg↑
+
+LDB
+LPW
+ThinkCoder(Ours)
+
+82.4
+84.8
+90.0
+
+65.4
+65.8
+79.2
+
+98.2
+98.2
+97.0
+
+81.7
+84.8
+89.6
+
+29.3
+34.7
+40.1
+
+71.4
+73.7
+79.2
+
+Table 3: Pass@1 for LDB, LPW, and ThinkCoder on MBPP, MBPP-ET, HumanEval, HumanEval-ET, and CodeContests benchmarks with GPT-4o as the backbone.
+
+test cases than the original datasets, respectively.
+Regarding the test data, the original problem set
+sizes for MBPP and HumanEval are 257 and 164,
+while their extended versions contain 378 and 164
+problems, respectively. For training, we started
+with 374 MBPP training examples and 90 validation examples, combining them as the initial
+dataset. Using temperature-based and reflectionbased generation methods, we expanded this set to
+over 2,000 examples for ReST training. We also
+evaluate our framework on two major benchmarks
+designed for harder problems: LiveCodeBench and
+CodeContests. LiveCodeBench consists of the 167
+most recent samples collected between October
+2024 and January 2025, while CodeContests includes 165 problems.
+5.2
+
+the ThinkCoder framework. For the composite
+model, we compared it with the current SOTA
+models, MapCoder (Islam et al., 2024), AgentCoder (Huang et al., 2023b), LDB (Zhong et al.,
+2024), and LPW (Lei et al., 2024).
+Model
+
+GPT-4-Turbo
+
+GPT-4o
+
+LiveCodeBench↑
+33.4
+43.7(30.8%)
+46.1(38.0%)
+44.9(34.4%)
+22.5
+35.3(56.9%)
+38.3(70.2%)
+41.3(83.6%)
+
+CodeContests↑
+16.1
+26.1(62.1%)
+27.3(69.6%)
+28.5(77.0%)
+21.0
+34.1(62.4%)
+38.9(85.2%)
+40.1(91.0%)
+
+Table 4: ThinkCoder performance on LiveCodeBench
+and CodeContests. n represents the self-refinement
+budget, with the self-exploration budget fixed at k = 5.
+
+Baselines
+
+In terms of LLM base model selection for the
+application of ThinkCoder, we considered a
+range of advanced instruction-tuned models, including the general-purpose models LLama2-7BChat, Kimi2 , GPT-4-Turbo(gpt-4-1106-preview)
+and GPT-4o(gpt-4o-2024-05-13), as well as
+the code-specific model CodeQwen1.5-7B-Chat.
+We conducted a comprehensive evaluation of
+ThinkCoder’s Pass@1 performance on MBPP and
+HumanEval across LLMs of different parameter
+sizes. For the test-time optimization process, we
+used the base model LLama2-7B to evaluate performance changes on the MBPP dataset. We compared results obtained before and after fine-tuning,
+using either the original training data or the success trajectories and incorporating or excluding
+2
+
+n
+0
+1
+2
+5
+0
+1
+2
+5
+
+5.3
+
+Implementation details
+
+We set different parameter combinations for different experimental settings. To validate the improvement of the base LLMs, we set the exploration
+budget k = 5, the temperature received by the exploration agent t = 0.5, the number of optimal refinements n = 5, and the budget control threshold
+θ = 0.8. The exploration agent generates m = 3
+test cases per code. To compare ThinkCoder with
+SOTA results, we set the hyperparameters k, t, n,
+θ, and m to 20, 1.0, 2, 1.0, and 3, respectively.
+In the data collection phase, the exploration agent
+M0 is specified as CodeQwen1.5-7B-Chat because
+it is free and performs well. During ReST training, we set the learning rate to 2 × 10−5 and train
+for 2 epochs. We employ Low-Rank Adaptation
+
+https://platform.moonshot.cn
+
+6
+
+Figure 3: (a) The Pass@1 metric of the baseline models under different temperature t. (b) The Pass@k metric of
+the baseline models, where k represents the exploration budget. (c) The variation of the Pass@1 metric for each
+baseline model under the ThinkCoder framework as the optimal refinement budget n increases.
+0.70
+
+(LoRA) (Hu et al., 2021) to train LLMs.
+
+Trendline (Generated Code)
+Trendline (Generated Tests)
+Generated Tests on Groundtruth Code
+Generated Code on Groundtruth Tests0.62
+
+0.65
+
+Evaluation
+
+Table 1 illustrates the performance changes of various base LLMs on the MBPP and HumanEval
+datasets as the Optimal Refinement iteration n increases. Table 2 and Table 3 compare the performance of ThinkCoder and SOTA models, using
+GPT-4-Turbo and GPT-4o as the base LLMs. Table 4 shows great potential on harder benchmarks.
+Table 5 compares ThinkCoder’s computation load
+with MapCoder at similar settings. Table 6 presents
+the performance changes of LLama2-7B before and
+after fine-tuning with trajectory data collected by
+ThinkCoder. Table 7 illustrates the ablation study
+of self-exploration and self-refinement. Figure 3
+shows the impact of changes in the hyperparameter temperature t, exploration budget k, and refinement iterations n on the Pass@1 and Pass@k
+metric. Figure 4 depicts the trends in the accuracy
+of generated test cases and codes as the optimal
+refinement iterations in the ThinkCoder increase.
+6.1
+
+0.60
+
+0.60
+
+Pass@1
+
+6
+
+0.64
+
+0.60
+
+0.58
+
+0.55
+0.50
+
+0.66
+0.64
+0.62
+
+0.54
+
+0.53
+0.50
+
+0.50
+
+0.51
+
+0.54
+
+0.54
+
+0.54
+
+0.51
+
+0.48
+
+0.45
+0.40
+
+Optimal Refinement Iterations
+2
+
+4
+
+6
+
+8
+
+Figure 4: The variation in Pass@1 performance of the
+exploration code and test cases on the MBPP dataset
+under ThinkCoder, as evaluated by CodeQwen1.5-7BChat as the base LLM.
+
+6.2
+
+Ablation Study of Self-exploration and
+Self-refinement
+
+Figures 3(b) and 3(c) highlight the performance gains from both self-exploration and selfrefinement.
+The gain from self-exploration
+is greater than that from self-refinement. As
+illustrated in Table 7, self-refinement significantly enhances efficiency when paired with selfexploration. However, increasing the exploration
+budget excessively (e.g., k = 20) leads to inefficiency. A moderate increase in the exploration
+budget accelerates the optimization of the selfrefinement process.
+
+Performance on Code Generation
+
+Table 1 shows that ThinkCoder achieves significant
+improvements in scenarios with fewer standard test
+cases, with performance on MBPP and HumanEval
+improving by 4%-70% after 5 iterations of refinement. In contrast, gains in more extensive scenarios, like MBPP-ET and HumanEval-ET, are more
+modest, ranging from 1%-35%. ThinkCoder’s generated test cases effectively verify code, reducing
+the need for manual tests, but its performance saturates in complex scenarios, making it better suited
+for simpler tasks. Table 2 further demonstrates the
+potential of ThinkCoder. When the number of exploration iterations k is extended to 20, ThinkCoder
+surpasses AgentCoder’s performance, which needs
+5 refinement rounds, in just 2 iterations.
+
+6.3
+
+Performance with ReST Training
+
+From the results presented in Table 6, it is clear
+that ReST fine-tuning on LLama2-7B using successful trajectories collected by ThinkCoder significantly enhances the model’s core capabilities.
+Firstly, LLama2-7B(ReST) demonstrates superior
+performance compared to both LLama2-7B(SFT)
+and LLama2-7B at iteration 0, highlighting that
+ReST training improves the exploration agent’s
+7
+
+HumanEval
+
+Mbpp
+
+CodeContest
+
+Models
+
+n
+
+k
+
+Pass@1↑
+
+Tokens (k)↓
+
+n
+
+k
+
+Pass@1↑
+
+Tokens (k)↓
+
+n
+
+k
+
+Pass@1↑
+
+Tokens (k)↓
+
+MapCoder
+
+5
+
+5
+
+93.9
+
+21.3
+
+3
+
+3
+
+83.1
+
+5.58
+
+3
+
+3
+
+28.5
+
+18.3
+
+ThinkCoder(Ours)
+
+20
+
+1
+
+93.9
+
+0.26
+
+5
+
+1
+
+89.5
+
+0.24
+
+5
+
+5
+
+28.5
+
+2.94
+
+Table 5: The token usage for agent responses and the required refinement iterations in ThinkCoder for HumanEval
+and MBPP, compared to MapCoder (as ThinkCoder and MapCoder share similar configurations), with GPT-4-Turbo
+as the base LLM. The tiktoken package is used to calculate the response token usage.
+
+Models
+LLama2-7B
+LLama2-7B(SFT)
+LLama2-7B(ReST)
+
+Optimal Refinement Iterations
+0
+1
+2
+3
+4
+5
+14.7 22.7 24.9 27.7 32.7 36.9
+27.8 35.3 37.5 37.6 38.0 38.1
+32.3 46.2 44.8 46.1 45.7 46.1
+
+6.5
+
+We conducted hyperparameter selection experiments on the MBPP dataset. As shown in Figure 3(a), models exhibit optimal performance
+at different temperature settings. LLama2-7BChat, CodeQwen1.5-7B-Chat, and Kimi improve
+in Pass@1 as temperature increases, while GPT4-Turbo and GPT-4o perform better at lower temperatures. Figure 3(b) indicates that Pass@k performance of base LLMs improves with increasing
+exploration budget k but eventually stabilizes. Figure 3(c) shows that Pass@1 performance improves
+with more refinement iterations n, but exploration
+gains are more significant. For details on hyperparameters θ and m, see Appendix A.2 and A.3.
+
+Table 6: Performance comparison of the LLama2-7B
+model under different settings: baseline without finetuning, supervised fine-tuning (SFT) with original train
+dataset, and Reinforced Self-Training (ReST) with success trajectories from ThinkCoder on the MBPP dataset.
+
+ability to identify better solutions. Secondly, with
+a temperature setting of 0.5, the model achieves
+optimal performance with only a single round of
+refinement, underscoring the efficiency of ReST
+fine-tuning in reducing computational overhead.
+
+6.6
+Self-exploration
+Budget k
+1
+2
+5
+10
+20
+
+1
+91.7
+93.3
+93.3
+96.7
+96.7
+
+Self-refinement Budget n
+2
+3
+5
+10
+90.0 91.7 93.3 93.3
+95.0 95.0 96.7 96.7
+93.3 95.0 95.0 96.7
+96.7 96.7 96.7 96.7
+96.7 96.7 96.7 96.7
+
+Cost Analysis
+
+In Table 5, we compare the computational overhead
+between MapCoder and ThinkCoder. Compablue
+to MapCoder, which uses four LLM-based agents
+executed serially, ThinkCoder employs only one
+LLM-based agent and one non-LLM-based CodeVerifier, resulting in lower time overhead. Therefore, we use token overload as a measure of cost
+consumption. It reveals that ThinkCoder demonstrates more efficient resource utilization compared
+to MapCoder with a similar pass@1.
+
+20
+95.0
+96.7
+96.7
+96.7
+96.7
+
+Table 7: The performance trends on the randomly 60
+Mbpp samples on GPT-4 with varying compositions of
+self-exploration and self-refinement budgets.
+
+7
+6.4
+
+Hyperparameters Study
+
+Conclusion
+
+In this paper, we introduce ThinkCoder, a framework designed to improve the code generation efficiency of LLMs. The proposed approach incorporates LLM’s exploration with a non-LLM-based
+CodeVerifier that greatly reduces the token usage. To further minimize computational costs during exploration, we capture successful trajectories
+through ThinkeCoder to fine-tune the LLM. This
+process enhances code generation performance
+while reducing refinement iterations for optimal solutions. We evaluate our framework across LLMs
+of varying sizes and demonstrate its superior performance over current composite models.
+
+Evolution of Generated Code and Tests
+
+After each round of optimal refinement, we evaluated the generated solutions and testing pools. Using the ground truth test set, we analyzed the performance changes of the solutions in each round.
+Meanwhile, the ground truth code was used to assess the changes in the testing pools. As shown in
+Figure 4, the accuracy of both the solutions and testing pools improved simultaneously. This demonstrates that ThinkCoder is capable of generating
+continuously optimized test cases while also refining the quality of the solutions.
+8
+
+Acknowledgments
+
+Angelica Chen, Jérémy Scheurer, Tomasz Korbak,
+Jon Ander Campos, Jun Shern Chan, Samuel R Bowman, Kyunghyun Cho, and Ethan Perez. 2023. Improving code generation by training with natural language feedback. arXiv preprint arXiv:2303.16749.
+
+This work is also supported by the Public Computing Cloud, Renmin University of China and by fund
+for building worldclass universities (disciplines) of
+Renmin University of China.
+
+Mark Chen, Jerry Tworek, Heewoo Jun, Qiming
+Yuan, Henrique Ponde De Oliveira Pinto, Jared Kaplan, Harri Edwards, Yuri Burda, Nicholas Joseph,
+Greg Brockman, et al. 2021. Evaluating large
+language models trained on code. arXiv preprint
+arXiv:2107.03374.
+
+Limitations
+In our current approach to managing the testing
+pool, we primarily focus on selective expansion but
+lack effective strategies for cleaning noise from the
+test set. Moreover, test set diversity relies heavily
+on LLMs’ generation capabilities. Our work highlights the importance of tests and the gap between
+generated and annotated cases. We plan to enhance
+the testing pool in future work. Furthermore, while
+ReST training has demonstrated excellent results in
+enhancing the code generation capabilities of foundational LLMs, validation in ThinkCoder reveals
+rapid convergence. This indicates that fine-tuning
+teaches the LLM to find good answers, but the improvement in exploring the overall solution space
+remains limited. To address this, we look forward
+to introducing on-policy training methods in future
+work, combining data collection with fine-tuning
+to continuously evolve the model during training.
+This will generate more diverse answers and enhance the LLM’s online exploration capabilities.
+
+Yihong Dong, Jiazheng Ding, Xue Jiang, Ge Li, Zhuo
+Li, and Zhi Jin. 2023. Codescore: Evaluating
+code generation by learning code execution. arXiv
+preprint arXiv:2301.09043.
+Yihong Dong, Xue Jiang, Zhi Jin, and Ge Li. 2024.
+Self-collaboration code generation via chatgpt. ACM
+Transactions on Software Engineering and Methodology, 33(7):1–38.
+Caglar Gulcehre, Tom Le Paine, Srivatsan Srinivasan, Ksenia Konyushkova, Lotte Weerts, Abhishek
+Sharma, Aditya Siddhant, Alex Ahern, Miaosen
+Wang, Chenjie Gu, et al. 2023. Reinforced selftraining (rest) for language modeling. arXiv preprint
+arXiv:2308.08998.
+Qi Guo, Junming Cao, Xiaofei Xie, Shangqing Liu,
+Xiaohong Li, Bihuan Chen, and Xin Peng. 2024. Exploring the potential of chatgpt in automated code refinement: An empirical study. In Proceedings of the
+46th IEEE/ACM International Conference on Software Engineering, pages 1–13.
+
+References
+Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan
+Allen-Zhu, Yuanzhi Li, Shean Wang, Lu Wang,
+and Weizhu Chen. 2021. Lora: Low-rank adaptation of large language models. arXiv preprint
+arXiv:2106.09685.
+
+Jacob Austin, Augustus Odena, Maxwell Nye, Maarten
+Bosma, Henryk Michalewski, David Dohan, Ellen
+Jiang, Carrie Cai, Michael Terry, Quoc Le, et al. 2021.
+Program synthesis with large language models. arXiv
+preprint arXiv:2108.07732.
+
+Dong Huang, Qingwen Bu, and Heming Cui. 2023a.
+Codecot and beyond: Learning to program and test
+like a developer. arXiv preprint arXiv:2308.08784.
+
+John W Backus, Friedrich L Bauer, Julien Green,
+Charles Katz, John McCarthy, Alan J Perlis, Heinz
+Rutishauser, Klaus Samelson, Bernard Vauquois,
+Joseph Henry Wegstein, et al. 1960. Report on the
+algorithmic language algol 60. Communications of
+the ACM, 3(5):299–311.
+
+Dong Huang, Qingwen Bu, Jie M Zhang, Michael Luck,
+and Heming Cui. 2023b. Agentcoder: Multi-agentbased code generation with iterative testing and optimisation. arXiv preprint arXiv:2312.13010.
+
+Jinze Bai, Shuai Bai, Yunfei Chu, Zeyu Cui, Kai Dang,
+Xiaodong Deng, Yang Fan, Wenbin Ge, Yu Han, Fei
+Huang, et al. 2023. Qwen technical report. arXiv
+preprint arXiv:2309.16609.
+
+Md Ashraful Islam, Mohammed Eunus Ali, and
+Md Rizwan Parvez. 2024. Mapcoder: Multi-agent
+code generation for competitive problem solving.
+arXiv preprint arXiv:2405.11403.
+
+Jonas Becker, Jan Philip Wahle, Bela Gipp, and Terry
+Ruas. 2024. Text generation: A systematic literature
+review of tasks, evaluation, and challenges. arXiv
+preprint arXiv:2405.15604.
+
+Sajed Jalil, Suzzana Rafi, Thomas D LaToza, Kevin
+Moran, and Wing Lam. 2023. Chatgpt and software
+testing education: Promises & perils. In 2023 IEEE
+international conference on software testing, verification and validation workshops (ICSTW), pages
+4130–4137. IEEE.
+
+Sahil Chaudhary. 2023. Code alpaca: An instructionfollowing llama model for code generation. GitHub
+repository.
+
+9
+
+Xue Jiang, Yihong Dong, Lecheng Wang, Zheng Fang,
+Qiwei Shang, Ge Li, Zhi Jin, and Wenpin Jiao. 2024.
+Self-planning code generation with large language
+models. ACM Transactions on Software Engineering
+and Methodology, 33(7):1–30.
+
+Tal Ridnik, Dedy Kredo, and Itamar Friedman. 2024.
+Code generation with alphacodium: From prompt
+engineering to flow engineering. arXiv preprint
+arXiv:2401.08500.
+Baptiste Roziere, Jonas Gehring, Fabian Gloeckle, Sten
+Sootla, Itai Gat, Xiaoqing Ellen Tan, Yossi Adi,
+Jingyu Liu, Romain Sauvestre, Tal Remez, et al. 2023.
+Code llama: Open foundation models for code. arXiv
+preprint arXiv:2308.12950.
+
+Bryan F Jones, HH Sthamer X Yang, and DE Eyres.
+2024. The automatic generation of software test data
+sets using adaptive search techniques. WIT Transactions on Information and Communication Technologies, 14.
+
+Charlie Snell, Jaehoon Lee, Kelvin Xu, and Aviral Kumar. 2024. Scaling llm test-time compute optimally
+can be more effective than scaling model parameters.
+arXiv preprint arXiv:2408.03314.
+
+Chao Lei, Yanchuan Chang, Nir Lipovetzky, and
+Krista A Ehinger. 2024. Planning-driven programming: A large language model programming workflow. arXiv preprint arXiv:2411.14503.
+
+Junjie Wang, Yuchao Huang, Chunyang Chen, Zhe Liu,
+Song Wang, and Qing Wang. 2024. Software testing
+with large language models: Survey, landscape, and
+vision. IEEE Transactions on Software Engineering.
+
+Jia Li, Ge Li, Yongmin Li, and Zhi Jin. 2024a. Structured chain-of-thought prompting for code generation. ACM Transactions on Software Engineering
+and Methodology.
+
+Huan Zhang, Wei Cheng, Yuhan Wu, and Wei Hu. 2024.
+A pair programming framework for code generation
+via multi-plan exploration and feedback-driven refinement. In Proceedings of the 39th IEEE/ACM
+International Conference on Automated Software Engineering, pages 1319–1331.
+
+Qingyao Li, Wei Xia, Kounianhua Du, Xinyi Dai, Ruiming Tang, Yasheng Wang, Yong Yu, and Weinan
+Zhang. 2024b. Rethinkmcts: Refining erroneous
+thoughts in monte carlo tree search for code generation. arXiv preprint arXiv:2409.09584.
+
+Juntian Zhang, Yuhan Liu, Wei Liu, Jian Luan, Rui Yan,
+et al. 2025. Weaving context across images: Improving vision-language models through focus-centric
+visual chains. arXiv preprint arXiv:2504.20199.
+
+Tsz-On Li, Wenxi Zong, Yibo Wang, Haoye Tian,
+Ying Wang, Shing-Chi Cheung, and Jeff Kramer.
+2023. Finding failure-inducing test cases with chatgpt. arXiv preprint arXiv:2304.11686.
+
+Tianyu Zheng, Ge Zhang, Tianhao Shen, Xueling Liu,
+Bill Yuchen Lin, Jie Fu, Wenhu Chen, and Xiang
+Yue. 2024. Opencodeinterpreter: Integrating code
+generation with execution and refinement. arXiv
+preprint arXiv:2402.14658.
+
+Yue Liu, Thanh Le-Cong, Ratnadira Widyasari,
+Chakkrit Tantithamthavorn, Li Li, Xuan-Bach D Le,
+and David Lo. 2024a. Refining chatgpt-generated
+code: Characterizing and mitigating code quality issues. ACM Transactions on Software Engineering
+and Methodology, 33(5):1–26.
+
+Zibin Zheng, Kaiwen Ning, Yanlin Wang, Jingwen
+Zhang, Dewu Zheng, Mingxi Ye, and Jiachi Chen.
+2023. A survey of large language models for code:
+Evolution, benchmarking, and future trends. arXiv
+preprint arXiv:2311.10372.
+
+Yuhan Liu, Xiuying Chen, Xiaoqing Zhang, Xing Gao,
+Ji Zhang, and Rui Yan. 2024b. From skepticism to
+acceptance: simulating the attitude dynamics toward
+fake news. In Proceedings of the Thirty-Third International Joint Conference on Artificial Intelligence,
+pages 7886–7894.
+
+Li Zhong, Zilong Wang, and Jingbo Shang. 2024.
+Ldb: A large language model debugger via verifying runtime execution step-by-step. arXiv preprint
+arXiv:2402.16906.
+
+Yuhan Liu, Zirui Song, Xiaoqing Zhang, Xiuying Chen,
+and Rui Yan. 2024c. From a tiny slip to a giant leap:
+An llm-based simulation for fake news evolution.
+arXiv preprint arXiv:2410.19064.
+Niklas Muennighoff, Qian Liu, Armel Zebaze, Qinkai
+Zheng, Binyuan Hui, Terry Yue Zhuo, Swayam
+Singh, Xiangru Tang, Leandro Von Werra, and
+Shayne Longpre. 2023. Octopack: Instruction tuning code large language models. arXiv preprint
+arXiv:2308.07124.
+Yujia Qin, Shihao Liang, Yining Ye, Kunlun Zhu, Lan
+Yan, Yaxi Lu, Yankai Lin, Xin Cong, Xiangru Tang,
+Bill Qian, et al. 2023. Toolllm: Facilitating large
+language models to master 16000+ real-world apis.
+arXiv preprint arXiv:2307.16789.
+
+10
+
+A
+
+Appendix
+
+A.1
+
+Algorithm of ThinkCoder
+
+Algorithm 1 ThinkCoder
+
+Algorithm 1 shows the pseudo-code of ThinkCoder.
+A.2
+
+Exploration Budget Control
+
+0.75
+
+0.6
+0.5
+
+0.70
+
+Pass@1
+
+Exploration Budget
+
+0.7
+
+=0.7
+=0.8
+=0.9
+
+0.4
+0.65
+
+0.3
+
+=0.7
+=0.8
+=0.9
+
+0.60
+0.55
+1
+
+2
+
+3
+
+0.2
+0.1
+4
+
+5
+
+6
+
+7
+
+8
+
+9
+
+Optimal Refinement Iteration
+
+0.0
+
+Figure 5: The relationship between the computational
+cost and performance of ThinkCoder at different budget
+control thresholds, where ‘Pass@1’ indicates the performance on the MBPP dataset, and ‘θ’ refers to the budget
+control threshold that allows the task to execute the next
+exploration process. ‘Exploration Budget’ represents
+the ratio of total requests during each iteration.
+
+Figure 5 outlines the number of tasks for the exploration agent per iteration and the overall Pass@1
+metric under different budget control thresholds.
+By increasing the exploration budget control threshold θ, the number of tasks requiring correction in
+each iteration is significantly reduced, leading to a
+notable decrease in ThinkCoder’s runtime. However, this approach risks leaving some incorrectly
+validated tasks uncorrected, which could negatively
+impact performance. In our experiments, we set
+θ = 0.8, as this value not only progressively improves Pass@1 but also reduces the number of tasks
+per iteration by nearly half.
+A.3
+
+We randomly selected 60 tasks from the MBPP
+test data to observe the performance improvement
+and code execution overhead as the number of test
+cases m increases during each exploration. Table
+8 illustrates this trend. The base model we used is
+Kimi. We observed that increasing m leads to improved Pass@1 performance and results in longer
+execution times due to the additional effort required
+for self-verification. We set m for all experiments
+to balance time efficiency and performance.
+A.4
+
+Tests m/Exploration
+1
+
+3
+
+5
+
+10
+
+Pass@1
+
+80.0
+
+81.7
+
+81.7
+
+86.7
+
+Overload(s)
+
+28.7
+
+86.0
+
+112.3
+
+364.5
+
+Prompts for Exploration Agent
+
+Figure 6 illustrates the input received by the exploration agent, including the problem, the best
+solution, the test cases from the ground truth, the
+generated test cases from testing pooling, and feedback on test failures.
+
+Exploration for Tests
+
+Metrics
+
+1: Initialize the testing pool TP=[], set the globally max pass
+rate gp = 0 and best solution gs = None
+2: Set the hyperparameters t = 0.5, k = 5, n = 5, m =
+3, θ = 0.8
+3: Set the instruction prompt for code generation task and
+instruction for task p as I = [p, prompt]
+4: for each iter ∈ n do
+5:
+Initialize the locally max pass rate lp = 0 and best
+solution ls = None for iteration iter
+Randomly select m successful test cases from TP as
+6:
+tests
+7:
+Select a new type of error feedback for test ft from
+TP as f
+8:
+if ft and f is not None then
+Update
+the
+instruction
+I
+=
+9:
+[p, gs , ft , f, tests, prompt]
+10:
+end if
+11:
+Get code solutions G′ and test cases TP′ from exploration agent for the instruction I within k iterations
+12:
+Deduplicate testing pool TP’ by AST
+13:
+for each i ∈ |G′ | do
+14:
+Get the pass rate rgi for solution gi from CodeVerifier with the input TP′
+15:
+if rgi > lp then
+16:
+Set lp = rgi , ls = gi
+17:
+end if
+18:
+end for
+19:
+if lp > gp then
+20:
+Set gp = lp , gs = ls
+21:
+Add TP’ to TP
+22:
+end if
+23:
+if gp > θ then
+24:
+return gs as the best solution
+25:
+Terminate optimal refinement iteration
+26:
+end if
+27: end for
+
+A.5
+
+Inputs for CodeVerifier
+
+Figure 7 shows the input of the executable Python
+environment, including the code and all test cases
+from the testing pool.
+
+Table 8: The variation in the Pass@1 metric and the
+CodeVerifier’s overload is influenced by changes in the
+number of test cases m during each exploration.
+
+11
+
+Figure 6: ThinkCoder exploration agent prompt example.
+
+A.6
+
+Example of Thorough Exploration
+
+Figure 8 illustrates multiple solutions explored by
+the exploration agent.
+A.7
+
+Example of Optimal Refinement
+
+To better understand the process of optimal refinement, Figure 9 illustrates a single refinement iteration. Before refinement, we leveraged the best
+solution output from the previous iteration, along
+with failed tests and unmet feedback sampled from
+the testing pool. Using this reflection information,
+the solution was updated and revalidated on the test
+cases in the testing pool. The success rate improved
+from 0.217 to 0.356, leading us to select the current
+solution as the best solution.
+A.8
+
+Example of Testing Pool
+
+Figure 10 illustrates the test cases in the testing
+pool generated through multiple explorations by
+ThinkCoder.
+
+12
+
+Figure 7: ThinkCoder CodeVerifier input example.
+
+Figure 8: ThinkCoder exploration examples.
+
+13
+
+Figure 9: ThinkCoder refinement examples.
+
+Figure 10: ThinkCoder testing pool examples.
+
+14
+
+

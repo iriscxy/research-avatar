@@ -1,0 +1,3286 @@
+When Personalization Tricks Detectors:
+The Feature-Inversion Trap in Machine-Generated Text Detection
+Lang Gao1 , Xuhui Li1 , Chenxi Wang1 , Mingzhe Li2 , Wei Liu3 ,
+Zirui Song1 , Jinghui Zhang1 , Rui Yan4 , Preslav Nakov1 , Xiuying Chen1 *
+1
+
+MBZUAI 2 ByteDance
+National University of Singapore 4 Wuhan University
+{Lang.Gao, Preslav.Nakov, Xiuying.Chen}@mbzuai.ac.ae
+3
+
+Personalized
+
+Abstract
+
+arXiv:2510.12476v3 [cs.CL] 30 Apr 2026
+
+As large language models (LLMs) increasingly
+imitate personal writing styles, personalization has become a key challenge for machinegenerated text (MGT) detection. Yet personalized MGT detection remains largely underexplored. In this work, we introduce StyloBench,
+the first benchmark for evaluating detector robustness under personalization, built from literary and blog texts paired with their LLMgenerated imitations. Experiments across diverse detectors show pronounced performance
+instability under personalization, with frequent
+inversions relative to general-domain behavior.
+To better understand this limitation, we conduct
+an in-depth analysis and attribute it to a featureinversion trap, i.e., features that are effective
+for separating human-written text (HWT) from
+MGT in general flip their effect in personalized contexts, ultimately misleading detectors.
+Motivated by this, we propose StyloCheck, a
+diagnostic framework for predicting detector
+robustness under personalization. StyloCheck
+identifies the inverted features and quantifies
+detector dependence using perturbed texts pronounced in the features. In our experiments,
+StyloCheck predicts both the direction and
+magnitude of cross-domain performance shifts
+with an 85% correlation to actual outcomes.
+We hope this work will raise awareness of the
+structural risks introduced by personalization
+and motivate more robust approaches to personalized MGT detection.  Github.
+
+1
+
+MGT
+
+General
+
+HWT
+
+HWT
+
+MGT
+
+Feature Value
+Inverted
+Diffs
+
+Figure 1: Illustration of the feature-inversion trap. The
+feature values of HWT/MGT exhibit inverted differences across domains.
+
+However, these capabilities also raise security
+and ethical concerns, as LLMs may generate fake
+news and misinformation (Tian et al., 2025). Moreover, style imitation can be misused, for instance,
+by impersonating public figures or creating fake
+work (Herbold et al., 2024). These risks make
+machine-generated text (MGT) detection increasingly important and urgent in real-world deployment scenarios across platforms, media ecosystems,
+and high-stakes communication environments globally. Although existing studies have made progress
+in general-domain detection, it remains unclear
+how well they perform in personalized domains
+with diverse stylistic variations and user-specific
+nuances, preferences, and contextual dependencies. Hence, we introduce StyloBench, the first
+benchmark for MGT detection in personalized settings. StyloBench covers two sub-scenarios: Literary works and Blog posts, each paired with LLMgenerated imitations. Interestingly, experiments on
+StyloBench show that personalization can noticeably degrade detector performance. Moreover, on
+the Literary subset, many detectors exhibit prediction inversion, where predictions tend to shift opposite to the expected direction, suggesting weakened
+or even flipped discriminative cues under highly
+personalized text.
+
+Introduction
+
+Large Language Models (LLMs) have achieved
+strong text generation performance (Huang et al.,
+2025), with increasing capability of mimicking personalized language styles in tasks such as news
+writing, style imitation, and story generation (Tu
+et al., 2024; Wang et al., 2025), across diverse
+domains, settings, and increasingly complex realworld applications.
+* Corresponding author.
+
+1
+
+• We build StyloBench, the first benchmark
+for MGT detection in personalized scenarios,
+and uncover drastic performance declines and
+even reversals in existing detectors.
+
+In order to explore why detectors fluctuate under personalization, we train a domain classifier on
+human-written texts (HWT) from general and personalized domains, and test it on both HWT/MGT
+in the two domains to see, across domains, whether
+domain features fluctuate similarly and consistently
+across different evaluation settings. The classifier
+exhibits a clear inversion: In the general domain,
+MGT is predicted to be more general” than HWT;
+however, in the personalized domain, MGT is instead classified as more personalized” than HWT.
+This has given rise to our feature-inversion trap
+hypothesis, namely that features that are effective
+for separating HWT from MGT in general flip their
+effect in personalized contexts, ultimately misleading detectors. In order to identify where this inversion is most pronounced, we formalize the search
+for the strongest inversion as a Rayleigh quotient
+problem (Dong et al., 2024) and exploit its extremal
+property to obtain the inverted feature direction.
+Feature directions derived from different datasets
+exhibit high cosine similarity, closely aligned with
+domain classifier weights and far from those of
+HWT/MGT classifiers. Projecting samples onto
+these feature directions yields scalar feature values,
+as shown in Figure 1, which reveal a clear inversion effect: within each dataset, the HWT–MGT
+feature value difference is negatively correlated
+with detector performance. This suggests that the
+“feature-inversion trap” is a stable, cross-domain
+phenomenon akin to stylistic differences, and that
+detector failures are partly driven by reliance on
+these inverted features.
+Based on this finding, we propose StyloCheck,
+an effective approach to predict the detector’s
+performance changes in personalized scenarios.
+Given a detector, StyloCheck evaluates it on probe
+datasets constructed with token-level perturbations
+that remove semantics, style, and basic HWT/MGT
+features while preserving inverted-feature differences. The resulting performance reflects the detector’s reliance on inverted features: higher performance on probe datasets indicates stronger reliance on these features. We test seven detectors
+on 100 probe datasets and find that the Pearson
+correlation between StyloCheck’s outputs and the
+actual cross-domain performance gaps exceeds 0.7
+in 90% of the cases, and consistently stays above
+0.85. This shows that StyloCheck reliably predicts
+both the direction and the magnitude of transfer
+performance changes, with higher reliability as the
+number of probe datasets increases.
+
+• We identify the Feature-Inversion Trap, a systematic shift between general and stylized domains, and show that this phenomenon can
+fundamentally undermine detectors by inverting the features they rely on.
+• We propose StyloCheck, which estimates
+both the direction of change and the magnitude of performance variation of a detector
+under personalized scenarios. It serves as an
+early warning signal without requiring largescale testing. The estimation shows high reliability and strong consistency with actual performance, with Pearson correlation exceeding
+0.85.
+
+2
+
+Related Work
+
+2.1
+
+MGT Detection
+
+Several benchmarks have been developed for evaluating the performance of HWT vs. MGT detection across different domains, generators, and
+languages, e.g., MGTBench (He et al., 2024),
+M4 (Wang et al., 2024b), M4GT-Bench (Wang et al.,
+2024a) and RAID (Dugan et al., 2024). Moreover, several domain-specific benchmarks, including WetBench (Quaremba et al., 2025) and MultiSocial (Macko et al., 2025), have focused on specialized contexts such as Wikipedia and social media. However, none of them has looked into evaluating MGT detection in highly personalized or
+stylistically consistent text.
+MGT detection methods fall into two main categories: training-based and training-free (Xu et al.,
+2025a). Training-based methods treat detection
+as supervised classification, usually by fine-tuning
+pretrained encoders such as RoBERTa (Liu et al.,
+2019), or by using improved frameworks and architectures (Guo et al., 2024; Tian et al., 2024; Jiao
+et al., 2025). Training-free methods rely on explicit
+textual or probabilistic cues, including geometric
+and probabilistic signals (Bao et al., 2024; Xu et al.,
+2025a), token distributions (Su et al., 2023b), topological features (Tulchinskii et al., 2023; Wei et al.,
+2025), and human-assistive indicators (Gehrmann
+et al., 2019; Russell et al., 2025). However, existing
+studies have not addressed or evaluated personalized or highly stylistically adaptive scenarios.
+2
+
+Subset
+Domain
+Generator Size
+Method
+Generators
+Subdomains
+Examples
+Sample Length
+
+Stylo-Literary
+
+Stylo-Blog
+
+3.1
+
+Dataset Construction
+
+Article
+≤ 14B
+CPT
+3
+7
+21,000
+≤ 512 tokens
+
+Blog
+≥ 70B
+Prompting
+4
+1
+4,000
+≤ 512 tokens
+
+3.1.1
+
+Stylo-Literary
+
+In the article scenario, HWTs consist of excerpts
+from literary works, while MGTs are generated
+by LLMs trained to learn and imitate the authors’
+styles. Concretely, for HWT, we use data from the
+Gutenberg Book Corpus (Gerlach and Font-Clos,
+2020), an open-source collection of books grouped
+by authors. We selected seven authors: Jane Austen
+(J.A), Charles Dickens (C.D), Fyodor Dostoyevsky
+(F.D), Plato (P.L), Bernard Shaw (B.S), Jonathan
+Swift (J.S), and Mark Twain (M.T). These authors
+are well known for their distinctive styles and each
+has more than five long-form works. As some artifacts in the texts are not original content, but rather
+formatting or source information, we clean the texts
+to keep only the original content (see Appendix A.2
+for more detail). Then, we split each author’s texts
+into 512-token segments. For each author, we randomly select 1,000 segments as HWTs in the test
+set, and up to 3,000 additional segments as the
+training set. For MGT, we apply Continuous Pretraining (CPT, Shi et al., 2025) of LLMs on the
+training set to achieve deeper personalized imitation. We train three LLMs in their base versions:
+Qwen3-4B (Team, 2025), Llama-3.1-8B (Dubey
+et al., 2024), and Phi-4 (14B, Abdin et al., 2024).
+We update only one LoRA (Hu et al., 2022) layer
+to reduce the training cost and to speed up learning.
+After training, we take the first 30 tokens of each
+HWT test sample as the input and let the LLM continue the text. The selected hyperparameters and
+other generation details are in Appendix A.4.
+
+Table 1: Statistics about StyloBench. CPT: Continuous
+Pretraining.
+
+2.2
+
+Personalized LLM Generation
+
+Personalization of LLMs has recently become increasingly important (Zhang et al., 2025c). Personalization methods have developed into two
+main approaches: (i) Prompt-based personalization drives LLMs toward users’ traits via personalized prompts (Tseng et al., 2024). Some work
+designed retrieval (Mysore et al., 2024) and agent
+frameworks (Zhang et al., 2025b) to achieve deeper
+imitation and more context-aware, user-aligned
+generation behaviors. (ii) Training-based personalization adapts user traits via instruction tuning (Woźniak et al., 2024; Liu et al., 2025), or
+through self-supervised learning for dynamic adaptation (Mendoza et al., 2024). This often yields
+stronger and more persistent stylistic alignment
+across diverse tasks and long-form generation settings. However, such personalization ability of
+LLMs raises concerns, including the possibility
+for political impersonation (Herbold et al., 2024)
+and copyright infringement (Zhang et al., 2025a;
+Karamolegkou et al., 2023). This underscores the
+need for personalized MGT detection. However,
+to the best of our knowledge, no prior work has
+systematically studied the problem of personalized
+MGT in realistic, large-scale evaluation scenarios.
+
+3
+
+3.1.2
+
+Stylo-Blog
+
+In the blog scenario, the HWTs come from Blog1K 1 , a high-quality subset of the Blog Authorship
+Corpus (Schler et al., 2006). Blog-1K contains multiple posts grouped by 1,000 human authors. We
+further introduce the data source in Appendix A.3.
+We randomly select 1,000 posts, each truncated to
+a maximum length of 512 tokens, as HWT examples in the test set, and the corresponding MGTs
+are generated by LLMs. For each blog post, we apply a few-shot prompting template using 1–3 other
+posts by the same author as examples to guide the
+model in imitating the author’s style. The generator
+continues from the first 30 tokens of the given post,
+producing text with approximately the same length
+as the original.
+
+StyloBench
+
+To investigate the performance of existing MGT
+detection methods in personalized scenarios, we
+create StyloBench, the first benchmark for MGT
+detection under personalized conditions. This
+dataset has two subsets representing two scenarios:
+(i) Stylo-Literary, simulating personalization in
+literary works, and (ii) Stylo-Blog, simulating
+personalization in blogs. Table 1 gives some statistics about these datasets. We provide a detailed
+discussion about motivation for dataset scenario
+selection, model selection, and dataset scale and
+diversity in Appendix A.1.
+
+1
+
+3
+
+https://zenodo.org/records/7455623
+
+We use the following four popular large-scale
+LLMs as generators: GPT-4o, Claude-4-Sonnet
+(Claude-4), Claude-3.7-Sonnet-Latest (Claude3.7), and Qwen2.5-72B, covering diverse architectures. The full generation details are in Appendix A.3 and A.4.
+3.2
+
+(1) Significant performance degradation occurs in personalized settings. Average AUROC on M4 (above 85%) falls sharply on stylized datasets, dropping to as low as 32.33% on
+Stylo-Literary—worse than random guessing.
+(2) High variance under domain shift: Detectors exhibit divergent trends; for instance, while
+Entropy improves from 31.83% in M4 to 76.18%
+in Stylo-Literary, Lastde drops from 97.69% to
+62.57%.
+(3) Systematic and abnormal inversions: Many
+detectors experience dramatic flips, with AUROC
+for methods like Fast-DetectGPT falling as low
+as 8.71%, indicating a near-complete reversal of
+discriminative capability.
+(4) Increased instability in complex styles: Fluctuations are more pronounced on Stylo-Literary
+than on Stylo-Blog, with abnormal reversals occurring more frequently.
+These observations suggest that existing MGT
+detectors may be highly unstable in personalized
+scenarios. When generators effectively imitate specific styles, detector performance tends to shift
+unpredictably or even reverse entirely. Detailed
+per-domain performance analyses are provided in
+Appendix D.1.
+
+Evaluation Setup
+
+Evaluation Datasets Apart from StyloBench
+for personalized scenarios, we also evaluate on an
+English subset of M4 (Wang et al., 2024b), to show
+the MGT detectors’ performance in a general setup.
+The English subset of M4 spans diverse sources, and
+contains MGTs from four generators: ChatGPT,
+Cohere, text-davinci-003 (Davinci), and BLOOMz,
+with ∼3,000 MGTs per source–generator pair. We
+further explain the data source and give more statistics in Appendix A.5.
+Baselines & Evaluation We evaluate seven representative training-free detectors, which achieve
+strong MGT detection performances in general domain: Log-Likelihood (Solaiman et al., 2019), LogRank (Solaiman et al., 2019), DetectLRR (Su
+et al., 2023a), Entropy (Gehrmann et al., 2019;
+Ippolito et al., 2020), Fast-DetectGPT (Bao et al.,
+2024), Lastde and Lastde++ (Xu et al., 2025a).
+Details are provided in Appendix B.1. We use
+AUROC as the evaluation metric following prior
+work (Xu et al., 2025a; Bao et al., 2024).
+We mainly focus on training-free MGT detectors because they rely on a small set of explicit text
+features, making performance changes easier to interpret as feature shifts across domains and across
+different data distributions and evaluation conditions in practice. Training-based detectors learn
+more complex representations influenced by data
+and model factors, so their behavior is harder to attribute to specific textual properties. However, we
+also include experiments for training-based methods in Appendix B.3. We use AUROC to measure
+the overall performance of an MGT detector, as
+detailed in Appendix C.1.
+3.3
+
+4
+
+The Feature-Inversion Trap
+
+Building on the observed instability in personalized
+scenarios, we next analyze its mechanism. In §4.1,
+we introduce the feature-inversion trap hypothesis;
+in §4.2, we extract the most salient inverted feature
+vector to verify this hypothesis; and in §4.2.2, we
+demonstrate its generality across datasets.
+4.1
+
+Feature-Inversion Trap Hypothesis
+
+Probing Method To analyze the differences between HWT and MGT, we require a representation
+space that effectively captures semantic and stylistic features. Prior work has shown that the hidden
+space of pretrained language models often encodes
+diverse linguistic and stylistic properties along approximately linear directions (Mikolov et al., 2013).
+Based on this insight, we adopt GPT-2 (Brown
+et al., 2020) as a proxy model, using activations
+from its different modules as feature representations. However, it remains unclear which specific
+modules within such a model most prominently
+encode task-relevant features. We examine all modules of GPT-2, including attention layers, MLP
+layers, and residual streams.
+
+Main Results
+
+Table 2 presents the performance of various detectors across datasets. We report the average AUROC
+for each generator across all subdomains, with full
+experimental results detailed in Appendix F. The
+last row shows the average AUROC for each generator across all baselines. The results reveal four
+primary findings:
+4
+
+M4(General)
+Generator
+
+Stylo-Blog
+
+Stylo-Literary
+
+Cohere ChatGPT Davinci BLOOMZ Qwen2.5-72B Claude-4 Claude-3.7 GPT-4o Llama3.1-8B
+
+Phi-4
+
+Qwen3-4B
+
+Entropy
+Lastde
+Lastde++
+Log-Likelihood
+LogRank
+Detect-LRR
+Fast-DetectGPT
+
+31.83
+97.69
+98.22
+93.12
+94.21
+94.88
+98.78
+
+26.35
+97.48
+98.67
+93.76
+94.94
+96.13
+98.99
+
+40.10
+83.70
+84.41
+72.79
+73.18
+74.03
+85.28
+
+41.33
+88.03
+80.91
+59.75
+69.42
+84.34
+55.01
+
+13.02
+92.69
+99.07
+95.27
+95.61
+94.85
+99.47
+
+36.57
+68.58
+83.37
+72.30
+71.31
+67.16
+84.60
+
+34.08
+50.96
+88.27
+77.29
+75.37
+66.99
+89.43
+
+63.43
+6.67
+58.41
+41.65
+34.89
+20.26
+57.57
+
+55.23
+69.88
+60.38
+36.59
+38.53
+45.73
+33.22
+
+51.92
+65.67
+47.57
+30.94
+32.60
+40.62
+18.47
+
+76.18
+62.57
+39.78
+9.23
+10.44
+19.43
+8.71
+
+Avg.
+
+86.96
+
+86.62
+
+73.36
+
+68.40
+
+84.28
+
+69.13
+
+68.91
+
+40.41
+
+48.51
+
+41.11
+
+32.33
+
+Detector
+
+Table 2: Performance of MGT detectors, grouped by generator: shown is AUROC given one generator. Blue :
+higher AUROC; green : lower AUROC.
+1.0
+
+Following (Gao et al., 2025), we train a logistic
+regression-style domain classifier, whose weight
+direction serves as domain-related features, to distinguish general HWT from personalized HWT,
+and then evaluate it on HWT/MGT samples in both
+domains. Figure 3(a) shows a clear separation of
+the projection onto the weight direction (feature
+values) between the two domains, as expected. Notably, the feature value of MGT is lower than HWT
+in the general domain but higher in the personalized domain, revealing a consistent cross-domain
+reversal pattern in feature behavior. This leads to
+the feature-inversion trap hypothesis: distinguishable MGT features in general domain are inverted
+under personalization.
+
+AUROC
+
+0.9
+0.8
+0.7
+0.6
+
+Residual
+Personalized
+0
+
+2
+
+4
+
+Attention
+General
+6
+
+Layer
+
+MLP
+8
+
+10
+
+Figure 2: AUROC scores of MGT classifiers across
+modules in two domains. The colors denote modules, and the line styles denote domains. We can see
+that the deep residual layers are best at distinguishing
+HWT/MGT in both domains.
+
+For each module, we extract the activation of the
+last token as the text representation and train a logistic regression classifier to distinguish HWT from
+MGT in general and personalized domains. Figure 2 reports the AUROC for each module. Deep
+residual streams consistently achieve high AUROC
+across the two domains, indicating that they retain
+strong discriminative features. Therefore, we focus on the residual stream at a near-final layer, i.e.,
+layer 10, in the following analysis.
+
+4.2 Verification of the Feature-Inversion Trap
+In order to verify the existence of the featureinversion trap, we aim to identify the most representative inverted feature direction that consistently
+captures cross-domain discrepancies in feature behavior. If the projection of datasets in this direction
+is highly correlated with detector performance, it
+would suggest that detectors rely on it, thereby supporting our hypothesis.
+4.2.1
+
+Probe Datasets We construct two small probe
+datasets. Following (Xu et al., 2025a), we adapt
+Xsum (Narayan et al., 2018) and their LLMgenerated continuations as the general-domain data.
+We randomly sample 150 texts from the J.A subset
+of Stylo-Literary and take their Phi-4 MGTs as
+personalized-domain data. Each domain contains
+150 HWT and 150 MGT samples.
+
+Deriving the Inverted Feature Direction
+
+We begin by extracting the inverted feature direction that is most responsible for this effect, in order
+to assess its correlation with detector performance.
+Notation We denote the general-domain dataset
+by G and the personalized-domain dataset by S.
+Let g+ , g− ∈ G and s+ , s− ∈ S represent MGT
+and HWT activations in the two domains. For each
+quadruple (g+ , g− , s+ , s− ), we compute domainspecific difference vectors:
+
+Visibility of the Inverting Trend Since the detector’s performance fluctuates under domain shift,
+we first investigate whether the representations
+themselves encode domain differences across varying data distributions and stylistic conditions.
+
+vG = g+ − g− ,
+
+5
+
+vS = s+ − s− .
+
+(1)
+
+20
+
+0
+
+0
+
+20
+
+20
+
+40
+
+40
+
+Spearman
+
+Domain Classifier Scores
+
+Feature Values on w
+
+20
+
+Personalized
+General
+
+HWT MGT HWT MGT HWT MGT HWT MGT
+(a)
+(b)
+
+Figure 3: (a) Domain classifier score distribution: We
+can see moderate inversion effects. (b) Feature value
+distributions on the inverted feature direction w⋆ : we
+can see a major inversion effect.
+
+Figure 4: Spearman ρ between feature value differences
+of datasets and corresponding detector performance.
+
+This w⋆ represents the inverted feature direction, i.e., the axis along which the HWT–MGT
+projection (feature value) difference in the general
+domain is most strongly inverted in the personalized domain. Using the probe datasets in §4.1,
+we show feature value distributions of four sample
+types on w⋆ in Figure 3(b). In the personalized domain, MGT values are lower than HWT, while in
+the general domain, MGT values are higher. This
+flip provides direct evidence of feature inversion.
+
+Inversion-Value Matrix and Object Our goal
+is to find a direction w where the projection of
+vG is opposite to that of vS . For each quadruple
+(g+ , g− , s+ , s− ), we define the projection product
+in direction w as
+qi (w) = (w⊤ vG )(w⊤ vS ) = w⊤ (vG vS⊤ )w. (2)
+Since for any matrix M, it holds that w⊤ Mw =
+w⊤ 12 (M + M⊤ )w, Equation 2 can be rewritten as
+
+⊤ w.
+(3)
+qi (w) = w⊤ 12 vG vS⊤ + vS vG
+
+4.2.2 Correlation with Detector Performance
+Deriving the inverted feature direction w⋆ reveals a
+dimension where MGT and HWT roles flip across
+domains, but this alone does not confirm its effect
+on detectors. To establish the connection, we evaluate the correlation between the strength of the
+inverted feature and detector performance.
+Intuitively, along w⋆ , the relative positions of
+HWT and MGT feature values in the two domains
+are inverted. We quantify this property using feature value difference. For a dataset M with its
+MGT denoted as m+ and HWT as m− , the feature
+value difference is
+
+Further details on the calculation of Equation 2
+and 3 are in Appendix C.3. For each quadruple, we
+define a cross-domain matrix
+
+
+⊤ ,
+(4)
+Ai = 21 vG vS⊤ + vS vG
+which is symmetry. We aggregate over quadruples:
+P
+A = i Ai .
+(5)
+The overall inversion objective then is
+R(w) =
+
+P
+
+i qi (w) = w
+
+⊤ Aw,
+
+s.t. ||w|| = 1.
+
+0.57 0.5804
+0.76
+-0.7740
+0.78
+0.80
+0.82
+-0.8265
+0.84
+-0.8415 -0.8468
+0.86
+-0.8551
+-0.8651
+0.88
+y stde ood ++ ank RR
+p
+PT
+o
+r
+La ikelih astde LogR tect-L etectG
+Ent
+L
+-L
+De ast-D
+Log
+F
+
+(6)
+
+D(M, w⋆ ) =
+
+Since each Ai is symmetric, the aggregated matrix
+A in Equation 5 is also symmetric. So far, we
+have transformed the problem into the Rayleigh
+quotient of A with respect to w under the unit-norm
+constraint. Illustrations on the Rayleigh quotient
+problem are available in Appendix C.3.
+
+P
+
+{m+ ,m− }⊂M
+
+
+
+
+⋆ − m⊤ w ⋆ ,
+m⊤
+w
++
+−
+
+(7)
+
+which reflects the overall discrepancy between
+MGTs and HWTs on the inverted feature. Larger
+values indicate a clearer separation, while smaller
+or flipped values suggest confusion between the
+two classes. Following the experimental design
+in §3.2, we partition M4 and StyloBench by unique
+generator–subfield combinations, resulting in a total of N = 45 subsets. For each subset, we compute D(·, w⋆ ), forming a set {Di }N
+i=1 . Meanwhile,
+for each MGT detector, we collect the AUROCs on
+the same subsets, denoted as {AUROCi }N
+i=1 . We
+measure their consistency by Spearman
+correlation:
+
+ρ = Spearman {Di }, {AUROCi } .
+
+Solution By the property of the Rayleigh quotient, minimizing the objective in Eq. 6 reduces to
+w⋆ = arg min|w|=1 R(w), whose the solution is
+the eigenvector of A that corresponds to its smallest eigenvalue: A = U ΣU ⊤ , w⋆ = U [:, −1],
+where U [:, −1] denotes the last column of U , associated with the minimum eigenvalue.
+6
+
+(a)
+(a)
+
+(b)
+
+Figure 6: (a) Changes of feature values under different
+levels of token shuffling. Shuffling brings consistent
+change in feature value. (b) Distribution of feature values in the probe dataset. Two classes share zero overlap.
+
+Figure 5: (a) |CosSim| between feature directions from
+different datasets. w⋆ are close to WDomain and beyond
+WMGT . (b) AUROC distributions of the generalization
+test. WDomain has evidently better generalizability.
+
+To obtain these two reference directions, we
+train logistic regression models. One model separates HWT and MGT and gives WMGT . The other
+separates general and personalized data and gives
+WDomain . We repeat this process 100 times and
+produce 100 sets of the three types of vectors. We
+then compute cosine similarity within each group.
+Figure 5(a) shows that WMGT has low similarity with a mean of 0.163. WDomain and w⋆ show
+higher stability with means of 0.475 and 0.547. We
+also test how WMGT and WDomain generalize to
+new and previously unseen subsets.
+Figure 5(b) shows that WDomain keeps a high
+AUROC in other related subsets with a mean of
+0.994, while WMGT varies more widely from 0.4
+to 0.8 with a mean value of 0.757. The strong overall similarity between WDomain and w⋆ indicates
+that inverted features share the same high level of
+generalization ability.
+Based on these observations, we conclude that
+the feature-inversion trap is a widespread phenomenon between personalized and general domains, and the inverted features share strong commonalities across various different datasets. However, general MGT detectors often suffer from the
+feature-inversion trap, leading to unreliable performance in personalized domains. So how can we
+effectively leverage such consistent inversion to
+enhance detector transferability?
+
+The resulting correlations ρ for each detector are
+shown in Figure 4. We can see that entropy exhibits
+a positive correlation (∼ 0.6), whereas all other detectors have ρ < −0.77, indicating strong negative
+correlations. We further show the distribution of
+{AUROCi } versus {Di } of each detector in Appendix D.2. Overall, these results demonstrate that
+the detector’s performance is tightly linked to a
+feature inverted across domains.
+To verify that this correlation is not spurious,
+we further conduct experiments that isolate the effects of inverted features. We evaluate detectors on
+randomized text lacking semantic content, where
+positive and negative samples are separated along
+the inverted direction, an orthogonal direction, or
+at random. Detectors only show strong discrimination under the first case, indicating their direct
+reliance on inverted features (Appendix D.3).
+4.3
+
+(b)
+
+Generality of the Feature-Inversion Trap
+
+Having verified that w⋆ captures a key inverted
+feature correlated with performance, we now investigate whether this phenomenon is dataset-specific
+or reflects a broader, cross-domain pattern. To
+this end, we evaluate the consistency of inverted
+features across multiple datasets. We processed
+Stylo-Literary and M4 as follows. For each subdomain–generator pair in M4, we create five subsets,
+each with 150 random HWTs and 150 MGTs, as
+general-domain probe datasets.
+Also, we apply the same procedure to
+Stylo-Literary to obtain personalized-domain
+probe datasets for consistent comparison and reliable cross-domain evaluation across sampling trials.
+Each experiment samples one general subset and
+one personalized subset. We then extract three feature directions: (1) the inverted feature direction
+w⋆ , (2) the MGT feature direction WMGT , and (3)
+the domain feature direction WDomain .
+
+5
+
+StyloCheck
+
+In this section, we propose StyloCheck, an automatic transferability estimator that predicts performance shifts by quantifying detectors’ reliance on
+inverted features. Instead of directly measuring
+transfer performance, it evaluates detector behavior
+on controlled probe datasets that isolate these features, providing an indirect yet effective estimate
+of transferability.
+7
+
+Our evaluated detectors treat MGT as positive
+samples, which in both the general domain and the
+probe dataset tend to have higher feature values.
+Therefore, if a detector relies on the inverted feature, it should perform well on the probe dataset.
+AUROC reflects the degree of reliance on inverted
+features: high values indicate strong dependence
+and degradation after transfer, low values suggest
+inverted dependence and potential performance
+gains, and values near 0.5 imply weak dependence
+and stable transfer.
+5.2
+
+Figure 7: Top: Pearson r between transfer gaps and AUROCs. Bottom: corresponding AUROCs of detectors
+in probe datasets. Percentages of experiments groups
+where r > 0.7 and r > 0.5 are marked.
+
+5.1
+
+Performance of StyloCheck
+
+We test seven detectors to examine how well it
+reflects their performance shifts during transfer.
+Evaluation Setup. We construct 100 probe
+datasets from M4 and Stylo-Literary. In each
+experiment, we randomly choose five of them for
+testing, and we compute the mean AUROC. We
+then measure the Pearson r between this mean AUROC and the detector’s overall performance gap
+between M4 and Stylo-Literary. The results of
+over 100 such experiments are shown in Figure 7.
+
+Design of StyloCheck
+
+5.1.1 Probe Dataset Synthesis
+To construct probe datasets that differ only in
+inverted features, we eliminate confounding factors from text semantics, domain, and class
+(HWT/MGT) by shuffling tokens. To control shuffle strength, we use Kendall’s τ , a measure of sequence order ranging from 1 to −1, corresponding to a gradual inversion of token order (see Appendix C.2). For each sentence, we generate variants with Kendall’s τ spanning this range. As
+shown in Figure 6(a), both Kendall’s τ and the
+corresponding feature values vary continuously.
+Therefore, we build probe datasets by shuffling
+tokens. We sample one general and one personalized HWT, generate 800 variants for each with
+different Kendall’s τ , merge them, and select the 50
+samples with the highest feature values as positives
+and the 50 lowest as negatives. As shown in Figure 6(b), the resulting feature value distributions
+show no overlap. We further evaluate the style and
+MGT linear classifiers introduced in §4.1, which
+achieve near-perfect accuracy during training but
+drop to 53% and 66% AUROC on the probe dataset,
+respectively, confirming the effective removal of
+domain and class features. The probe dataset thus
+reflects only differences in the inverted features.
+
+Results. Figure 7 shows the AUROC of all detectors across experiments. Two patterns appear.
+(1) Entropy stays below 0.5 in all runs, showing
+inverted reliance, while all other detectors remain
+above 0.5, showing positive reliance. This matches
+their transfer behavior, where Entropy improves,
+and others degrade. (2) In 90% of runs, Pearson
+r exceeds 0.5, and in 78% it exceeds 0.7, indicating stable reliance levels. These results show that
+StyloCheck identifies detectors’ dependence on
+inverted features and also captures how strong that
+dependence is. We add an ablation study on the
+number of probe datasets in Appendix D.4.
+
+6
+
+Discussion
+
+In this section, we address several conceptual questions raised by the observed mechanism, with empirical evidence deferred to Appendix E.
+(i) Is the feature-inversion trap a typical
+out-of-distribution (OOD) effect? The featureinversion trap is a special case of OOD, marked by
+two points: It aligns with the inverted feature direction, and it often causes a reversal of detector behavior rather than simple degradation. Appendix E.1
+shows that common OOD do not produce these
+patterns. Appendix E.2 also outlines its links to
+related terms such as spurious correlations.
+
+5.1.2 Transferability Evaluation
+We next describe how detector performance on
+the probe dataset reflects transferability. Since the
+probe dataset removes semantic, domain, and classrelated signals, performance on it more directly
+and clearly reveals the role of inverted features in
+detector decisions.
+8
+
+(ii) What do inverted features capture? Our evidence shows that they relate to text diversity. Many
+training-free detectors (Xu et al., 2025a; Gehrmann
+et al., 2019) assume that HWT is more diverse
+than MGT, but personalization breaks this pattern:
+personalized MGT can be more varied and less coherent. This shift is consistent with the latent we
+observe and helps explain the negative performance
+flips of these detectors. See Appendix E.3.
+
+Finally, the experiments are conducted in controlled offline settings with static benchmarks,
+which may not fully capture real-world scenarios.
+In practice, detection often occurs in dynamic and
+interactive contexts, such as adaptive generation,
+human–AI coauthoring, or adversarial style imitation. Evaluating under these conditions may provide a more complete understanding of robustness.
+
+Ethical Considerations
+(iii) How can we mitigate the feature-inversion
+trap? A practical option is to use tuned trainingbased detectors. They learn more cues and can
+reach strong in-domain accuracy after training
+on personalized text, though their cross-domain
+generalization remains limited, as shown in Appendix E.4. For training-free detectors, using features less sensitive to style drift, such as stable traits
+of human writing, may reduce reliance on diversity
+signals. Adaptive thresholding (Jung et al., 2025)
+that adjusts to the stylization can also improve robustness in personalized settings.
+
+7
+
+This work aims to advance understanding of
+machine-generated text (MGT) detection in personalized scenarios and is intended for research on
+transparency, robustness, and responsible AI use.
+All datasets used in our experiments are derived
+from publicly available sources, and no private,
+sensitive, or personally identifiable information is
+included. The generation process follows open and
+reproducible settings without targeting any real individuals. While our findings reveal potential weaknesses in existing detectors, they are presented to
+support the development of safer and more reliable
+detection systems rather than to facilitate misuse or
+impersonation. We encourage future research to apply these insights ethically, ensuring that detection
+technologies are used to mitigate misinformation
+and protect authorship integrity.
+
+Conclusion and Future Work
+
+We presented StyloBench, the first dataset for
+MGT detection in personalized scenarios. Our
+study showed that existing detectors face large performance shifts, and even inversion, after domain
+transfer. We traced this to the feature-inversion
+trap, where features that separate MGT and HWT
+change their roles across domains and lead detectors to flip predictions. Based on this, we proposed
+StyloCheck, a transferability framework that measures how much detectors rely on inverted features.
+In future work, we plan to explore MGT detection methods that avoid such features to support
+stronger transferability.
+
+References
+Marah Abdin, Jyoti Aneja, Harkirat Behl, Sébastien
+Bubeck, Ronen Eldan, Suriya Gunasekar, Michael
+Harrison, Russell J. Hewett, Mojan Javaheripi, Piero
+Kauffmann, James R. Lee, Yin Tat Lee, Yuanzhi
+Li, Weishung Liu, Caio C. T. Mendes, Anh Nguyen,
+Eric Price, Gustavo de Rosa, Olli Saarikivi, and 8
+others. 2024. Phi-4 technical report. ArXiv preprint,
+arXiv:2412.08905.
+Guangsheng Bao, Yanbin Zhao, Zhiyang Teng, Linyi
+Yang, and Yue Zhang. 2024. Fast-DetectGPT: Efficient zero-shot detection of machine-generated text
+via conditional probability curvature. In Proceedings
+of International Conference on Learning Representations, ICLR ’24, Vienna, Austria.
+
+Limitations
+Our study focuses on English, and further work is
+needed to assess whether the findings generalize
+to multilingual, domain-specific, or code-switched
+settings. Linguistic variation may introduce different stylistic cues and distributional properties that
+affect both personalization and detection behavior
+beyond the current analysis.
+While feature inversion explains much of the performance shift under personalization, other latent
+factors may also affect robustness. Aspects such
+as discourse structure or higher-level semantics are
+not modeled and remain to be explored.
+
+Tom Brown, Benjamin Mann, Nick Ryder, Melanie
+Subbiah, Jared D Kaplan, Prafulla Dhariwal, Arvind
+Neelakantan, Pranav Shyam, Girish Sastry, Amanda
+Askell, Sandhini Agarwal, Ariel Herbert-Voss,
+Gretchen Krueger, Tom Henighan, Rewon Child,
+Aditya Ramesh, Daniel Ziegler, Jeffrey Wu, Clemens
+Winter, and 12 others. 2020. Language models
+are few-shot learners. In Proceedings of the Conference on Neural Information Processing Systems,
+NeurIPS ’20, Vancouver, Canada.
+
+9
+
+Xiangyu Dong, Xingyi Zhang, and Sibo Wang. 2024.
+Rayleigh quotient graph neural networks for graphlevel anomaly detection. In Proceedings of the International Conference on Learning Representations,
+ICLR ’24, Vienna, Austria.
+
+Edward J Hu, yelong shen, Phillip Wallis, Zeyuan AllenZhu, Yuanzhi Li, Shean Wang, Lu Wang, and Weizhu
+Chen. 2022. LoRA: Low-rank adaptation of large
+language models. In Proceedings of the International
+Conference on Learning Representations, ICLR ’22.
+
+Abhimanyu Dubey, Abhinav Jauhri, Abhinav Pandey,
+Abhishek Kadian, Ahmad Al-Dahle, Aiesha Letman,
+Akhil Mathur, Alan Schelten, Amy Yang, Angela
+Fan, Anirudh Goyal, Anthony Hartshorn, Aobo Yang,
+Archi Mitra, Archie Sravankumar, Artem Korenev,
+Arthur Hinsvark, Arun Rao, Aston Zhang, and 82
+others. 2024. The Llama 3 herd of models. ArXiv
+preprint, arXiv:2407.21783.
+
+Yue Huang, Chujie Gao, Siyuan Wu, Haoran Wang,
+Xiangqi Wang, Yujun Zhou, Yanbo Wang, Jiayi Ye,
+Jiawen Shi, Qihui Zhang, and 1 others. 2025. On
+the trustworthiness of generative foundation models: Guideline, assessment, and perspective. ArXiv
+preprint, arXiv:2502.14296.
+Andrew Ilyas, Shibani Santurkar, Dimitris Tsipras, Logan Engstrom, Brandon Tran, and Aleksander Madry.
+2019. Adversarial examples are not bugs, they are
+features. In Proceedings of the Conference on Neural
+Information Processing Systems, NeurIPS ’19, pages
+125–136, Vancouver, Canada.
+
+Liam Dugan, Alyssa Hwang, Filip Trhlík, Andrew
+Zhu, Josh Magnus Ludan, Hainiu Xu, Daphne Ippolito, and Chris Callison-Burch. 2024. RAID: A
+shared benchmark for robust evaluation of machinegenerated text detectors. In Proceedings of the 62nd
+Annual Meeting of the Association for Computational
+Linguistics (Volume 1: Long Papers), ACL ’24, pages
+12463–12492, Bangkok, Thailand.
+
+Daphne Ippolito, Daniel Duckworth, Chris CallisonBurch, and Douglas Eck. 2020. Automatic detection
+of generated text is easiest when humans are fooled.
+In Proceedings of the 58th Annual Meeting of the
+Association for Computational Linguistics, ACL ’20,
+pages 1808–1822. Association for Computational
+Linguistics.
+
+Lang Gao, Kaiyang Wan, Wei Liu, Chenxi Wang, Zirui
+Song, Zixiang Xu, Yanbo Wang, Veselin Stoyanov,
+and Xiuying Chen. 2025. Evaluate bias without manual test sets: A concept representation perspective for
+llms. ArXiv preprint, arXiv:2505.15524.
+
+Kaijie Jiao, Quan Wang, Licheng Zhang, Zikang Guo,
+and Zhendong Mao. 2025. M-RangeDetector: Enhancing generalization in machine-generated text detection through multi-range attention masks. In Findings of the Association for Computational Linguistics:
+ACL 2025, Findings of ACL ’25, pages 8971–8983,
+Vienna, Austria. Association for Computational Linguistics.
+
+Sebastian Gehrmann, Hendrik Strobelt, and Alexander
+Rush. 2019. GLTR: Statistical detection and visualization of generated text. In Proceedings of the 57th
+Annual Meeting of the Association for Computational
+Linguistics: System Demonstrations, ACL ’19, pages
+111–116, Florence, Italy.
+Martin Gerlach and Francesc Font-Clos. 2020. A standardized project gutenberg corpus for statistical analysis of natural language and quantitative linguistics.
+Entropy, 22(1):126.
+
+Minseok Jung, Cynthia Fuertes Panizo, Liam Dugan,
+Yi R., Fung, Pin-Yu Chen, and Paul Pu Liang.
+2025. Group-adaptive threshold optimization for
+robust AI-generated text detection. ArXiv preprint,
+arXiv:2502.04528.
+
+Biyang Guo, Xin Zhang, Ziyuan Wang, Minqi Jiang,
+Jinran Nie, Yuxuan Ding, Jianwei Yue, and Yupeng
+Wu. 2023. How Close is ChatGPT to Human Experts? Comparison Corpus, Evaluation, and Detection. ArXiv preprint, arXiv:2301.07597.
+
+Antonia Karamolegkou, Jiaang Li, Li Zhou, and Anders Søgaard. 2023. Copyright violations and large
+language models. In Proceedings of the 2023 Conference on Empirical Methods in Natural Language
+Processing, EMNLP ’23, pages 7403–7412, Singapore. Association for Computational Linguistics.
+
+Xun Guo, Yongxin He, Shan Zhang, Ting Zhang, Wanquan Feng, Haibin Huang, and Chongyang Ma. 2024.
+DeTeCtive: Detecting AI-generated Text via Multilevel Contrastive Learning. In Proceedings of the
+Conference on Neural Information Processing Systems, NeurIPS ’24, pages 88320–88347, Vancouver,
+Canada.
+
+Jiongnan Liu, Yutao Zhu, Shuting Wang, Xiaochi Wei,
+Erxue Min, Yu Lu, Shuaiqiang Wang, Dawei Yin,
+and Zhicheng Dou. 2025. LLMs + persona-plug =
+personalized LLMs. In Proceedings of the 63rd Annual Meeting of the Association for Computational
+Linguistics (Volume 1: Long Papers), ACL ’25, pages
+9373–9385, Vienna, Austria. Association for Computational Linguistics.
+
+Xinlei He, Xinyue Shen, Zeyuan Chen, Michael Backes,
+and Yang Zhang. 2024. Mgtbench: Benchmarking
+machine-generated text detection. In Proceedings of
+the ACM SIGSAC Conference on Computer and Communications Security, CCS ’24, pages 2251–2265,
+Salt Lake City, UT, USA.
+
+Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer Levy, Mike Lewis,
+Luke Zettlemoyer, and Veselin Stoyanov. 2019.
+RoBERTa: A Robustly Optimized BERT Pretraining Approach. ArXiv preprint, arXiv:1907.11692.
+
+Steffen Herbold, Alexander Trautsch, Zlata Kikteva, and
+Annette Hautli-Janisz. 2024. Large language models
+can impersonate politicians and other public figures.
+ArXiv preprint, arXiv:2407.12855.
+
+10
+
+Dominik Macko, Jakub Kopal, Róbert Móro, and Ivan
+Srba. 2025. MultiSocial: Multilingual Benchmark of
+Machine-Generated Text Detection of Social-Media
+Texts. In Proceedings of the 63rd Annual Meeting of
+the Association for Computational Linguistics (Volume 1: Long Papers), ACL ’25, pages 727–752, Vienna, Austria. Association for Computational Linguistics.
+
+on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on
+Natural Language Processing, EMNLP ’19, pages
+3980–3990, Hong Kong, China. Association for Computational Linguistics.
+
+Andrea Cristina McGlinchey and Peter J Barclay. 2024.
+Using machine learning to distinguish human-written
+from machine-generated creative fiction. ArXiv
+preprint, arXiv:2412.15253.
+
+Jenna Russell, Marzena Karpinska, and Mohit Iyyer.
+2025. People who frequently use ChatGPT for writing tasks are accurate and robust detectors of AIgenerated text. In Proceedings of the 63rd Annual
+Meeting of the Association for Computational Linguistics, ACL ’25, pages 5342–5373, Vienna, Austria.
+Association for Computational Linguistics.
+
+Rafael Mendoza, Isabella Cruz, Richard Liu, Aarav
+Deshmukh, David Williams, Jesscia Peng, and Rohan Iyer. 2024. Adaptive Self-Supervised Learning
+Strategies for Dynamic On-Device LLM Personalization. ArXiv preprint, arXiv:2409.16973.
+
+Jonathan Schler, Moshe Koppel, Shlomo Argamon, and
+James W Pennebaker. 2006. Effects of age and gender on blogging. In Proceedings of the AAAI Conference on Artificial Intelligence, AAAI ’06, Boston,
+Massachusetts, USA.
+
+Tomáš Mikolov, Wen-tau Yih, and Geoffrey Zweig.
+2013. Linguistic regularities in continuous space
+word representations. In Proceedings of the 2013
+Conference of the North American Chapter of the
+Association for Computational Linguistics: Human
+Language Technologies, NAACL ’13, pages 746–
+751, Atlanta, Georgia. Association for Computational
+Linguistics.
+
+Benjamin Schweinhart. 2021. Persistent homology and
+the upper box dimension. Discrete & Computational
+Geometry, pages 331–364.
+Haizhou Shi, Zihao Xu, Hengyi Wang, Weiyi Qin,
+Wenyuan Wang, Yibin Wang, Zifeng Wang, Sayna
+Ebrahimi, and Hao Wang. 2025. Continual learning
+of large language models: A comprehensive survey.
+ACM Computing Surveys, 58(5).
+
+John Morris, Volodymyr Kuleshov, Vitaly Shmatikov,
+and Alexander Rush. 2023. Text embeddings reveal
+(almost) as much as text. In Proceedings of the 2023
+Conference on Empirical Methods in Natural Language Processing, EMNLP ’23, pages 12448–12460,
+Singapore.
+
+Irene Solaiman, Miles Brundage, Jack Clark, Amanda
+Askell, Ariel Herbert-Voss, Jeff Wu, Alec Radford,
+Gretchen Krueger, Jong Wook Kim, Sarah Kreps,
+Miles McCain, Alex Newhouse, Jason Blazakis, Kris
+McGuffie, and Jasmine Wang. 2019. Release strategies and the social impacts of language models.
+ArXiv preprint, arXiv:1908.09203.
+
+Sheshera Mysore, Zhuoran Lu, Mengting Wan, Longqi
+Yang, Bahareh Sarrafzadeh, Steve Menezes, Tina
+Baghaee, Emmanuel Barajas Gonzalez, Jennifer
+Neville, and Tara Safavi. 2024. Pearl: Personalizing large language model writing assistants with
+generation-calibrated retrievers. In Proceedings of
+the 1st Workshop on Customizable NLP: Progress
+and Challenges in Customizing NLP for a Domain,
+Application, Group, or Individual (CustomNLP4U),
+pages 198–219, Miami, Florida, USA. Association
+for Computational Linguistics.
+
+Jinyan Su, Terry Zhuo, Di Wang, and Preslav Nakov.
+2023a. DetectLLM: Leveraging log rank information for zero-shot detection of machine-generated
+text. In Findings of the Association for Computational Linguistics: EMNLP 2023, EMNLP ’23, pages
+12395–12412, Singapore, Singapore. Association for
+Computational Linguistics.
+Jinyan Su, Terry Yue Zhuo, Di Wang, and Preslav Nakov.
+2023b. DetectLLM: Leveraging log rank information for zero-shot detection of machine-generated
+text. In Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing,
+EMNLP ’23, pages 12395–12412, Singapore, Singapore. Association for Computational Linguistics.
+
+Shashi Narayan, Shay B. Cohen, and Mirella Lapata.
+2018. Don’t give me the details, just the summary!
+Topic-aware convolutional neural networks for extreme summarization. In Proceedings of the 2018
+Conference on Empirical Methods in Natural Language Processing, EMNLP ’18, pages 1797–1807,
+Brussels, Belgium. Association for Computational
+Linguistics.
+
+Qwen Team. 2025. Qwen3 technical report. ArXiv
+preprint, arXiv:2505.09388.
+
+Gerrit Quaremba, Elizabeth Black, Denny Vrandečić,
+and Elena Simperl. 2025. WETBench: A benchmark
+for detecting task-specific machine-generated text on
+Wikipedia. ArXiv preprint, arXiv:2507.03373.
+
+Chong Tian, Qirong Ho, and Xiuying Chen. 2025. A
+symbolic adversarial learning framework for evolving fake news generation and detection. In Proceedings of the 2025 Conference on Empirical Methods
+in Natural Language Processing, EMNLP ’25, pages
+12296–12310, Suzhou, China. Association for Computational Linguistics.
+
+Nils Reimers and Iryna Gurevych. 2019. SentenceBERT: Sentence embeddings using Siamese BERTnetworks. In Proceedings of the 2019 Conference
+
+11
+
+Yuchuan Tian, Hanting Chen, Xutao Wang, Zheyuan
+Bai, Qinghua Zhang, Ruifeng Li, Chao Xu, and
+Yunhe Wang. 2024. Multiscale positive-unlabeled
+detection of AI-generated texts. In Proceedings of
+the Twelfth International Conference on Learning
+Representations, ICLR ’24, Vienna, Austria.
+
+Dongjun Wei, Minjia Mao, Xiao Fang, and Michael
+Chau. 2025. Short-PHD: Detecting short LLMgenerated text with topological data analysis after
+off-topic content insertion. In Second Conference on
+Language Modeling, COLM ’25, Montreal, Canada.
+Stanisław Woźniak, Bartłomiej Koptyra, Arkadiusz
+Janz, Przemysław Kazienko, and Jan Kocoń. 2024.
+Personalized large language models. In Proceedings
+of the 24th IEEE International Conference on Data
+Mining, ICDM ’24, Abu Dhabi, UAE.
+
+Yu-Min Tseng, Yu-Chao Huang, Teng-Yun Hsiao, WeiLin Chen, Chao-Wei Huang, Yu Meng, and YunNung Chen. 2024. Two tales of persona in LLMs: A
+survey of role-playing and personalization. In Findings of the Association for Computational Linguistics:
+EMNLP 2024, EMNLP ’24, pages 16612–16631, Miami, Florida, USA. Association for Computational
+Linguistics.
+
+Yihuai Xu, Yongwei Wang, Yifei Bi, Huangsen Cao,
+Zhouhan Lin, Yu Zhao, and Fei Wu. 2025a. Trainingfree LLM-generated text detection by mining token
+probability sequences. In Proceedings of the Thirteenth International Conference on Learning Representations, ICLR ’25, Singapore.
+
+Quan Tu, Shilong Fan, Zihang Tian, Tianhao Shen,
+Shuo Shang, Xin Gao, and Rui Yan. 2024. CharacterEval: A chinese benchmark for role-playing conversational agent evaluation. In Proceedings of the
+62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), ACL ’24,
+pages 11836–11850, Bangkok, Thailand. Association
+for Computational Linguistics.
+
+Yiyan Xu, Jinghao Zhang, Alireza Salemi, Xinting Hu,
+Wenjie Wang, Fuli Feng, Hamed Zamani, Xiangnan
+He, and Tat-Seng Chua. 2025b. Personalized generation in large model era: A survey. In Proceedings of
+the 63rd Annual Meeting of the Association for Computational Linguistics, ACL ’25, pages 24607–24649,
+Vienna, Austria.
+
+Eduard Tulchinskii, Kristian Kuznetsov, Kushnareva
+Laida, Daniil Cherniavskii, Sergey Nikolenko,
+Evgeny Burnaev, Serguei Barannikov, and Irina Piontkovskaya. 2023. Intrinsic dimension estimation
+for robust detection of AI-generated texts. In Proceedings of the Conference on Neural Information
+Processing Systems, NeurIPS ’23, New Orleans,
+Louisiana, USA.
+
+Wenqian Ye, Guangtao Zheng, Xu Cao, Yunsheng Ma,
+Xia Hu, and Aidong Zhang. 2024. Spurious correlations in machine learning: A survey. ArXiv preprint,
+arXiv:2402.12715.
+Denghui Zhang, Zhaozhuo Xu, and Weijie Zhao. 2025a.
+LLMs and copyright risks: Benchmarks and mitigation approaches. In Proceedings of the 63rd Annual
+Meeting of the Association for Computational Linguistics, ACL ’25, pages 44–50, Vienna, Austria.
+
+Ben Wang and Aran Komatsuzaki. 2021. GPT-J-6B: A
+6 Billion Parameter Autoregressive Language Model.
+Yuxia Wang, Jonibek Mansurov, Petar Ivanov, Jinyan
+Su, Artem Shelmanov, Akim Tsvigun, Osama Mohammed Afzal, Tarek Mahmoud, Giovanni Puccetti,
+Thomas Arnold, Alham Fikri Aji, Nizar Habash,
+Iryna Gurevych, and Preslav Nakov. 2024a. M4GTbench: Evaluation benchmark for black-box machinegenerated textdetection. In Proceedings of the 62nd
+Annual Meeting of the Association for Computational
+Linguistics (Volume 1: Long Papers), ACL ’24, pages
+3964–3992, Bangkok, Thailand.
+
+Weizhi Zhang, Xinyang Zhang, Chenwei Zhang, Liangwei Yang, Jingbo Shang, Zhepei Wei, Henry Peng
+Zou, Zijie Huang, Zhengyang Wang, Yifan Gao, Xiaoman Pan, Lian Xiong, Jingguo Liu, Philip S. Yu,
+and Xian Li. 2025b. PersonaAgent: When Large
+Language Model Agents Meet Personalization at Test
+Time. ArXiv preprint, arXiv:2506.06254.
+Zhehao Zhang, Ryan A. Rossi, Branislav Kveton, Yijia Shao, Diyi Yang, Hamed Zamani, Franck Dernoncourt, Joe Barrow, Tong Yu, Sungchul Kim,
+Ruiyi Zhang, Jiuxiang Gu, Tyler Derr, Hongjie Chen,
+Junda Wu, Xiang Chen, Zichao Wang, Subrata Mitra,
+Nedim Lipka, and 2 others. 2025c. Personalization
+of large language models: A survey. Transactions on
+Machine Learning Research.
+
+Yuxia Wang, Jonibek Mansurov, Petar Ivanov, Jinyan
+Su, Artem Shelmanov, Akim Tsvigun, Chenxi Whitehouse, Osama Mohammed Afzal, Tarek Mahmoud,
+Toru Sasaki, Thomas Arnold, Alham Fikri Aji, Nizar
+Habash, Iryna Gurevych, and Preslav Nakov. 2024b.
+M4: Multi-generator, Multi-domain, and Multilingual Black-Box Machine-Generated Text Detection. In Proceedings of the 18th Conference of the European Chapter of the Association for Computational
+Linguistics (Volume 1: Long Papers), EACL ’24,
+pages 1369–1407, St. Julian’s, Malta.
+
+Han Zhao, Chen Dan, Bryon Aragam, Tommi S.
+Jaakkola, Geoffrey J. Gordon, and Pradeep Ravikumar. 2022. Fundamental limits and tradeoffs in invariant representation learning. Journal of Machine
+Learning Research, 23(340):1–49.
+
+Zixiao Wang, Duzhen Zhang, Ishita Agrawal, Shen
+Gao, Le Song, and Xiuying Chen. 2025. Beyond
+Profile: From Surface-Level Facts to Deep Persona
+Simulation in LLMs. In Findings of the Association
+for Computational Linguistics: ACL 2025, ACL ’25,
+pages 21239–21257, Vienna, Austria.
+
+Kaiyang Zhou, Ziwei Liu, Yu Qiao, Tao Xiang, and
+Chen Change Loy. 2022. Domain generalization: A
+survey. IEEE Transactions on Pattern Analysis and
+Machine Intelligence, 45(4):4396–4415.
+
+12
+
+A
+
+Details on StyloBench and M4
+
+A.1
+
+Dataset Construction Discussion
+
+A.1.1
+
+A.2
+
+Due to formatting and compilation issues, the
+Gutenberg Book Corpus contains various artifacts
+that may distort detector performance. These artifacts are removed by eliminating non-original
+indentation symbols, normalizing line breaks by
+deleting isolated ones and reducing consecutive
+breaks to a single instance, and removing lines with
+repeated “=” symbols that often mark structural
+boundaries. Unrelated segments are also excluded.
+We also remove lines with links as they usually
+indicate source annotations. Lines with long digit
+sequences are removed since they often correspond
+to compiler contact information.
+
+Scenario Selection
+
+StyloBench focuses on two personalization scenarios: literary style imitation and social media
+style blog generation. These scenarios are widely
+used in recent personalization studies (Xu et al.,
+2025b; McGlinchey and Barclay, 2024) and provide rich individual expression. Literary texts offer
+long narratives with stable author styles, while blog
+posts capture informal and self-expressive writing.
+Together, they form a practical testbed for personalized MGT, where detectors face realistic stylistic
+shifts when distinguishing MGT from HWT. The
+current version of StyloBench does not yet include
+multilingual or other specialized domains, and future extensions are planned to cover a broader range
+of personalized scenarios.
+A.1.2
+
+A.3
+
+Details of Stylo-Blog
+
+Data Source. The data source of Stylo-Blog
+is Blog-1K, a well-known subset of the Blog Authorship Corpus (Schler et al., 2006). The Blog
+Authorship Corpus was originally collected from
+posts on blogger.com in 2004. It spans a wide
+range of topics, is linguistically diverse, and has
+been widely used for studying stylistic and demographic features. Based on this corpus, Blog-1K filters high-quality blogs and groups them by authors,
+resulting in 1,000 authors and 16,132 posts. It provides clearer author attribution, a more balanced
+data distribution, and more consistent writing quality, making it suitable for constructing Stylo-Blog
+in personalized evaluation settings.
+
+Model Selection
+
+The 2 components of StyloBench use different
+model configurations, mainly due to differences
+in data availability and personalization depth. For
+literary data in Stylo-Literary, there are many
+texts per author, which makes CPT on each author feasible and allows deeper stylistic imitation. Smaller models are used in this setting because they are easier to train and adapt to individual authors. For blogs in Stylo-Blog, each
+user has fewer posts, so CPT is not suitable. In
+this case, large instruction-tuned models accessed
+through APIs are prompted to mimic user style,
+capturing shallower but flexible personalization.
+Stylo-Literary and Stylo-Blog represent two
+complementary levels of personalization and provide a diverse evaluation space for detectors.
+A.1.3
+
+Preprocessing for Stylo-Literary
+
+Few-shot Construction. For each author, we
+construct few-shot prompts using their remaining
+posts to guide style imitation. After selecting one
+post as the target for generating MGT, the number
+of few-shot examples depends on how many posts
+remain for that author. If only one post remains,
+we use a 1-shot setting. If two posts remain, we
+use a 2-shot setting. If three or more posts remain,
+we randomly sample three posts to form a 3-shot
+prompt. This strategy ensures that the few-shot
+construction adapts to data availability while maintaining consistency across authors. The prompt
+template is shown in Figure 8.
+
+Dataset Scale and Diversity
+
+The overall scale of StyloBench is comparable
+to existing MGT detection benchmarks such as
+CH3-English (Guo et al., 2023), with about 25,000
+versus 26,000 samples. StyloBench contains 21
+subsets, similar to the 20 subsets in M4, and each setting uses over 1,000 test samples, ensuring stable
+analysis while keeping the benchmark manageable.
+In Stylo-Literary, seven authors with distinct
+styles are included, all of which lead to clear performance shifts in detectors on HWT and MGT.
+This suggests that the current author set is already
+informative, while still allowing future expansion.
+
+A.4
+
+Configurations of LLM Generators
+
+In constructing Stylo-Literary, key parameters
+are shown in Table 3. For both subsets, we set the
+maximum length to 512 tokens for consistent style
+imitation and use a temperature of 1 to encourage
+diversity, while keeping other parameters at their
+default values.
+13
+
+def Prompt(historical_examples, target_request):
+return f"""Given a **BLOG REQUEST** from a USER to continue writing a blog, write a **BLOG POST**
+
+mimicking the USER to satisfy the REQUEST.
+Use the following instructions for your response:
+1. You should maintain consistency in tone and style with the USER's historical blog posts.
+2. You should imitate the language style of the USER's historical blog posts.
+3. You should employ similar rhetorical methods as the USER's historical blog posts.
+4. You must continue the BLOG POST for **at least 512 tokens**, expanding naturally on the REQUEST.
+Here are some historical blog posts by the USER:
+{historical_examples}
+REQUEST (blog beginning, first ~30 words):
+{target_request}
+Write the BLOG POST to **continue the REQUEST**, mimicking the tone, style, and rhetorical methods of the
+USER's historical blog posts."""
+
+Figure 8: Prompt template for MGT in synthesizing Stylo-Blog. It takes 1–3 blogs from the same author as
+historical_examples and uses the first 30 tokens of the current blog as target_request for continuation.
+
+Parameter
+
+Value
+
+B
+
+Experiment Details
+
+Maximum samples
+Batch size
+Learning rate
+Epochs
+
+3,000
+8
+0.0001
+5
+
+B.1
+
+Baselines
+
+We follow the same set of baseline detectors as
+in (Xu et al., 2025a). The implementation details
+of the seven baselines in this study are as follows.
+
+LoRA configuration
+LoRA rank
+LoRA alpha
+LoRA dropout
+
+16
+32
+0.1
+
+Log-Likelihood (Solaiman et al., 2019). The
+average log probability of all tokens in a text is used
+as the metric. Texts with lower average likelihood
+are more likely to be MGT.
+
+Table 3: Key hyperparameters in CPT for generating
+Stylo-Literary MGTs.
+
+Generator Wikipedia Reddit WikiHow PeerRead arXiv
+
+Total
+
+Davinci
+ChatGPT
+Cohere
+BLOOMz
+
+14,323
+14,339
+11,257
+14,340
+
+3,000
+2,995
+2,336
+3,000
+
+3,000
+3,000
+1,220
+3,000
+
+3,000
+3,000
+2,999
+3,000
+
+2,323
+2,344
+1,702
+2,340
+
+3,000
+3,000
+3,000
+3,000
+
+LogRank (Solaiman et al., 2019). The average
+log rank of tokens in the text, where ranks are
+determined by GPT-J’s probabilities, is used as the
+metric. Texts with higher ranks could be MGT.
+Entropy (Gehrmann et al., 2019). The average
+entropy of the predicted token distribution is computed. Texts with higher entropy values are more
+likely to be MGT.
+
+Table 4: Statistics of the selected English subset of M4,
+where the values indicate the numbers of HWTs and
+MGTs, which are equal.
+
+A.5
+
+DetectLRR (Su et al., 2023a). The ratio of loglikelihood to log-rank is taken as the score. Larger
+ratios indicate a higher chance of MGT.
+
+The English Subset of M4
+
+Fast-DetectGPT (Bao et al., 2024). It perturbs
+the input text to create contrast samples and compares the scoring differences between the original
+and perturbed texts. Larger discrepancies indicate
+that the original text is more likely to be MGT.
+
+The selected English subset contains 5 data sources
+to reflect diversity and daily language use: Reddit,
+Wikipedia, WikiHow, arXiv, and PeerRead. Each
+LLM generator uses 2–8 distinct prompts to produce varied MGTs. We select only the generators
+that have data in all five sources in the released version of M4. Table 4 reports the detailed statistics.
+
+Lastde (Xu et al., 2025a). This method analyzes
+local and global diversity of token probability sequences, and combines them with likelihood infor14
+
+mation. Lower diversity relative to likelihood is
+more indicative of MGT.
+
+structural performance drops beyond typical domain generalization settings.
+At the same time, these training-based models
+do not collapse to extremely low AUROC values as
+some training-free detectors do, indicating that they
+may rely on a broader set of learned features that
+help prevent complete failure. Complete results are
+provided in Appendix F for reference.
+
+Lastde++ (Xu et al., 2025a). It is an enhanced
+version of Lastde that normalizes scores using multiple contrast samples, making the results more
+stable. Higher normalized values suggest MGT.
+We test all baselines under a black-box scenario
+without generator access, using GPT-J-6B (Wang
+and Komatsuzaki, 2021) as a proxy. For LogLikelihood, LogRank, Entropy, and DetectLRR,
+features are computed from GPT-J-6B probabilities
+and ranks; for DetectGPT, Fast-DetectGPT, Lastde,
+and Lastde++, perturbed variants are generated and
+scores are compared with the original.
+B.2
+
+Dataset
+
+DeTeCtive
+
+Stylo-Literary
+Stylo-Blog
+M4
+
+53.33
+64.77
+99.94
+
+53.78
+49.73
+84.69
+
+AUROC 0.4–0.6
+
+64%
+
+92%
+
+Table 6: Average AUROC of training-based detectors.
+
+Training-free Methods
+
+Since full results on Stylo-Blog have already
+been presented in Table 2, the complete results
+for Stylo-Literary and M4 are provided in Appendix F for completeness.
+B.3
+
+RoBERTa
+
+Setup. We evaluate two representative trainingbased detectors: RoBERTa (Liu et al., 2019) and
+DeTeCtive (Guo et al., 2024). For M4, each subset is
+split by randomly selecting 1,000 HWT and MGT
+samples as the test set, with all remaining samples
+used for training. The finetuning configuration for
+RoBERTa is shown in Table 5. For DeTeCtive, we
+use the publicly released checkpoint that achieves
+the best performance on M42 and evaluate it on the
+same test sets. We use AUROC for evaluation.
+
+Batch size
+Epochs
+Learning rate
+Warmup steps
+Random seed
+
+Metrics and Mathematical Tools
+
+C.1
+
+AUROC
+
+AUROC measures detector performance across the
+full range of thresholds rather than relying on a
+fixed one, therefore reflecting the overall ability
+of the detector. AUROC ranges from 0.0 to 1.0,
+where 0.5 corresponds to random guessing, and 1.0
+indicates perfect discrimination. It can be interpreted as the probability that a randomly selected
+machine-generated text is assigned a higher detection score than a randomly selected human-written
+text. Values below 0.5 indicate performance worse
+than random guessing and imply that the predictions are systematically inverted.
+
+Experiments on Training-based Methods
+
+Hyperparameter
+
+C
+
+C.2
+
+Correlation Coefficients
+
+Spearman ρ Spearman’s rank correlation coefficient measures the monotonic relationship between
+two variables by computing the Pearson correlation
+on their rank values. It is defined as
+P
+6 ni=1 d2i
+ρ=1−
+,
+(8)
+n(n2 − 1)
+
+Value
+32
+10
+2 × 10−5
+2000
+42
+
+Table 5: Training configuration for RoBERTa.
+
+where di is the rank difference of the i-th sample.
+Values close to 1 or −1 indicate strong positive or
+negative monotonic correlation.
+
+Results and Analysis. The averaged results on
+the three datasets are reported in Table 6. Both
+detectors perform well on M4, but their AUROC scores on StyloBench mostly fall within
+0.4–0.6, close to random prediction in many cases.
+RoBERTa shows near-random performance in
+about 64% of personalized settings, while this rises
+to 92% for DeTeCtive, indicating frequent and
+
+Pearson r Pearson’s correlation coefficient captures the linear relationship between two variables.
+It is defined as
+Pn
+
+i=1 (xi −x̄)(y
+√Pni −ȳ)
+.
+2
+2
+(x
+−x̄)
+i=1 i
+i=1 (yi −ȳ)
+
+r = √Pn
+
+(9)
+
+Values near 1 indicate strong positive linear correlation, values near −1 strong negative correlation,
+and 0 denotes no linear correlation.
+
+2
+
+https://huggingface.co/heyongxin233/
+DeTeCtive/blob/main/M4_monolingual_best.pth
+
+15
+
+M4
+
+Stylo-Blog
+
+Stylo-Literary
+
+Figure 9: The average AUROC of different detectors on M4, Stylo-Blog, and Stylo-Literary. The lines indicate
+performance changes caused by domain transfer. Detectors show a clear change in the personalized domain,
+including surges, decreases, and inversions.
+
+Figure 10: AUROC of each detector and the distribution of feature value difference D(·, w⋆ ) on the test set for each
+experiment. The plots show clear correlation, with varying strength and sign across detectors.
+
+Rayleigh Quotient For a matrix M ∈ Rn×n and
+a nonzero vector w ∈ Rn , the Rayleigh quotient is
+defined as
+w⊤ Mw
+R(w) =
+.
+(11)
+w⊤ w
+
+Kendall’s τ Kendall’s τ measures the ordinal
+association between two variables based on the
+number of concordant and discordant pairs:
+pairs)
+
+τ = (#concordant pairs)−(#discordant
+. (10)
+n
+2
+
+When ||w|| = 1, this can be also written as:
+R(w) = w⊤ Mw. When M is symmetric, R(w) is
+bounded between the smallest and largest eigenvalues of M. In particular, the minimum of R(w)
+equals the smallest eigenvalue and the maximum
+equals the largest eigenvalue, attained when w is
+the corresponding eigenvector.
+
+In this work, τ is also employed as a quantitative
+measure of word order. Values close to 1 indicate
+strong agreement with the original order, values
+close to −1 indicate reversed order, and values
+around 0 correspond to randomized tokens.
+C.3
+
+Mathematical Design Explanation
+
+Derivation of Equation 2 The equation qi (w) =
+(w⊤ vG )(w⊤ vS ) follows from basic matrix multiplication:
+(w⊤ vG )(w⊤ vS ) = (w⊤ vG )(vS⊤ w) = w⊤ (vG vS⊤ )w.
+
+Derivation of Equation 3 For any real matrix
+M ∈ Rn×n and vector w, the quadratic form equals
+its transpose, as it is a scalar:
+(w⊤ M w)⊤ = w⊤ M ⊤ (w⊤ )⊤ = w⊤ M ⊤ w.
+Therefore
+w⊤ Mw = 21 w⊤ (M + M⊤ )w.
+Applying this to M = vG vS⊤ gives
+⊤
+qi (w) = w⊤ 21 (vG vS⊤ + vS vG
+)w.
+
+16
+
+D
+
+Analysis on Feature-Inversion Trap
+
+D.1
+
+Performance Change of Detectors
+
+To examine detector behavior across domains, we
+compute the average AUROC on M4, Stylo-Blog,
+and Stylo-Literary, and report the results in Figure 9. The trends are consistent with §5.2.
+Most detectors degrade more in the personalized domain than in the general domain, while
+a few, such as Entropy and Fast-DetectGPT, improve on certain personalized subsets. Classifiers
+show smaller fluctuations on Stylo-Blog than on
+Stylo-Literary, suggesting that post-training imitation misleads detectors more than prompting.
+On Stylo-Literary, five detectors fall below 0.5
+AUROC, indicating prediction reversal in the personalized domain.
+
+D.2
+
+Correlation Visualization
+
+(1) Random: All detectors stay near 0.5. This
+confirms that detectors behave randomly in random
+noise, which confirms their normal functioning.
+(2) Inverted direction: Detectors show strong
+classification tendencies. Entropy has an average
+AUROC below 0.4. Other detectors have an AUROC above 0.6. The AUROC distribution is also
+more spread out. Extreme values such as AUROC
+above 0.8 or below 0.2 appear more often. These
+signs show that detectors rely on inverted features
+to make a prediction.
+(3) Orthogonal direction: No strong tendency
+appears. Some detectors behave almost the same
+as in the random set, such as Lastde, Lastde++, and
+Fast-DetectGPT. Other detectors shift slightly but
+remain within the 0.4 to 0.6 range, which is still
+close to random. These results show that other features cannot influence detector behavior as inverted
+features do. Together with the strong correlation
+shown in Figure 4, these results support a clear
+conclusion. In personalized settings, the featureinversion trap is a key reason for the reversed behavior of many detectors.
+
+Following §4.2.2, we plot the AUROC of each detector and the distribution of D(·, w⋆ ) on the test
+set across multiple experiments, as shown in Figure 10. The results reveal that: (1) The sample
+distribution is concentrated, and most points lie
+near the fitted line, which indicates a clear correlation between AUROC and D(·, w⋆ ). (2) Entropy shows a positive correlation, while the others
+show a negative correlation, which indicates that
+the Feature-Inversion Trap affects different detectors in different ways.
+D.3
+
+Verification of Detector Dependence on
+Inverted Features
+
+In §4.2.2, we show a strong negative correlation
+between the projection gap of inverted features and
+detector performance. This correlation may still be
+spurious. We therefore design experiments to show
+that detectors do rely on inverted features.
+The core idea is simple: if a detector relies on inverted features, then it should still work on random
+text. The text may be meaningless, but if positive and negative samples show a clear gap along
+the inverted feature, the detector should still show
+strong results. On the contrary, other features or
+pure random noise should not produce this effect.
+
+D.4
+
+Ablation Study for StyloCheck
+
+We conduct an ablation study to assess how the
+number of probe datasets affects the reliability of
+StyloCheck. Figure 12(a) shows the distribution
+of r when using 1, 3, and 5 datasets. With fewer
+datasets, the mean r decreases and the probability
+of r < −0.5 increases, indicating a higher risk of
+incorrect prediction. Figure 12(b) plots the change
+of r as the number of datasets grows from 1 to
+10. The mean r rises gradually, but slows down
+as it approaches an upper bound near 0.8. The
+standard deviation also decreases, but with diminishing returns. These results suggest that increasing
+the dataset size improves reliability, but the benefit
+diminishes over time. Using five probe datasets
+offers a good balance in practice.
+
+Setup. We tokenize each text. We then shuffle
+these tokens to create text with no meaning. Based
+on these texts, we build three types of test sets.
+(1) Along inverted direction. We sort samples by
+their projection on the inverted feature direction
+w⋆ . We take the top samples as positives and the
+bottom samples as negatives. This set tests whether
+the detector depends only on inverted features. (2)
+Along orthogonal direction. We sort samples by
+⋆ that is orthogotheir projection on a direction w⊥
+nal to the inverted feature. We take the top samples
+as positives and the bottom samples as negatives.
+This set tests whether the detector depends on other
+directions that share the same form but do not reflect inverted features. (3) Random. We shuffle all
+samples and split them into positives and negatives
+at random. This gives a baseline under complete
+randomness. For each type, we create 50 datasets.
+Each has 50 positive and 50 negative samples.
+
+E
+
+Empirical Evidence for §6
+
+E.1 Difference Between the Feature-Inversion
+Trap and OOD Effects
+In §6, we state two reasons why the featureinversion trap is different from standard OOD effects: (1) it is tightly correlated with the inverted
+feature direction; (2) it causes reversal of detector
+behavior, not only performance decay. We now
+verify both points with experiments.
+
+Results and analysis. We test seven detectors on
+these datasets. We plot the AUROC distribution
+across the 50 runs in Figure 11. The results show
+three clear patterns.
+17
+
+ProbDensity
+
+AUROC
+
+Inverted Direction
+
+Orthoganal Direction
+
+Random
+
+Figure 11: AUROC of each detector on three synthetic test sets and the distribution of feature value difference
+D(·, w⋆ ) under each construction.
+General Subdomains
+
+(a)
+
+General-Personalized
+
+(b)
+
+Figure 12: (a) Distribution of Pearson r with 1, 3, and
+5 probe datasets. (b) Change of mean Pearson r with
+the number of probe datasets, shaded with one standard
+deviation intervals.
+
+Figure 13: Correlation differences in different detectors.
+
+E.2
+For point (1). We use performance differences
+across M4 subsets as a representative OOD case,
+as prior work (Wang et al., 2024b) studies detector
+generalization on them and their domain gaps are
+well known. For all M4 subsets, we follow §4.2
+to compute the projection gap on the inverted direction, denoted as DM4 . We then compute the
+Spearman correlation between this gap and detector performance on M4:
+r = Spearman(DM4 , AUROCM4 ).
+
+Connections to Other Terms
+
+The feature inversion phenomenon introduced appears to share surface similarities with several established concepts in machine learning. To avoid
+misunderstanding, we describe the relation between these concepts and our findings, and we
+clarify the differences.
+Spurious Correlations. The feature inversion
+phenomenon relates to spurious correlations (Ye
+et al., 2024), as detectors rely on cues that are not
+stable across domains. For example, they often
+assume HWT is more diverse than MGT, but personalization flips this pattern and changes the cue’s
+meaning. Unlike typical spurious correlations, the
+relation is reversed rather than weakened.
+Domain Shift Robustness. The feature inversion phenomenon is related to domain shift. In
+typical settings, performance degrades as features
+lose reliability (Zhou et al., 2022). Under personalization, the feature direction changes, causing
+prediction reversal. This indicates a stronger, more
+structural shift than standard OOD cases, as discussed in Appendix E.1.
+Adversarial Robustness.
+For the featureinversion trap, there is a conceptual link to adversarial robustness, as both involve shifts that redirect
+model attention to different features (Ilyas et al.,
+2019). Personalization consistently alters stylistic
+properties, changing how detectors use cues. However, this shift arises naturally from personalized
+
+(12)
+
+Results for all detectors are shown in Figure 13.
+Cross-domain correlations (general → personalized) exceed those within M4, showing that the
+inverted direction explains shifts to personalized
+domains but not differences within M4.
+For point (2). Reversal rarely appears across M4
+subsets but is frequent on StyloBench. Complete
+M4 results are in Appendix F. Among 140 runs, 25
+(17.9%) have AUROC below 0.5, while in StyloLiterary, 93 of 147 (63.3%) fall below 0.5. This
+gap shows that personalized scenarios cannot be
+explained by common OOD factors such as feature
+weakening. Together with point (1), this supports
+that personalization causes structural feature reversal rather than a typical domain shift.
+18
+
+text generation rather than intentional adversarial
+manipulation, so the mechanisms differ.
+Invariant Representation Learning. Invariant
+representation learning aims to identify features
+stable across domains (Zhao et al., 2022). Feature
+inversion shows that many detectors rely on noninvariant features, such as lexical or semantic diversity. Even with invariant learning, detectors may
+still depend on unstable cues under strong personalization. This highlights a limitation of invariant
+learning for MGT detection.
+Feature Inversion in Natural Language Processing. The term feature inversion in NLP often refers to reconstructing text from representations (Morris et al., 2023). Our use differs: it denotes a change in feature direction across domains.
+A feature separating HWT from MGT in one domain may work oppositely in another. This reflects
+semantic reversal rather than reconstruction.
+E.3
+
+∆
+
+HWT
+MGT
+
+9.9952
+6.5751
+
+12.0255
+13.0849
+
+2.0304
+6.5098
+
+∆
+
+-3.4201
+
+1.0594
+
+-
+
+∆
+
+HWT
+MGT
+
+5.2764
+3.2783
+
+4.4390
+5.4325
+
+-0.8374
+2.1542
+
+∆
+
+-1.9981
+
+0.9935
+
+-
+
+E.4 Towards Mitigating the Feature Inversion
+Phenomenon
+
+Lexical Diversity We follow intrinsic dimension analysis from prior work (Tulchinskii et al.,
+2023), which shows MGT embeddings lie on
+lower-dimensional manifolds than HWT, indicating lower diversity. Using the probe datasets in
+Section 4.1, we follow (Tulchinskii et al., 2023):
+roberta-base encodes each sentence, last-layer
+token embeddings are treated as points, and persistent homology dimension (Schweinhart, 2021)
+estimates lexical variation. Results are in Table 7.
+For HWT, personalized samples have higher diversity than general ones. For MGT, diversity is lower
+in general but higher in personalized settings. This
+reversal aligns with feature inversion and suggests
+that in highly personalized scenarios, MGT may
+use words more variably than HWT.
+Personalized
+
+Personalized
+
+Semantic Coherence We apply a similar approach to analyze sentence-level semantic coherence. Using Sentence-BERT (Reimers and
+Gurevych, 2019), each sentence is mapped to a
+vector, where closer vectors indicate stronger semantic consistency. If these vectors lie on a lowdimensional manifold, the text is more coherent
+with smoother semantic flow, while higher dimensionality indicates larger semantic shifts. We segment each text into sentences using punctuation and
+encode them with the all-MiniLM-L6-v2 model,
+then estimate the manifold dimension for each
+group. Results are presented in Table 8. For MGT,
+coherence is lower in general domains, but in personalized domains it becomes higher than that of
+HWT. Therefore, inverted features are related to
+both lexical diversity and semantic coherence.
+
+We believe that the inverted features include, but
+are not limited to, lexical diversity and semantic
+coherence. Both of these properties describe aspects of textual coherence, and both show a clear
+reversal trend across domains.
+
+General
+
+General
+
+Table 8: Sentence-level intrinsic dimension for general
+and personalized domains.
+
+What Do Inverted Features Capture
+
+Token
+Dimension
+
+Sentence
+Dimension
+
+Finetuning on personalized text can improve detector accuracy in the target domain, but these gains
+do not transfer well across domains. Training on
+one domain brings little benefit to another, and joint
+training still cannot overcome the model’s generalization limits. Thus, training alone cannot resolve
+feature inversion; effective solutions require capturing inverted feature behavior or avoiding reliance
+on unstable cues.
+We evaluate three finetuning variants of
+RoBERTa. For M4, following Appendix B.3, each
+subset is split with 1,000 samples for testing and
+the rest for training; StyloBench is split similarly.
+The first variant is trained on M4, the second on
+Stylo-Literary, and the third on the combined
+sets. All variants are tested on the M4 test sets and
+both parts of StyloBench. Results are shown in Table 9. Finetuning improves performance within the
+training domain, but gains do not transfer across
+domains. Even joint training does not close the
+gap, especially on Stylo-Blog. This indicates that
+limited generalization still restricts mitigation of
+the inversion phenomenon.
+
+Table 7: Token-level intrinsic dimension for general and
+personalized domains.
+
+19
+
+Training Set
+
+Stylo-Literary
+
+Stylo-Blog
+
+M4
+
+None
+M4
+Stylo-Literary
+Mixed
+
+52.37
+53.33
+99.96
+99.95
+
+53.87
+64.77
+67.95
+71.94
+
+41.68
+99.94
+70.72
+99.95
+
+Table 9: Performance of RoBERTa variants, trained on
+different data.
+
+F
+
+Full Results
+
+For training-free methods, full results on
+Stylo-Literary and M4 are shown in Tables 10
+and 11. Since the full results on Stylo-Blog are
+already given in Table 2, we do not repeat them
+here. For training-based methods, full results on
+Stylo-Literary, Stylo-Blog, and the English
+subset of M4 are shown in Tables 12, 13, and 14.
+
+20
+
+Author
+Detector
+
+J.A
+
+C.D
+
+F.D
+
+P.L
+
+B.S
+
+J.S
+
+M.T
+
+Avg.
+
+58.80
+72.80
+58.45
+32.42
+34.35
+41.72
+31.84
+
+52.07
+85.08
+76.40
+45.10
+47.56
+55.74
+44.26
+
+52.12
+73.41
+66.63
+44.07
+45.67
+50.79
+37.03
+
+49.85
+83.10
+73.17
+44.47
+47.08
+54.67
+39.88
+
+55.23
+69.88
+60.38
+36.59
+38.53
+45.73
+33.22
+
+50.86
+66.94
+43.13
+31.28
+32.22
+36.90
+15.05
+
+54.62
+78.14
+60.90
+34.01
+35.73
+43.69
+25.34
+
+52.45
+66.27
+51.73
+38.76
+39.98
+44.38
+21.08
+
+52.24
+77.95
+59.78
+33.63
+36.02
+44.56
+21.67
+
+51.92
+65.67
+47.57
+30.94
+32.60
+40.62
+18.47
+
+79.37
+76.44
+54.65
+10.62
+12.23
+23.16
+15.34
+
+73.63
+61.58
+41.56
+17.14
+18.68
+26.64
+8.26
+
+82.53
+74.43
+52.94
+8.52
+10.26
+19.88
+11.72
+
+76.18
+62.57
+39.78
+9.23
+10.44
+19.43
+8.71
+
+Llama-3.1-8B
+Entropy
+Lastde
+Lastde++
+Log-Likelihood
+LogRank
+Detect-LRR
+Fast-DetectGPT
+
+71.91
+15.17
+12.85
+5.33
+6.07
+13.23
+8.02
+
+57.64
+72.96
+58.34
+31.81
+34.62
+46.21
+27.46
+
+44.19
+86.64
+76.84
+52.93
+54.38
+57.74
+44.01
+Phi-4
+
+Entropy
+Lastde
+Lastde++
+Log-Likelihood
+LogRank
+Detect-LRR
+Fast-DetectGPT
+
+50.79
+25.83
+13.40
+9.39
+11.41
+26.85
+6.08
+
+57.71
+65.61
+42.14
+25.97
+28.60
+40.34
+15.61
+
+44.76
+78.99
+61.89
+43.53
+44.26
+47.65
+24.42
+
+Qwen-3-4B
+Entropy
+Lastde
+Lastde++
+Log-Likelihood
+LogRank
+Detect-LRR
+Fast-DetectGPT
+
+70.23
+23.59
+9.88
+1.72
+2.42
+11.67
+2.91
+
+80.26
+60.30
+30.06
+5.68
+7.15
+17.30
+5.29
+
+71.89
+72.78
+46.55
+11.97
+12.44
+19.39
+8.67
+
+75.36
+68.88
+42.82
+9.00
+9.90
+17.96
+8.78
+
+Table 10: Full AUROC results on Stylo-Literary, where generators are highlighted .
+
+21
+
+Subdomain
+Detector
+
+arXiv
+
+PeerRead
+
+Reddit
+
+WikiHow
+
+Wikipedia
+
+Avg.
+
+23.82
+96.38
+79.51
+64.56
+80.29
+97.42
+31.23
+
+41.90
+55.84
+52.57
+50.05
+51.85
+57.08
+25.41
+
+83.33
+90.03
+89.98
+26.44
+35.62
+69.69
+75.66
+
+41.33
+88.03
+80.91
+59.75
+69.42
+84.34
+55.01
+
+10.35
+99.37
+99.72
+98.98
+99.14
+98.96
+99.84
+
+7.04
+92.62
+94.86
+96.57
+96.26
+93.02
+96.22
+
+48.49
+97.40
+99.07
+84.69
+88.29
+95.32
+99.03
+
+26.35
+97.48
+98.67
+93.76
+94.94
+96.13
+98.99
+
+28.84
+99.67
+98.74
+96.08
+96.38
+96.13
+99.20
+
+6.62
+99.57
+99.90
+99.43
+99.56
+99.37
+99.93
+
+45.16
+96.01
+98.04
+87.39
+89.97
+93.04
+98.30
+
+31.83
+97.69
+98.22
+93.12
+94.21
+94.88
+98.78
+
+17.00
+94.32
+98.34
+95.22
+95.39
+93.77
+98.72
+
+23.26
+85.46
+87.80
+84.26
+83.46
+78.75
+89.36
+
+61.68
+88.73
+94.64
+63.40
+67.08
+78.10
+94.29
+
+40.10
+83.70
+84.41
+72.79
+73.18
+74.03
+85.28
+
+BLOOMz
+Entropy
+Lastde
+Lastde++
+Log-Likelihood
+LogRank
+Detect-LRR
+Fast-DetectGPT
+
+33.95
+98.98
+98.56
+88.71
+94.39
+98.93
+96.04
+
+23.66
+98.94
+83.96
+68.97
+84.96
+98.56
+46.73
+ChatGPT
+
+Entropy
+Lastde
+Lastde++
+Log-Likelihood
+LogRank
+Detect-LRR
+Fast-DetectGPT
+
+61.64
+99.00
+99.85
+89.13
+91.48
+94.08
+99.93
+
+4.21
+99.00
+99.85
+99.45
+99.51
+99.29
+99.92
+Cohere
+
+Entropy
+Lastde
+Lastde++
+Log-Likelihood
+LogRank
+Detect-LRR
+Fast-DetectGPT
+
+64.16
+95.91
+98.50
+85.67
+88.24
+90.59
+99.50
+
+14.39
+97.28
+95.93
+97.02
+96.92
+95.28
+97.00
+Davinci
+
+Entropy
+Lastde
+Lastde++
+Log-Likelihood
+LogRank
+Detect-LRR
+Fast-DetectGPT
+
+78.65
+50.53
+41.47
+21.97
+20.68
+20.29
+44.09
+
+19.92
+99.49
+99.81
+99.11
+99.30
+99.25
+99.91
+
+Table 11: Full AUROC results on M4, where generators are highlighted .
+
+Detector
+
+Generator
+
+J.A
+
+C.D
+
+F.D
+
+P.L
+
+B.S
+
+J.S
+
+M.T
+
+Avg.
+
+Roberta
+
+Llama-3.1-8B
+Phi-4
+Qwen3-4B
+
+35.09
+46.23
+58.82
+
+66.87
+55.77
+58.25
+
+68.81
+61.65
+54.92
+
+46.90
+36.71
+37.25
+
+64.12
+55.15
+57.25
+
+50.71
+45.10
+45.75
+
+63.81
+54.50
+56.27
+
+56.62
+50.73
+52.64
+
+DeTeCtive
+
+Llama-3.1-8B
+Phi-4
+Qwen3-4B
+
+68.98
+63.63
+82.99
+
+65.31
+63.09
+77.16
+
+61.80
+68.25
+77.41
+
+66.34
+65.75
+71.48
+
+71.73
+69.15
+75.94
+
+64.02
+63.40
+74.01
+
+63.21
+65.10
+70.29
+
+65.91
+65.48
+75.61
+
+Table 12: Results of training-based detectors on Stylo-Literary.
+
+Detector
+
+Claude3.7
+
+Claude4
+
+GPT-4o
+
+Qwen2.5-72B
+
+Avg.
+
+Roberta
+DeTeCtive
+
+47.38
+43.97
+
+57.33
+45.06
+
+59.40
+47.68
+
+94.99
+60.39
+
+64.78
+49.28
+
+Table 13: Results of training-based detectors on Stylo-Blog.
+
+22
+
+Detector
+
+Generator
+
+arXiv
+
+PeerRead
+
+Reddit
+
+WikiHow
+
+Wikipedia
+
+Avg.
+
+Roberta
+
+Davinci
+Cohere
+ChatGPT
+BLOOMZ
+
+99.33
+99.92
+100.00
+99.98
+
+100.00
+99.99
+100.00
+100.00
+
+100.00
+99.95
+100.00
+100.00
+
+100.00
+100.00
+100.00
+100.00
+
+99.98
+99.77
+99.95
+100.00
+
+99.86
+99.93
+99.99
+100.00
+
+DeTeCtive
+
+Davinci
+Cohere
+ChatGPT
+BLOOMZ
+
+21.04
+67.04
+89.73
+70.95
+
+99.56
+98.64
+99.83
+96.80
+
+71.45
+86.20
+80.51
+87.49
+
+38.15
+76.87
+39.62
+49.23
+
+49.12
+40.97
+56.75
+91.62
+
+55.86
+73.94
+73.29
+79.22
+
+Table 14: Results of training-based detectors on the English subset of M4.
+
+23
+
+G
+
+Examples of StyloBench
+
+For an intuitive understanding, we show examples of Stylo-Blog and Stylo-Literary with different generators and subdomains in Tables 15 and 16.
+
+Table 15: Examples of Stylo-Blog. The first 30 tokens used to generate MGTs are bolded.
+Model
+Human
+
+Qwen2.5-72B
+
+Claude-4
+
+Text
+Human
+There is so much on my mind these days... So much that I can’t seem to form a clear thought. I want so
+badly to move on with my life, but habits and people and I, myself, keep pulling me back. I know what I
+need to do, but it’s almost like I am afraid to take that step. I’ve always done the safe thing, made the safe
+choices. I’ve always done what was expected of me. And now that I am finally trying to step out on my
+own, I’m being told that I am running away. As much as I know that I need to do this, I still have those
+same childish fears that I’ve always had. I love my family, I love my friends, but I use them as a crutch. I
+use them as the reasons to stay in my comfort zone. I use them as my excuses to not step into that
+shadowy place just beyond my line of sight. I am not running away from anything, well, maybe some
+things, but sometimes, running away is the only way to set yourself free. I’ve prayed and prayed, begged
+and pleaded with God to not tell me what I already know. There is no way to deny that I know where my
+life is going. The only way that I can get to where I truly need to be is to walk away from everything that
+I know, to take that first blind step into my future. And the only way to do that is to put my complete trust
+and total faith in God.
+Machine
+There is so much on my mind these days... So much that I can’t seem to form a clear thought. I
+want so badly to share all these swirling emotions and thoughts, but the words just don’t seem to come.
+It feels like a storm is brewing inside me, with no outlet in sight. The more I try to wrap my head around
+everything, the more I feel like I’m losing my grip on the present. \n\nI’ve been thinking a lot about the
+people in my life recently. The relationships that have shaped me, the ones that have endured through
+thick and thin, and the ones that have faded into the background. It’s funny, how the people who are
+closest to you can be the ones you struggle to open up to the most. I find myself holding back, afraid of
+what will happen if I let it all out. But then, there are moments, like that one in church, where everything
+bubbles up to the surface and I can’t hold it back.\n\nLast Sunday, I was standing there, singing those
+familiar worship songs, and it was like I was transported. The words, \"I walk by faith, each step by faith;
+to live by faith, I put my trust in You,\" echoed in my heart. And in that moment, I felt it. I looked around,
+and the faces of the people surrounding me were both familiar and strange. Familiar, because they’ve
+been a part of my life for so long. Strange, because life has a way of changing us, sometimes so subtly
+that we don’t even notice until we stop and really look.\n\nOf the couple hundred people in that room, I
+only knew about half. Of those, there were the people who have been constants in my life: the adults who
+have watched me grow from a girl into a woman, and the children who I have watched grow from
+toddlers to young adults. There were the people who have stood by me through my weakest moments,
+holding me up when I thought I would fall. And there were those who I have supported, giving them a bit
+of my strength when they needed it most.\n\nBut there was one person, one person who I couldn’t talk to,
+the one person I wasn’t sure if I could leave. And in that moment, the tears started to sting my eyes. I
+couldn’t reach out, couldn’t communicate what I was feeling. The song ended in fellowship time, and I
+There is so much on my mind these days... So much that I can’t seem to form a clear thought. I
+want so badly to move on with my life, but I feel like I’m stuck in this weird limbo where nothing makes
+sense anymore. You know that feeling when you’re standing at a crossroads and every direction looks
+both terrifying and exciting at the same time? That’s exactly where I am right now.\n\nI keep thinking
+back to all those times when I was so sure I had everything figured out. Remember when I was eighteen
+and thought I knew exactly how my life would unfold? Ha! If only that naive girl could see me now.
+She’d probably be shocked at how different things turned out, but maybe she’d also be proud of the
+woman I’ve become through all the unexpected twists and turns.\n\nThe truth is, I’m tired of feeling like
+I’m waiting for permission to live my own life. Does that make sense? It’s like I’ve been holding my
+breath, waiting for some magical moment when everything will click into place and I’ll suddenly know
+what I’m supposed to do next. But what if that moment never comes? What if this uncertainty is just part
+of being human, part of growing up, part of learning to trust yourself even when you can’t see the whole
+staircase?\n\nI was talking to my mom the other day, and she said something that really stuck with me.
+She said, \"Honey, sometimes moving on doesn’t mean you have all the answers. Sometimes it just
+means you’re brave enough to take the next step without
+Continued on next page
+
+24
+
+Table 15: Examples of Stylo-Blog (continued)
+Model
+
+Text
+
+Claude-3.7
+
+There is so much on my mind these days... So much that I can’t seem to form a clear thought. I
+want so badly to just sit and process everything, but life keeps moving at this relentless pace that doesn’t
+allow for much reflection.\n\nYou know that feeling when your brain is like a browser with too many tabs
+open? That’s me right now. A hundred thoughts racing, memories surfacing at odd moments, worries
+about tomorrow pressing in, and in the midst of it all, trying to remember if I picked up milk at the store
+yesterday.\n\nI found myself driving home from work yesterday, and I couldn’t even tell you what streets
+I took. My body was on autopilot while my mind wandered through a maze of its own making. It’s scary
+sometimes, how disconnected we can become from the present moment.\n\nLast night, I was folding
+laundry – such a mundane task – when suddenly tears were streaming down my face. Not sad tears
+necessarily, just... release tears. The kind that come when your heart is too full of something unnamed.
+The kind that need no explanation or justification. They just are.\n\nAnd in that moment, with a
+half-folded t-shirt in my hands, I realized how much I’ve been holding in. How many emotions I’ve been
+packing away neatly like these clothes, trying to make everything fit in the limited space I’ve allowed
+myself.\n\nI think we all do this sometimes. We keep pushing forward, keep smiling, keep showing up for
+the people who need us. We sing the worship songs on Sunday morning, we make the lunches, we answer
+the emails, we check the boxes. And somewhere in all of that, our own hearts get a little lost.\n\nI’m
+looking at my Bible sitting on the nightstand. It’s been there for days, untouched. Not because I don’t
+want to open it, but because I’m afraid of what might happen if I do. If I get still enough to listen, what
+will God say? What will He ask of me? What emotions might surface that I’ve been working so hard to
+keep submerged?\n\nI walk by faith, each step by faith.\n\nThose words from the song at church keep
+coming back to me. Walking by faith doesn’t always mean having clear direction. Sometimes it means
+putting one foot in front of the other when the path ahead is completely obscured. Sometimes it means
+trusting that even in the mental chaos, God
+
+GPT-4o
+
+There is so much on my mind these days... So much that I can’t seem to form a clear thought. I
+want so badly to put it all into words, but every time I try, they swirl around like leaves caught in an
+autumn breeze. It’s as if the very alphabet refuses to settle on the page, preferring instead to dance in
+chaos. And amidst this whirlwind, I find myself yearning for clarity, for a moment of stillness where I can
+breathe and just... be.\n\nSometimes I think about how life used to be so simple, yet we couldn’t wait to
+grow up. Oh, how naive we were! The dreams of adulthood seemed wrapped in wonder and possibility,
+but now I see that they come twined with responsibility and introspection. I pause, caught in the space
+between what was and what is, longing for that childlike clarity once more.\n\nThis introspection takes
+me back to those quiet moments in the pews of the old church, where the weight of expectations lifted
+slightly with each hymn sung. There, in the company of familiar faces, I found something akin to peace.
+We were together, bound not just by belief but by the shared journey of faith and vice-versa, bearing the
+burdens of our collective humanity.\n\nYet these days, everywhere I turn, there seems to be complexity
+and noise. The world spins faster, and sometimes I feel like an outsider peering in through fogged glass. I
+find solace in small acts: the laughter of a child, the rustle of leaves, the comforting ordinariness of a
+daily routine. I seek meaning in the minutiae, an anchor in the intricate tapestry of life.\n\nI’ve been
+volunteering more with the local youth group, hoping to give back some of what was freely given to me.
+And, oh, how their perspectives refresh my own! Their unfiltered view of the world serves as a reminder
+of what truly matters. I watch them, these bundles of potential and enthusiasm, and think about
+possibilities — not just their possibilities, but mine too. \n\nHow often do we, as adults, lose sight of our
+dreams? They get locked away like treasures in a dusty attic, while we pursue notions of success that may
+not really belong to us. And yet, every now and then, I’m reminded to dust them off, to recall who I truly
+am beyond the roles and titles accumulated over the years. It’s like catching a glimpse of your reflection
+in
+
+25
+
+Table 16: Examples of Stylo-Literary. The first 30 tokens used to generate MGTs are bolded.
+Source
+Human
+
+Machine
+
+Human
+
+Text
+Human Author: Mark Twain Generator: Llama-3.1-8B
+“Say, wouldn’t it ’a’ been nuts if he’d a-been here last night ” “Oh, by George, but wouldn’t it” said
+Ferguson “Then we’d have seen scientific work Intellect–just pure intellect–away up on the upper levels,
+dontchuknow Archy is all right, and it don’t become anybody to belittle him, I can tell you But his gift is
+only just eyesight, sharp as an owl’s, as near as I can make it out just a grand natural animal talent, no
+more, no less, and prime as far as it goes, but no intellect in it, and for awfulness and marvelousness no
+more to be compared to what this man does than–than–Why, let me tell you what he’d have done He’d
+have stepped over to Hogan’s and glanced–just glanced, that’s all–at the premises, and that’s enough See
+everything Yes, sir, to the last little detail; and he’ll know more about that place than the Hogans would
+know in seven years Next, he would sit down on the bunk, just as ca’m, and say to Mrs Hogan–Say, Ham,
+consider that you are Mrs Hogan I’ll ask the questions; you answer them ” “All right; go on ” “’Madam,
+if you please–attention–do not let your mind wander Now, then–sex of the child ’ “’Female, your Honor ’
+“’Um–female Very good, very good Age ’ “’Turned six, your Honor ’ “’Um–young, weak–two miles
+Weariness will overtake it then It will sink down and sleep We shall find it two miles away, or less Teeth ’
+“’Five, your Honor, and one a-coming ’ “’Very good, very good, very good, indeed ’ You see, boys, he
+knows a clue when he sees it, when it wouldn’t mean a dern thing to anybody else ’Stockings, madam
+Shoes ’ “’Yes, your Honor–both ’ “’Yarn, perhaps Morocco ’ “’Yarn, your Honor And kip ’ “’Um–kip
+This complicates the matter However, let it go–we shall manage Religion ’ “’Catholic, your Honor ’
+“’Very good Snip me a bit from the bed blanket, please Ah, thanks
+“Say, wouldn’t it ’a’ been nuts if he’d a-been here last night ” “Oh, by George, but wouldn’t that be
+too many, though I like to talk it out once, just for pastime; and sometimes, when I’m alone in the shop, I
+try to make it all come again in dialog, and then it seems as if it had, and I dream about it nights You can
+imagine yourn over again, same as I do When I get tired of myn, I take up Huck’s ” “Why, it was the
+most–” “Yes–incoherency, that’s what it was They just rambled around from one thing to another, and
+never landed in the same place twice Let it alone; it ain’t anybody’s fault Consider them illiterates Now
+you shell notice, Astronomical would naturally drop into their own language; and he did Then he would
+always try to correct himself, and begin to sling off parts of words that he thought belonged to English,
+but didn’t No, he couldn’t put together so you could remember anything he’d said, within fifteen minutes
+after it was done; and he couldn’t get his sentence started twice, right straight through So somebody else
+would interrupt and say, “What’s de use, let him ’lone–dey can’t git shet o’ de subject,” or something like
+that, you know, and then start himself and go to talking You see, he tried to talk English all the time, only
+he couldn’t somehow It got him down So he took to talking dialect, because it was easier and convenient,
+you know Well, as soon as he’d break loose, there warn’t no getting him to his english again He couldn’t
+seem to settle down to it We all used to go for him and rush him every time he’d begin to talk English,
+and force him to talk dialect The Widow Douglas used to break in on me dreadful at first, with her
+English; but she got the hang of it a deal sooner than any of the rest She said she couldn’t stand it, and she
+warned me off from trying to make a body talk dialect that hadn’t been brought up to it, I might as well
+atrophy an elephant Yes, even the widow: everybody was down to the other fellow’s level, before we got
+through And some better’n others, too Present
+Human Author: Jane Austen Generator: Llama-3.1-8B
+” So far her improvement was sufficient–and in many other points she came on exceedingly well;
+for though she could not write sonnets, she brought herself to read them; and though there seemed no
+chance of her throwing a whole party into raptures by a prelude on the pianoforte, of her own
+composition, she could listen to other people’s performance with very little fatigue Her greatest
+deficiency was in the pencil–she had no notion of drawing–not enough even to attempt a sketch of her
+lover’s profile, that she might be detected in the design There she fell miserably short of the true heroic
+height At present she did not know her own poverty, for she had no lover to portray She had reached the
+age of seventeen, without having seen one amiable youth who could call forth her sensibility, without
+having inspired one real passion, and without having excited even any admiration but what was very
+moderate and very transient This was strange indeed But strange things may be generally accounted for if
+their cause be fairly searched out There was not one lord in the neighbourhood; no–not even a baronet
+There was not one family among their acquaintance who had reared and supported a boy accidentally
+found at their door–not one young man whose origin was unknown Her father had no ward, and the
+squire of the parish no children But when a young lady is to be a heroine, the perverseness of forty
+surrounding families cannot prevent her Something must and will happen to throw a hero in her way Mr
+Allen, who owned the chief of the property about Fullerton, the village in Wiltshire where the Morlands
+lived, was ordered to Bath for the benefit of a gouty constitution–and his lady, a good-humoured woman,
+fond of Miss Morland, and probably aware that if adventures will not befall a young lady in her own
+village, she must seek them abroad, invited her to go with them Mr and Mrs Morland were all
+compliance, and Catherine all happiness
+
+26
+
+Examples of Stylo-Literary, continued from last page.
+Source
+
+Text
+
+Machine
+
+” So far her improvement was sufficient–and in many other points she came on exceedingly well;
+for though she could not write sonnets, she brought herself to read them with feeling, and the history
+of her first setting out to excel was soon written, and made into a narrow little volume, two volumes in
+quinto, and all in her own hand She had no notice of it herself, till her mother one day said, “Ellen, may I
+see your drawing-room window ” And when Elizabeth turned her hand out of the draw- ing-book, some
+elegant little figure of a tower or grotto which Miss Crawford had criticising, there, without thinking, lay
+the pretty little volume The look which Elizabeth instantly raised to comprehend the business, remained
+some time on Miss Crawford’s face, and hers was AN UNPLEASANT ONE It spoke meekness,
+submitting, shy distrust, penetrating curiosity, but yet grudging invitation A second or two passed in
+complete silence before either of them spoke, and then it was only, “Well, Ellen –I thought you had been
+writing ” “Oh I did, indeed, I was so much concerned about it ” “And have you explained everything to
+Mr Morland What does he say ” “He is very good-aided But I have been used to have poorer friends My
+family have been poor, for years ” “Yes; that is, you have no father or brother living I beg your pardon
+You are on the spot yourself, which is always something in a friend He must be a singular man–a silent,
+melancholy, earnest, persevering, thinking, practicing man–his mind completely under his own
+control–somewhat severe, perhaps–but with great energy–great forbearance–great capacity of enjoying
+the thing that he likes –provided a woman’s wishes were consulted but what do I tell you They never
+ARE At this rate you will never know Badly as we judge alone, we should never dare to judge till
+
+Human
+
+Machine
+
+Human Author: Jane Austen Generator: Phi-4
+” “I am very sorry for it,” said Catherine dejectedly; “if I had known this before–” “Perhaps,” said
+Miss Tilney in an embarrassed manner, “you would be so good–it would make me very happy if–” The
+entrance of her father put a stop to the civility, which Catherine was beginning to hope might introduce a
+desire of their corresponding After addressing her with his usual politeness, he turned to his daughter and
+said, “Well, Eleanor, may I congratulate you on being successful in your application to your fair friend ”
+“I was just beginning to make the request, sir, as you came in ” “Well, proceed by all means I know how
+much your heart is in it My daughter, Miss Morland,” he continued, without leaving his daughter time to
+speak, “has been forming a very bold wish We leave Bath, as she has perhaps told you, on Saturday
+se’nnight A letter from my steward tells me that my presence is wanted at home; and being disappointed
+in my hope of seeing the Marquis of Longtown and General Courteney here, some of my very old friends,
+there is nothing to detain me longer in Bath And could we carry our selfish point with you, we should
+leave it without a single regret Can you, in short, be prevailed on to quit this scene of public triumph and
+oblige your friend Eleanor with your company in Gloucestershire I am almost ashamed to make the
+request, though its presumption would certainly appear greater to every creature in Bath than yourself
+Modesty such as yours–but not for the world would I pain it by open praise If you can be induced to
+honour us with a visit, you will make us happy beyond expression ’Tis true, we can offer you nothing like
+the gaieties of this lively place; we can tempt you neither by amusement nor splendour, for our mode of
+living, as you see, is plain and unpretending; yet no endeavours shall be wanting on our side to make
+Northanger Abbey not wholly disagreeable ” Northanger Abbey These were thrilling words, and wound
+up Catherine’s feelings to the highest point of ecstasy Her grateful and gratified heart could hardly
+restrain its expressions within the language of tolerable calmness To receive so flattering an invitation To
+have her company so warmly solicited
+” “I am very sorry for it,” said Catherine dejectedly; “if I had known this before–” “Perhaps,” said
+Miss Tilney, with an affectionate smile, “it would not have made you more easy on the subject ” Her
+brother instantly interfered; “Do you advise her to tell me of it then ” “By no means, if she can help it The
+disadvantage is at least mutual There need be no consequence but what will be attended by pleasure ” But
+though the matter was apparently arranged in a moment, and they all three seemed most happily
+reconciled to each other, there yet lingered in Catherine’s mind some feelings which required the
+subduing influence of a good night’s rest to put them quite to flight; and, though without exactly knowing
+why, as soon as she left the room, and while slowly ascending the staircase, she felt convinced that
+General Tilney could never like her, or think her pretty –They had one family friend, besides these
+gentlemen, who resided among them Mr Frederick Tilney, their eldest son, was the rector of the parish, of
+which his father was patron A young man very like his cousin John, but handsomer than him He had a
+great deal of the same manner–and every body thought him extremely agreeable, except Catherine She
+did not like him; and, now that Edmund Bertram was removed from her acquaintance, she wished very
+much that _he_ might never return from Oxford It appeared afterwards that he must often visit his
+relations in Gloucestershire, and this raised a thousand unpleasant questions: Whom would he come with
+Why was not his sister invited also Would he bring Anne Heretitia Mention of Mr Allen did so little
+honour to either sex, to human nature in general, that Catherine was rather glad the circumstance was
+suppressed They sat down to table, twenty-three in number, and in a style of luxury, which, to Catherine,
+with the exception of her first morning’s entertainment, was peculiar Having been indulged with
+uncommon orders in her favourite toy-shop only two days before, she knew how much superior was cold
+beef, or cold lamb, at any time of life, to the daintiest dinner that ever was cooked; and being prepared,
+therefore, to find fault, nothing could be more exquisite than her admiration In addition to every other
+
+27
+
+Examples of Stylo-Literary, continued from last page.
+Source
+
+Human
+
+Machine
+
+Text
+Human Author: Bernard Shaw Generator: Phi-4
+We shall come to the question of the economic dependence of women on men later on; but at
+present we had better confine ourselves to the theories of marriage which we are not ashamed to
+acknowledge and defend, and upon which, therefore, marriage reformers will be obliged to proceed We
+may, I think, dismiss from the field of practical politics the extreme sacerdotal view of marriage as a
+sacred and indissoluble covenant, because though reinforced by unhappy marriages as all fanaticisms are
+reinforced by human sacrifices, it has been reduced to a private and socially inoperative eccentricity by
+the introduction of civil marriage and divorce Theoretically, our civilly married couples are to a Catholic
+as unmarried couples are: that is, they are living in open sin Practically, civilly married couples are
+received in society, by Catholics and everyone else, precisely as sacramentally married couples are; and
+so are people who have divorced their wives or husbands and married again And yet marriage is enforced
+by public opinion with such ferocity that the least suggestion of laxity in its support is fatal to even the
+highest and strongest reputations, although laxity of conduct is winked at with grinning indulgence; so
+that we find the austere Shelley denounced as a fiend in human form, whilst Nelson, who openly left his
+wife and formed a menage a trois with Sir William and Lady Hamilton, was idolized Shelley might have
+had an illegitimate child in every county in England if he had done so frankly as a sinner His
+unpardonable offence was that he attacked marriage as an institution We feel a strange anguish of terror
+and hatred against him, as against one who threatens us with a mortal injury What is the element in his
+proposals that produces this effect The answer of the specialists is the one already alluded to: that the
+attack on marriage is an attack on property; so that Shelley was something more hateful to a husband than
+a horse thief: to wit, a wife thief, and something more hateful to a wife than a burglar: namely, one who
+would steal her husband’s house from over her head, and leave her destitute and nameless on the streets
+We shall come to the question of the economic dependence of women on men later on; but at
+present we had better confine ourselves to the theories of Mrs Warren’s profession As far as its
+religious aspect goes, it seems, so far as I can make out, to be a practice of prostitution in which no
+payment is accepted and from which the practitioner expects nothing but damnation This has never been
+a very popular method: St Paul tells us that prostitutes were always ready enough to trade for money
+without asking for any recompense in heaven Consequently it was not until Mr Gladstone found out,
+when he visited Florence in 1897, that Fra Angelico represented angels with wings instead of tails, that a
+reaction set in against Dante, who did not take this view of things There are many saints in our calendar,
+male and female, whose sanctity has apparently depended largely upon their experience of this form of
+the calling But these records are extremely obscure, because they all insist much more strongly than
+Dante does on the fact that there is only one thing wrong with vice: that is, that it should pay Now in all
+discussions as to whether there is anything fundamentally wrong with human nature–the strongest
+practical grounds being generally alleged by those who believe nothing whatever in its fundamental
+soundness–it is necessary to have a common denominator Both sides must agree what ẅrongm̈eans
+before they can go on to argue about the degree in which it exists If there is something really wrong with
+human nature, then, logically, no human conduct or instinct or desire can possibly be regarded as
+infallibly right The immorality of an action cannot depend entirely on the motive behind it You may begin
+by admitting that if you do certain things with a good motive your act is not sinful; but still, you cannot
+admit that such acts done with a bad motive are not wicked Why should not the most disinterested and
+self-sacrificing promiscuity be just as vicious as the greediest and vilest lust And why should not the
+vilest and greediest lust be just as virtuous as the purest devotion Can anyone answer these questions
+sensibly (I am sure nobody ever tries) except on the
+Human Author: Bernard Shaw
+
+28
+
+Generator: Qwen3-4B
+
+Examples of Stylo-Literary, continued from last page.
+Source
+
+Text
+
+Human
+
+We shall come to the question of the economic dependence of women on men later on; but at
+present we had better confine ourselves to the theories of marriage which we are not ashamed to
+acknowledge and defend, and upon which, therefore, marriage reformers will be obliged to proceed We
+may, I think, dismiss from the field of practical politics the extreme sacerdotal view of marriage as a
+sacred and indissoluble covenant, because though reinforced by unhappy marriages as all fanaticisms are
+reinforced by human sacrifices, it has been reduced to a private and socially inoperative eccentricity by
+the introduction of civil marriage and divorce Theoretically, our civilly married couples are to a Catholic
+as unmarried couples are: that is, they are living in open sin Practically, civilly married couples are
+received in society, by Catholics and everyone else, precisely as sacramentally married couples are; and
+so are people who have divorced their wives or husbands and married again And yet marriage is enforced
+by public opinion with such ferocity that the least suggestion of laxity in its support is fatal to even the
+highest and strongest reputations, although laxity of conduct is winked at with grinning indulgence; so
+that we find the austere Shelley denounced as a fiend in human form, whilst Nelson, who openly left his
+wife and formed a menage a trois with Sir William and Lady Hamilton, was idolized Shelley might have
+had an illegitimate child in every county in England if he had done so frankly as a sinner His
+unpardonable offence was that he attacked marriage as an institution We feel a strange anguish of terror
+and hatred against him, as against one who threatens us with a mortal injury What is the element in his
+proposals that produces this effect The answer of the specialists is the one already alluded to: that the
+attack on marriage is an attack on property; so that Shelley was something more hateful to a husband than
+a horse thief: to wit, a wife thief, and something more hateful to a wife than a burglar: namely, one who
+would steal her husband’s house from over her head, and leave her destitute and nameless on the streets
+
+Machine
+
+We shall come to the question of the economic dependence of women on men later on; but at
+present we had better confine ourselves to the theories of immorality and bad manners which is, in
+short, one single doctrine which has grown by multiplication into an infinity of articles To all these it may
+be said that the theory to which they are attributable is the theory of physical inferiority, moral incapacity,
+inhumanity or mere unskilled destructiveness The elementary creed includes not only the theory of male
+superiority as actually evidenced in modern warfare, but also such absurd assumptions as that in spite of
+modern civilized warfare women cannot fight and must therefore remain separate from mankind even if
+they have no more powerful reason for doing so; or again that the splendid courage displayed by the
+women who stood out during the Great War was produced by a preternatural instinctive force: in other
+words, a sexual instinctuality, which is declared to be incapable of being cultivated by education All this
+is gobbledygook made up by professional female critics to please their paymasters The truth in short is
+what Adam Smith, long ago put it thus T̈o man’s nature is due his love of dominion over woman He may,
+and I believe he ought sometimes to, allow her freedom of choice in marriage matters; but when he does
+this, he leaves his wife in much the same position as if she were married to him against her will A great
+deal of what we call justice or respectability between husband and wife really comes from a strong sense
+of self-reverence, accompanied by an equally strong sense of the infamy of a lie T̈HE HOMO SAPIENS
+MUSICAL PARADISE Some people feel perfectly happy in the belief that women are more refined than
+men because they are less brutal, less selfish, less rapacious In itself this idea makes some sort of sense;
+but it has been found that it does not explain everything Every human being desires, sooner or later, some
+sort of gratification Men usually seek satisfaction from sex activity, and sometimes from sublimated
+forms of that activity (theology, science, music); whereas women often find no satisfactory substitute
+except bare animal
+
+29
+
+

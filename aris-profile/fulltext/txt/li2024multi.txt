@@ -1,0 +1,1512 @@
+Mingzhe Li∗
+
+Xiuying Chen*
+
+Jing Xiang
+
+Ant Group
+limingzhe.lmz@antgroup.com
+
+CBRC, KAUST
+xiuying.chen@kaust.edu.sa
+
+Ant Group
+liping.xj@antgroup.com
+
+Qishen Zhang†
+
+Changsheng Ma
+
+Chenchen Dai
+
+Ant Group
+qishen.zqs@antgroup.com
+
+CBRC, KAUST
+changsheng.ma@kaust.edu.sa
+
+Ant Group
+daichenchen.dcc@antgroup.com
+
+Jinxiong Chang
+
+Zhongyi Liu
+
+Guannan Zhang
+
+Ant Group
+jinxiong.cjx@antfin.com
+
+Ant Group
+zhongyi.lzy@alibaba-inc.com
+
+Ant Group
+zgn138592@antgroup.com
+Input Query
+
+ABSTRACT
+Text matching systems have become a fundamental service in most
+Searching platforms. For instance, they are responsible for matching
+user queries to relevant candidate items, or rewriting the user-input
+query to a pre-selected high-performing one for a better search
+experience. In practice, both the queries and items often contain
+multiple attributes, such as the category of the item and the location
+mentioned in the query, which represent condensed key information that is helpful for matching. However, most of the existing
+works downplay the effectiveness of attributes by integrating them
+into text representations as supplementary information. Hence,
+in this work, we focus on exploring the relationship between the
+attributes from two sides. Since attributes from two ends are often
+not aligned in terms of number and type, we propose to exploit
+the benefit of attributes by multiple-intent modeling. The intents
+extracted from attributes summarize the diverse needs of queries
+and provide rich content of items, which are more refined and
+abstract, and can be aligned for paired inputs. Concretely, we propose a multi-intent attribute-aware matching model (MIM), which
+consists of three main components: attribute-aware encoder, multiintent modeling, and intent-aware matching. In the attribute-aware
+encoder, the text and attributes are weighted and processed through
+a scaled attention mechanism with regard to the attributes’ importance. Afterward, the multi-intent modeling extracts intents from
+two ends and aligns them. Herein, we come up with a distribution
+loss to ensure the learned intents are diverse but concentrated, and
+a kullback–leibler divergence loss that aligns the learned intents.
+Finally, in the intent-aware matching, the intents are evaluated by a
+self-supervised masking task, and then incorporated to output the
+final matching result. Extensive experiments on three real-world
+* Both authors contributed equally to this research.
+† Corresponding author.
+Permission to make digital or hard copies of all or part of this work for personal or
+classroom use is granted without fee provided that copies are not made or distributed
+for profit or commercial advantage and that copies bear this notice and the full citation
+on the first page. Copyrights for components of this work owned by others than the
+author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or
+republish, to post on servers or to redistribute to lists, requires prior specific permission
+and/or a fee. Request permissions from permissions@acm.org.
+WSDM ’24, March 4–8, 2024, Merida, Mexico
+© 2024 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+ACM ISBN 979-8-4007-0371-3/24/03. . . $15.00
+https://doi.org/10.1145/3616855.3635813
+
+How to get to Hangzhou Railway Station without change? Urgent!
+Query Attribute
+Location: Hangzhou
+
+Entity: Railway Station
+
+Category: Travel Guide
+
+Intent Modeling
+Rewrite
+
+arXiv:2402.07788v1 [cs.CL] 12 Feb 2024
+
+Multi-Intent Attribute-Aware Text Matching in Searching
+
+Transportation Payment Importance
+
+✔
+
+Query Attribute #1
+Location: Hangzhou, Zhejiang Province
+Entity: Subway E-Ticket
+Category: Public Traffic
+
+Open the Hangzhou Subway
+E-Ticket in Zhejiang Province
+Candidate Query #1
+
+✘
+
+Query Attribute #2
+Location: Hangzhou
+Entity: Mobile Phone
+Category: Communication
+
+Can I use a mobile phone to access
+the Internet on the Hangzhou Subway?
+Candidate Query #2
+
+Figure 1: The application of our text matching task in query
+rewriting scenarios. The model rewrites the given query to
+pre-selected high-performing queries.
+
+datasets from different matching scenarios show that MIM significantly outperforms state-of-the-art matching baselines. MIM is also
+tested by online A/B test, which brings significant improvements
+over three business metrics in query rewriting and query-item
+relevance tasks compared with the online baseline in Alipay App.
+
+CCS CONCEPTS
+• Information systems → Web searching and information
+discovery.
+
+KEYWORDS
+Text matching, Multi-Intent, Searching, Attribute-Aware Recommendation, Cross Multi-Head Attention
+ACM Reference Format:
+Mingzhe Li, Xiuying Chen, Jing Xiang, Qishen Zhang, Changsheng Ma,
+Chenchen Dai, Jinxiong Chang, Zhongyi Liu, Guannan Zhang. 2024. MultiIntent Attribute-Aware Text Matching in Searching. In Proceedings of the
+17th ACM International Conference on Web Search and Data Mining (WSDM
+’24), March 4–8, 2024, Merida, Mexico. ACM, New York, NY, USA, 9 pages.
+https://doi.org/10.1145/3616855.3635813
+
+WSDM ’24, March 4–8, 2024, Merida, Mexico
+
+Mingzhe Li et al.
+
+Intent 1: cost-effective
+Dove Beauty Bar
+Gender: Unisex
+Price: $ 15.73
+Usage: Body and Facial Cleanser
+Function: Softer Skin Care
+Color: Green
+Query Attributes
+
+✘
+
+Dove Men+Care
+Gender: Men
+Price: $ 3.97
+Usage: Body and Facial Cleanser
+Function: Clean and Hydrate Skin
+Color: Matcha
+
+✔︎
+
+Intent 2: skin clean
+Manual Toilet Seat
+Gender: Unisex
+Price: $ 129.99
+Usage: Non-electric Flushing
+Function: Increased Comfort
+Color: White
+
+✘
+
+HEETA Body Brush
+Gender: Unisex
+Price: $ 6.83
+Usage: Wet Dry Brushing
+Function: Gentle Exfoliating
+Color: Black
+
+✔︎
+
+Intent 3: light color
+Dnc Back Scrubber
+Gender: Unisex
+Price: $ 12.99
+Usage: Brushing Body Softly
+Function: Long Handle Helping
+Color: Black
+
+Search Result without Intents
+
+✘
+
+Metene Shower
+Gender: Unisex
+Price: $ 9.99
+Usage: Brushing with Shampoo
+Function: Gentle Exfoliating
+Color: Cream
+
+Metene Shower
+Gender: Unisex
+Price: $ 9.99
+Usage: Brushing with Shampoo
+Function: Gentle Exfoliating
+Color: Cream
+
+✔︎
+
+Dual-Sided Back Brush
+Gender: Unisex
+Price: $ 9.99
+Usage: Stiff and Soft Bristles
+Function: Body Exfoliator
+Color: White
+
+Search Result with Intents
+
+Figure 2: The application of our model in the query-item matching setting. The model identifies multiple intents on “costeffective”, “skin clean”, and “light color”, based on which it conducts query-item matching to return relevant items to the users.
+
+1
+
+INTRODUCTION
+
+Search engines are one of the most important technologies nowadays. Traditional search engines build inverted indexes based on
+queries and documents to accomplish information retrieval. With
+the richness of search content, modern systems start to store key
+information of queries and items by attributes, such as brands, entities, and regions [28]. Such information can help classify whether
+the queries or items match each other. For example, in the query
+rewriting task in Figure 1, when a user inputs a query, the matching
+system can identify the related attributes, and rewrite the query
+to high-performing queries in a curated set, so as to increase the
+chance of matching relevant items further. Another application
+is the query-item matching task in Figure 2, where the system
+matches the query to related items, also based on the attributes.
+Various approaches have been adopted for text matching with
+attributes in search platforms [18, 30, 33]. Recently, deep-learningbased approaches become popular, which typically represent queries
+and items with low-dimensional vectors. To name a few, [40] extracted keywords and intents from the input texts as attributes, and
+enhances the matching from different granularities. [11] treated
+multiple additional inputs as attributes, and explicitly represented
+each attribute as an embedding, which is further fused into the
+input embeddings. Most recently, [31] considered the relationship
+between attributes and input text by introducing an attribute fusion
+layer to identify the most relevant features.
+The above works show that attributes play an important role in
+text matching task. However, they mainly integrate the attribute
+information into the text representation, underplaying the effectiveness of attributes. Since attributes contain a condensed form
+of information in the input, we assume that modeling the relationship between the attributes of two sides is decisive in the matching
+tasks. Nevertheless, attributes from two ends are often not aligned
+in terms of number and type, and directly matching them is counterintuitive. We give a real-world example here in Figure 2. The
+query “Macaroon color bath artifacts for students in bathroom”
+with attributes “students”, “bath artifacts” and “macaroon color”
+can be matched with the back rub, which has a low price fit for a
+student and light color that belongs to the macaroon color scheme.
+
+However, the number of attributes for the items is different from
+that of the query, and the attribute content does not directly correspond to the query either. Thus, a deeper and more comprehensive
+understanding of the attributes is required. In this paper, we resort
+to the “intents” of the text, which is a more abstract and representative concept that reflects the customers’ needs. A suitable rewriting
+query or an item will always meet the customers’ intents. In the
+above case, once the model understands the query by its intents
+on “cost-effective”, “light color”, and “skin clean”, it can match the
+query to the proper items.
+Motivated by the above observation, in this paper, a novel multiintent attribute-aware matching framework (MIM) is proposed.
+Specifically, MIM consists of three main components: attributeaware encoder, multi-intent modeling, and intent-aware matching.
+Firstly, an attribute-aware encoder processes the query and attributes from two inputs together, to let information flow across
+both parts. Considering that different attributes have different impacts on the matching performance, we propose a scale attention
+mechanism and assign different weights to the attributes in the
+encoding process. Afterward, a multi-intent modeling module extracts a number of intent representations from the attribute-aware
+representations, where each intent reflects a different intention of
+the user. To ensure the learned intents can represent diverse perspectives of the input text while also closely related to the text gist,
+we come up with a distribution loss. This loss pushes the intent representations far away from each other but centered around the text
+representation. We further propose a kullback-leibler loss to align
+the intent distributions and match the learned intents from two
+sides. Finally, an intent-aware matching module takes the learned
+intent and text representations as input to give the final matching
+result. Since some salient intents can be decisive in the matching
+evaluation, while other second-order intents may play a less important role, we come up with a self-supervision task to evaluate
+the importance of each intent. Concretely, we mask each intent
+and see how the change influences the objective loss. If the performance gets worse, which means that the intent is important for
+the final decision, we increase its corresponding weight and vice
+versa. Offline experiments on three real-world datasets in different
+
+Multi-Intent Attribute-Aware Text Matching in Searching
+
+scenarios, and online A/B test experiments on Alipay App verify
+the effectiveness of our proposed MIM.
+To summarize, our contributions are three-fold:
+• We propose MIM for multi-intent text matching learning in
+searching systems, which is the first attempt to comprehensively
+leverage both query and item textual attributes for multi-intent
+understanding.
+• To achieve the above goal, we propose an intent-aware encoder,
+a multi-intent modeling module, and an intent-aware matching
+module, which extract multiple intents from the queries and the
+matched intents from the items to perform precise and diverse
+candidate matching.
+• Extensive experiments on three real-world applications validate the effectiveness of the proposed method. Currently, MIM has
+been deployed online, serving hundreds of millions of Alipay users
+and yielding significant improvement in commercial metrics.
+
+2
+
+RELATED WORK
+
+E-Commerce Item Relevance Searching. Millions of items can
+be found on typical e-commerce platforms. Users go to these platforms and type in search terms to find the things they want. The
+success of e-commerce platforms depends on matching the query to
+the appropriate items. Users visit these platforms and enter search
+queries to retrieve their desired items [11, 20]. Therefore, matching the query to the relevant items is essential for the success of
+e-commerce platforms [7]. To address the challenge of semantic
+alignment between queries and items, several works attempted to
+incorporate contextual information [12, 32] to obtain more comprehensive representations. To better learn the relative position of
+sentence vectors in the semantic space, [2, 8, 37] provided difficult
+negative samples for contrastive learning through optimizing the
+sampling strategy. These works generally focused only on the pure
+input text of query and item, neglecting the additional attribute
+information along with the text, which is proved to be useful in
+e-commerce tasks [11, 33]. [40] extracted keywords and abstract intents from sentences and performed semantic matching at different
+granularities. [31] modeled the relationship between attributes and
+input text by introducing an attribute fusion layer to identify the
+most relevant features. However, previous works have undervalued
+the effectiveness of attributes by treating them as supplementary
+information integrated into text representations. Therefore, in this
+work, we concentrate on exploring the relationship between attributes from two sides directly.
+Query Rewriting Aside from matching queries to items, another
+application of text matching is to rewrite user queries to pre-selected
+high-performing queries. The user query might be of poor quality due to colloquial expression, errors in the input system, or the
+users’ abridged language [39]. The problem of vocabulary gap is
+also pronounced in the e-commerce setting where queries are in
+informal language whereas the item titles/descriptions are written
+in formal language [12]. [24] proposed to learn a transition probability to delete or replace words at the granularity level. [6] utilized
+abstracted keywords to modify the semantic representation of the
+input text. [27] formulated query rewriting into a cyclic machine
+translation problem to leverage abundant click log data. Further,
+in this paper, not only the attribute information is differentially
+
+WSDM ’24, March 4–8, 2024, Merida, Mexico
+
+incorporated into the semantic information, but also the alignment
+relationship between the two input texts at different levels of granularity is learned by extracting the intent embedded in the attributes.
+Multi-Intent Modeling. Due to the diversity of the text and multiple matching possibilities in the text-matching task, multi-intent
+based encoding methods have been explored for better matching
+performance [3, 5, 17]. For example, [4] extracted multi-interests
+from the user’s historical behaviors and profile information to enhance candidate matching performance in the recommendation
+system. [16] applied the multi-intent ideology in news recommendation and proposed a poly attention scheme to learn multiple interest vectors for each user, which encodes the different intentions
+of the user. A variation of multi-intent, i.e., multi-view modeling,
+has also been explored. [38] proposed a multi-view document representation learning framework since a document can usually answer
+multiple potential queries from different views. [26] proposed a
+multi-view link prediction task to determine the entity candidates
+that belong to the correct concepts in the commonsense view and
+face view. However, to the best of our knowledge, no works explore
+the multi-intent phenomenon in the text matching field in Searching. In this work, we come up with a multi-intent modeling module
+by aggregating information from text and attributes.
+
+3 MODEL
+3.1 Problem Formulation
+We first introduce the notations and key concepts. For brevity, we
+take the scenario of matching a user query to a pre-defined query as
+an example, and the settings for query-item matching is similar. For
+an input query text 𝑋 = {𝑥 1, 𝑥 2, . . . , 𝑥𝑚 }, where 𝑥𝑖 represents the
+𝑖-th word, we assume there are corresponding attributes with the
+query such as entities, location area, and category words. We denote
+the attributes as 𝐴 = {𝑎 1, 𝑎 2, . . . , 𝑎𝑛𝐴 }, where 𝑛𝐴 is the attribute
+𝑙𝑎
+
+number of 𝐴, and 𝑎𝑖 consists of 𝑙𝑖𝑎 words {𝑎𝑖1, 𝑎𝑖2, . . . , 𝑎𝑖𝑖 }. Our aim is
+to identify whether the input query matches a rephrased query 𝑌 =
+{𝑦1, 𝑦2, . . . , 𝑦𝑛 }, where 𝑦 𝑗 represents the 𝑗-th word. The rephrased
+query 𝑌 is also attached with 𝑛𝐵 attributes 𝐵 = {𝑏 1, 𝑏 2, . . . , 𝑏𝑛𝐵 }.
+In our multi-intent text matching model, we first extract multiple
+intents from the text and attributes, and aggregate information
+from the input with intents to generate the final matching score.
+
+3.2
+
+Attribute-aware Encoder
+
+First, we need to learn the semantic meaning of the input text and
+attributes from both queries. Considering the superior performance
+of attention mechanisms on text-matching task [1, 36], we concatenate the input texts with the attributes. However, we notice that the
+importance of attributes is not only derived from their relationships
+with other input units, but also influenced by their own content.
+If the attribute does not convey meaningful information related
+to the matching, it should play a less important role in the encoding process. Hence, we propose a scaled self-attention module to
+model the temporal interactions between the texts and attributes
+in a matching pair.
+Concretely, we append a special token “[𝐶𝐿𝑆]” at the beginning
+of the concatenated input, and append a special token “[𝑆𝐸𝑃]” to the
+
+WSDM ’24, March 4–8, 2024, Merida, Mexico
+
+Mingzhe Li et al.
+
+(3) Intent-aware Matching
+
+✔︎
+
+✔︎
+
+Mask Loss
+
+✘
+
+Loss before mask
+
+Intent Weight
+
+Loss after mask
+
+Matching Score
+
+✘
+
+✘
+
+✘
+
+✘
+
+✘
+
+Global Interaction
+
+(2) Multi-Intent Modeling
+
+KL
+Loss
+
+Intents
+
+Intents
+
+Distribution
+Loss
+
+Multi-Intent Extraction
+
+Multi-Intent Extraction
+
+···
+
+···
+
+gate
+
+How to get to Hangzhou Railway
+Station without change? Urgent!
+
+Railway Station
+
+Input Query
+
+gate
+
+Hangzhou ···
+
+gate
+
+gate
+
+(1) Attribute-aware Encoder
+
+Travel Guide
+
+Attribute
+
+Open the Hangzhou Subway ETicket in Zhejiang Province
+
+Rewritten Query
+
+Subway E-Ticket
+
+gate
+
+gate
+
+Hangzhou, Zhejiang
+Province
+
+···
+
+Public Traffic
+
+Attribute
+
+Figure 3: Overview of MIM, which consists of three parts: (1) Attribute-aware Encoder obtains vector representations for the
+queries and attributes based on cross-attention and attribute-weighting; (2) Multi-Intent Modeling extracts multiple diverse
+intents related to the queries with two devised losses; (3) Intent-Aware Matching incorporates information from queries and
+intents to output the final matching result.
+front of each attribute and text. The representation of “[𝑆𝐸𝑃]” appended to the 𝑘-th attribute is regarded as the overall representation
+of the attribute, denoted as ℎ𝑘𝐴𝑡𝑡𝑟 . Then, we obtain the 𝑘-th importance gate 𝑔𝑘 based on ℎ𝑘𝐴𝑡𝑡𝑟 : 𝑔𝑘 = 𝜎 (ℎ𝑘𝐴𝑡𝑡𝑟 ), where 𝑘 ∈ [1, 𝑛𝐴 +𝑛𝐵 ],
+and 𝜎 (.) is a fully-connected layer with the sigmoid function. Next,
+we incorporate the gate values into the attention process. Note that
+there can be multiple words in the 𝑘-th attribute, and all the words
+correspond to the same importance gate 𝑔𝑘 . For brevity, for the
+following part, we change the index of the gate from the attribute
+index to the word-level index. Following [34], all inputs are transformed into query 𝑄, key 𝐾, and value 𝑉 through fully connected
+layers. The attentive module then takes each 𝑄𝑖 to attend to 𝐾 𝑗
+′ = 𝑄 × 𝐾 . Next, the gate score 𝑔 is incorporated in the
+as 𝛼𝑖,𝑗
+𝑖
+𝑗
+𝑗
+gate-aware softmax operation,
+obtaining
+attention
+distribution 𝛼𝑖,𝑗
+
+
+′
+exp 𝑔 𝑗 ·𝛼𝑖,𝑗
+
+ , where 𝛼𝑖,𝑗 denotes the attention
+′
+𝑛=1 exp 𝑔 𝑗 ·𝛼𝑖,𝑛
+
+following 𝛼𝑖,𝑗 = Í𝐿
+
+weight between 𝑖-th word to 𝑗-th word, and 𝑔 𝑗 denotes the corresponding attribute weight of the 𝑗-th word. These output attention
+distribution results are used as weights to gain the weighted sum of
+Í
+𝑉 𝑗 as ℎ𝑖′ = 𝐿𝑗=1 𝛼𝑖,𝑗 ×𝑉 𝑗 . Here, the concatenated sequence length is
+Í 𝐴 𝑎
+Í 𝐵 𝑏
+calculated as 𝐿 = 𝑚+ 𝑛𝑘=1
+𝑙𝑘 +𝑛+ 𝑛𝑘=1
+𝑙𝑘 . To prevent the vanishing
+or exploding of gradients, a layer normalization operation [13] is
+also applied on the output of the feed-forward layer.
+Herein, we use the corresponding “[SEP]” vector for the 𝑖-th
+attribute at the last layer as the updated attribute representations
+ℎ𝑖𝐴 and ℎ𝑖𝐵 for 𝐴 and 𝐵 respectively.
+
+3.3
+
+Multi-Intent Modeling
+
+Multiple Intent Extractor. After obtaining the vector representations of the inputs, we aim to analyze and extract the multiple
+
+intents from them. The motivation is twofold. Firstly, taking Figure 1 as an example, a query may reflect the user’s multiple intents
+in regard to a candidate rewriting query, e.g., “transportation”, “payment”, and “importance”. On the other hand, two queries can be
+similar in terms of word usage but have different semantic meanings. Without intent modeling, it would be hard to identify the
+subtle differences and give correct matching results. For example,
+“How to use mobile phones to take the Hangzhou Subway?” and
+“Can I use a mobile phone to access the Internet on the Hangzhou
+Subway?” should not be matched together, since they have different
+user intents. Hence, if we can extract the hidden intents behind
+the input and evaluate the matching degree between two queries
+taking the intents into consideration, the matching will be more
+comprehensive and accurate.
+Generally, we aggregate attributes into multiple intents based
+on the association between them. Considering that the query is
+playing a central role during the intent extraction, we treat it as a
+condition, which controls the intent extraction process. Concretely,
+ℎ𝑋 is concatenated with each updated attribute representation ℎ𝐴𝑗 ,
+and the multi-intent can be obtained through attribute-weighted
+aggregation:
+𝑤𝑐,𝑗 = softmax([ℎ𝑋 ; ℎ𝐴𝑗 ]𝑊 𝐴 + 𝑏 𝐴 ),
+T
+𝐼𝑐𝑋 = 𝑤𝑐,𝑗
+× ℎ𝐴𝑗 ,
+
+(1)
+(2)
+
+where [; ] denotes concatenation operation, and 𝑊 𝐴 ∈ R2𝑑 ×𝑐 and
+𝑏 𝐴 ∈ R𝑐 are learnable matrices. The weight 𝑤𝑐,𝑗 aggregates 𝑛𝐴
+attributes into 𝑐 intents. In this way, we obtain the multi-intent
+𝐼 𝑋 ∈ R𝑐 ×𝑑 of input query 𝑋 , where 𝑑 is the hidden dimension. The
+intent extraction of rewritten query 𝑌 with attributes 𝐵 is similar,
+and we denote it as 𝐼 𝑌 .
+
+Multi-Intent Attribute-Aware Text Matching in Searching
+
+WSDM ’24, March 4–8, 2024, Merida, Mexico
+
+Distribution Loss. Intuitively, we want the learned intents
+to be diverse and conclude all the interests implied by the query.
+However, multiple intents can usually degrade into one, as shown
+in similar one-to-many architectures such as the mixture of experts
+[41] and multi-view matching [38]. On the other hand, the semantic
+meaning of learned intents should be closely related to that of the
+user query. Hence, we come up with a distribution loss, which
+pushes the representations of multiple intents to be far from each
+other, but centered around the query representation. Concretely, we
+calculate the similarity between each pair of intents and between
+the query and intent. The distribution loss minimizes the similarity
+between intents and their distance to the query representation:
+∗
+
+L𝑑𝑖𝑠 = E[−log Í
+
+𝑒 𝑐𝑜𝑠 (𝐼𝑖 ,ℎ )/𝜏
+
+𝐼𝑖 ,𝐼 𝑗 ∈𝐼 ∗ 𝑒
+
+𝑐𝑜𝑠 (𝐼𝑖 ,𝐼 𝑗 )/𝜏
+
+],
+
+(3)
+
+where 𝜏 denotes the temperature parameter, ∗ can be 𝑋 or 𝑌 . 𝐼𝑖 , 𝐼 𝑗 ∈
+𝐼 ∗ is the extracted intents, 𝑐𝑜𝑠 (.) denotes cosine similarity between
+the two representations, and ℎ ∗ denotes the query representations
+from the attribute-aware encoder.
+KL-Divergence Loss. Apart from the distribution restriction on
+the process of learning intents, we also have a divergence loss on
+the learned intent representations. The motivation is that for paired
+queries, their intents in the latent space should also be aligned with
+each other. The intent matching is especially important when the
+attributes cannot be directly aligned. Hence, for the positive cases
+in our training dataset, we come up with the intent KL-divergence
+loss to push their intent representations to have similar distributions. On the other hand, for the negative pairs in the training set,
+we aim to maximize the KL-divergence. We choose to align the
+intent distributions instead of directly pushing the intent representations closer since we emphasize the “matching” of the multiple
+representations:
+
+
+L𝐾𝐿 = D𝐾𝐿 𝑞(𝐼 𝑋 | ℎ𝑋 , ℎ𝑖𝐴 )∥𝑞(𝐼 𝑌 | ℎ𝑌 , ℎ𝑖𝐵 ) ,
+(4)
+where 𝑞 denotes the statistic distribution of the generated intents.
+
+3.4
+
+The model training is then to maximize this likelihood score for
+each positive target item against the rest negative ones:
+L𝑚𝑎𝑡𝑐ℎ = −(𝑠 log(𝑃) + (1 − 𝑠) log(1 − 𝑃)),
+
+L𝑚𝑎𝑠𝑘 =
+
+where 𝑐 is the extracted intent number of each input. Here, the
+global information from “[CLS]” token is fused into the matching
+process. Finally, the likelihood that the input query 𝑋 should be
+rephrased as rewritten query 𝑌 can be obtained as:
+𝑃 = 𝜎 (𝐹𝐶 ([ℎ𝑐𝑙𝑠 ; 𝛽 1 𝐼ˆ1 ; . . . ; 𝛽 𝑗 𝐼ˆ𝑗 ])),
+where 𝜎 is the sigmoid function.
+
+(6)
+
+2𝑐
+∑︁
+
+exp(L𝑛𝑒𝑤 − L𝑚𝑎𝑡𝑐ℎ ), 𝛽 𝑗 2 ,
+
+(8)
+
+𝑗=1
+
+where = ∥ · ∥ 2 is the L2 norm of the vector.
+We use the overall loss L to optimize the parameters of the
+end-to-end framework:
+L = L𝑚𝑎𝑡𝑐ℎ + L𝑑𝑖𝑠 + L𝐾𝐿 + L𝑚𝑎𝑠𝑘 .
+
+(9)
+
+4 EXPERIMENTS
+4.1 Datasets
+Table 1: Dataset statistics.
+
+Amazon
+
+Intent-aware Matching
+
+After obtaining the multi-intent representation, we can utilize them
+to help predict the matching degree of the two inputs.
+Concretely, we incorporate the intent information into text representations by utilizing attention mechanisms. Remember that in
+§ 3.2, we append a “[CLS]” token in front of both inputs. Here, we
+apply its polished representation ℎ𝑐𝑙𝑠 output from the attributeaware encoder as a query, and concatenate the intents 𝐼 𝑋 and 𝐼 𝑌
+of each input as 𝐼 𝑗 , so as to calculate the intent importance weight
+𝛽 𝑗 during the matching:
+
+
+exp ℎ𝑐𝑙𝑠 × 𝐼 𝑗
+𝛽 𝑗 = Í2𝑐
+(5)
+,
+𝑐𝑙𝑠 × 𝐼
+𝑡
+𝑡 =1 exp ℎ
+
+(7)
+
+where 𝑠 denotes that inputs match (1) or not (0).
+Intent-Mask Self-Supervision Task. Motivated by the selfsupervision training from the existing pretrained language models
+[14, 22], we propose an intent-mask self-supervision task to identify
+intents that are beneficial for the matching and emphasize their
+contributions in the matching process. Generally, we iteratively
+mask each intent and calculate the matching loss in each case. If the
+loss increases by a large margin, it means that the masked intent
+is of great importance to the matching performance. Hence, the
+model will learn to assign higher weights to the intent.
+The corresponding process is shown in Figure 3, where the loss
+before and after masking is denoted by the red and white bars,
+respectively. Specifically, we keep the denotation of the original
+matching loss without the mask as 𝐿𝑚𝑎𝑡𝑐ℎ , and we denote the loss
+after the mask as 𝐿𝑛𝑒𝑤 . Then, the masking loss is defined as:
+
+Alipay
+Query Rewriting
+
+Alipay
+Query-Item Matching
+
+number of query-item pairs
+training dataset size
+valid dataset size
+test dataset size
+
+1,818,825
+27,757
+139,306
+425,762
+
+number of rewritten query pairs
+training dataset size
+valid dataset size
+test dataset size
+
+32,604
+1,253,757
+2,347
+2,500
+
+number of query-item pairs
+training dataset size
+valid dataset size
+test dataset size
+
+730,027
+710,027
+10,000
+10,000
+
+In this paper, we conduct offline experiments on three real-world
+datasets as shown in Table 1, including a public benchmark Amazon [29] and two large-scale industrial datasets that we collected
+from Alipay App.
+The Amazon dataset is a query-item matching dataset. It provides
+a list of up to 40 potentially relevant items for each query. Here
+we utilize the English part of the large version for the query-item
+matching task. For the input query, we extract key phrases from
+it by TextRank [25] as the attributes. As for the item, its attributes
+include description, bullet point, brand, color, and source. Following
+
+WSDM ’24, March 4–8, 2024, Merida, Mexico
+
+Mingzhe Li et al.
+
+Table 2: Offline performance of MIM and baselines on Amazon and Alipay datasets. Numbers in bold mean that the improvement
+to the best baseline is statistically significant (a two-tailed paired t-test with p-value <0.01).
+Amazon
+
+Alipay Query Rewriting
+
+Accuracy
+
+AUC
+
+F1
+
+Accuracy
+
+AUC
+
+F1
+
+Accuracy
+
+AUC
+
+F1
+
+BERT [9]
+SimCSE [8]
+RankCSE [21]
+
+0.7315
+0.7423
+0.7495
+
+0.7767
+0.7882
+0.8071
+
+0.8145
+0.8213
+0.8247
+
+0.8560
+0.8577
+0.8649
+
+0.9092
+0.9104
+0.9192
+
+0.6944
+0.7003
+0.7218
+
+0.8051
+0.8147
+0.8154
+
+0.8722
+0.8736
+0.8785
+
+0.8127
+0.8143
+0.8166
+
+MVR [38]
+MADRAL [11]
+
+0.7492
+0.7624
+
+0.8036
+0.8177
+
+0.8275
+0.8229
+
+0.8622
+0.8670
+
+0.9137
+0.9188
+
+0.7151
+0.7332
+
+0.8137
+0.8142
+
+0.8773
+0.8758
+
+0.8182
+0.8184
+
+BERT-concat
+AGREE [31]
+Machop [35]
+DCMatch [40]
+
+0.7434
+0.7681
+0.7705
+0.7732
+
+0.7941
+0.8193
+0.8314
+0.8356
+
+0.8238
+0.8282
+0.8303
+0.8343
+
+0.8578
+0.8624
+0.8695
+0.8700
+
+0.9197
+0.9129
+0.9136
+0.9208
+
+0.7102
+0.7257
+0.7384
+0.7399
+
+0.8168
+0.8169
+0.8213
+0.8202
+
+0.8764
+0.8797
+0.8903
+0.8847
+
+0.8195
+0.8213
+0.8340
+0.8366
+
+MIM
+
+0.7813
+
+0.8449
+
+0.8413
+
+0.8792
+
+0.9324
+
+0.7506
+
+0.8343
+
+0.9012
+
+0.8431
+
+the official setting, all matching labels are split into training and
+test data. We split 10% of the training data as the valid dataset.
+The Alipay Query Rewriting dataset is collected from the online Alipay searching platform, where we gather the consecutive
+exposure and click logs for four weeks and summarize the highfrequency queries. We randomly sample a set of queries as inputs.
+The corresponding candidate rewriting queries are constructed
+by human annotators. Each query includes three attributes: entity
+(the identified entity), location (geographic information such as
+countries, provinces, cities, and regions), and category (functional
+categories like transportation, technology, and medical health). In
+the construction process for attributes, we asked annotators to exhaustively label a list of possible entities and locations. Then, the
+entity and location attributes are obtained by exact string matching with the labeled list. For the category classification, we use a
+pretrained model to match the queries to 24 pre-defined categories.
+The Alipay Query-Item Matching dataset is also constructed
+based on the high-frequency queries obtained above. We obtain potentially relevant items for each query based on user click behavior
+log data, and all retrieved items are manually annotated to indicate
+whether they are relevant to the query. The extraction of attributes
+from queries is consistent with the Query Rewriting dataset. As for
+the items, we utilize structured information filled out by users as
+attributes, including keyword, category, functionality, and brand.
+
+4.2
+
+Alipay Query-Item Matching
+
+Baselines.
+
+We compared our proposed model against naive text-matching
+methods, multi-view methods, and attribute-aware methods.
+The naive text-matching baselines include: • BERT [9]: the most
+commonly used pre-trained language model for text matching. •
+SimCSE [8]: a contrastive learning framework that advances sentence embeddings. • RankCSE [21]: an unsupervised sentence
+representation learning method, which incorporates ranking consistency and ranking distillation with contrastive learning.
+Next, we compared with baselines that learn multi-view representations for attributes which is similar to our approach: • MVR [38]:
+extract multi-view embeddings for one document and align with
+different queries. In this paper, we adapt their method to obtain
+
+multi-view representations by concatenating text input and attributes. • MADRAL [11]: introduces multi-attribute prediction
+task along with the main matching task to fuse the learned attribute
+information with the text semantic meanings.
+Finally, we compared with baselines that also introduce attributes
+as inputs: • BERT-concat: a baseline that directly concatenates the
+input text with attributes as BERT input. • Machop [35] employs
+attributes as additional knowledge to guide the model to focus
+on key-matching information. • DCMatch [40] designs multiple
+supervised tasks to learn different granularities of attribute information for matching. • AGREE [31] introduces an attribute fusion
+layer in the item side to incorporate the most relevant item features
+into representations.
+
+4.3
+
+Implementation Details
+
+We implemented our experiments in Pytorch on an NVIDIA A100
+GPU. For our model and all baselines, we followed the same setting
+as described below. We set the truncation length for the Amazon
+dataset as 512 and 128 for the Alipay dataset. We set the intent
+number to three by default. The model was fine-tuned based on
+BERT-base with 12 layers and 768 hidden dimensions, and the other
+parameters were all initialized randomly using a zero-mean Gaussian distribution with a std of 0.01. Experiments were performed
+with a batch size of 256. We used Adam optimizer [10] as our optimizing algorithm, with a range of [−1, 1] gradient clipping during
+training. We selected the 5 best checkpoints based on performance
+on the validation set and reported averaged results on the test set.
+
+4.4
+
+Evaluation Metrics
+
+For offline evaluation, we use Accuracy, AUC, and F1 metrics, which
+have been widely adopted for candidate matching: • Accuracy
+calculates the proportion of correct predictions among all prediction
+results. • AUC calculates the area under the ROC curve, which
+can better adapt to the phenomenon of class imbalance. • F1 score
+balances both recall and precision, and leads to a better judgment
+about the performance of the classifier.
+For online evaluation, we select a range of core commercial metrics, including the click-through-rate per page view (pvCTR) and
+
+Multi-Intent Attribute-Aware Text Matching in Searching
+
+WSDM ’24, March 4–8, 2024, Merida, Mexico
+
+Table 3: The performance improvements on two scenes of
+Alipay App Search with online A/B test.
+
+Method
+
+Alipay Query Rewriting
+pvCTR
+GR
+BR
+
+Alipay Query-Item Matching
+pvCTR
+GR
+BR
+
+online
+MIM
+
++0.0
++0.11%
+
++0.0
++0.84%
+
++0.0
++11.95%
+
+-0.0
+-13.43%
+
++0.0
++2.32%
+
+-0.0
+-1.15%
+
+Relevance Score metrics consisting of good case rate (GR) and bad
+case rate (BR). • pvCTR calculates the average number of clicked
+times per search action. • GR is used to evaluate the proportion of
+accurate paraphrasing cases, or the proportion of items that fully
+meet the user’s query requirements, whose growth reflects the benefits actually brought to the Alipay APP. • BR, corresponding to
+GR, calculates the proportion of bad results. Its decrease indicates
+that the model has actually solved existing problems.
+
+4.5
+
+Offline Performance
+
+Table 2 shows the experimental results in terms of Accuracy, AUC,
+and F1 score on the three datasets. Firstly, the supervised learning
+of text matching models performs better than that of representation
+learning models. This is because, through task design, the model
+can better learn which information in the input data should contribute more to the matching task, while ignoring the parts that may
+have meaning but do not contribute much to judging text matching.
+For example, even if the recent RankCSE model shows excellent
+performance on embedding learning tasks, it still does not perform
+as well as several baselines designed for matching, which means
+sufficient interaction is decisive in the fusion of information, and its
+effectiveness is significant in matching tasks. Secondly, models with
+attributes show better performance, suggesting that the attribute
+information is of great significance in the text-matching task. In
+comparison with the BERT-concat, Machop, and DCMatch show
+better ability in candidate matching. This may be mainly attributed to the fact that the Machop and DCMatch can better utilize
+attributes. AGREE and MADRAL both have strong performance by
+using attributes as additional supervision signals. Thirdly, we find
+that multi-aspect modeling is effective in various directions. For
+example, MVR is a method with a max-pooling operation on multiview representations, and Machop has multi-attribute structureaware pooling. They both achieve good performance compared
+with other baselines. Finally, MIM achieves the best performance
+across all the datasets and different metrics. Specifically, MIM outperforms DCMatch by 0.0091 AUC score on Amazon, 0.0116 score
+on Alipay Query Rewriting datasets, and 0.0165 score on Alipay
+Query-Item Matching tasks, respectively. All pairwise comparisons
+among systems are statistically significant using the paired student
+t-test for significance at 𝛼 = 0.01. The above observation demonstrates that our method of extracting intents makes better use of the
+attributes, and our designed intent alignment mechanism improves
+the text-matching performance.
+
+4.6
+
+Online Experiments
+
+Besides the offline experiments, we also conduct online A/B tests
+by deploying MIM in the query rewriting and query-item relevance
+
+Table 4: Ablation study of MIM on Amazon dataset. Numbers
+in bold indicate that the improvement over the best baseline
+is statistically significant.
+Accuracy
+
+AUC
+
+F1
+
+MIM
+
+0.7813
+
+0.8449
+
+0.8413
+
+w/o gate score
+w/o L𝐾𝐿
+w/o L𝑑𝑖𝑠
+w/o multi-intent
+w/o mask task
+
+0.7763
+0.7741
+0.7744
+0.7664
+0.7780
+
+0.8429
+0.8403
+0.8392
+0.8254
+0.8435
+
+0.8402
+0.8384
+0.8387
+0.8332
+0.8397
+
+matching of the Alipay searching system for seven days. In the control group, the matching strategy deployed in our current online
+system follows a similar cross-encoder structure. In the test group,
+the proposed MIM is deployed to serve the candidate rewritten
+query matching and query-item relevance matching, respectively.
+The same recall and ranking strategies are used for a fair comparison, and the averaged A/B test results are reported in Table 3. Note
+that the results are reported with relative improvements. Here, it
+can be observed that the proposed MIM provides better performance on all online score metrics. Specifically, it outperforms the
+current system in terms of the good case rate and bad case rate
+by a large margin, which indicates that MIM enhances the user’s
+search experience. Our MIM also achieves a relative improvement
+of 0.11% and 0.84% in terms of the pvCTR on both scenarios respectively. Therefore, we can conclude that MIM generates better
+search results for millions of users in Alipay.
+
+5 ANALYSIS AND DISCUSSION
+5.1 Ablation Study.
+We perform an ablation study on the test set to investigate the
+influence of different modules in our proposed MIM model. Modules are tested in four ways: (1) We remove the gate score in the
+attribute-aware encoder, and use the original self-attention mechanism instead; (2) we remove the kl loss L𝐾𝐿 which is used to align
+the distribution of intents on both sides; (3) we remove the distribution loss L𝑑𝑖𝑠 that models multiple intents distribution around
+the text representation; (4) we remove the multi-intent modeling
+module completely and directly feed the output from the encoder
+to the matching module; (5) we remove the self-supervised mask
+task in the intent-aware matching.
+Table 4 presents the results on the Amazon dataset. First, the
+F1 score drops by 0.0011 after removing the scaled self-attention
+mechanism, which indicates that the attribute content is of great
+importance to the attention process. Then, the AUC score drops
+by 0.0046 and 0.0057 after the L𝐾𝐿 loss and L𝑑𝑖𝑠 are removed, respectively. This shows that restrictions on the learned intents do
+help identify matching aspects of two inputs. The F1 score drops
+by 0.0081 after the multi-intent modeling is removed. It denotes
+establishing the intent modeling in the matching process is necessary to improve the performance of text matching. Finally, we
+find that the Accuracy score drops by 0.0033 after the mask loss is
+removed. This means that the additional self-supervised task helps
+the matching model to benefit from proper intent weights.
+
+0.925
+0.900
+0.875
+0.850
+0.825
+0.800
+0.775
+0.750
+
+Mingzhe Li et al.
+
+0.90
+Accuracy
+AUC
+F1 score
+
+Score
+
+Score
+
+WSDM ’24, March 4–8, 2024, Merida, Mexico
+
+0.85
+
+Accuracy
+AUC
+F1 score
+
+0.80
+
+Table 5: Case study (truncated) for Alipay Query Rewriting Task. • denotes attributes. The highlighted pink-colored
+words indicate the aligned needs, and the blue-colored words
+show the misaligned information.
+Query Rewriting #1
+
+0.75
+1
+
+2
+
+3
+
+4
+
+Intent Num
+
+5
+
+(a)
+
+6
+
+All
+
+Entity
+
+Location Classification
+
+Attribute
+(b)
+
+Figure 4: (a) Relationship between number of intent and
+Accuracy, AUC and F1 score on Alipay test dataset. (b) Performance of MIM after removing different attributes in Alipay
+dataset.
+
+How to use mobile phones to
+take the Hangzhou Subway?
+
+How do I transfer money
+to someone in Beijing
+from my phone?
+
+• Entity: Electronic driving license
+• Location area: Nationwide
+• Category: Electronic certificate inquiry
+
+Relevant Rewritten Query Selected by MIM:
+Traffic management 12123
+
+• Entity: Traffic management
+• Location area: Nationwide
+• Category: Motor vehicle management
+
+Relevant Rewritten Query Selected by DCMatch:
+How can I capture a photo for my digital ID?
+
+• Entity: digital ID
+• Location area: Nationwide
+• Category: Domestic services
+
+Query Rewriting #2
+
+Unpaired Query:
+
+Input Query:
+
+Input Query:
+How to check violation records of
+electronic driving license?
+
+Input Query:
+What is the medical insurance electronic
+certificate in Beijing?
+
+• Entity: medical insurance
+• Location area: Beijing
+• Category: Medical care assurance
+
+Relevant Rewritten Query Selected by MIM:
+Beijing citizen electronic health insurance card
+
+• Entity: Insurance card
+• Location area: Beijing
+• Category: Medical care assurance
+
+Relevant Rewritten Query Selected by DCMatch:
+What is the process for purchasing medicine
+online using medical insurance in Beijing?
+
+• Entity: Medical insurance
+• Location area: Beijing
+• Category: Medical health
+
+Attribute:
+
+Attribute:
+
+max
+
+Entity: Money
+Location: Beijing
+Category: Function
+
+Entity: Mobile phone
+Location: Hangzhou
+Category: Communication
+
+Rewritten Query:
+Operation guide for crosscity money transfer
+
+Attribute:
+
+min
+
+Entity: Operation Guide
+Location: Nationwide
+Category: Tutorial
+
+Figure 5: Visualization of intent distribution with attributes,
+where ten cases are sampled from the test set randomly. The
+red nodes, blue nodes, and green nodes represent the intents,
+attributes, and queries, respectively.
+
+sample ten cases and project their query, attribute, and intent representations into a two-dimension space with t-SNE [23]. As shown
+in Figure 5, the intents of matched queries or items are close to
+each other, while the unpaired representations are scattered in the
+space. The extracted intents are evenly distributed and surround the
+query. The proximity of the intent and attributes of the same query
+indicates that the intent effectively summarizes the information
+contained in the attributes.
+
+5.3
+Number of Intents. We change the intents number in the Aliapy
+Query Rewriting dataset from 1 to 6, and report the Accuracy, AUC,
+and F1 scores as shown in Figure 4(a). It can be observed that the
+metric scores increase with augmenting the number of intents, to
+begin with. This is intuitive since one or two intents cannot cover
+the diverse semantic meanings of the inputs. After reaching the
+upper limit, it begins to drop. This might be because the differences
+between intents become trivial, and the model cannot utilize them
+well to conduct matching. Generally, our model maintains a high
+performance across different intent numbers.
+Impact of Each Attribute. We are also interested in each attribute’s contribution, i.e., which attribute is most important for
+the text-matching task. To illustrate the effect of attribute representations in MIM, we investigate how MIM performs after removing
+each attribute on the Alipay Query Rewriting dataset. We plot the
+corresponding Accuracy, AUC, and F1 scores in Figure 4(b). It is
+noted that for the Alipay searching scenario, the location area plays
+an important role. When we remove this attribute, the performance
+of MIM drops the most.
+
+5.2
+
+Visualization of Intent Distribution with
+Attributes
+
+Since our extracted intents are represented by vectors, it is hard
+to directly obtain their semantic meanings. Herein, we randomly
+
+Case Study.
+
+In Table 5, we randomly select two cases from the Alipay Query
+Rewriting datasets, where we show the input queries, attributes of
+the queries and items, and output results returned by our MIM and
+the best baseline DCMatch. The highlighted pink-colored words
+indicate the aligned needs, and the blue-colored words show the
+misaligned information. It can be seen that our MIM successfully
+captures the intents of checking records and searching for electronic
+cards in the original query, and the input query is rewritten to a
+more simple, condensed, and accurate query.
+
+6
+
+CONCLUSION
+
+In this paper, we propose a multi-intent attribute-aware text matching model, which matches queries to rewrite queries or items by
+attending to attributes and extracting intents. To address the problem that multiple intents collapse into similar representations, we
+propose a distribution loss to increase the diversity of the intents
+related to the query text. We also come up with a divergence loss to
+better pair the learned intents from both sides. We finally employ an
+intent-mask self-supervision task to decide the importance of each
+intent and incorporate them to output the final matching result. Extensive experiments demonstrate the effectiveness of the proposed
+MIM, which currently serves tens of millions of users on Alipay
+app online. In the future, we aim to expand textual attribute-aware
+matching to multimodal attribute-aware matching.
+
+Multi-Intent Attribute-Aware Text Matching in Searching
+
+REFERENCES
+[1] Dzmitry Bahdanau, Kyunghyun Cho, and Yoshua Bengio. 2015. Neural machine
+translation by jointly learning to align and translate. In ICLR.
+[2] Fredrik Carlsson, Amaru Cuba Gyllensten, Evangelia Gogoulou, Erik Ylipää
+Hellqvist, and Magnus Sahlgren. 2020. Semantic re-tuning with contrastive
+tension. In International conference on learning representations.
+[3] Yukuo Cen, Jianwei Zhang, Xu Zou, Chang Zhou, Hongxia Yang, and Jie Tang.
+2020. Controllable multi-interest framework for recommendation. In Proceedings
+of the 26th ACM SIGKDD International Conference on Knowledge Discovery & Data
+Mining. 2942–2951.
+[4] Zheng Chai, Zhihong Chen, Chenliang Li, Rong Xiao, Houyi Li, Jiawei Wu,
+Jingxu Chen, and Haihong Tang. 2022. User-Aware Multi-Interest Learning for
+Candidate Matching in Recommenders. In Proceedings of the 45th International
+ACM SIGIR Conference on Research and Development in Information Retrieval.
+1326–1335.
+[5] Xiuying Chen, Mingzhe Li, Shen Gao, Xin Cheng, Qiang Yang, Qishen Zhang,
+Xin Gao, and Xiangliang Zhang. 2023. A Topic-aware Summarization Framework
+with Different Modal Side Information. SIGIR (2023).
+[6] Xiuying Chen, Daorui Xiao, Shen Gao, Guojun Liu, Wei Lin, Bo Zheng, Dongyan
+Zhao, and Rui Yan. 2020. RPM-Oriented Query Rewriting Framework for Ecommerce Keyword-Based Sponsored Search (Student Abstract). In Proceedings
+of the AAAI Conference on Artificial Intelligence, Vol. 34. 13769–13770.
+[7] Lu Fan, Qimai Li, Bo Liu, Xiao-Ming Wu, Xiaotong Zhang, Fuyu Lv, Guli Lin,
+Sen Li, Taiwei Jin, and Keping Yang. 2022. Modeling User Behavior with Graph
+Convolution for Personalized Product Search. In Proceedings of the ACM Web
+Conference 2022. 203–212.
+[8] Tianyu Gao, Xingcheng Yao, and Danqi Chen. 2021. SimCSE: Simple Contrastive
+Learning of Sentence Embeddings. In Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing. 6894–6910.
+[9] Jacob Devlin Ming-Wei Chang Kenton and Lee Kristina Toutanova. 2019. BERT:
+Pre-training of Deep Bidirectional Transformers for Language Understanding. In
+Proceedings of NAACL-HLT. 4171–4186.
+[10] Diederik P Kingma and Jimmy Ba. 2014. Adam: A method for stochastic optimization. arXiv preprint arXiv:1412.6980 (2014).
+[11] Weize Kong, Swaraj Khadanga, Cheng Li, Shaleen Kumar Gupta, Mingyang
+Zhang, Wensong Xu, and Michael Bendersky. 2022. Multi-Aspect Dense Retrieval.
+In Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and
+Data Mining. 3178–3186.
+[12] Lakshya Kumar and Sagnik Sarkar. 2021. Neural Search: Learning Query and
+Product Representations in Fashion E-commerce. SIGIR (2021).
+[13] Jimmy Lei Ba, Jamie Ryan Kiros, and Geoffrey E Hinton. 2016. Layer normalization. arXiv preprint arXiv:1607.06450 (2016).
+[14] Mike Lewis, Yinhan Liu, Naman Goyal, Marjan Ghazvininejad, Abdelrahman
+Mohamed, Omer Levy, Veselin Stoyanov, and Luke Zettlemoyer. 2020. BART:
+Denoising Sequence-to-Sequence Pre-training for Natural Language Generation,
+Translation, and Comprehension. In Proc. of ACL.
+[15] Jinpeng Li, Yingce Xia, Rui Yan, Hongda Sun, Dongyan Zhao, and Tie-Yan Liu.
+2021. Stylized dialogue generation with multi-pass dual learning. Advances in
+Neural Information Processing Systems 34 (2021), 28470–28481.
+[16] Jian Li, Jieming Zhu, Qiwei Bi, Guohao Cai, Lifeng Shang, Zhenhua Dong, Xin
+Jiang, and Qun Liu. 2022. MINER: Multi-Interest Matching Network for News
+Recommendation. In Findings of the Association for Computational Linguistics:
+ACL 2022. 343–352.
+[17] Mingzhe Li, Xiuying Chen, Shen Gao, Zhangming Chan, Dongyan Zhao, and Rui
+Yan. 2020. VMSMO: Learning to Generate Multimodal Summary for Video-based
+News Articles. In Proceedings of the 2020 Conference on Empirical Methods in
+Natural Language Processing (EMNLP). 9360–9369.
+[18] Mingzhe Li, Xiexiong Lin, Xiuying Chen, Jinxiong Chang, Qishen Zhang, Feng
+Wang, Taifeng Wang, Zhongyi Liu, Wei Chu, Dongyan Zhao, et al. 2022. Keywords
+and Instances: A Hierarchical Contrastive Learning Framework Unifying Hybrid
+Granularities for Text Generation. In Proceedings of the 60th Annual Meeting of
+the Association for Computational Linguistics (Volume 1: Long Papers). 4432–4441.
+[19] Zhenwen Liang, Wenhao Yu, Tanmay Rajpurohit, Peter Clark, Xiangliang Zhang,
+and Ashwin Kaylan. 2023. Let GPT be a Math Tutor: Teaching Math Word
+Problem Solvers with Customized Exercise Generation. EMNLP (2023).
+[20] Jiongnan Liu, Zhicheng Dou, Qiannan Zhu, and Ji-Rong Wen. 2022. A Categoryaware Multi-interest Model for Personalized Product Search. In Proceedings of
+the ACM Web Conference 2022. 360–368.
+[21] Jiduan Liu, Jiahao Liu, Qifan Wang, Jingang Wang, Wei Wu, Yunsen Xian,
+Dongyan Zhao, Kai Chen, and Rui Yan. 2023. RankCSE: Unsupervised Sentence
+Representations Learning via Learning to Rank. arXiv preprint arXiv:2305.16726
+
+WSDM ’24, March 4–8, 2024, Merida, Mexico
+
+(2023).
+[22] Yinhan Liu, Myle Ott, Naman Goyal, Jingfei Du, Mandar Joshi, Danqi Chen, Omer
+Levy, Mike Lewis, Luke Zettlemoyer, and Veselin Stoyanov. 2019. RoBERTa: A
+Robustly Optimized BERT Pretraining Approach. (2019).
+[23] Laurens van der Maaten and Geoffrey Hinton. 2008. Visualizing data using t-SNE.
+Journal of machine learning research 9, Nov (2008), 2579–2605.
+[24] Ning Miao, Hao Zhou, Lili Mou, Rui Yan, and Lei Li. 2019. Cgmh: Constrained
+sentence generation by metropolis-hastings sampling. In Proceedings of the AAAI
+Conference on Artificial Intelligence, Vol. 33. 6834–6842.
+[25] Rada Mihalcea and Paul Tarau. 2004. Textrank: Bringing order into text. In Proceedings of the 2004 conference on empirical methods in natural language processing.
+404–411.
+[26] Guanglin Niu, Bo Li, Yongfei Zhang, and Shiliang Pu. 2022. CAKE: A Scalable
+Commonsense-Aware Framework For Multi-View Knowledge Graph Completion.
+In Proceedings of the 60th Annual Meeting of the Association for Computational
+Linguistics (Volume 1: Long Papers). 2867–2877.
+[27] Yiming Qiu, Kang Zhang, Han Zhang, Songlin Wang, Sulong Xu, Yun Xiao, Bo
+Long, and Wen-Yun Yang. 2021. Query Rewriting via Cycle-Consistent Translation for E-Commerce Search. In 2021 IEEE 37th International Conference on Data
+Engineering (ICDE). IEEE, 2435–2446.
+[28] Ahmed Rashed, Shereen Elsayed, and Lars Schmidt-Thieme. 2022. CARCA:
+Context and Attribute-Aware Next-Item Recommendation via Cross-Attention.
+arXiv preprint arXiv:2204.06519 (2022).
+[29] Chandan K. Reddy, Lluís Màrquez, Fran Valero, Nikhil Rao, Hugo Zaragoza,
+Sambaran Bandyopadhyay, Arnab Biswas, Anlu Xing, and Karthik Subbian. 2022.
+Shopping Queries Dataset: A Large-Scale ESCI Benchmark for Improving Product
+Search. (2022). arXiv:2206.06588
+[30] Badrul Sarwar, George Karypis, Joseph Konstan, and John Riedl. 2001. Item-based
+collaborative filtering recommendation algorithms. In Proceedings of the 10th
+international conference on World Wide Web. 285–295.
+[31] Hongyu Shan, Qishen Zhang, Zhongyi Liu, Guannan Zhang, and Chenliang
+Li. 2023. Beyond Two-Tower: Attribute Guided Representation Learning for
+Candidate Retrieval. In Proceedings of the ACM Web Conference 2023. 3173–3181.
+[32] Nandan Thakur, Nils Reimers, Johannes Daxenberger, and Iryna Gurevych. 2021.
+Augmented SBERT: Data Augmentation Method for Improving Bi-Encoders for
+Pairwise Sentence Scoring Tasks. In Proceedings of the 2021 Conference of the
+North American Chapter of the Association for Computational Linguistics: Human
+Language Technologies. 296–310.
+[33] Mohamed Trabelsi, Zhiyu Chen, Shuo Zhang, Brian D Davison, and Jeff Heflin.
+2022. StruBERT: Structure-aware BERT for Table Search and Matching. In Proceedings of the ACM Web Conference 2022. 442–451.
+[34] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones,
+Aidan N Gomez, Łukasz Kaiser, and Illia Polosukhin. 2017. Attention is all
+you need. Advances in neural information processing systems 30 (2017).
+[35] Jin Wang, Yuliang Li, Wataru Hirota, and Eser Kandogan. 2022. Machop: an
+end-to-end generalized entity matching framework. In Proceedings of the Fifth
+International Workshop on Exploiting Artificial Intelligence Techniques for Data
+Management. 1–10.
+[36] Yue Wang, Dan Qiao, Juntao Li, Jinxiong Chang, Qishen Zhang, Zhongyi Liu,
+Guannan Zhang, and Min Zhang. 2023. Towards Better Hierarchical Text Classification with Data Generation. In Findings of the Association for Computational
+Linguistics: ACL 2023. 7722–7739.
+[37] Yuanmeng Yan, Rumei Li, Sirui Wang, Fuzheng Zhang, Wei Wu, and Weiran Xu.
+2021. ConSERT: A Contrastive Framework for Self-Supervised Sentence Representation Transfer. In Proceedings of the 59th Annual Meeting of the Association for
+Computational Linguistics and the 11th International Joint Conference on Natural
+Language Processing (Volume 1: Long Papers). 5065–5075.
+[38] Shunyu Zhang, Yaobo Liang, Ming Gong, Daxin Jiang, and Nan Duan. 2022. MultiView Document Representation Learning for Open-Domain Dense Retrieval. In
+Proceedings of the 60th Annual Meeting of the Association for Computational
+Linguistics (Volume 1: Long Papers). 5990–6000.
+[39] Xuanhe Zhou, Guoliang Li, Chengliang Chai, and Jianhua Feng. 2021. A learned
+query rewrite system using monte carlo tree search. Proceedings of the VLDB
+Endowment 15, 1 (2021), 46–58.
+[40] Yicheng Zou, Hongwei Liu, Tao Gui, Junzhe Wang, Qi Zhang, Meng Tang, Haixiang Li, and Daniell Wang. 2022. Divide and Conquer: Text Semantic Matching
+with Disentangled Keywords and Intents. In Findings of the Association for Computational Linguistics: ACL 2022. 3622–3632.
+[41] Simiao Zuo, Qingru Zhang, Chen Liang, Pengcheng He, Tuo Zhao, and Weizhu
+Chen. 2022. MoEBERT: from BERT to Mixture-of-Experts via Importance-Guided
+Adaptation. (2022).
+
+

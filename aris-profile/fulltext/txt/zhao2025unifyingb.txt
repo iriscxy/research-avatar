@@ -1,0 +1,2075 @@
+arXiv:2504.06714v3 [cs.IR] 25 Oct 2025
+
+Unifying Search and Recommendation with Dual-View Representation Learning
+in a Generative Paradigm
+JUJIA ZHAO, Leiden University, The Netherlands
+WENJIE WANG, University of Science and Technology of China, China
+CHEN XU, Renmin University of China, China
+XIUYING CHEN, Mohamed bin Zayed University of Artificial Intelligence, United Arab Emirates
+ZHAOCHUN REN, Leiden University, The Netherlands
+SUZAN VERBERNE, Leiden University, The Netherlands
+Recommender systems and search engines are critical components of online platforms, with recommender systems proactively
+providing information to users, whereas search engines enable users to seek information actively. Unifying both tasks in a shared
+model is promising since it can enhance user modeling and item understanding. Previous approaches mainly follow a discriminative
+paradigm, utilizing shared encoders to process input features and task-specific heads to perform each task. However, this paradigm
+faces two key challenges: gradient conflict and manual architecture design overhead. From the information theory perspective, these
+challenges potentially both stem from the same issue — low mutual information between input features and task-specific output
+during optimization.
+To address this, we propose GenSR, a novel generative paradigm for unifying search and recommendation (S&R), which leverages
+task-specific prompts to partition the model’s parameter space into subspaces, thereby enhancing mutual information. To construct
+effective subspaces for each task, GenSR first prepares informative representations for each subspace and then optimizes both subspaces
+in one unified model. Specifically, GenSR consists of two main modules: (1) Dual Representation Learning, which independently
+models collaborative and semantic historical information to derive expressive item representations; and (2) S&R Task Unifying, which
+utilizes contrastive learning together with instruction tuning to generate task-specific outputs effectively. Extensive experiments on
+two benchmarks show GenSR outperforms state-of-the-art methods across S&R tasks.
+Additional Key Words and Phrases: Unifying Search and Recommendation, Generative Recommendation, Multi-task Learning
+ACM Reference Format:
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne. 2025. Unifying Search and Recommendation with
+Dual-View Representation Learning in a Generative Paradigm. 1, 1 (October 2025), 25 pages. https://doi.org/10.1145/nnnnnnn.nnnnnnn
+
+1
+
+Introduction
+
+Recommender systems and search engines have become indispensable components of modern online service platforms,
+including e-commerce websites and social media networks [53, 59]. Usually, search and recommendation (S&R) tasks
+Authors’ Contact Information: Jujia Zhao, j.zhao@liacs.leidenuniv.nl, Leiden University, The Netherlands; Wenjie Wang, wenjiewang96@gmail.com,
+University of Science and Technology of China, China; Chen Xu, xc_chen@ruc.edu.cn, Renmin University of China, China; Xiuying Chen, xiuying.chen@
+mbzuai.ac.ae, Mohamed bin Zayed University of Artificial Intelligence, United Arab Emirates; Zhaochun Ren, z.ren@liacs.leidenuniv.nl, Leiden University,
+The Netherlands; Suzan Verberne, s.verberne@liacs.leidenuniv.nl, Leiden University, The Netherlands.
+Permission to make digital or hard copies of all or part of this work for personal or classroom use is granted without fee provided that copies are not
+made or distributed for profit or commercial advantage and that copies bear this notice and the full citation on the first page. Copyrights for components
+of this work owned by others than the author(s) must be honored. Abstracting with credit is permitted. To copy otherwise, or republish, to post on
+servers or to redistribute to lists, requires prior specific permission and/or a fee. Request permissions from permissions@acm.org.
+© 2025 Copyright held by the owner/author(s). Publication rights licensed to ACM.
+Manuscript submitted to ACM
+
+Manuscript submitted to ACM
+
+1
+
+2
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+Search Optimize Direction
+
+Search
+Output
+
+Rec.
+Output
+
+Search
+Head
+
+Rec.
+Head
+
+Shared
+Encoder
+Input Features
+
+(a) Discriminative Paradigm
+
+Search
+Subspace
+
+Rec. Optimize Direction
+Rec.
+Subspace
+
+Search / Rec. Output
+Generative
+Model
+Task
+Instruction
+Shared Space
+
+Gradient Conflict
+
+Dual Representation
+Learning
+(for each subspace)
+
+Input Features
+
+(b) Generative Paradigm
+
+Fig. 1. (a) and (b) illustrate the discriminative and generative paradigms for unifying S&R, respectively, highlighting their differences
+in parameter space. While the discriminative paradigm results in low mutual information by optimizing S&R tasks within a shared
+parameter space, the generative paradigm enhances mutual information by partitioning the space into distinct subspaces through
+instructions.
+
+are trained on separate models [7]. Recently, advances in information retrieval show that unifying these two tasks
+within a shared model offers significant advantages [39, 55]: First, joint modeling of user behaviors across both S&R
+provides a more comprehensive understanding of user preferences. Second, leveraging interactions from both task
+domains enriches item-side interactions, enhancing the understanding and delivery of items.
+Existing efforts to unify S&R mostly follow a discriminative paradigm, which utilizes shared encoders to process
+input features (e.g., user interaction history) and task-specific heads to predict whether a user will click on an item in
+S&R tasks, as illustrated in Figure 1(a) [37, 54]. However, such paradigm has two drawbacks: 1) Gradient conflict: The
+differing optimization objectives of S&R, where search primarily focuses on modeling query-item relevance based on
+the current query context, while recommendation emphasizes capturing user preferences by analyzing user’s historical
+interactions, lead to gradient conflicts in the shared encoder [19, 36]. This often results in negative cosine similarity
+between the task gradients and interferes with effective model optimization [56] (see empirical evidence in Section 6.5).
+2) Manual architecture design overhead: The design of task-specific heads requires substantial manual effort,
+increasing system complexity and reducing scalability and extensibility [34, 54].
+Inspired by information theory, we argue that these drawbacks potentially both stem from the same underlying
+issue — low mutual information between the model’s input features and task-specific output during optimization. This
+low mutual information arises from constraining both tasks within a shared parameter space in the shared encoder,
+as depicted in the parameter space analysis in Figure 1(a). This constraint limits the representation capability of the
+shared encoder, resulting in gradient conflict. Consequently, it necessitates manual designs of task-specific heads to
+compensate the potential performance degradation caused by gradient conflicts.
+To address the above limitations, we aim to increase the mutual information between the model’s input features
+and the task-specific outputs. Partitioning the parameter space into distinct subspaces has proven to be effective for
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+
+3
+
+enhancing mutual information, particularly when addressing diverse tasks [46]. It reduces task interference and enables
+the model to learn task-specific predictions through different task optimization subspaces. To naturally achieve such
+partitioning, we design a generative paradigm that leverages instruction tuning in pre-trained generative models.
+Instruction tuning partitions the parameter space by introducing distinct prompts for each task, effectively tailoring a
+unique optimization subspace for S&R as illustrated in Figure 1(b).
+To this end, we propose a novel Generative paradigm for unifying Search and Recommendation, abbreviated
+as GenSR, which leverages task-specific prompts to partition the model’s parameter space into subspaces, thereby
+enhancing mutual information (see detailed analysis in §4). To construct effective subspaces for each task, GenSR
+first prepares informative representations for each subspace and then optimizes both subspaces in one unified model.
+Specifically, GenSR consists of two main modules: (1) Dual representation learning: GenSR independently models
+historical dual representations that encompass sufficient information for both S&R tasks. Specifically, we simultaneously
+learn item representations from both collaborative filtering (CF) view and semantic view. Meanwhile, to capture user
+preference from extensive S&R historical interactions, a soft-filtering strategy is designed to prioritize the most relevant
+representations. (2) S&R task unifying: GenSR integrates previously learned representation with task-specific prompts
+and feeds them into a shared generative model to perform both tasks. Specifically, it employs contrastive learning
+to align the CF and semantic representations for the same users and uses instruction tuning to effectively generate
+task-specific outputs.
+In summary, our main contributions are as follows:
+(1) We propose GenSR, a generative paradigm designed to unify S&R tasks through dual representation learning and
+S&R task unifying.
+(2) We introduce a novel perspective for comparing discriminative and generative paradigms based on mutual
+information.
+(3) We conduct comprehensive experiments on two public datasets, including S&R performance analysis, mutual
+information estimation, parameter space visualization, gradient conflict analysis and ablation study of different
+modules, to validate GenSR’s effectiveness and efficiency compared to other baselines across both S&R tasks.
+
+2
+
+Related Work
+
+2.1
+
+Unifying search and recommendation
+
+Recent research highlights that search and recommendation (S&R) behaviors are inherently complementary, as each
+provides unique signals that enhance user modeling and item understanding [32, 38]. By jointly leveraging data from
+both tasks, it is possible to achieve more accurate intent modeling and representation learning, thereby improving the
+performance of both tasks. As a result, an increasing number of studies have focused on unifying S&R. These efforts
+can be broadly categorized into two main directions:
+(1) Search-enhanced recommendation [52], which integrates search behavior into the recommendation scenario
+to improve user preference modeling. This line of research assumes that users’ search queries convey semantic intent
+signals that are often missing from the behavioral data used in recommendation systems. For instance, SESRec [39]
+utilizes contrastive learning to extract similar and dissimilar user interests from S&R, and then leverages users’ search
+interests for recommendation. Query-SeqRec [20] effectively incorporates explicit user queries from the search side,
+alongside item interactions, for improved user intent modeling and recommendation performance.
+Manuscript submitted to ACM
+
+4
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+(2) Unifying S&R [55], which shares S&R data and utilizes one model to boost the performance on both tasks.
+
+This line of work typically utilizes shared representations or architectures to model S&R behaviors within a unified
+framework. For example, UnifiedSSR [54] jointly models user behavior history in S&R scenarios using a parametersharing dual-branch network and an intent-oriented session module. UniSAR [37] models fine-grained user behavior
+transitions between S&R through extraction, alignment, and fusion.
+However, they follow the discriminative paradigm, which introduces gradient conflict and manual design complexity.
+Recently, Penha et al. [32] proposed a generative model for unifying S&R. While promising, it treats S&R data
+independently, ignoring their joint interaction history—a rich source of contextual signals for user modeling. In
+contrast, we introduce a generative paradigm that jointly leverages S&R interactions to better model user and item
+representations and enhances mutual information.
+
+2.2
+
+Generative recommendation
+
+Generative models, notably Generative Adversarial Networks (GANs) [13, 22, 49] and Variational Autoencoders
+(VAEs) [28, 30, 58], are pivotal for personalized recommendations but face structural limitations [25, 40]. Nowadays,
+pre-trained generative models have garnered attention in recommendation for their contextual understanding and
+global knowledge [29], which better capture user preferences from interactions. Early studies focused on fine-tuning
+these models with tailored prompts and recommendation data, e.g., P5 [14], TALLRec [5], and M6-Rec [9]. For instance,
+TALLRec introduces an effective and efficient instruction tuning framework to align large language models (LLMs) with
+recommendation tasks, addressing the challenge that LLMs are not originally pre-trained for such purposes. Subsequent
+advancements, notably BIGRec [4], IDGenRec [44] and TIGER [35], extend this approach by grounding outputs in
+specific item spaces or incorporating semantic details to refine recommendations. For example, BIGRec first fine-tunes
+LLMs to generate meaningful item descriptions and then maps these to actual items, enhancing recommendation
+performance. IDGenRec proposes learning unique, semantically rich textual IDs for items to seamlessly integrate
+them into LLM-based generative recommender systems. Recently, researchers have recognized the critical role of CF
+information in generative recommendation, as CF plays a crucial role in understanding user and item representations
+in recommendation systems [24, 50].
+However, integrating search data into generative recommendations remains underexplored and holds potential for
+capturing users’ immediate intent to boost personalization.
+
+2.3
+
+Personalized search
+
+Personalized search aims to deliver items tailored to users’ preferences, behaviors, and contextual information. Early
+methods learn user representations from profiles or search histories to re-rank items based on personalized relevance.
+For instance, HEM learns user representations from user profiles to provide personalized search rankings [2]. TEM
+enhances this by incorporating user search histories, allowing it to better capture users’ preferences and historical
+behaviors [8]. Beyond these, some approaches tackle key challenges such as sparse user behavior and noisy interaction
+data. For instance, CoPPS [10] leverages contrastive learning to enhance user representations under sparse and noisy
+search scenarios. QIN [15] incorporates cascaded filtering to extract query-relevant behaviors and employs fused
+attention to distill salient signals from long-tail history. However, most personalized search methods rely solely on
+search-side signals, overlooking the rich collaborative filtering information available in recommendation interactions.
+This limits their ability to effectively model long-term user preferences.
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+
+5
+
+In contrast, our proposed model adopts a unified framework that integrates both recommendation and search
+behaviors within a generative paradigm, enabling the construction of task-aware prompts and richer user representations
+to improve retrieval quality.
+
+2.4
+
+Generative model for ranking
+
+Due to the advanced contextual understanding capabilities of pre-trained language models, generative models for
+ranking have emerged as a novel approach to directly model the relevance between queries and items by casting
+ranking as a sequence generation problem. These methods approach ranking by generating sequences conditioned on
+input queries and documents, shifting away from traditional scoring-based frameworks. By treating ranking as a text
+generation task, they are capable of modeling complex interactions between queries and items in a more flexible and
+contextualized manner. For example, Nogueira et al. [31] adapts T5 for document ranking by training it to generate
+relevance labels (“true” or “false”) for query-document pairs. Similarly, Ferraretto et al. [11] introduces a generative
+ranking model trained to output both relevance labels and explanations for query-document pairs.
+Despite these advances, it’s promising to incorporate recommendation data to extract users’ preferences which helps
+to boost the performance on the search side.
+
+3
+
+Task Formulation
+
+We formulate the task of unifying S&R within both discriminative and generative paradigms. The goal is to integrate
+users’ historical S&R interactions into a single model capable of performing both tasks according to user needs. In
+the search setting, the objective is to retrieve documents relevant to a user’s query while leveraging their historical
+S&R interactions. In the recommendation setting, the objective is to suggest items based on the user’s historical S&R
+interactions. Formally, let U and I be the sets of users and items. For a user 𝑢 ∈ U, the model predicts preference for a
+candidate item 𝑖𝑐 in either a search or recommendation context. To achieve this, the model takes as input three types of
+information for each user 𝑢:
+(1) Interaction history 𝐻𝑢 = {(𝑖 1, 𝑏 1 ), (𝑖 2, 𝑏 2 ), · · · , (𝑖 𝑁 , 𝑏 𝑁 )}, where 𝑖𝑛 ∈ I is the 𝑛−th item in the interaction
+history, 𝑁 is the total number of interactions, 𝑏𝑛 is the type of behavior for 𝑛−th item, with "src" indicating
+search and "rec" indicating recommendation.
+(2) Candidate item 𝑖𝑐 , which is the item candidate pool used for evaluating whether the user 𝑢 will like (i.e., click)
+this item.
+(3) Query 𝑞, issued if the current task is search; otherwise, 𝑞 is empty for recommendation.
+Discriminative paradigm. This paradigm encodes inputs via shared encoders and applies task-specific heads. The
+model minimizes the combined cross-entropy loss for both tasks:
+min{LΦ = L𝑠 (𝐻𝑢 , 𝑖𝑐 , 𝑞) + 𝛾 L𝑟 (𝐻𝑢 , 𝑖𝑐 )},
+
+(1)
+
+Φ
+
+where Φ denotes model parameters, 𝛾 controls the trade-off between S&R tasks, and L𝑠 , L𝑟 are cross-entropy losses for
+S&R.
+Generative paradigm. Differently, in the generative paradigm, we cast both S&R as conditional text generation. The
+input information is transformed into a unified structured prompt 𝑥, which is tokenized before being fed into the model
+for instruction tuning. The model generates “Yes” or “No” to indicate user preference via constrained generation.
+Manuscript submitted to ACM
+
+6
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+
+The training objective minimizes the negative log-likelihood of the users’ preference 𝑦 conditioned on input 𝑥 in an
+auto-regressive manner:
+min{LΘ = −
+Θ
+
+|𝑦 |
+∑︁
+
+log 𝑃Θ (𝑦𝑡 |𝑦 <𝑡 , 𝑥)},
+
+(2)
+
+𝑡 =1
+
+where Θ denotes model parameters, 𝑥 and 𝑦 denote the “Instruction Input” and “Instruction Output” in the self-instruct
+data for instruction tuning, 𝑦𝑡 is the 𝑡-th token of 𝑦, and 𝑦 <𝑡 represents all tokens preceding 𝑦𝑡 .
+4
+
+Mutual Information Analysis of GenSR
+
+In this section, we conduct an in-depth analysis of mutual information to support our claim that the proposed generative
+paradigm effectively enhances mutual information compared to traditional discriminative methods. We begin by
+defining mutual information from an information-theoretic perspective, and then present the theoretical evidence to
+substantiate this claim.
+4.1
+
+Information-theoretic perspective
+
+From an information-theoretic standpoint, the representational capability of a unified S&R model can be examined via
+the mutual information between the input 𝑋 and the output 𝑌𝑡 for a task 𝑡 ∈ {𝑆, 𝑅}. Mutual information, denoted as
+𝐼 (𝑋 ; 𝑌𝑡 ), measures how much information the input 𝑋 provides about the output 𝑌𝑡 , quantifying their dependence. By
+definition:
+𝐼 (𝑋 ; 𝑌𝑡 ) = 𝐻 (𝑌𝑡 ) − 𝐻 (𝑌𝑡 | 𝑋 ),
+
+(3)
+
+where 𝐻 (𝑌𝑡 ) is the entropy of 𝑌𝑡 , and 𝐻 (𝑌𝑡 | 𝑋 ) is the conditional entropy of 𝑌𝑡 given 𝑋 .
+A higher mutual information indicates that the input 𝑋 contains more predictive information about the output 𝑌𝑡 ,
+reflecting a stronger alignment between inputs and task-specific outputs, i.e., higher model representation capability.
+Conversely, lower mutual information implies that predicted output fail to fully capture the distribution and pattern
+of input, reflecting a lower model representation capability. Therefore, mutual information 𝐼 (𝑋 ; 𝑌𝑡 ) serves as a good
+indicator for model representation capability [3].
+4.2
+
+Theoretical analysis
+
+In this section, we aim to show the effectiveness of our model GenSR, based on the aforementioned mutual information.
+Specifically, we conduct a theoretical analysis to show this utilizing the following theorem:
+Theorem 4.1. Suppose the input distribution 𝑋 ∼ N (𝜇, Σ), and the noise 𝜖 ∼ N (0, 𝜎𝜖2 𝐼 ) is independent of 𝑋 . Consider
+two paradigms: generative (with parameters 𝜙) and discriminative (with parameter 𝜃 ). Assume the loss functions L𝜃 and
+L𝜙 admit second-order Taylor expansions around their respective true parameters with bounded remainder terms,1 then the
+mutual information between the input and output satisfies:
+𝐼𝜃 (𝑋 ; 𝑌𝑆 ) + 𝐼𝜃 (𝑋 ; 𝑌𝑅 ) ≤ 𝐼𝜙 (𝑋 ; 𝑌𝑆 ) + 𝐼𝜙 (𝑋 ; 𝑌𝑅 ).
+
+(4)
+
+Here, 𝐼𝜙 (𝑋 ; 𝑌𝑆 ) and 𝐼𝜙 (𝑋 ; 𝑌𝑅 ) denote the mutual information between input and output under the generative paradigm for
+S&R tasks, respectively, while 𝐼𝜃 (𝑋 ; 𝑌𝑆 ) and 𝐼𝜃 (𝑋 ; 𝑌𝑅 ) denote mutual information under the discriminative paradigm.
+
+1 This assumption is common in statistical learning and information retrieval [26, 33].
+
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+Input
+
+Dual Representation Learning
+CF
+View
+
+Target
+
+CF
+Emb.
+Table
+
+CF
+Transformer
+
+CF
+Soft
+Filtering
+
+CF
+History
+Emb.
+
+S&R Task Unifying
+Search
+
+Rec.
+
+S&R
+CF data
+
+Cross-Attn
+Module
+Encoded
+S&R History
+
+Target
+
+Output
+
+Contrastive
+Learning
+
+History
+
+History
+
+7
+
+Semantic
+View
+
+S&R
+Semantic data
+
+Semantic
+Tokenizer
+
+Target
+Emb.
+Semantic
+Transformer
+
+Importance
+Score
+
+Target
+CF Emb.
+
+History
+Emb.
+
+Semantic
+Soft
+Filtering
+
+Target
+Semantic
+Emb.
+Semantic
+History
+Emb.
+
+Instruction
+Tuning
+
+Target
+CF Emb.
+
+Generative
+model
+
+Target
+Semantic
+Emb.
+Query
+Emb.
+
+Rec. Prompt Text Emb.
+Search Prompt Text Emb.
+
+Fig. 2. GenSR structure. Given S&R history, GenSR first utilizes dual representation learning to obtain CF and semantic history
+embeddings. The S&R task unifying module then integrates these dual representations with task-specific prompts into a shared
+generative model, leveraging contrastive learning for view alignment and instruction tuning to effectively generate task-specific
+outputs for both search and recommendation.
+
+We provide a detailed proof of Theorem 4.1 from the view of parameter approximation separability in the Appendix.
+Intuitively, we prove that generative paradigm can enhance mutual information in S&R scenario compared with
+discriminative paradigm under certain input distribution assumption.
+5
+
+Method
+
+In this section, we introduce GenSR, a novel generative paradigm for unifying search and recommendation (S&R).
+GenSR has two modules: 1) Dual Representation learning, which independently learns item representations from both
+the CF view and the semantic view. 2) S&R Task Unifying, which utilizes contrastive learning together with instruction
+tuning to generate task-specific outputs effectively. The overall architecture of GenSR is shown in Figure 2.
+5.1
+
+Dual representation learning
+
+To derive informative dual representation for each subspace, GenSR first models historical dual-view representation to
+encompass sufficient information for both S&R tasks, and then employs soft-filtering strategy to capture use preference
+from extensive S&R historical representations.
+5.1.1 Dual-view representation. When unifying S&R tasks, it is crucial to model item representations that
+encapsulate sufficient information to effectively support both tasks. A key consideration in this process is the distinct
+focus of S&R tasks on item representations. Specifically, for the search task, item representations rely heavily on semantic
+matching between queries and items, as users actively search for specific items based on their explicit information
+needs. In contrast, for the recommendation task, item representations are mainly shaped by CF information derived
+from historical user interactions [61], as recommendations are passively received by users who often lack explicit
+information needs.
+This distinction underscores the need to integrate both semantic and CF information to construct comprehensive
+item representations. To tackle this challenge, we propose a dual-view representation method that separately captures
+semantic and CF information from two views.
+Manuscript submitted to ACM
+
+8
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+
+CF view. To model the CF view for the dual-view representation, we begin by extracting the S&R history 𝐻𝑢 =
+{𝑖 1, 𝑖 2, · · · , 𝑖 𝑁 } for a given user 𝑢. This history represents all chronologically ordered S&R interactions, where 𝑁 denotes
+the total number of interactions recorded in the user’s history 𝐻𝑢 .
+From this history, we compute the corresponding CF representations 𝐸𝑢cf = {𝑒 1, 𝑒 2, · · · , 𝑒 𝑁 }𝑇 ∈ R𝑁 ×𝑑 using a pretrained CF embedding table E ∈ R | I | ×𝑑 . Here, each 𝑒𝑖 is a 𝑑-dimensional embedding, |I| denotes the total number of
+items in the corpus, and 𝑑 represents the dimensionality of the CF embeddings.2
+To capture the sequential dependencies within the S&R history, the representations 𝐸𝑢cf are further processed using a
+transformer encoder. The encoder comprises a Multi-Head Self-Attention (MSA) layer and a Feed-Forward Network
+(FFN). Specifically, the MSA layer takes 𝐸𝑢cf as the input, where the query (𝑄), key (𝐾), and value (𝑉 ) matrices are all set
+to 𝐸𝑢cf . Then the CF representation 𝐶𝑢 ∈ R𝑁 ×𝑑 is computed as:
+𝐶𝑢 = 𝐹 𝐹 𝑁 (𝑀𝑆𝐴(𝐸𝑢cf, 𝐸𝑢cf, 𝐸𝑢cf )),
+
+(5)
+
+Semantic view. To model the semantic view for the dual-view representation, we process the user’s S&R history
+𝐻𝑢 = {𝑖 1, 𝑖 2, · · · , 𝑖 𝑁 }, which contains all chronologically ordered interactions, where 𝑁 is the total number of interactions.
+′
+
+Semantic representations 𝐸𝑢sem = {𝑠 1, 𝑠 2, · · · , 𝑠 𝑁 }𝑇 ∈ R𝑁 ×𝑑 are derived by tokenizing the textual descriptions of items
+using a generative model tokenizer. Here, 𝑑 ′ is the embedding dimensionality of the generative model, and each 𝑠𝑖 is a
+𝑑 ′ -dimensional embedding capturing the item’s semantic information.
+To capture the sequential dependencies, the representations 𝐸𝑢sem are fed into a transformer encoder. The transformer
+encoder consists of a Multi-head Self-Attention (MSA) layer and a Feed-Forward layer (FFN). Specifically, MSA takes
+′
+
+𝐸𝑢sem as the input, where 𝑄 = 𝐾 = 𝑉 = 𝐸𝑢sem . Then the semantic representation 𝑆𝑢 ∈ R𝑁 ×𝑑 is computed as:
+𝑆𝑢 = 𝐹 𝐹 𝑁 (𝑀𝑆𝐴(𝐸𝑢sem, 𝐸𝑢sem, 𝐸𝑢sem )).
+5.1.2
+
+(6)
+
+S&R history soft filtering. When combining S&R behaviors together in the user history sequence, it is essential
+
+to effectively capture user preferences from an extensive history of S&R interactions. The fusion of these two tasks
+introduces a larger volume and greater complexity of user behaviors, making it crucial to extract meaningful patterns
+from the multi-task interaction history. To address this challenge, we propose a history soft filtering strategy, which
+selectively soft-filters relevant items from the extensive S&R interaction history based on the user’s specific information
+needs.
+Intuitively, after obtaining the learned CF representation 𝐶𝑢 and semantic representation 𝑆𝑢 from the dual-view
+representation, we calculate the importance score of each historically interacted item with respect to the candidate item
+𝑖𝑐 . Specifically, for the CF side, given a user 𝑢, the CF representation 𝐶𝑢 = {ℎ 1, ℎ 2, . . . , ℎ 𝑁 } contains the encoded CF
+embeddings of 𝑁 historically interacted items, where ℎ 𝑗 is the encoded CF embedding of the 𝑗-th item. To determine
+the relevance of each ℎ 𝑗 to the candidate item 𝑖𝑐 with CF embedding 𝑒𝑖𝑐 , we compute the importance score 𝛼 𝑗 using a
+multi-head cross-attention (MCA) module:
+𝑁
+ ∑︁
+
+𝛼 𝑗 = exp MCA(𝑒𝑖𝑐 , ℎ 𝑗 ) / exp MCA(𝑒𝑖𝑐 , ℎ𝑘 ) ,
+
+(7)
+
+𝑘=1
+
+where 𝛼 𝑗 is the importance score for the 𝑗-th historical item, and MCA(𝑒𝑖𝑐 , ℎ 𝑗 ) represents the attention score between
+the candidate item’s CF embedding 𝑒𝑖𝑐 and the 𝑗-th item CF embedding ℎ 𝑗 . Through the MCA module, the candidate
+
+2 The CF embedding table E is derived from training LightGCN using only the recommendation behaviors in the dataset [18].
+
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+
+9
+
+item 𝑒𝑖𝑐 dynamically queries and weights the most relevant historical item embeddings ℎ 𝑗 , providing importance signals
+for subsequent soft filtering.
+We then apply soft-filtering to the S&R interaction history using the calculated importance scores 𝛼 𝑗 :
+𝐶𝑢filter =
+
+𝑁
+∑︁
+
+𝛼 𝑗 · 𝑊𝑉 ℎ 𝑗 ,
+
+(8)
+
+𝑗=1
+
+where 𝑊𝑉 is a learned projection matrix associated with 𝐶𝑢 , and ℎ 𝑗 is the 𝑗-th optimized CF embedding from 𝐶𝑢 .
+Similarly, we perform the same soft-filtering for the semantic side, obtaining 𝑆𝑢filter . By learning both the filtered CF
+and semantic representations of historical S&R interactions, we obtain relevant dual representation that supports both
+S&R tasks.
+5.2
+
+S&R task unifying
+
+After preparing the dual representation, GenSR integrates these learned representation with task-specific prompts,
+which are then fed into a shared generative model to unify S&R tasks.
+5.2.1 Training. We use instruction tuning to train the generative model for performing S&R tasks, enabling the
+parameter space to naturally partition into subspaces optimized for different tasks. Specifically, after obtaining
+𝐶𝑢 and 𝑆𝑢 from the dual representation learning, we construct a task-specfic prompt that incorporates these
+representations, along with the query 𝑞 (for search tasks only), the candidate item’s CF embeddings 𝑒𝑖𝑐 and
+semantic embeddings 𝑠𝑖𝑐 . Formally, we use generative model tokenizer to tokenize the textual content of the prompt,
+which contains textual instructions and the query (if applicable). The result of the tokenization is represented as:
+𝑃𝑡 = [𝑝 𝑡1, ⟨𝑃𝐻 1⟩, 𝑝 𝑡2, ⟨𝑃𝐻 2⟩, 𝑝 𝑡3, ⟨𝑃𝐻 3⟩, 𝑝 𝑡4, ⟨𝑃𝐻 4⟩, 𝑝 𝑡5 ], where task 𝑡 ∈ {𝑆, 𝑅}, 𝑝𝑘𝑡 denotes 𝑘-th segments of prompt text
+tokens for task 𝑡, and ⟨𝑃𝐻 ⟩ represents placeholders that will be replaced with other feature embeddings later.3 We
+then encode the prompt into a sequence of embeddings and replace the placeholders with learned representation and
+candidate item embeddings for each task:
+𝐸𝑡 = [𝑒 1𝑡 , 𝐶𝑢 , 𝑒 2𝑡 , 𝑆𝑢 , 𝑒 3𝑡 , 𝑒𝑖𝑐 , 𝑒 4𝑡 , 𝑠𝑖𝑐 , 𝑒 5𝑡 ],
+
+where 𝑡 ∈ {𝑆, 𝑅}.
+
+(9)
+
+Here, 𝑒𝑘𝑡 ∈ R1×𝑑2 represents the embedding for token 𝑝 𝑘1 , obtained via the embedding lookup in the generative model.
+The final tokenized embedding 𝐸𝑡 is fed into the generative model as input for instruction tuning. This approach allows
+the model to adaptively leverage both CF and semantic information, while employing task-specific prompts to partition
+the model’s parameter space into subspaces for optimizing different tasks.
+5.2.2
+
+Contrastive learning between CF and Semantic views. Since we design dual representation learning from
+
+the CF and semantic views, it is important to notice that these perspectives provide complementary insights into
+user preferences. Aligning these two views enables the model to integrate their respective strengths, resulting in
+comprehensive and robust user representations that enhance generalization across diverse S&R tasks.
+To effectively align user representations from both the CF and semantic views, we employ contrastive learning. This
+approach encourages the CF and semantic representations of the same user 𝑢 to be closer in the embedding space, while
+ensuring that the CF or semantic representations of different users 𝑢 ′ (within the same batch) are pushed further apart.
+
+3 The five segments of prompt text tokens (𝑝 𝑡 to 𝑝 𝑡 ) are used because, in our setting, we only have four feature embeddings to insert into the prompt.
+1
+5
+Therefore, the prompt is divided into five segments to interleave the embeddings properly.
+
+Manuscript submitted to ACM
+
+10
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+
+Table 1. Statistics of three datasets. #Inter-S and #Inter-R denote the interaction number of search behavior and recommendation
+behavior, respectively.
+
+Dataset
+
+#User
+
+#Item
+
+#Queries
+
+#Inter-S
+
+#Inter-R
+
+Amazon
+KuaiSAR
+
+68,223
+25,877
+
+61,934
+6,890,707
+
+4,298
+453,667
+
+934,664
+5,059,169
+
+989,618
+14,605,716
+
+Specifically, for a given user 𝑢, with CF representation 𝐶𝑢 and semantic representation 𝑆𝑢 obtained from dual-view
+representation, the goal is twofold: 1) Minimize the distance between 𝐶𝑢 and 𝑆𝑢 (positive pair), ensuring that the CF
+and semantic embeddings of the same user are closely aligned, effectively transferring complementary information
+between views. 2) Maximize the distance between 𝐶𝑢 (or 𝑆𝑢 ) and the representations 𝐶𝑢 ′ or 𝑆𝑢′ of other users 𝑢 ′ in
+the batch (negative pairs). This enforces distinctiveness between users, preventing overlapping embeddings that could
+reduce model performance in S&R tasks. The contrastive loss for this alignment is calculated as follows:
+L𝑐 = − |𝐵1 |
+
+Í
+𝑢 ∈𝐵
+
+exp(sim(𝐶𝑢Í,𝑆𝑢 )/𝜏 )
+
+log Í ′
+
+𝑢 ∈𝐵 exp(sim(𝐶𝑢 ,𝑆𝑢 ′ )/𝜏 )+ 𝑢 ′ ∈𝐵 exp(sim(𝑆𝑢 ,𝐶𝑢 ′ )/𝜏 )
+
+,
+
+(10)
+
+where 𝐶𝑢 and 𝑆𝑢 denote the CF and semantic embeddings for the same user 𝑢, while 𝑢 ′ refers to other users in the batch
+𝐵. The function sim(·, ·) is implemented as cosine similarity, measuring the similarity between two embeddings. 𝜏 is a
+temperature factor that adjusts the sharpness of the similarity distribution, controlling how much emphasis is placed
+on high-similarity pairs.
+5.2.3
+
+Loss function. The overall loss function for the GenSR model consists of two components: 1) a task-specific
+
+generation loss for S&R, LS&R , and 2) a contrastive learning loss, L𝑐 , which aligns the CF and semantic representations.
+The combined loss is:
+L = LS&R + 𝛽L𝑐 , where
+LS&R = −
+
+|𝑦 |
+∑︁
+
+log 𝑃Θ (𝑦𝑡 |𝑦 <𝑡 , 𝐸)},
+
+(11)
+(12)
+
+𝑡 =1
+
+where 𝛽 is the loss balance factor that controls the weight of the contrastive loss relative to the S&R task loss, and |𝑦|
+is the length of the target sequence, 𝑦𝑡 is the token at position 𝑡 in the target sequence, and 𝑦 <𝑡 represents all tokens
+preceding 𝑡. The conditional probability 𝑃Θ (𝑦𝑡 | 𝑦 <𝑡 , 𝐸) is computed by the generative model, parameterized by overall
+model parameters Θ, given the input tokenized embedding 𝐸. Intuitively, generation loss LS&R encourages the model to
+maximize the likelihood of generating the correct output sequence for S&R.
+6
+
+Experiments
+
+In this section, we conduct a comprehensive experimental study to address the following research questions.
+- RQ1: How does the performance of GenSR compare to other baseline methods across various datasets in both
+recommendation and search scenarios?
+- RQ2: How well can GenSR enhance mutual information compared to discriminative approaches?
+- RQ3: How effectively does GenSR mitigate gradient conflict relative to discriminative approaches?
+- RQ4: What is the impact of different strategies (e.g., dual-view representation and S&R history soft filtering) within
+GenSR on its overall performance?
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+
+11
+
+Table 2. Overall performance of GenSR and other baselines under recommendation scenario. Bold signifies the best performance
+among the baselines and GenSR while underline represents the second-best method. * denotes statistically significant improvements
+of GenSR over the best baseline, according to t-tests with a significance level of 𝑝 < 0.01.
+
+R@5
+
+Amazon
+R@10
+N@5
+
+N@10
+
+R@5
+
+KuaiSAR
+R@10
+N@5
+
+N@10
+
+DIN [62]
+GRU4Rec [21]
+SASRec [23]
+BERT4Rec [42]
+FMLP-Rec [63]
+CoLLM [60]
+IDGenRec [44]
+
+0.5170
+0.4949
+0.5295
+0.5311
+0.5356
+0.5800
+0.2305
+
+0.6525
+0.6548
+0.6772
+0.6658
+0.6879
+0.6811
+0.2818
+
+0.3726
+0.3388
+0.3747
+0.3954
+0.3739
+0.4651
+0.1791
+
+0.4165
+0.3907
+0.4225
+0.4390
+0.4232
+0.5001
+0.1955
+
+0.4509
+0.3764
+0.4065
+0.3699
+0.4292
+0.4092
+-
+
+0.6179
+0.5788
+0.6007
+0.5885
+0.6159
+0.5915
+-
+
+0.3104
+0.2345
+0.2671
+0.2381
+0.2851
+0.3199
+-
+
+0.3643
+0.3087
+0.3298
+0.3083
+0.3453
+0.3683
+-
+
+NRHUB [52]
+Query-SeqRec [20]
+SESRec [39]
+JSR [57]
+USER [55]
+UnifiedSSR [54]
+UniSAR [37]
+BSR [32]
+GenSR
+
+0.4988
+0.5401
+0.5623
+0.5467
+0.5441
+0.5196
+0.5874
+0.1417
+0.6102*
+
+0.6503
+0.6860
+0.6864
+0.6779
+0.6854
+0.6707
+0.7020
+0.2278
+0.7200*
+
+0.3487
+0.3859
+0.4245
+0.3970
+0.3964
+0.3662
+0.4513
+0.0899
+0.4922*
+
+0.3977
+0.4333
+0.4648
+0.4396
+0.4422
+0.4151
+0.4885
+0.1177
+0.5278*
+
+0.3862
+0.3920
+0.4956
+0.4791
+0.4086
+0.3981
+0.5169
+0.2180
+0.5235*
+
+0.5610
+0.5890
+0.6643
+0.6453
+0.5627
+0.5939
+0.6792
+0.3395
+0.6819*
+
+0.2572
+0.2552
+0.3432
+0.3315
+0.2820
+0.2617
+0.3632
+0.1472
+0.3686*
+
+0.3136
+0.3186
+0.3978
+0.3853
+0.3318
+0.3249
+0.4158
+0.1860
+0.4199*
+
+Method
+
+Recommendation
+
+Joint S&R
+
+Table 3. Overall performance of GenSR and other baselines under search scenario. Bold signifies the best performance among the
+baselines and GenSR while underline represents the second-best method. * denotes statistically significant improvements of GenSR
+over the best baseline, according to t-tests with a significance level of 𝑝 < 0.01.
+
+R@5
+
+Amazon
+R@10
+N@5
+
+N@10
+
+R@5
+
+KuaiSAR
+R@10
+N@5
+
+N@10
+
+QEM [1]
+HEM [2]
+AEM [1]
+ZAM [1]
+TEM [8]
+CoPPS [10]
+
+0.7100
+0.6778
+0.7095
+0.7109
+0.8185
+0.8169
+
+0.8186
+0.8267
+0.8443
+0.8468
+0.9051
+0.9051
+
+0.5066
+0.4736
+0.5114
+0.5147
+0.6303
+0.6281
+
+0.5422
+0.5221
+0.5554
+0.5590
+0.6587
+0.6570
+
+0.6020
+0.6505
+0.5956
+0.6117
+0.6502
+0.6616
+
+0.7182
+0.7653
+0.7182
+0.7344
+0.7632
+0.7707
+
+0.4575
+0.5029
+0.4415
+0.4560
+0.4887
+0.4977
+
+0.4953
+0.5400
+0.4812
+0.4959
+0.5254
+0.5331
+
+JSR [57]
+USER [55]
+UnifiedSSR [54]
+UniSAR [37]
+BSR [32]
+GenSR
+
+0.7038
+0.7631
+0.7744
+0.8190
+0.4786
+0.9782*
+
+0.8225
+0.8697
+0.8812
+0.8977
+0.6015
+0.9853*
+
+0.5173
+0.6000
+0.5847
+0.6875
+0.3485
+0.9664*
+
+0.5563
+0.6348
+0.6196
+0.7132
+0.3883
+0.9687*
+
+0.7162
+0.7304
+0.7377
+0.7476
+0.1573
+0.7661*
+
+0.7961
+0.8149
+0.8320
+0.8369
+0.2075
+0.8372
+
+0.5962
+0.6069
+0.5991
+0.6417
+0.1359
+0.7564*
+
+0.6221
+0.6342
+0.6297
+0.6708
+0.1520
+0.7655*
+
+Method
+
+Search
+
+Joint S&R
+
+6.1
+
+Experimental setups
+
+6.1.1
+
+Datasets. We evaluate GenSR on the two publicly available datasets that contain both S&R histories.
+
+(1) Amazon4 is a publicly released product review dataset collected from Amazon. It contains extensive usergenerated product reviews and metadata, such as product titles and descriptions. We use the "Kindle Store" 5-core
+sub-dataset from the dataset, which contains user reviews and ratings for Kindle books. Adopting the procedure
+from prior work [37, 39], we first generate synthetic search behaviors and queries based on this recommendation
+4 https://jmcauley.ucsd.edu/data/amazon/.
+
+Manuscript submitted to ACM
+
+12
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+
+dataset and then apply a leave-one-out strategy for dataset splitting. The detailed process for generating search
+behaviors is described in [2]. Specifically, queries are extracted from the hierarchical category information of
+each item and paired with user purchase behaviors to construct user–query–item triples. Due to the limited
+availability of real-world unified search and recommendation datasets, this automatically generated search
+dataset has been widely adopted in prior research on unifying search and recommendation [2, 16, 37, 39, 48].
+(2) KuaiSAR5 is a micro-video dataset that offers authentic S&R behaviors of users, featuring detailed item categories
+and real user queries. We preprocess the data to include only users showing both S&R behaviors. Following [37],
+we filter for users and items with at least five interactions and allocate the latest day’s data for testing, the
+previous day for validation, and the earlier data for training.
+The statistics of datasets are shown in Table 1.
+6.1.2
+
+Baselines. We compare our method with the state-of-the-art recommendation, search, and unifying methods.
+
+The recommendation baselines are:
+• DIN [62] employs a local activation unit that adaptively learns user interest representations, weighting historical
+behaviors based on their relevance to a candidate ad.
+• GRU4Rec [21] utilizes RNNs for session-based recommendations. It models sequential user interactions within
+short sessions, improving recommendations where user profiles are absent.
+• SASRec [23] introduces a self-attention based model for sequential recommendation, adeptly capturing long-term
+user behavior by adaptively focusing on relevant past items.
+• BERT4Rec [42] employs deep bidirectional self-attention with a Cloze objective to learn richer item
+representations by leveraging both left and right contexts in user behavior sequences.
+• FMLP [63] uses an all-MLP model that employs learnable filters in the frequency domain to effectively denoise
+sequential user behavior data.
+• CoLLM [60] integrates collaborative embeddings derived from external traditional recommender models into
+LLMs by mapping them to the LLM’s input token space.
+• IDGenRec [44] proposes learning unique, semantically rich textual IDs for items to seamlessly integrate them
+into LLM-based generative recommender systems.6
+The search baselines are:
+• QEM [2] learns a dense vector representation for a given search query, allowing for semantic similarity
+calculations with products in the same embedding space.
+• HEM [2] jointly learns distributed representations for words, queries, users, and products in a unified latent
+space, effectively personalizing product search by composing user and query embeddings.
+• AEM [1] is an attention-based model that personalizes product search by dynamically weighting items in a
+user’s purchase history according to the current query.
+• ZAM [1] introduces a novel Zero Attention Strategy, allowing the model to automatically determine when and
+how much to personalize by optionally attending to a zero vector, thus enabling differentiated personalization.
+• TEM [8] leverages a transformer architecture to dynamically control the influence of personalization and model
+the interactions between purchased items for personalized product search.
+5 https://kuaisar.github.io/.
+6We only implement IDGenRec on Amazon due to its requirement for explicit semantic textual information of items, which is unavailable for KuaiSAR.
+
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+
+13
+
+• CoPPS [10] introduces contrastive learning to learn robust user representations for personalized product search
+by leveraging diverse data augmentation strategies that exploit intrinsic sequence correlations and external
+knowledge graphs to overcome data sparsity and noise.
+The unifying baselines include two categories:
+(a) Search enhanced recommendation:
+• NRHUB [52] enriches user representations by integrating heterogeneous user behaviors (search queries, browsed
+webpages, and clicked news) through an attentive multi-view learning framework.
+• Query-SeqRec [20] leverages previously ignored user queries as a crucial contextual signal to enhance sequential
+recommendation accuracy by better understanding evolving user intent
+• SESRec [39] enhances sequential recommendation by learning disentangled representations of similar and
+dissimilar user interests from their combined search and recommendation behaviors.
+(b) Jointly unified S&R:
+• JSR [57] jointly models search and recommendation tasks by learning shared item representations and minimizing
+a combined loss function.
+• USER [55] integrates heterogeneous user search and recommendation behaviors into a single chronological
+sequence to learn comprehensive user interests and leverage the interdependencies between the two tasks.
+• UnifiedSSR [54] leverags cross-scenario and cross-view information sharing and dynamically modeling user
+intent through self-supervised session discovery.
+• UniSAR [37] introduces a novel framework to explicitly extract, align, and fuse various fine-grained user
+transition behaviors between search and recommendation.
+• BSR [32] employs atomic item IDs to jointly train generative models for search and recommendation.
+6.1.3
+
+Experimental settings. Following previous work [37, 54, 55], we randomly sample 99 negative items that the
+
+user has not interacted with and combine them with the ground truth item to create the candidate item list. All the
+models are then tasked with ranking these candidate items to evaluate top-K S&R performance using Recall@K and
+NDCG@K with 𝐾 = {5, 10}. For all the baselines, the hyper-parameters are searched according to the reporting range
+in the original papers. To ensure a fair comparison, we implement constrained beam search during inference for two
+full-ranking generative baselines, IDGenRec and GenSR, which guarantees that the generated results are restricted to the
+valid candidate set. Regarding our proposed GenSR, we select flan-t5-base as the backbone. The best hyper-parameters
+are selected with the searching scopes as follows: the temperature factor 𝜏 and the loss balance factor 𝛽 are tuned with
+the ranges {0.01, 0.03, 0.05, 0.07, 0.09} and {0.001, 0.01, 0.1, 0.15, 0.2, 0.25, 0.3}.
+6.2
+
+Overall performance (RQ1)
+
+We conducted a comprehensive experimental comparison of GenSR’s performance against various baseline methods in
+both recommendation and search scenarios. As shown in Table 2 and Table 3, the experimental results reveal several
+key findings:
+(1) Superiority of GenSR: GenSR consistently outperforms all baseline methods across all datasets in both S&R tasks,
+achieving state-of-the-art results. This good performance is primarily attributed to GenSR’s generative paradigm and
+its two core modules: Dual Representation Learning and S&R Task Unifying. As discussed in Section 4, the generative
+paradigm enhances the mutual information between input features and task outputs by constructing effective
+Manuscript submitted to ACM
+
+14
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+
+task-specific subspaces. This approach mitigates the gradient conflict issues commonly observed in traditional
+discriminative multi-task learning, as further illustrated in Sections 6.4.2 and Sections 6.5. After that, by preparing
+effective dual-view representations for each subspace and jointly optimizing them within one unified model, GenSR
+improves the performance of both tasks while fully leveraging the capabilities of a shared pre-trained model.
+(2) General Advantages of the Unified S&R Approach: We observe that unified S&R methods consistently
+outperform models designed for a single task, both recommendation-only models (e.g., DIN and SASRec) and searchonly models (e.g., QEM and TEM). These findings provide strong evidence for the intrinsic value of integrating S&R
+within a shared framework. User behaviors in search and recommendation are not isolated but complementary,
+with each offering distinct and informative signals. Joint modeling enables a more comprehensive understanding of
+user preferences and facilitates richer item-side interaction signals, ultimately leading to mutual performance gains
+across both tasks.
+(3) Analysis of GenSR’s SOTA Performance on the Amazon Search Task: Notably, GenSR achieves particularly
+strong results on the Amazon dataset’s search task. This can be explained by the dataset’s nature: search queries
+in Amazon are synthesized from item descriptions, indicating a high degree of alignment and strong semantic
+correlation between queries and item content. Note that the use of synthetic queries for this dataset to use it for
+search purposes is in line with prior work (see Section 6.1.1). Thanks to GenSR’s dual representation learning
+module, particularly the semantic-view, GenSR is exceptionally capable of capturing and utilizing such fine-grained
+semantic matching. When queries are semantically aligned with item descriptions, GenSR’s generative capabilities
+allow it to more precisely infer user intent and retrieve relevant items, thereby yielding remarkable performance
+improvements. This highlights the generative paradigm’s strong potential in leveraging semantic information,
+especially on semantically rich and well-aligned datasets.
+(4) Limitations of Existing Baseline Methods: Not all generative or unified models can achieve GenSR’s performance
+level. For example, IDGenRec performs relatively poorly, especially when compared with GenSR. This is likely due
+to its heavy reliance on semantic textual information to generate unique item IDs, which may hinder its ability to
+fully capture and utilize traditional CF signals in recommendation tasks. In many cases, pure semantic matching
+is insufficient to reflect complex user-item collaborative preferences. GenSR addresses this issue through dual
+representation learning. Similarly, BSR exhibits significantly limited performance. By generating atomic item IDs,
+BSR lacks enriched semantic information to enhance item representations. Relying solely on atomic IDs may result
+in poor modeling of item properties and deep user preferences, especially when semantic matching is crucial for
+search tasks.
+6.3
+
+Potential Application to Full Ranking (RQ1)
+
+Full ranking represents a highly challenging yet critical evaluation setting for real-world S&R systems. Unlike the more
+common candidate re-ranking evaluation scenario in unified S&R, where models operate on a small, pre-selected set of
+candidate items, full-ranking requires identifying the most relevant items directly from the entire corpus of available
+items. Success in full-ranking demonstrates a model’s robust capability for open-vocabulary item discovery and global
+relevance estimation, pushing the limits of what search engines and recommender systems can achieve.
+A key advantage of the generative paradigm in S&R lies in its inherent ability to perform full-ranking, seamlessly
+unifying the retrieval and re-ranking stages into a single, end-to-end optimization framework [43]. Unlike traditional
+two-stage pipelines which first retrieve a subset of candidates and subsequently re-rank them, a generative model
+directly produces the final ranked items in a single pass. This unified approach not only simplifies the overall architecture
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+
+15
+
+Table 4. Overall performance of GenSR and other baselines in the full-ranking setting. Bold signifies the best performance among the
+baselines and GenSR, and underline represents the second-best method. * denotes statistically significant improvements of GenSR
+over the best baseline, according to t-tests with a significance level of 𝑝 < 0.01.
+
+Method
+
+R@5
+
+Amazon
+R@10
+N@5
+
+N@10
+
+R@5
+
+KuaiSAR
+R@10
+N@5
+
+N@10
+
+Recommendation
+
+TIGER [35]
+BSR [32]
+GenSR
+
+0.0108
+0.0027
+0.0153*
+
+0.0173
+0.0037
+0.0211*
+
+0.0101
+0.0016
+0.0136*
+
+0.0142
+0.0019
+0.0198*
+
+0.0149
+0.0052
+0.0187*
+
+0.0213
+0.0081
+0.0254*
+
+0.0138
+0.0043
+0.0181*
+
+0.0201
+0.0071
+0.0250*
+
+Search
+
+GenRet [43]
+BSR [32]
+GenSR
+
+0.0221
+0.0072
+0.0268*
+
+0.0311
+0.0080
+0.0362*
+
+0.0197
+0.0058
+0.0223*
+
+0.0277
+0.0059
+0.0305*
+
+0.0112
+0.0074
+0.0181*
+
+0.0181
+0.0109
+0.0259*
+
+0.0099
+0.0066
+0.0144*
+
+0.0173
+0.0095
+0.0216*
+
+but also allows the model to jointly optimize retrieval and re-ranking without relying on intermediate heuristic filtering.
+To comprehensively assess the global ranking capability of this generative paradigm, we further evaluate GenSR in the
+full-ranking setting.
+To adapt GenSR for the full-ranking task, we slightly modify its input and output strategy which is suitable for the
+more typical evaluation setting in unified S&R. In the standard evaluation setup, GenSR is typically given a candidate
+item 𝑖𝑐 along with user history and query, and it generates token probability to indicate preference. However, in the
+full-ranking scenario, the model’s goal shifts from assessing a pre-existing candidate to identifying the most relevant
+item from the entire corpus. To accommodate this, the input prompt to the generative model is adjusted by excluding
+the embeddings of the candidate item (𝑒𝑖𝑐 , 𝑠𝑖𝑐 ). Instead, the model is provided only with the user’s interaction history
+𝐻𝑢 and query 𝑞 (for search tasks), and it is trained to directly generate the relevant item ID through dual representation
+learning (excluding soft-filtering strategy due to the lack of candidate item) and S&R task unifying.
+This adjustment transforms the task into an item ID generation problem, similar to current generative retrieval
+and recommendation methods. During inference, we employ constrained beam search, which ensures that the output
+consists of valid item IDs from the entire corpus. This approach effectively performs full-ranking, enabling the model to
+discover the most relevant items without relying on a pre-selected candidate set.
+Crucially, this adaptation strategy aligns the computational complexity of GenSR for full-ranking with that of existing
+typical generative retrieval models [32, 51]. The primary computational burden lies in the decoding phase, where the
+model generates item IDs. During this process, constrained beam search is applied over the vocabulary of item IDs,
+with complexity approximately proportional to 𝐵 × 𝐿 × 𝑉𝑖𝑡𝑒𝑚 . Here, 𝐵 is the beam size, 𝐿 is the length of the generated
+ID sequence (typically 1 for a single item ID), and 𝑉𝑖𝑡𝑒𝑚 is the total number of items in the corpus.
+We compare GenSR with three representative generative models under the full-ranking setting:
+• BSR [32] is a generative joint S&R model that outputs items as plain IDs, without leveraging content semantics.
+• TIGER [35] is a generative recommendation model that assigns each item a discrete Semantic ID and trains a
+sequence-to-sequence model to predict the next item’s Semantic ID in a user’s history
+• GenRet [43] is a generative retrieval model that learns to tokenize documents into short discrete identifiers and
+generate these identifiers for a given query.
+These baselines include both unified S&R models and single-task generative approaches. We evaluate all models
+on the Amazon and KuaiSAR datasets under the full-ranking setting, using the same top-𝐾 metrics as reported in
+Section 6.1. The results are presented in Table 4. As expected, all models experience a performance drop compared
+Manuscript submitted to ACM
+
+16
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+Table 5. Mutual Information Estimation.
+Method
+
+Amazon
+Search
+Rec.
+
+KuaiSAR
+Search
+Rec.
+
+UniSAR
+GenSR
+
+0.9003
+0.9378
+
+0.8514
+0.9251
+
+0.8739
+0.9217
+
+0.8475
+0.9168
+
+to the main setting due to the significantly larger candidate space. Nevertheless, GenSR consistently outperforms the
+generative baselines by a substantial margin across all metrics and datasets, owing to its superior dual representation
+learning and unified training strategy. Overall, these results strongly highlight GenSR’s remarkable generalization ability
+across different evaluation scenarios. While the typical candidate re-ranking setting remains widely used in unified S&R
+task, GenSR also demonstrates its capacity to perform effectively in the generative full-ranking setting. This underscores
+GenSR’s effectiveness and its potential to serve as a robust generative paradigm in search and recommendation tasks.
+6.4
+
+Mutual Information Analysis (RQ2)
+
+In this section, we evaluate mutual information from two complementary angles. First, we provide quantitative evidence
+by estimating the mutual information gains directly. Second, we offer a qualitative geometric view via parameter-space
+visualization, showing how GenSR’s subspaces disentangle task manifolds and better align inputs with task-specific
+outputs, thereby increasing the mutual information between them.
+6.4.1 Quantifying mutual information gains. To further support our theoretical claim directly and verify the conclusion
+in a broader complex real-world scenario, we employ Mutual Information Neural Estimation (MINE) to empirically
+estimate the practical mutual information between the input 𝑋 and the task-specific outputs 𝑌𝑆 and 𝑌𝑅 [6]. Our empirical
+findings are consistent with the theoretical conclusion. Specifically, we use the Donsker-Varadhan representation of KL
+divergence to estimate the lower bound of mutual information as:
+𝐼 (𝑋 ; 𝑌𝑡 ) ≥ E𝑃 (𝑋 ,𝑌𝑡 ) [𝑓 (𝑥, 𝑦𝑡 )] − log E𝑃 (𝑋 )𝑃 (𝑌𝑡 ) [𝑒 𝑓 (𝑥,𝑦𝑡 ) ],
+
+(13)
+
+where 𝑓 (𝑥, 𝑦𝑡 ) is a neural network function trained to maximize this bound.
+In our experiments, we calculate mutual information for both S&R tasks under the discriminative and generative
+paradigms. For each task, we estimate 𝐼 (𝑋 ; 𝑌𝑡 ) by sampling data from the joint distribution 𝑃 (𝑋, 𝑌𝑡 ) and comparing
+it with samples from the independent marginal distributions 𝑃 (𝑋 ) and 𝑃 (𝑌𝑡 ). This process provides a quantitative
+measure of how well the input and output distributions are aligned in each paradigm. We compare GenSR with the most
+powerful discriminative paradigm baseline UniSAR in two public datasets: Amazon and KuaiSAR (see detailed dataset
+description and baseline description in Section 6.1). The results, presented in Table 5, show that the generative paradigm
+consistently achieves higher mutual information for both tasks. This improvement aligns with our theoretical analysis,
+which is attributed to the task-specific subspaces. We next provide a parameter-space visualization to complement
+these quantitative results.
+6.4.2 Parameter space visualization analysis. We empirically analyze the model’s parameter space to deeply investigate
+and visually support our core claim: the proposed generative paradigm can effectively enhance the mutual information
+between the model input 𝑋 and task-specific output 𝑌𝑡 . We present our analysis in three steps: (1) the inherent differences
+in the original data distributions of the search and recommendation tasks; (2) the optimization challenges posed by the
+discriminative paradigm under a shared parameter space, which may lead to low mutual information; and (3) how the
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+
+(a) S&R Data KDE Density Contours
+
+(b) Discriminative Paradigm
+
+17
+
+(c) Generative Paradigm
+
+Fig. 3. Parameter space visualization under KuaiSAR.
+
+generative paradigm naturally achieves high mutual information by partitioning the parameter space. All analyses
+are conducted based on the KuaiSAR dataset, as it is the only real-world, publicly available dataset, offering authentic
+complexity and user behavior patterns and avoiding biases that may be introduced by synthetic data, thereby making
+our observations more representative.
+To examine the raw data distributions of S&R tasks, we utilize Kernel Density Estimation (KDE) to approximate
+𝑃 (𝑋𝑆 , 𝑌𝑆 ) and P(𝑋𝑅 , 𝑌𝑅 ) [45], providing a non-parametric representation of S&R data distributions. Specifically, we
+concatenate 𝑋 and 𝑌 vectors for each sample, and apply KDE with Gaussian kernels to estimate the probability density.
+To visualize these distributions, we first use t-SNE to reduce the data into a two-dimensional space and then compute
+KDE in the resulting embedding space [47]. The KDE density contours for S&R tasks are plotted in Figure 3(a), revealing
+distinct density patterns that suggest differences in the underlying distributions of the two tasks.
+Given the observed differences in task distributions, we further investigate the parameter space when unifying
+S&R tasks under the discriminative paradigm. Specifically, we extract the model’s hidden states for S&R tasks and use
+Principal Component Analysis (PCA) to visualize the activation distribution in two dimensions as shown in Figure 3(b).
+The results indicate that the hidden state distributions of S&R tasks under the discriminative paradigm exhibit significant
+overlap. This suggests that the model is forced to learn and represent two fundamentally different tasks within a single
+shared parameter space. Such enforced sharing leads to limitations in representational capacity: the model struggles to
+learn sufficiently distinct, task-specific representations for each task. From an information-theoretic perspective, this
+overlap causes the task-relevant information in the input 𝑋 to become entangled, thereby limiting the upper bound
+of mutual information. When the model cannot effectively differentiate or capture the distinct patterns of each task,
+it becomes difficult to find optimal gradient directions during training, which is the root cause of gradient conflicts
+(which will be quantified in Section 6.5).
+Finally, we analyze the parameter space under our generative paradigm in Figure 3(c). The generative paradigm
+naturally partitions the parameter space into task-specific subspaces that align with the separate distributions of S&R
+tasks. This separation yields multiple advantages: (1) Enhanced Mutual Information: The independence of subspaces
+ensures that input features are mapped more clearly and accurately to their corresponding task outputs. This allows each
+task’s representation learning and optimization to proceed without interference from the other, significantly enhancing
+the mutual information between input 𝑋 and task-specific output 𝑌𝑡 . This enriched mutual information translates
+directly into stronger task-specific representation capacity and improved prediction accuracy. (2) Mitigated Gradient
+Manuscript submitted to ACM
+
+18
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+
+Conflicts: By partitioning the space, the optimization gradients for the search and recommendation tasks can evolve
+independently within their own "dedicated" subspaces. This fundamentally reduces direct conflicts between task-specific
+optimization goals, enabling the model to converge more stably and efficiently while maximizing performance for both
+tasks.
+6.5
+
+Gradient conflict analysis (RQ3)
+
+In this section, we further empirically evaluate the degree of gradient conflict in both the discriminative paradigm and
+our proposed method to support that our method alleviates gradient conflict compared to the discriminative paradigm.
+To assess this effect, we compare our approach with the strongest discriminative baseline, UniSAR. At each training
+step, both models are supplied with the same mini-batch. We compute the loss for the search task and the recommendation
+task separately for the current mini-batch. Then, from both models (GenSR and UniSAR), we extract the corresponding
+gradients from the same self-attention layer in the transformer encoder. This layer is typically crucial for learning
+high-level representations and is where task-shared information is most concentrated, making it a likely site for gradient
+conflict. And then, the extracted high-dimensional gradient tensors are flattened into one-dimensional vectors. We
+compute the cosine similarity between the two flattened gradient vectors. A higher cosine value indicates less conflict
+between the two tasks.
+Figure 4 shows the similarity distribution across the training process. The key trends and conclusions are as follows:
+(1) Fluctuations and Negative Similarity in UniSAR: As a representative of the discriminative paradigm, UniSAR
+exhibits dramatic fluctuations in its gradient similarity curve, frequently dipping into the negative range. These
+sharp fluctuations indicate frequent disagreements between the optimization objectives of S&R tasks over shared
+parameters across training steps (mini-batches). Additionally, the recurring dips into negative values (often
+around or below -0.5) clearly point to severe gradient conflicts. This suggests that at these steps, the gradient
+directions for search and recommendation are adversarial. Such opposing updates cause the model parameters
+to oscillate between conflicting objectives, slowing convergence, reducing training efficiency, and ultimately
+resulting in suboptimal performance.
+(2) Sustained Positive and Smooth Curve in GenSR: In contrast, GenSR maintains a consistently positive has
+a smaller amplitude in the gradient similarity curve throughout training. The predominantly positive cosine
+similarities indicate that GenSR rarely encounters task conflicts; in most cases, the gradients of search and
+recommendation tasks are aligned or at least non-interfering. This means that even when the two tasks pursue
+different objectives, their updates to shared parameters remain largely compatible. Additionally, the smoother
+evolution of the curve further reflects training stability and efficiency. In the absence of severe gradient opposition,
+model parameters converge more steadily toward globally optimal solutions.
+These contrasting trends clearly demonstrate that assigning search and recommendation to distinct subspaces
+significantly reduces gradient conflict and enables more stable optimization compared to the discriminative paradigm.
+6.6
+
+Ablation study (RQ4)
+
+To systematically assess the individual contributions of each critical module within GenSR, we conducte a comprehensive
+ablation study. Specifically, our aim is to quantitatively analyze the independent impact of the dual-view representation
+learning, S&R history soft filtering, and contrastive learning modules on the model’s overall performance. Figure 5
+presents the ablation experimental results, revealing the following key findings:
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+
+KuaiSAR
+
+0.8
+
+S&R Gradient Similarity
+
+S&R Gradient Similarity
+
+Amazon
+0.6
+0.4
+0.2
+0.0
+0.2
+GenSR (Ours)
+UniSAR
+GenSR Avg: 0.287
+UniSAR Avg: 0.198
+
+0.4
+0.6
+0
+
+2000
+
+4000
+
+6000
+
+8000
+
+19
+
+10000
+
+Training Steps
+
+12000
+
+GenSR (Ours)
+UniSAR
+GenSR Avg: 0.231
+UniSAR Avg: 0.170
+
+0.8
+0.6
+0.4
+0.2
+0.0
+0.2
+
+14000
+
+0
+
+2000
+
+4000
+
+6000
+
+8000
+
+10000
+
+Training Steps
+
+12000
+
+14000
+
+Fig. 4. Gradient Conflict Analysis.
+
+Recommendation
+
+NDCG@5
+
+0.45
+0.40
+0.35
+0.30
+
+w/o Dual-view
+w/o filter
+w/o contras
+GenSR
+
+1.0
+
+NDCG@5
+
+w/o Dual-view
+w/o filter
+w/o contras
+GenSR
+
+0.50
+
+Search
+
+1.1
+0.9
+0.8
+0.7
+0.6
+
+Amazon
+
+Dataset
+
+KuaiSAR
+
+0.5
+
+Amazon
+
+Dataset
+
+KuaiSAR
+
+Fig. 5. Ablation study of different components in GenSR.
+
+(1) Contribution of Dual Representation Learning: When the model is restricted to a single representation
+view (i.e., utilizing only the CF view or the semantic view), there is a substantial performance degradation across
+both recommendation and search tasks on both datasets. For instance, on the Amazon dataset, the NDCG@5 for
+the recommendation task dropped by approximately 26.5% compared to the full model, while for the search task,
+NDCG@5 decreased by about 6.1%. The KuaiSAR dataset exhibited similar performance drops. These findings
+underscore the intrinsic complementarity between CF and semantic information for unifying S&R tasks. By
+independently learning representations from these two distinct views, GenSR effectively integrates the diverse
+information needed to support both S&R tasks.
+(2) Contribution of S&R History Soft Filtering: Excluding the S&R history soft filtering module led to a noticeable
+decline in model performance. On the Amazon dataset, the NDCG@5 for the recommendation and search tasks
+Manuscript submitted to ACM
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+
+0.496
+0.494
+
+Rec.
+
+0.98
+
+0.492
+
+0.97
+0.96
+
+0.01
+
+0.03
+
+0.05
+
+0.98
+
+0.07
+
+0.09
+
+0.96
+
+0.92
+
+0.488
+
+0.90
+
+0.58
+0.56
+0.54
+0.52
+
+0.94
+
+0.490
+
+(a) Temperature Factor (NDCG@5)
+
+Search
+Rec.
+
+Rec.
+
+0.99
+
+Search
+
+0.60
+
+Search
+Rec.
+
+Search
+
+20
+
+0.50
+0.48
+0.46
+0.44
+
+0.001 0.01 0.1 0.15 0.2 0.25 0.3
+
+(b) Loss Balance Factor (NDCG@5)
+
+Fig. 6. Hyper-parameter analysis for the Amazon dataset.
+
+decreased by approximately 12.2% and 3.1%, respectively. These results underscore the critical role of this filtering
+strategy in extracting relevant information from complex interaction histories.
+(3) Contribution of Contrastive Learning: The removal of the contrastive learning component resulted in
+a significant decline in model performance. On the Amazon dataset, the NDCG@5 for the recommendation
+and search tasks dropped by approximately 6.1% and 1.0%, respectively. These findings highlight the critical
+role of contrastive learning in aligning representations from different views. While dual-view representation
+learning independently captures CF and semantic information, contrastive learning acts as a crucial mechanism
+to integrate these complementary representations within a shared embedding space. By encouraging the CF
+and semantic embeddings of the same user to be spatially closer while separating embeddings of different users,
+contrastive learning ensures both views jointly contribute to robust and comprehensive user preference modeling.
+This cross-view alignment is essential for enhancing the model’s generalization capability, as it prevents potential
+representation misalignment or disentanglement that may arise from independent learning. Ultimately, this
+mechanism maximizes the synergistic benefits of leveraging information from dual sources.
+
+6.7
+
+Hyper-parameter analysis (RQ4)
+
+To thoroughly understand the robustness and optimal configuration of GenSR, we conducte a sensitivity analysis on two
+critical hyperparameters: the temperature factor (𝜏) within the contrastive learning objective, and the loss balance factor
+(𝛽) that governs the weighting of the contrastive loss relative to the main S&R task loss. This analysis is performed on
+the Amazon dataset, with observed trends being consistent across the KuaiSAR dataset, thus the Amazon results are
+presented for conciseness in Figure 6. Our findings are as follows:
+(1) The temperature factor 𝜏 is a critical parameter in shaping the similarity distribution within the contrastive
+learning objective. Specifically, it scales the logits before the softmax operation, thereby controlling the sharpness
+of the similarity distribution. A smaller 𝜏 leads to a sharper distribution, assigning higher confidence to truly
+similar pairs and emphasizing fine-grained distinctions between positive and negative samples. Conversely, a
+larger 𝜏 results in a smoother distribution, which softens the penalty for less similar negative pairs and can
+reduce the discriminative power. As shown in the Figure 6(a), GenSR’s performance, measured by NDCG@5 for
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+
+21
+
+both recommendation and search tasks, exhibits a clear peak within a specific range of 𝜏. When 𝜏 is too small
+(e.g., 0.01), performance significantly degrades (e.g., NDCG@5 for recommendation drops by approximately 1.5%
+from peak). This is likely due to the contrastive loss becoming overly sensitive to minor differences or noise,
+potentially leading to feature collapse or focusing too intensely on easy negative samples, hindering the learning
+of generalized representations. Conversely, excessively large 𝜏 values (e.g., 0.09) also lead to performance drops
+(e.g., NDCG@5 for recommendation drops by approximately 0.8% from peak), as the loss function becomes less
+discriminative, failing to adequately distinguish between positive and negative pairs. This indicates that finding
+a balanced 𝜏 is critical for effective contrastive learning. An appropriate 𝜏 ensures that the model can sufficiently
+distinguish between positive (CF and semantic views of the same user) and negative samples (views of different
+users) without becoming overly sensitive or under-discriminating.
+(2) The loss balance factor determines the relative importance of the contrastive learning loss 𝐿𝑐 compared to the
+primary S&R task generation loss 𝐿𝑆&𝑅 . It controls the trade-off between aligning the dual-view representations
+and optimizing for accurate task-specific outputs. Figure 6(b) illustrates the impact of 𝛽 on performance. We
+observe that performance for both S&R tasks generally improves as 𝛽 increases from a very low value (e.g.,
+0.001) and then stabilizes or slightly declines after reaching an optimal range. For instance, when 𝛽 is too low
+(e.g., 0.001), the NDCG@5 for recommendation is significantly lower, suggesting that the contrastive loss has
+insufficient influence to properly align the CF and semantic views, thus failing to leverage their complementary
+strengths. As 𝛽 increases into the optimal range, the model benefits from the improved aligned representations.
+However, excessively high 𝛽 values can shift the model’s focus disproportionately toward embedding alignment,
+potentially marginalizing the primary S&R task objectives. This analysis underscores the importance of carefully
+selecting 𝛽. A well-chosen value ensures the contrastive loss contributes sufficiently to robust representation
+learning and cross-view alignment without overshadowing the core S&R objectives, maintaining a balance that
+supports both embedding alignment and task-specific accuracy.
+7
+
+Conclusion
+
+In this work, we have introduced GenSR, a novel generative paradigm that unifies search and recommendation by
+leveraging task-specific prompts to partition the model’s parameter space into specialized subspaces. This subspace
+partitioning framework encourages each task to learn distinct yet complementary representations, thereby enhancing
+mutual information and reducing gradient conflict within a unified model. To enable effective subspace modeling,
+GenSR first constructs dual-view user representations that capture both collaborative and semantic signals across
+S&R behaviors. These signals are aligned through contrastive learning and are fused with prompt-guided generation,
+allowing the model to adaptively generate task-specific outputs based on a unified interaction history. Unlike previous
+discriminative methods that rely heavily on manual architecture design or rigid parameter sharing, GenSR offers a
+more flexible and expressive alternative grounded in information-theoretic principles.
+Extensive experiments on two public datasets, Amazon and KuaiSAR, demonstrate the effectiveness of our approach.
+GenSR consistently outperforms strong discriminative and generative baselines on both search and recommendation
+tasks. In addition to superior ranking performance, our analysis shows that GenSR achieves higher estimated mutual
+information and better gradient alignment, confirming that the proposed method improves the model representation
+capability and mitigate gradient conflict between two tasks.
+While our framework is grounded in an information-theoretical analysis and employs task-specific subspaces to
+increase mutual information, there is potential to further optimize these subspaces from an optimization perspective. In
+Manuscript submitted to ACM
+
+22
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+
+future work, we aim to explore advanced optimization techniques to improve the alignment and mutual information
+between these task-specific subspaces.
+Appendix (Proof of Theorem 5.1)
+This appendix provides a detailed proof of Theorem 4.1, aiming to theoretically demonstrate how our proposed
+generative paradigm, GenSR, effectively enhances mutual information in unifying S&R tasks.
+We consider two paradigms for unifying S&R: the discriminative paradigm with parameter 𝑤𝜃 and the generative
+paradigm with parameter 𝑤𝜙 . Let the true parameters be 𝑤𝜃∗ and 𝑤𝜙∗ , and let their estimates from data be 𝑤ˆ 𝜃 and 𝑤ˆ 𝜙
+respectively. The parameter approximation is obtained by minimizing their respective loss functions:7
+𝑤ˆ 𝜃 = arg min 𝐿(𝑤𝜃 ),
+
+𝑤ˆ 𝜙 = arg min 𝐿(𝑤𝜙 ).
+
+𝑤𝜃
+
+𝑤𝜙
+
+In the binary classification setting, it has been proved that the discriminative parameter can be represented as the
+∗ − 𝑤 ∗ , where 𝑤 ∗ and 𝑤 ∗ denote the true
+difference of the generative parameters across classes (i.e., 𝑤𝜃∗ = 𝑤𝜙,1
+𝜙,0
+𝜙,0
+𝜙,1
+
+parameters for class 0 (“yes”) and class 1 (“no”) ) [33]. Hence, comparing parameter approximation errors for the two
+paradigms is meaningful. To do that, we expand the loss functions around the respective true parameters using Taylor’s
+expansion. We define the approximation errors as follows: Δ𝐷 = 𝑤ˆ 𝜃 − 𝑤𝜃∗ , Δ𝐺 = 𝑤ˆ 𝜙 − 𝑤𝜙∗ . For each paradigm, we have:
+∇𝐿𝑛 (𝑤𝜃∗ ) + ∇2 𝐿𝑛 (𝑤𝜃∗ )Δ𝐷 + 𝑅𝐷 (Δ𝐷 ) = 0,
+∇𝐿𝑛 (𝑤𝜙∗ ) + ∇2 𝐿𝑛 (𝑤𝜙∗ )Δ𝐺 + 𝑅𝐺 (Δ𝐺 ) = 0,
+where 𝑅𝐷 (Δ𝐷 ) and 𝑅𝐺 (Δ𝐺 ) are the corresponding higher-order remainder terms that capture the nonlinear and
+cross-dimensional interactions. Following [33], we assume that the remainder terms satisfy a uniform bound in the
+local neighborhood: for any fixed small perturbation Δ, then:
+∥𝑅𝐺 (Δ)∥ 1 ≤
+
+1
+∥Δ∥ 𝛼1
+𝛾𝐺
+
+and
+
+∥𝑅𝐷 (Δ)∥ 1 ≤
+
+1
+∥Δ∥ 𝛼1 ,
+𝛾𝐷
+
+𝛼 ≥ 2,
+
+where 𝛾𝐺 and 𝛾𝐷 are the separability constants for the generative and discriminative paradigms respectively. Since it has
+been proven that the generative paradigm enjoys higher separability (i.e. 𝛾𝐺 > 𝛾𝐷 ) [33], we have ∥𝑅𝐺 (Δ)∥ 1 < ∥𝑅𝐷 (Δ) ∥ 1 ,
+for any fixed Δ.
+Assuming that the perturbations are small enough for the linear part of the expansion to dominate, we can apply the
+Taylor expansions [41]:
+h
+i −1
+Δ𝐺 ≈ − ∇2 𝐿𝑛 (𝑤𝜙∗ )
+𝑅𝐺 (Δ𝐺 ),
+
+
+ −1
+Δ𝐷 ≈ − ∇2 𝐿𝑛 (𝑤𝜃∗ )
+𝑅𝐷 (Δ𝐷 ).
+
+Furthermore, the generative paradigm, through its explicit partitioning of the parameter space via task-specific prompts,
+and its inherent higher separability, results in a Hessian matrix with better conditioning during optimization:8
+h
+i −1
+
+ −1
+≤ ∇2 𝐿𝑛 (𝑤𝜃∗ )
+∇2 𝐿𝑛 (𝑤𝜙∗ )
+.
+
+7 For binary generation tasks (e.g., “yes” vs. “no”), the negative log-likelihood in the generative setting aligns with the binary cross-entropy loss of the
+
+discriminative setting, allowing the same format of loss.
+8 Although this uniform bound is stated for an arbitrary (fixed) Δ, in practice the error analysis is applied to the respective perturbations Δ and Δ in
+𝐷
+𝐺
+their own local neighborhood. Since both Δ𝐷 and Δ𝐺 are assumed to be small (and we are only using the bound locally), it is reasonable to apply the
+same type of bound separately to each—even though they are different. The uniformity of the bound assures us that the same structure holds regardless
+of which (small) perturbation is under consideration.
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+
+23
+
+Thus, combining these observations we obtain
+h
+i −1
+h
+i −1
+𝑅𝐺 (Δ𝐺 ) ≤ ∇2 𝐿𝑛 (𝑤𝜙∗ )
+∥𝑅𝐺 (Δ𝐺 )∥ 1
+∥Δ𝐺 ∥ = ∇2 𝐿𝑛 (𝑤𝜙∗ )
+<
+
+
+
+∇2 𝐿𝑛 (𝑤𝜃∗ )
+
+ −1
+
+∥𝑅𝐷 (Δ𝐷 )∥ 1 ≈ ∥Δ𝐷 ∥,
+
+where the last approximate equality holds when the remainder terms are small compared to the linear term. This chain
+of inequalities leads to the conclusion:
+∥𝑤ˆ 𝜙 − 𝑤𝜙∗ ∥ ≤ ∥𝑤ˆ 𝜃 − 𝑤𝜃∗ ∥.
+
+(14)
+
+This indicates that the generative paradigm can achieve a lower parameter approximation error, meaning its estimated
+parameters are closer to the true parameters.
+Consider a Gaussian model given by: 𝑌 = 𝑤 ∗𝑋 + 𝑏 ∗ + 𝜖, with 𝑋 ∼ N (𝜇𝑋 , 𝜎𝑋2 ), 𝜖 ∼ N (0, 𝜎𝜖2 ) independent of 𝑋 ,
+Building on prior work in information theory and statistical learning (e.g.,[12, 27]), mutual information between input
+𝑋 and prediction 𝑌ˆ , parameterized by model parameter 𝑤, is expressed as:
+!
+𝑤𝜎𝑋2
+1
+ˆ
+𝐼 𝑤 (𝑋 ; 𝑌 ) = ln 1 + 2 .
+(15)
+2
+𝜎𝜖
+This formula illustrates that the model’s representation capability, as reflected by mutual information, is related to
+the magnitude of the parameter 𝑤 ∗ and the variances of the input and noise. Specifically, when parameter estimates
+𝑤ˆ are closer to the true parameters 𝑤 ∗ , the model can better capture the information embedded in the data, leading
+to higher mutual information. Therefore, tnder comparable noise variances [17], as parameter estimates 𝑤ˆ approach
+the true parameter 𝑤 ∗ , the mutual information 𝐼 (𝑋 ; 𝑌ˆ ) approaches the theoretical upper bound 𝐼 (𝑋 ; 𝑌 ), which is
+identical for both paradigms. Given that we have established Eq.(14) and Eq.(15), the generative paradigm achieves
+lower approximation error, leading directly to higher mutual information:
+𝐼 𝑤𝜃 (𝑋 ; 𝑌𝑆 ) + 𝐼 𝑤𝜃 (𝑋 ; 𝑌𝑅 ) ≤ 𝐼 𝑤𝜙 (𝑋 ; 𝑌𝑆 ) + 𝐼 𝑤𝜙 (𝑋 ; 𝑌𝑅 ).
+References
+
+[1] Qingyao Ai, Daniel N Hill, SVN Vishwanathan, and W Bruce Croft. 2019. A zero attention model for personalized product search. In CIKM. ACM,
+379–388.
+[2] Qingyao Ai, Yongfeng Zhang, Keping Bi, Xu Chen, and W Bruce Croft. 2017. Learning a hierarchical embedding model for personalized product
+search. In SIGIR. ACM, 645–654.
+[3] Philip Bachman, R Devon Hjelm, and William Buchwalter. 2019. Learning representations by maximizing mutual information across views. NeurIPS
+32 (2019).
+[4] Keqin Bao, Jizhi Zhang, Wenjie Wang, Yang Zhang, Zhengyi Yang, Yancheng Luo, Fuli Feng, Xiangnaan He, and Qi Tian. 2023. A bi-step grounding
+paradigm for large language models in recommendation systems. arXiv:2308.08434 (2023).
+[5] Keqin Bao, Jizhi Zhang, Yang Zhang, Wenjie Wang, Fuli Feng, and Xiangnan He. 2023. TALLRec: An Effective and Efficient Tuning Framework to
+Align Large Language Model with Recommendation. In RecSys. ACM.
+[6] Mohamed Ishmael Belghazi, Aristide Baratin, Sai Rajeshwar, Sherjil Ozair, Yoshua Bengio, Aaron Courville, and Devon Hjelm. 2018. Mutual
+information neural estimation. In ICML. PMLR, 531–540.
+[7] Moumita Bhattacharya, Vito Ostuni, and Sudarshan Lamkhede. 2024. Joint Modeling of Search and Recommendations Via an Unified Contextual
+Recommender (UniCoRn). In RecSys. ACM, 793–795.
+[8] Keping Bi, Qingyao Ai, and W Bruce Croft. 2020. A transformer-based embedding model for personalized product search. In SIGIR. ACM, 1521–1524.
+[9] Zeyu Cui, Jianxin Ma, Chang Zhou, Jingren Zhou, and Hongxia Yang. 2022. M6-rec: Generative pretrained language models are open-ended
+recommender systems. arXiv:2205.08084 (2022).
+[10] Shitong Dai, Jiongnan Liu, Zhicheng Dou, Haonan Wang, Lin Liu, Bo Long, and Ji-Rong Wen. 2023. Contrastive Learning for User Sequence
+Representation in Personalized Product Search. In KDD. ACM, 380–389.
+[11] Fernando Ferraretto, Thiago Laitz, Roberto Lotufo, and Rodrigo Nogueira. 2023. Exaranker: Explanation-augmented neural ranker. arXiv:2301.10521
+(2023).
+Manuscript submitted to ACM
+
+24
+
+Jujia Zhao, Wenjie Wang, Chen Xu, Xiuying Chen, Zhaochun Ren, and Suzan Verberne
+
+[12] Marylou Gabrié, Andre Manoel, Clément Luneau, Nicolas Macris, Florent Krzakala, Lenka Zdeborová, et al. 2018. Entropy and mutual information
+in models of deep neural networks. NeurIPS 31 (2018).
+[13] Min Gao, Junwei Zhang, Junliang Yu, Jundong Li, Junhao Wen, and Qingyu Xiong. 2021. Recommender systems based on generative adversarial
+networks: A problem-driven perspective. Inf. Sci. (2021), 1166–1185.
+[14] Shijie Geng, Shuchang Liu, Zuohui Fu, Yingqiang Ge, and Yongfeng Zhang. 2022. Recommendation as language processing (rlp): A unified pretrain,
+personalized prompt & predict paradigm (p5). In RecSys. 299–315.
+[15] Tong Guo, Xuanping Li, Haitao Yang, Xiao Liang, Yong Yuan, Jingyou Hou, Bingqing Ke, Chao Zhang, Junlin He, Shunyu Zhang, et al. 2023.
+Query-dominant User Interest Network for Large-Scale Search Ranking. In CIKM. 629–638.
+[16] Yangyang Guo, Zhiyong Cheng, Liqiang Nie, Yinglong Wang, Jun Ma, and Mohan Kankanhalli. 2019. Attentive long short-term preference modeling
+for personalized product search. TOIS 37, 2 (2019), 1–27.
+[17] Trevor Hastie, Robert Tibshirani, Jerome Friedman, et al. 2009. The elements of statistical learning.
+[18] Xiangnan He, Kuan Deng, Xiang Wang, Yan Li, Yongdong Zhang, and Meng Wang. 2020. Lightgcn: Simplifying and powering graph convolution
+network for recommendation. In SIGIR. 639–648.
+[19] Yun He, Xuxing Chen, Jiayi Xu, Renqin Cai, Yiling You, Jennifer Cao, Minhui Huang, Liu Yang, Yiqun Liu, Xiaoyi Liu, et al. 2024. MultiBalance:
+Multi-Objective Gradient Balancing in Industrial-Scale Multi-Task Recommendation System. arXiv:2411.11871 (2024).
+[20] Zhankui He, Handong Zhao, Zhaowen Wang, Zhe Lin, Ajinkya Kale, and Julian Mcauley. 2022. Query-aware sequential recommendation. In CIKM.
+ACM, 4019–4023.
+[21] Balázs Hidasi, Alexandros Karatzoglou, Linas Baltrunas, and Domonkos Tikk. 2016. Session-based Recommendations with Recurrent Neural
+Networks. In ICLR.
+[22] Binbin Jin, Defu Lian, Zheng Liu, Qi Liu, Jianhui Ma, Xing Xie, and Enhong Chen. 2020. Sampling-decomposable generative adversarial recommender.
+In NeurIPS. Curran Associates, Inc., 22629–22639.
+[23] Wang-Cheng Kang and Julian McAuley. 2018. Self-attentive sequential recommendation. In ICDM. IEEE, 197–206.
+[24] Sein Kim, Hongseok Kang, Seungyoon Choi, Donghyun Kim, Minchul Yang, and Chanyoung Park. 2024. Large language models meet collaborative
+filtering: an efficient all-round LLM-based recommender system. In KDD. ACM, 1395–1406.
+[25] Durk P Kingma, Tim Salimans, Rafal Jozefowicz, Xi Chen, Ilya Sutskever, and Max Welling. 2016. Improved variational inference with inverse
+autoregressive flow. In NeurIPS. Curran Associates, Inc., 4743–4751.
+[26] Kazuaki Kishida. 2003. Pseudo relevance feedback method based on Taylor expansion of retrieval function in NTCIR-3 patent retrieval task. In ACL
+Workshop on Patent Corpus Processing. 33–40.
+[27] Gilbert Leung and Andrew R Barron. 2006. Information theory and mixing least-squares regressions. TOIT 52, 8 (2006), 3396–3410.
+[28] Dawen Liang, Rahul G Krishnan, Matthew D Hoffman, and Tony Jebara. 2018. Variational Autoencoders for Collaborative Filtering. In WWW. ACM,
+689–698.
+[29] Xinyu Lin, Wenjie Wang, Yongqi Li, Shuo Yang, Fuli Feng, Yinwei Wei, and Tat-Seng Chua. 2024. Data-efficient Fine-tuning for LLM-based
+Recommendation. arXiv:2401.17197 (2024).
+[30] Jianxin Ma, Chang Zhou, Peng Cui, Hongxia Yang, and Wenwu Zhu. 2019. Learning Disentangled Representations for Recommendation. In NeurIPS.
+Curran Associates, Inc., 5712–5723.
+[31] Rodrigo Nogueira, Zhiying Jiang, and Jimmy Lin. 2020. Document ranking with a pretrained sequence-to-sequence model. arXiv:2003.06713 (2020).
+[32] Gustavo Penha, Ali Vardasbi, Enrico Palumbo, Marco De Nadai, and Hugues Bouchard. 2024. Bridging Search and Recommendation in Generative
+Retrieval: Does One Task Help the Other?. In RecSys. ACM, 340–349.
+[33] Adarsh Prasad, Alexandru Niculescu-Mizil, and Pradeep K Ravikumar. 2017. On separability of loss functions, and revisiting discriminative vs
+generative models. NeurIPS 30 (2017).
+[34] Elahe Rahimian, Golara Javadi, Frederick Tung, and Gabriel Oliveira. 2023. DynaShare: task and instance conditioned parameter sharing for
+multi-task learning. In CVPR. IEEE, 4535–4543.
+[35] Shashank Rajput, Nikhil Mehta, Anima Singh, Raghunandan H Keshavan, Trung Vu, Lukasz Heldt, Lichan Hong, Yi Tay, Vinh Q Tran, Jonah Samost,
+et al. 2023. Recommender Systems with Generative Retrieval. In NeurIPS. Curran Associates, Inc.
+[36] Guangyuan Shi, Qimai Li, Wenlong Zhang, Jiaxin Chen, and Xiao-Ming Wu. 2023. Recon: Reducing conflicting gradients from the root for multi-task
+learning. In ICLR.
+[37] Teng Shi, Zihua Si, Jun Xu, Xiao Zhang, Xiaoxue Zang, Kai Zheng, Dewei Leng, Yanan Niu, and Yang Song. 2024. UniSAR: Modeling User Transition
+Behaviors between Search and Recommendation. In SIGIR. ACM, 1029–1039.
+[38] Teng Shi, Jun Xu, Xiao Zhang, Xiaoxue Zang, Kai Zheng, Yang Song, and Enyun Yu. 2025. Unified Generative Search and Recommendation. arXiv
+preprint arXiv:2504.05730 (2025).
+[39] Zihua Si, Zhongxiang Sun, Xiao Zhang, Jun Xu, Xiaoxue Zang, Yang Song, Kun Gai, and Ji-Rong Wen. 2023. When search meets recommendation:
+Learning disentangled search representation for recommendation. In SIGIR. ACM, 1313–1323.
+[40] Jascha Sohl-Dickstein, Eric Weiss, Niru Maheswaranathan, and Surya Ganguli. 2015. Deep unsupervised learning using nonequilibrium
+thermodynamics. In ICML. PMLR, 2256–2265.
+[41] Yang Song, Lu Zhang, and C Lee Giles. 2011. Automatic tag recommendation algorithms for social recommender systems. TWEB 5, 1 (2011), 1–31.
+Manuscript submitted to ACM
+
+Unifying Search and Recommendation with Dual-View Representation Learning in a Generative Paradigm
+
+25
+
+[42] Fei Sun, Jun Liu, Jian Wu, Changhua Pei, Xiao Lin, Wenwu Ou, and Peng Jiang. 2019. BERT4Rec: Sequential recommendation with bidirectional
+encoder representations from transformer. In CIKM. 1441–1450.
+[43] Weiwei Sun, Lingyong Yan, Zheng Chen, Shuaiqiang Wang, Haichao Zhu, Pengjie Ren, Zhumin Chen, Dawei Yin, Maarten Rijke, and Zhaochun
+Ren. 2023. Learning to tokenize for generative retrieval. Advances in Neural Information Processing Systems 36 (2023), 46345–46361.
+[44] Juntao Tan, Shuyuan Xu, Wenyue Hua, Yingqiang Ge, Zelong Li, and Yongfeng Zhang. 2024. Idgenrec: Llm-recsys alignment with textual id learning.
+In SIGIR. ACM, 355–364.
+[45] George R Terrell and David W Scott. 1992. Variable kernel density estimation. The Annals of Statistics (1992), 1236–1265.
+[46] Takaya Ueda and Ikuko Nishikawa. 2020. Latent space decomposition into task-specific and domain-specific subspaces for domain adaptation. In
+IJCNN. IEEE, 1–7.
+[47] Laurens Van der Maaten and Geoffrey Hinton. 2008. Visualizing Data Using t-SNE. JMLR 9, 11 (2008).
+[48] Christophe Van Gysel, Maarten de Rijke, and Evangelos Kanoulas. 2016. Learning latent vector spaces for product search. In CIKM. ACM, 165–174.
+[49] Jun Wang, Lantao Yu, Weinan Zhang, Yu Gong, Yinghui Xu, Benyou Wang, Peng Zhang, and Dell Zhang. 2017. Irgan: A minimax game for unifying
+generative and discriminative information retrieval models. In SIGIR. ACM, 515–524.
+[50] Wenjie Wang, Honghui Bao, Xinyu Lin, Jizhi Zhang, Yongqi Li, Fuli Feng, See-Kiong Ng, and Tat-Seng Chua. 2024. Learnable Tokenizer for
+LLM-based Generative Recommendation. arXiv:2405.07314 (2024).
+[51] Xiang Wang, Tinglin Huang, Dingxian Wang, Yancheng Yuan, Zhenguang Liu, Xiangnan He, and Tat-Seng Chua. 2021. Learning Intents behind
+Interactions with Knowledge Graph for Recommendation. In WWW. ACM, 878–887.
+[52] Chuhan Wu, Fangzhao Wu, Mingxiao An, Tao Qi, Jianqiang Huang, Yongfeng Huang, and Xing Xie. 2019. Neural news recommendation with
+heterogeneous user behavior. In Proceedings of the 2019 conference on empirical methods in natural language processing and the 9th international joint
+conference on natural language processing (EMNLP-IJCNLP). 4874–4883.
+[53] Shiguang Wu, Wenda Wei, Mengqi Zhang, Zhumin Chen, Jun Ma, Zhaochun Ren, Maarten de Rijke, and Pengjie Ren. 2024. Generative retrieval as
+multi-vector dense retrieval. In SIGIR. ACM, 1828–1838.
+[54] Jiayi Xie, Shang Liu, Gao Cong, and Zhenzhong Chen. 2024. UnifiedSSR: A Unified Framework of Sequential Search and Recommendation. In
+WWW. ACM, 3410–3419.
+[55] Jing Yao, Zhicheng Dou, Ruobing Xie, Yanxiong Lu, Zhiping Wang, and Ji-Rong Wen. 2021. USER: A unified information search and recommendation
+model based on integrated behavior sequence. In CIKM. ACM, 2373–2382.
+[56] Tianhe Yu, Saurabh Kumar, Abhishek Gupta, Sergey Levine, Karol Hausman, and Chelsea Finn. 2020. Gradient surgery for multi-task learning.
+Advances in neural information processing systems 33 (2020), 5824–5836.
+[57] Hamed Zamani and W Bruce Croft. 2018. Joint modeling and optimization of search and recommendation. arXiv:1807.05631 (2018).
+[58] Shuai Zhang, Lina Yao, and Xiwei Xu. 2017. Autosvd++ an efficient hybrid collaborative filtering model via contractive auto-encoders. In SIGIR.
+ACM, 957–960.
+[59] Xiaoyu Zhang, Ruobing Xie, Yougang Lyu, Xin Xin, Pengjie Ren, Mingfei Liang, Bo Zhang, Zhanhui Kang, Maarten de Rijke, and Zhaochun Ren.
+2024. Towards empathetic conversational recommender systems. In RecSys. ACM, 84–93.
+[60] Yang Zhang, Fuli Feng, Jizhi Zhang, Keqin Bao, Qifan Wang, and Xiangnan He. 2023. Collm: Integrating collaborative embeddings into large
+language models for recommendation. arXiv:2310.19488 (2023).
+[61] Jujia Zhao, Wenjie Wang, Xinyu Lin, Leigang Qu, Jizhi Zhang, and Tat-Seng Chua. 2023. Popularity-aware Distributionally Robust Optimization for
+Recommendation System. In CIKM. ACM, 4967–4973.
+[62] Guorui Zhou, Xiaoqiang Zhu, Chenru Song, Ying Fan, Han Zhu, Xiao Ma, Yanghui Yan, Junqi Jin, Han Li, and Kun Gai. 2018. Deep interest network
+for click-through rate prediction. In KDD. ACM, 1059–1068.
+[63] Kun Zhou, Hui Yu, Wayne Xin Zhao, and Ji-Rong Wen. 2022. Filter-enhanced MLP is all you need for sequential recommendation. In WWW. ACM,
+2388–2399.
+
+Manuscript submitted to ACM
+
+
