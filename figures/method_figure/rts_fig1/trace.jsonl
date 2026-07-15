@@ -1,2 +1,0 @@
-{"round": 1, "decision": "escalate", "reason": "agent bake not ok", "failure_kind": "other", "detail": "agent bake timed out (no <png>.bakestatus.json \u2014 is the agent wrapper running?)"}
-{"round": 1, "bake": "ok (mcp__codex__codex native gpt-image-2)", "panel": "automated Gemini+Codex panel did NOT run (bakestatus handshake timed out at 10min); Claude structural sign-off instead", "structural_signoff": "approve \u2014 all 19 locked labels + 6 arrows + callout + rail present and verbatim; forbidden tokens absent", "decision": "ACCEPT (manual)"}

@@ -42,7 +42,7 @@ aris-profile/PROFILE_AUTO.md      # 项目内(经 $ARIS_PROFILE 定位),不是�
 | 3 | `/ideagen` | **读 `outputs/01_LIT_SURVEY.html`**(不再自己 survey)→ 三透镜想 idea(方法优先)→ 对照自己工作 + 并行工作查新 → 排序 idea 榜(`outputs/02_IDEA_REPORT.html`) | **选一个 idea** |
 | 4 | `/workplan` | 从选定 idea → claim 驱动的 `outputs/03_EXPERIMENT_PLAN.html`(从投影摘要倒推)。**论文骨架就在 `03` 的 §0.5 里**,不单出文件;只有你明确要更完整的可视化大纲时才出 `03b_PAPER_PLAN.html` | 批准 plan |
 | 5 | `/run-plan` | 用 `/goal` 执行 plan,跑到关口停 | 每个结果块审"支不支持 claim" |
-| 6 | `/paper-write` | 个性化写论文(套风格 / 自引 / 反自抄) | 逐节审稿 |
+| 6 | `/paper-write` | 个性化写论文(套风格 / 自引 / 反自抄)。**自动串起四个审查子 skill**:`/paper-theorization`(统一理论骨架 + 机器验证)· `/paper-related-work`(广搜 + 逐个核对 arXiv id)· `/paper-gap-check`(每条 claim 回溯 `results/` → `paper/EXPERIMENT_PLAN.md`,绝不编数)· `/paper-logic-check`(另起 reviewer 查逻辑闭环)。四个也都能单独 `/paper-<name>` 调 | 逐节审稿 |
 
 ### `/profile-construct` — 建画像
 - 去 Google Scholar 个人主页,点开 **Show more** 展开全部论文,DevTools → 右键 `<html>` → Copy → **Copy outerHTML** → 存成 HTML(直接 `Cmd+S` 只会存前 20 篇)。
@@ -125,13 +125,18 @@ research-buddy/
 ├── CLAUDE.md                  定位 + 单一真源 + 7 条纪律(开 CC 自动加载)
 ├── .claude/
 │   ├── settings.json          设 $ARIS_PROFILE 指向 aris-profile/
-│   └── skills/                6 个 skill(+ scholar-translation-zh 翻译规范)
+│   └── skills/                6 个流程 skill + paper-write 的 4 个审查子 skill
+│       │                       (+ figure-ppt 画模型图、scholar-translation-zh 翻译规范)
 │       ├── profile-construct/SKILL.md
 │       ├── research-lit/SKILL.md
 │       ├── ideagen/SKILL.md
 │       ├── workplan/SKILL.md
 │       ├── run-plan/SKILL.md
-│       └── paper-write/SKILL.md
+│       ├── paper-write/SKILL.md          总编排(自动调下面 4 个)
+│       ├── paper-theorization/SKILL.md   统一理论骨架 + 机器验证
+│       ├── paper-related-work/SKILL.md   广搜 + 逐个核对 arXiv id
+│       ├── paper-gap-check/SKILL.md      查缺 → paper/EXPERIMENT_PLAN.md
+│       └── paper-logic-check/SKILL.md    逻辑闭环(另起 reviewer)
 ├── aris-profile/              单一真源(画像 + 语料 + 全文)
 │   ├── PROFILE_AUTO.md        权威画像(工具读)
 │   ├── PROFILE_AUTO.zh.md     中文镜像
