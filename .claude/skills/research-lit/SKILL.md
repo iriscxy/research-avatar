@@ -54,6 +54,10 @@ searches.
    `tools/` helpers, over hammering the API. (See project memory.)
 4. **Merge + de-duplicate** across angles by arXiv id (fallback: normalized
    title). Keep one canonical row per paper; note which angle(s) surfaced it.
+   When several papers cover the same point, prefer peer-reviewed / published work
+   and higher-cited work as the representative citation. Keep recent preprints when
+   they are materially newer or uniquely relevant; publication status and citation
+   count are prioritization signals, not a reason to erase relevant new work.
 
 > Prefer delegating the searches to agents so raw search dumps stay out of the
 > main context — you keep the merged, verified paper list, not the transcripts.
@@ -89,7 +93,9 @@ example; open it and reuse its `<style>` block verbatim):**
 - **Numbered Chinese `<h2>`** headings, each with an English `<span class="en">`.
 - **`.lead`** intro box; **`.flow`** taxonomy diagram (nodes + `→` arrows).
 - **`.grid` of `.card`s** per theme — each card: colored `.tag` · `✅ 已核实` mark ·
-  `<h4><a>` title · `.who` (authors · year) · one-line Chinese takeaway.
+  `<h4><a>` title · `.who` (authors · year · publication venue/status) · one-line
+  Chinese takeaway. Show publication information when retrieved, for example
+  `ICLR 2025` / `Nature 2024` / `arXiv preprint`; never infer a venue.
 - **`.callout`** for intuitions; **`.callout.debate`** for live disagreements;
   **`.callout.gap`** for structural gaps.
 - **Landscape `<table>`** (工作 · 类别 · 核心思路 · 年份 · 核实) with a `.disc`
@@ -102,6 +108,10 @@ Keep the tag colors meaningful (base `.tag`, `.tag.b` architecture, `.tag.w`
 safety, `.tag.p` steering/control, `.tag.v` debate) and mark every verified paper
 with a "verified" chip. (The `✅ 已核实` / 核实说明 / 趋势与空白 labels shown in the
 example file are the zh rendering — translate all such labels to the chosen language.)
+For published papers, make the card title and reference link point to the publisher /
+DOI / official venue page when retrieved; use the arXiv link as the fallback or add
+it as a secondary `preprint` link. For preprints, link directly to arXiv. Never
+replace a verified accessible arXiv link with a guessed publisher URL.
 
 ## A4 — Report + optional handoff
 Tell the researcher: the output path, how many papers/angles, the key debates and
