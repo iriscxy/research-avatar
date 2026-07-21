@@ -15,12 +15,12 @@ Set the `/goal` completion condition **mechanical and verifiable** — e.g. "eve
 1. **Stack match** — generate code against the profile's habitual launcher / framework / base model. Hyperparameters come from the plan, not the profile.
 2. **Smoke test FIRST** — smallest config end-to-end; fix setup before real GPU. **GATE: report smoke result.**
 3. **Deploy** the planned runs — resume-safe, versioned outputs, never overwrite a prior result. If the profile records OOMs on the target GPU, default to a memory-safe setup (lower batch / raise grad-accum) and note it.
-4. **Collect** into real files (`results/*.json|csv`) + an `outputs/04_EXPERIMENT_TRACKER.html` table. Every number traces to a file.
+4. **Collect** into real files (`results/*.json|csv`) + an `outputs/04_EXPERIMENT_TRACKER.html` table. Every number traces to a file. For each completed result block, carry over its plan's interpretation card and show: actual comparison, effect size, uncertainty, and whether the pre-registered weakening/falsification pattern occurred. Never silently substitute a post-hoc metric or threshold; a necessary protocol amendment must be visible, dated, and linked to the affected runs.
 
 ## Gates — STOP, human is judge
 
 - **After smoke test** → pass/fail before launching the full set.
-- **After each result block** (baseline / main / ablation) → present numbers *as read from result files*; ask "does this support its claim?" The researcher decides pivot / supplement / proceed. Never self-declare "it worked."
+- **After each result block** (baseline / main / ablation) → present numbers *as read from result files* alongside the pre-run interpretation card; ask "given this comparison, effect size, uncertainty, and any falsification signal, does this support its claim?" The researcher decides pivot / supplement / proceed. Never self-declare "it worked."
 - **Before any run over the plan's flagged budget** → ask first.
 
 ## Do NOT
