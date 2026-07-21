@@ -45,7 +45,13 @@ searches.
    - Uses WebSearch + WebFetch on `arxiv.org` across its angle, hitting sub-topics
      separately, until fresh queries stop surfacing new work (saturation).
    - Returns, per paper: exact **title · arXiv id (or DOI) · year · one-line
-     takeaway** (method + key finding/limitation).
+     takeaway** (method + key finding/limitation). For each paper, also
+     cross-check publication status against the relevant **ACL Anthology,
+     OpenReview, DBLP, conference/journal official website, and DOI record**
+     when applicable, and return the verified **venue · publication year · DOI
+     · official venue/DOI URL · arXiv URL as a preprint fallback**. Record
+     `arXiv preprint` only when no formal publication record is found; never
+     infer a venue, year, DOI, or URL.
    - **Anti-hallucination (hard rule):** report ONLY papers actually retrieved and
      whose id it saw on the page; anything unsure → mark `[UNVERIFIED]`, **never
      fabricate** an id/DOI/title. Drop unverifiable leads rather than list them.
@@ -54,6 +60,9 @@ searches.
    `tools/` helpers, over hammering the API. (See project memory.)
 4. **Merge + de-duplicate** across angles by arXiv id (fallback: normalized
    title). Keep one canonical row per paper; note which angle(s) surfaced it.
+   Preserve the cross-checked publication metadata and distinguish a formally
+   published paper from an arXiv-only preprint. If sources disagree, retain
+   the disagreement for the verification note and do not resolve it by guesswork.
    When several papers cover the same point, prefer peer-reviewed / published work
    and higher-cited work as the representative citation. Keep recent preprints when
    they are materially newer or uniquely relevant; publication status and citation
@@ -79,7 +88,9 @@ hard-coded; write it natively, not machine-translated; keep paper titles / code 
 identifiers in English). **Localize the section labels and the `lang`/font
 attributes to that language.** **Address the researcher in the second person**
 where the text speaks to her. **Every paper is a direct `<a href>`** to its
-arXiv/DOI page; unverifiable → visible `pending`/`[UNVERIFIED]` label, never a
+official venue or DOI page when published, with its arXiv URL retained as a
+secondary preprint link; arXiv is the primary link only for arXiv-only
+preprints. Unverifiable → visible `pending`/`[UNVERIFIED]` label, never a
 fabricated URL.
 
 **House style (match `outputs/01_LIT_SURVEY.html` exactly — it is the canonical
@@ -93,25 +104,30 @@ example; open it and reuse its `<style>` block verbatim):**
 - **Numbered Chinese `<h2>`** headings, each with an English `<span class="en">`.
 - **`.lead`** intro box; **`.flow`** taxonomy diagram (nodes + `→` arrows).
 - **`.grid` of `.card`s** per theme — each card: colored `.tag` · `✅ 已核实` mark ·
-  `<h4><a>` title · `.who` (authors · year · publication venue/status) · one-line
-  Chinese takeaway. Show publication information when retrieved, for example
-  `ICLR 2025` / `Nature 2024` / `arXiv preprint`; never infer a venue.
+  `<h4><a>` title · `.who` (authors · formal venue · publication year · DOI when
+  available · official venue/DOI link · arXiv preprint link) · one-line Chinese
+  takeaway. Show publication information only when cross-checked, for example
+  `ICLR 2025` / `Nature 2024`; use `arXiv preprint` only for papers without a
+  verified formal publication record.
 - **`.callout`** for intuitions; **`.callout.debate`** for live disagreements;
   **`.callout.gap`** for structural gaps.
 - **Landscape `<table>`** (工作 · 类别 · 核心思路 · 年份 · 核实) with a `.disc`
   **核实说明** below it (how ids were verified; note 26xx = 2026 preprints).
 - **趋势与空白** section: `ul.trend` list + a `.callout.gap` of the openings.
-- **References** grouped by theme into `.card`s (clickable arXiv links).
+- **References** grouped by theme into `.card`s (clickable official venue/DOI
+  links for published papers, with arXiv retained as a preprint link).
 - **Footer**: generated-by line + "引用前请核对原文".
 
 Keep the tag colors meaningful (base `.tag`, `.tag.b` architecture, `.tag.w`
 safety, `.tag.p` steering/control, `.tag.v` debate) and mark every verified paper
 with a "verified" chip. (The `✅ 已核实` / 核实说明 / 趋势与空白 labels shown in the
 example file are the zh rendering — translate all such labels to the chosen language.)
-For published papers, make the card title and reference link point to the publisher /
-DOI / official venue page when retrieved; use the arXiv link as the fallback or add
-it as a secondary `preprint` link. For preprints, link directly to arXiv. Never
-replace a verified accessible arXiv link with a guessed publisher URL.
+For published papers, make the card title and reference link point to the
+cross-checked publisher / DOI / official venue page, display the formal venue,
+publication year, and DOI when available, and retain the arXiv link as a
+secondary `preprint` link. For preprints, link directly to arXiv and label them
+`arXiv preprint`. Never replace a verified accessible arXiv link with a guessed
+publisher URL.
 
 ## A4 — Report + optional handoff
 Tell the researcher: the output path, how many papers/angles, the key debates and
@@ -122,7 +138,8 @@ gaps found (2–4 bullets). Do **not** invent a "verdict" on the field.
   next step if the researcher wants ideas grounded on it.
 
 ## Non-negotiables (inherited from the project's global disciplines)
-1. **Anti-hallucination.** Only cite papers actually retrieved with a verified id;
+1. **Anti-hallucination.** Only cite papers actually retrieved with a verified id
+   and publication metadata cross-checked against a relevant authoritative source;
    `[UNVERIFIED]` for anything else; never fabricate ids/DOIs/URLs. Drop, don't invent.
 2. **Self-contained HTML, never Markdown**, with real structure and direct links.
 3. **Native, idiomatic prose in the user's chosen language** (global policy — never
