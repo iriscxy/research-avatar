@@ -1,15 +1,34 @@
 ---
 name: ideagen
-description: Generate research ideas through a personalized lens (engineering/theory/benchmark) grounded in the researcher's own record AND the literature survey produced by /research-lit, verify novelty against concurrent work, automatically screen material ethical risks, and present a ranked slate for the human to pick. Optionally build on a reference paper. Stops at the pick gate; the chosen idea goes to /workplan. Use when the user wants new research ideas, a research direction, or brainstorming (for a literature survey alone, use /research-lit). Invocable as /ideagen.
+description: Generate research ideas through a personalized lens (engineering/theory/benchmark) grounded in the researcher's own record AND the literature survey produced by /research-lit, verify novelty against concurrent work, automatically screen material ethical risks, and present a ranked standard slate plus at most one evidence-tethered disruptive wildcard (D1) in the same report. Optionally build on a reference paper. Stops at the pick gate; the chosen idea goes to /workplan. Use when the user wants new research ideas, a research direction, brainstorming, disruptive/paradigm-shifting ideas, or a literature survey alone (for a literature survey alone, use /research-lit). Invocable as /ideagen.
 allowed-tools: Bash(*), Read, Write, Grep, Glob, WebSearch, WebFetch, AskUserQuestion
 ---
 
 Read the **English** `aris-profile/PROFILE_AUTO.md` (via `$ARIS_PROFILE`) first — canonical; `PROFILE_AUTO.zh.md` is a human-facing mirror, not for logic. If it is absent, tell the user to run `/profile-construct`. Converse in **Chinese**; keep code/identifiers/paper-titles native.
 
-**Arguments:** `<direction>` (free text) · `— lens: engineering|theory|benchmark` (= **mode**) · `— ref paper: <arXiv URL | PDF | URL>` (*optional*, triggers A0).
+**Arguments:** `<direction>` (free text) · `— lens: engineering|theory|benchmark` (= **mode**) · `— disruptive-wildcard: on|off` (default `on`) · `— ref paper: <arXiv URL | PDF | URL>` (*optional*, triggers A0).
 
-## Step 0 — Lock MODE + direction first
-The mode decides what *kind* of idea is generated, so fix it BEFORE anything else — never infer silently, never start A1 first. If `— lens:` was passed use it; else **AskUserQuestion** for the mode (engineering = iterate habitual methods, reuse code · benchmark = survey / new dataset-eval / reproduce-and-beat · theory = a hypothesis/bound on the method-evolution fault line) and confirm `<direction>` at the same time (offer her *Niche subfields* if none given). Only once both are fixed do A0/A1/A2 run.
+
+## Disruptive wildcard
+
+The standard profile · literature-gap slate remains the primary output. When
+`disruptive-wildcard` is `on`, also run an evidence-tethered contextual-salience drift
+pass and append only its highest-scoring eligible survivor after the standard idea
+cards in the **same report**. This does **not** claim direct control of Transformer
+self-attention. It quarantines existing solution wording, breaks a documented field
+assumption with structured operators, then restores the literature for collision
+checks.
+
+Never generate a standalone disruptive report or replace the standard slate with a
+disruptive-only slate. Standard and disruptive scores have different meanings and must
+not be merged into one ranking.
+
+When the wildcard is `on`, read
+[`references/disruptive-branch.md`](references/disruptive-branch.md) completely before
+A1 and follow it as mandatory procedure.
+
+## Step 0 — Lock MODE + direction + wildcard first
+The mode decides what *kind* of standard contribution is generated; the wildcard switch decides whether one disruptive outlier is incubated and appended. Fix all three BEFORE anything else — never infer silently, never start A1 first. If `— lens:` / `— disruptive-wildcard:` were passed use them; else **AskUserQuestion** for missing values: mode (engineering = iterate habitual methods, reuse code · benchmark = survey / new dataset-eval / reproduce-and-beat · theory = a hypothesis/bound on the method-evolution fault line), `<direction>` (offer her *Niche subfields* if none given), and whether the disruptive wildcard is on (default) or off. Only once all three are fixed do A0/A1/A1.5/A2 run.
 
 
 ## Step 0.5 — Ethics triage (conditional; do not create unnecessary prompts)
@@ -38,7 +57,15 @@ Summarize BEFORE surveying so generation targets its gaps. Fetch (`tools/fetch_f
 3. **Do NOT duplicate the survey's appendix in the idea report.** The full categorized paper list lives in `01_LIT_SURVEY.html`. In `02_IDEA_REPORT.html`, open with a **short Literature Landscape** (a few sentences summarizing the survey's debates + gaps) that **links to `01_LIT_SURVEY.html`** ("完整证据清单见文献综述"), and per idea cite only the **closest 1–3 papers** (direct `<a href>`) needed to justify its novelty verdict. **Anti-hallucination still applies:** cite only papers that appear (verified) in the survey or that you separately retrieved for a novelty check; unverifiable → `[UNVERIFIED]`, never fabricate.
 4. **Novelty top-ups are allowed.** A2/A3 may run a few *targeted* searches to pin the closest concurrent work for a specific candidate (last 3–6 months) — that is a novelty check, not a re-survey. Keep it narrow.
 
-## A2 — Idea generation (ONE lens, method-first)
+When the disruptive wildcard is `on`, convert the survey grounding (from `01_LIT_SURVEY.html`) into a **Route Gravity Map** before generating candidates: dominant object of optimization · default representation · assumed supervision/observability · accepted causal story · normal unit of analysis · standard evaluation contract · resource/scale assumptions. Every entry must cite survey evidence. This map identifies what the field treats as fixed; it is not itself an idea list.
+
+## A1.5 — Blind disruptive incubation (wildcard `on` only)
+
+Run D0–D3 from `references/disruptive-branch.md` immediately after the survey grounding and **before** reading a prior idea report or drafting any standard candidate. The quarantined synthesis context may contain only the research question, Route Gravity Map defaults, verified anomalies, profile strengths, hard constraints, and banned solution families. Hold the surviving seeds without ranking them against standard ideas. Restore paper titles, prior idea wording, and the standard slate only at D4.
+
+
+
+## A2 — Idea generation (ONE lens, branch-aware, method-first)
 Generate 6 candidates through the chosen mode, seeded by the profile AND the survey's structural gaps (from A1 / `01_LIT_SURVEY.html`):
 - **engineering** — iterate habitual methods from *Dominant Methods*; prefer reuse-existing-code. No arbitrary time cap ("2-week pilot"); let the problem set the scope.
 - **theory** — read *Publications Index* in time order + *Research Lineage*; find the method-evolution fault line; propose hypotheses adjacent to, not repeating, the lineage.
@@ -47,9 +74,12 @@ Generate 6 candidates through the chosen mode, seeded by the profile AND the sur
 **One-sentence lead + method-first.** Every idea opens with **ONE clear sentence** that says what it is — concrete about mechanism and contribution, readable in a single pass. Write it **for an experienced peer**: use the correct domain terms precisely (do not avoid them), but do NOT hide behind abstract methodology-speak ("steering as a measurement tool for mechanistic faithfulness") NOR dumb it down with childish analogies (kids arguing about vaccines). If the one sentence isn't clear, the idea isn't ready. Only *after* that sentence give the **2–4 concrete method steps** (what we build/train/run), then hypothesis/expected-outcome as acceptance criteria.
 
 
+
+For the disruptive wildcard, do not generate by extending the paper list or by asking for "more novel" variants. Follow the blind-synthesis and context-reentry sequence in `references/disruptive-branch.md`: quarantine prior solution wording · apply at least four distinct drift operators to the Route Gravity Map · generate from a documented anomaly/contradiction · require one irreducible mechanism · reject candidates that the closest route can absorb as a module/loss/prompt/benchmark.
+
 **Ethics output rule.** If the ethics triage flags at least one candidate, add a rightmost column to the ranked idea table under the existing section `2 · Ranked Idea Slate` and its faithful Chinese mirror `2 · 排名后的 Idea Slate` (or the language-equivalent heading in the primary report). Each flagged row must show the level plus a compact reason, such as `HIGH — opinion manipulation at population scale`; unflagged rows must say `No material issue identified`, not a warning prompt. In the existing `3 · Idea Cards` section, add the full **Ethics assessment** subsection inside the same card that contains that idea's pitch, method, hypothesis, and qualitative record. The assessment must not be moved to a global ethics section or a separate standalone card. If nothing is flagged, do not add an ethics column, ethics subsection, or ethics-related question anywhere in the report.
 
-**Re-run = accumulate, never discard.** A re-invocation does NOT replace the prior slate with an all-new one. Read any prior `outputs/02_IDEA_REPORT.html`, **carry ALL its ideas forward** (they remain valid candidates — an un-selected idea is not a failed idea), then **ADD fresh candidates** by rotating to a different profile asset / gap, and **re-rank the union**. The pool grows across runs. Mark the new ones (`? new this run`) so the researcher sees what changed. Only drop an idea the researcher *explicitly rejected* as a direction. Do NOT manufacture a gimmicky twist / far-fetched mashup / contrived problem just to add something new: if this run's honest fresh angles turn out crowded or weaker than the carried-forward ideas, say so explicitly and let the strong prior ideas keep their rank rather than padding the slate.
+**Re-run = accumulate, never discard — without contaminating the blind pass.** When the wildcard is on, finish A1.5 before opening the prior report. A re-invocation does NOT replace the prior slate with an all-new one. Read any prior `outputs/02_IDEA_REPORT.html`, **carry ALL its ideas forward** (they remain valid candidates — an un-selected idea is not a failed idea), then **ADD fresh candidates** by rotating to a different profile asset / gap, and **re-rank the union**. The pool grows across runs. Mark the new ones (`? new this run`) so the researcher sees what changed. Only drop an idea the researcher *explicitly rejected* as a direction. Do NOT manufacture a gimmicky twist / far-fetched mashup / contrived problem just to add something new: if this run's honest fresh angles turn out crowded or weaker than the carried-forward ideas, say so explicitly and let the strong prior ideas keep their rank rather than padding the slate.
 
 **Present the honest slate; never enforce a novelty quota.** If few candidates are genuinely `novel`, say so explicitly rather than padding the slate or relabeling `differentiable` / weakly verified ideas.
 
@@ -73,6 +103,9 @@ A3 is an evidence and duplicate-check stage, not the final quality-ranking stage
 
 Write the result directly into `outputs/02_IDEA_REPORT.html`; **do not create `NOVELTY_DOSSIER.md` or another novelty artifact**. Include a novelty-evidence table with at least: `ID | Idea | Novelty status | Closest work | Overlap | Concrete difference | Own-work overlap | Evidence gaps | Confidence`.
 
+
+For every disruptive seed surviving A1.5, also run the **absorbability test**: could a strong author of the closest work incorporate it as one extra module, loss, prompt, data slice, benchmark axis, or scaling run without changing that work's central causal story? If yes, label it `incremental/absorbed` and remove it from wildcard eligibility (retain it in the compact audit). Reintroduce paper titles and prior ideas only now, run targeted searches, and record both the closest collision and why the candidate does or does not require a different research program.
+
 ## A4 — Objective gate · qualitative review · ranking
 Separate the objective filter from the qualitative ranking; do **not** use numeric scores, weighted totals, or a novelty scorecard.
 1. **Objective gate (mechanical only):** drop a candidate only on an objective fact — compute clearly beyond the profile's hardware, or a provably-unavailable dataset. Never drop on "looks complex" / "might already be done"; annotate uncertainty instead.
@@ -81,7 +114,18 @@ Separate the objective filter from the qualitative ranking; do **not** use numer
 2b. If the ethics triage flagged the idea, include **Ethics risk** in the qualitative record and keep it separate from the technical `risk` field. The rightmost table cell and the card's detailed assessment must agree exactly on the level. Do not silently downgrade a risk to improve ranking.
 3. **Same-model devil's-advocate ranking:** in a clearly separated second pass, review the full set using the same model. For each idea state the strongest objection, likely failure mode, whether it passes 2a or remains an A+B mashup, whether the novelty evidence shows a collision or a defensible difference, and whether that difference can support a contribution. Rank qualitatively by this review, feasibility, risk, and research value—not by a numeric or weighted score—and write the objections out; never skip the pass.
 
+
+For the disruptive pool, keep a separate two-stage ranking. During **novelty incubation**, ignore ordinary implementation inconvenience and retain only candidates that pass evidence-tether, single-mechanism, falsifiability, and absorbability gates. During **reality reentry**, annotate compute/data/code risk and downrank only when the first decisive test itself is unavailable or unfalsifiable. Score **Paradigm break · Evidence plausibility · Falsifiability · Leverage/option value** separately, then use their arithmetic mean as the visible **Disruptive score**. Use feasibility risk only as a tie-breaker. Being vague, cross-domain, or expensive never earns disruption points. Select exactly the highest-scoring eligible survivor as `D1`; do not expose lower-scoring survivors as extra cards.
+
 ## GATE — human is judge
+
+Never create a second report for the disruptive pass. Set `data-idea-branch="standard"` and `data-disruptive-wildcard="present|shortfall|off"` on `<main>`. Mark every standard card with `data-idea-id="I<k>"`.
+
+- With wildcard `on`, append a **Disruptive wildcard** section after all standard idea cards. If an eligible survivor exists, show exactly one `<article data-disruptive-id="D1">`, its Disruptive score, and every field required by `references/disruptive-branch.md`.
+- If no disruptive seed survives, set `data-disruptive-wildcard="shortfall"` and show the compact failed-gate audit in that same position; do not invent `D1`.
+- Keep the standard ranking table unchanged. Do not insert D1 as rank 8 and do not compare its Disruptive score to standard Novelty / qualitative ranks.
+- When the wildcard is on, run `python3 tools/validate_ideagen_wildcard.py outputs/02_IDEA_REPORT.html` and fix all errors before presenting it. Ask the researcher to pick / kill / redirect by id (`I*` or `D1`). Never auto-proceed.
+
 Present **4–6 ranked ideas** in `outputs/02_IDEA_REPORT.html` in A4 rank order. Use a separate ranked-summary table with the columns `ID | Idea | Novelty status | Closest work | Concrete difference | Strongest objection | Confidence` (and a rightmost `Ethics risk` column only when Step 0.5 flagged at least one candidate); do not show numeric scores or require a minimum number of `novel` verdicts. Give each a stable id `I1, I2, …` in the first column (this is how the pick is referenced downstream). **Each idea — in both the table and its card — leads with its A2 one-sentence pitch** (peer-level, concrete, no jargon-fog / no childish analogy); the card then adds method steps · hypothesis · MVE · own-work overlap · feasibility · risk · contribution type · unresolved novelty evidence. The AskUserQuestion options must use that same one-sentence pitch, not a vaguer paraphrase. **Stop. AskUserQuestion for the researcher to pick / kill / redirect** (offer ideas by id + one-line title). Never auto-proceed.
 
 

@@ -29,7 +29,7 @@ explicitly with the same `/<name>` slash:
 |---|---|---|
 | 1 | `/profile-construct` | Build / refresh `PROFILE_AUTO.md` from Google Scholar + Claude-session habits |
 | 2 | `/research-lit` | Literature survey: many parallel verified arXiv/web search angles → self-contained **white-background, natively-Chinese** magazine-style HTML `outputs/01_LIT_SURVEY.html` (hero · taxonomy · card grids · landscape table · trends/gaps · grouped refs). Standalone, or the grounding step for `/ideagen` |
-| 3 | `/ideagen` | **Reads `outputs/01_LIT_SURVEY.html`** (does NOT re-survey) → 3-lens idea generation (method-first) → novelty check vs own work + concurrent work → ranked idea slate (`outputs/02_IDEA_REPORT.html`). Optional `— ref paper:` to build on a paper. Human picks the idea |
+| 3 | `/ideagen` | Literature survey via `/research-lit` — ranked standard slate — optional top disruptive wildcard (`D1`) in the same `outputs/02_IDEA_REPORT.html` — novelty/absorbability + ethics screens. Optional `— ref paper:`. Human picks `I*`/`D1` |
 | 4 | `/workplan` | From the chosen idea → claim-driven `outputs/03_EXPERIMENT_PLAN.html` (backward from the projected abstract). **The projected paper skeleton is a section (§0.5) INSIDE `03`, not a separate file** — a standalone `outputs/03b_PAPER_PLAN.html` is written ONLY if the researcher explicitly asks for a fuller/visual outline |
 | 5 | `/run-plan` | Execute the plan with `/goal`, stopping at gates for human review |
 | 6 | `/paper-write` | Personalized paper writing (style-ref / self-cite / anti-self-plagiarism). **Orchestrates four review sub-skills automatically** in its loop: `/paper-theorization` (unified formal spine, mechanically checked) · `/paper-related-work` (broad, id-verified citations) · `/paper-gap-check` (claim→`results/` audit → `paper/EXPERIMENT_PLAN.md`, never fabricate) · `/paper-logic-check` (fresh-reviewer narrative-loop check). Each is also a standalone `/paper-<name>` skill |
@@ -75,6 +75,14 @@ truth, tool-read), `results/*.json|csv` + logs (raw data), and the paper manuscr
    "canonical" names the file downstream reads, not a fixed language. (`PROFILE_AUTO.md`
    is the one exception: it stays English-canonical because it is tool-read, with an
    optional `PROFILE_AUTO.zh.md` human mirror.)
+
+
+8. **Disruption without fantasy.** The ideagen wildcard must break a
+   literature-documented assumption, remain tethered to a verified anomaly, survive
+   the absorbability and single-mechanism gates, and expose a cheap decisive falsifier.
+   Append only its highest-scoring eligible survivor after the ordinary ideas in the
+   same report. Random cross-domain mashups, vague paradigm language, and
+   infeasibility do not count as innovation.
 
 ## Tools (stdlib Python, no dependencies, no framework)
 
