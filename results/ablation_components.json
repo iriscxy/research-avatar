@@ -1,0 +1,17 @@
+{
+  "claim": "C4",
+  "experiment": "4.2 ablation of the two attack components (AdvBench, mean ASR across the five targets)",
+  "benchmark": "AdvBench",
+  "metric": "mean ASR (%) across DeepSeek-V3, GPT-4o, Llama-3.3-70B, Nemotron-70B, Qwen2.5-72B",
+  "settings": [
+    {"name": "Direct",          "description": "harmful goal sent as a plain single-turn request", "mean_asr": 0.0},
+    {"name": "Direct+Multi",    "description": "an extra conversational turn but no writing style", "mean_asr": 0.7},
+    {"name": "Style",           "description": "selected literary style in a single-turn prompt (stylization only)", "mean_asr": 31.7},
+    {"name": "Style Jailbreak", "description": "full method: selected style + two-turn continuation frame", "mean_asr": 78.0}
+  ],
+  "reading": {
+    "stylization_is_the_main_factor": "Direct 0.0 and Direct+Multi 0.7 show an extra turn alone does not explain the attack; Style alone already lifts mean ASR to 31.7",
+    "two_turn_amplifies": "adding the two-turn continuation frame on top of stylization raises mean ASR from 31.7 to 78.0",
+    "note": "these ablation means (Figure-5 bars, fixed diagnostic setting) are lower than the Table-1 headline mean ASR of 91.3 because the ablation isolates components"
+  }
+}

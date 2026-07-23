@@ -1,6 +1,6 @@
 ---
 name: paper-theorization
-description: Distill this work into ONE unified mathematical framing — a single central object with 2–4 load-bearing results stated in the body and derivations/proofs in an appendix. Gates every formal statement on necessity (non-redundant), usefulness (load-bearing), and unity (one centre), and MECHANICALLY checks each derivation (Lean if available, else sympy/numeric) before it is written. A review sub-skill of /paper-write; also usable standalone. Invoke when the user says "理论化", "formalize this", "add theory", "给论文加理论", "build a unified theory", or /paper-theorization.
+description: Distill this work into ONE unified mathematical framing — a single central object with 2–4 load-bearing results stated in the body and derivations/proofs in an appendix. Gates every formal statement on necessity (non-redundant), usefulness (load-bearing), and unity (one centre), and MECHANICALLY checks each derivation (Lean if available, else sympy/numeric) before it is written. A review sub-skill of /paper-write; also usable standalone. Invoke when the user says "formalize this", "add theory", "build a unified theory", "unify the theory", or /paper-theorization.
 ---
 
 # paper-theorization

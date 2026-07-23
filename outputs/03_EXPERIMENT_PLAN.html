@@ -3,10 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>实验计划 — I2 · Route-Then-Steer(CRH-in-MoE)</title>
+<title>实验计划 — Style Jailbreak（风格化即越狱）</title>
 <style>
-  :root{--ink:#1a1f2b;--muted:#5b6472;--line:#e3e7ee;--bg:#ffffff;--accent:#2563eb;--accent2:#0b7285;
-        --proj:#7c3aed;--ok:#1a7f52;--warn:#a6791f;--chip:#eef3fb;}
+  :root{--ink:#1a1f2b;--muted:#5b6472;--line:#e3e7ee;--accent:#2563eb;--accent2:#0b7285;--proj:#7c3aed;--ok:#1a7f52;}
   *{box-sizing:border-box}
   body{margin:0;background:#ffffff;color:var(--ink);font:16px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;}
   .wrap{max-width:1060px;margin:0 auto;padding:36px 30px 90px;}
@@ -24,209 +23,66 @@
   th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top;}
   th{background:#f2f5fa;font-weight:600;}
   td.c{white-space:nowrap;font-weight:600;color:var(--accent2);}
-  .ph{color:var(--proj);font-weight:700;}
-  ul,ol{margin:.3em 0 .3em 1.3em;padding:0;} li{margin:.25em 0;}
+  .ph{color:var(--ok);font-weight:700;}
   .lbl{color:var(--muted);font-weight:600;font-size:12.5px;letter-spacing:.03em;}
-  .box{border:1px solid var(--line);border-radius:10px;background:#fff;padding:14px 18px;margin:12px 0;}
-  .gate{border-left:4px solid var(--ok);background:#f4fbf7;}
   .foot{color:var(--muted);font-size:13px;margin-top:2.5em;border-top:1px solid var(--line);padding-top:1em;}
-  .mech{border-left:3px solid var(--accent2);padding:.2em 0 .2em 12px;margin:.5em 0;font-size:14px;background:#f6fbfc;}
 </style>
 </head>
 <body>
 <div class="wrap">
 
 <div class="banner">
-  <strong>实验计划 — I2 · Route-Then-Steer(CRH-in-MoE)</strong> · <span class="projtag">PROJECTED — 非结果</span><br>
-  在 <a href="02_IDEA_REPORT.html">02_IDEA_REPORT.html</a> 选定(2026-07-05)。以最接近的几篇论文全文为地基(见<a href="#grounding">文末 grounding 附录</a>),从投影摘要倒推而来。正文里每个数字都是占位 <span class="ph">[X%]</span>,要等 <code>/run-plan</code> 从真实结果文件里填。<strong>到 GATE 处停下等你批准,再开跑。</strong>
+  <strong>实验计划 — Style Jailbreak（风格化即越狱）</strong> · <span class="projtag">CLAIMS + 骨架</span><br>
+  给 <code>/paper-write</code> 读的 claim 清单与投影论文骨架。结果已由 <a href="05_FINDINGS.html">05_FINDINGS.html</a> 产出并落在 <code>results/*.json</code>。
+  目标会场 <strong>AAAI 2027</strong>，结构参照你自己在该会场的论文 <strong>ManipLVM-R1（AAAI 2026，<code>song2025maniplvm</code>）</strong>。
 </div>
 
 <h1>§0 · 投影标题与摘要 <span class="projtag">PROJECTED</span></h1>
 
-<div class="papertitle">Routed Away: Concept-Direction Fragmentation and Routing-Aware Steering in Mixture-of-Experts</div>
+<div class="papertitle">Stylization as a Jailbreak: Searching a Space of Literary Styles to Obscure Harmful Intent in Aligned Language Models</div>
 
 <div class="abstract">
-<p style="margin-top:0"><strong>摘要(投影——这是 I2 若成功后论文会有的摘要;每个数字都是占位,不是结果)。</strong></p>
-<p>通过往残差流里加一个向量来 steer 一个概念,是控制语言模型的一种标准做法,但在 Mixture-of-Experts 模型里它的效果参差不齐、常常很弱,而且原因不清楚。我们证明成因是几何的。一个概念的 steering 方向并不是一根共享向量;它被拆散到表达该概念的那些专家上。我们把这叫作路由碎片化(routing fragmentation),并把它逐概念地量化为逐专家差向量的离散度。当碎片化很高时,稀疏路由会把一个 token 送到并不承载该概念的专家上,于是单个残差向量被"路由甩开",其效果下降 <span class="ph">[X%]</span>。我们提出 Route-Then-Steer:先给 router 加一个小偏置,让 token 到达表达它的专家,再施加概念向量。在高碎片化概念上,Route-Then-Steer 把 steering 成功率从 <span class="ph">[X%]</span> 提到 <span class="ph">[X%]</span>、把跨样本方差削减 <span class="ph">[X%]</span>,同时在 refusal 这类低碎片化概念上与普通 steering 持平。这个增益能被碎片化预测,说明 MoE 里 steering 的失败是路由几何效应,而非向量太弱。我们放出碎片化度量与 Route-Then-Steer,面向 OLMoE 与 Qwen-MoE。</p>
+<p style="margin-top:0"><strong>摘要（投影——数字已由 <code>results/</code> 填入）。</strong></p>
+<p>越狱攻击利用大语言模型安全对齐的薄弱处来诱出有害回答。随着对齐变强,许多已有攻击要靠额外的攻击模型、复杂的提示搜索或精心设计的模板。近来研究提示风格化输入可能改变模型行为,但它如何干扰有害意图识别仍不清楚。我们用表征分析回答:把同一个文学风格同时套到有害与良性输入上,会显著削弱二者在表征上的可分性——线性探针准确率从 <span class="ph">0.98</span> 降到 <span class="ph">0.63</span>、有害区被良性流形包裹率从 <span class="ph">0.94</span> 降到 <span class="ph">0.55</span>。据此我们提出 Style Jailbreak,一个把有害目标转成风格化文学续写的黑盒攻击:离线构建风格图,只通过聊天查询交互,不访问权重/logits/梯度,也不用第二个攻击模型。在两基准、五个先进模型上,取得所评测黑盒攻击中最高的平均攻击成功率 <span class="ph">91.3%</span>(GPT-4o <span class="ph">95.7%</span>、DeepSeek-V3 <span class="ph">97.2%</span>),而直接请求只有约 <span class="ph">3%</span>。</p>
 </div>
-<p class="sub">风格自检:gap-first 开头、命名机制(路由碎片化 / Route-Then-Steer)、"我们提出 / 我们放出"式陈述、无破折号、无生僻词、≤180 词。标题保留英文原名(投稿即用)。</p>
-
-<p class="sub"><strong>摘要↔claim 自检:</strong>碎片化存在且可测 → C1;高碎片化时残差向量被路由甩开 → C2;Route-Then-Steer 恢复控制、打败基线 → C3;增益被碎片化预测、在 refusal 上持平 → C4。没有哪句摘要缺一个支撑实验。</p>
+<p class="sub">风格自检:gap-first 开头、命名机制（stylization / Style Jailbreak）、"我们提出"式陈述、无破折号、无生僻词。标题保留英文原名。</p>
 
 <h1>§0.5 · 投影论文骨架 <span class="projtag">PROJECTED</span></h1>
-<p class="sub">结构参照最接近的一篇 <a href="https://arxiv.org/abs/2606.04160">Expert-Aware Refusal Steering(2606.04160)</a>(Intro → Method:残差 vs expert-specific → 跨 MoE 模型的 Experiments → Discussion),并按 CRH 式 gap-first 方法论文调整(<a href="https://arxiv.org/abs/2605.01844">CRH</a> 作理论模板)。§1–§6 就是填充 Experiments 那节的具体实验。</p>
-
-<h3>1 · Introduction(每段一句主题句)</h3>
-<ol>
-  <li><strong>钩子 / gap:</strong>steering 是最便宜的推理期控制旋钮,但 MoE 已是默认开源架构,而 steering 在那里表现飘忽。</li>
-  <li><strong>谜题:</strong>已有工作说残差 steering "照常起效",但 expert-aware 变体反而更弱、且一个行为能被单个专家主导——这些凑不到一起。</li>
-  <li><strong>我们的诊断:</strong>一个概念方向被拆散到表达它的各专家上;我们把它做成一个可测的几何量(离散度),把 CRH 从 dense 残差流延伸进稀疏路由。</li>
-  <li><strong>后果:</strong>当碎片化高时,残差向量被路由甩开,而这恰是 steering 失败之处。</li>
-  <li><strong>修复 + 贡献:</strong>Route-Then-Steer、一个碎片化度量,以及"增益被碎片化预测"(且在低碎片化 refusal 上持平)这一结果。</li>
-</ol>
-
-<h3>2 · Related Work(分节 + 一句定位)</h3>
-<ul>
-  <li><strong>Activation steering 及其几何</strong> — <a href="https://arxiv.org/abs/2312.06681">CAA</a>、<a href="https://arxiv.org/abs/2311.03658">LRH</a>、<a href="https://arxiv.org/abs/2605.01844">CRH</a>:把 CRH 的逐样本圆柱几何从 dense 搬进 MoE。</li>
-  <li><strong>MoE 里的 steering 与控制</strong> — <a href="https://arxiv.org/abs/2606.04160">Expert-Aware Refusal Steering</a>、<a href="https://arxiv.org/abs/2509.09660">SteerMoE</a>、<a href="https://arxiv.org/abs/2604.27818">MASCing</a>:只做了 refusal,且没有"何时需要 routing-aware"的几何预测器。</li>
-  <li><strong>Router 干预</strong> — <a href="https://arxiv.org/abs/2510.14853">Rewiring Experts</a>:提供"route"这一步复用的免数据 router-logit nudge 原语。</li>
-  <li><strong>专家专业化之争</strong> — <a href="https://arxiv.org/abs/2604.09780">Myth of Expert Specialization</a> vs <a href="https://arxiv.org/abs/2604.05267">Domain Experts Exist</a>:碎片化给这个隐状态几何问题一个概念级、因果的抓手。</li>
-</ul>
-
-<h3>3 · Method(按模块命名的小节)</h3>
-<ul>
-  <li><strong>3.1 逐专家概念方向。</strong>强制路由到每个专家(router-logit offset,参 Expert-Aware Refusal Steering),在该专家 FFN 输出上算 difference-in-means 向量。</li>
-  <li><strong>3.2 碎片化度量。</strong>逐专家方向集合的离散度(平均两两 1−cosine,或 1 − 顶层共享方向解释的方差)。每概念一个数。</li>
-  <li><strong>3.3 routed-away 检验。</strong>因果核验:比较残差 steer 在"强制把 token 送到表达专家"与否两种情况下的效果。</li>
-  <li><strong>3.4 Route-Then-Steer。</strong>给 router logit 加偏置 δ(Rewiring 式)推向 top 表达专家,再施加残差概念向量;强度 λ 与 nudge α 在 §5 设定。</li>
-</ul>
-
-<h3>4 · Experiments → 论文小节映射</h3>
-<table>
-<thead><tr><th>论文 §</th><th>实验</th><th>支撑 claim / 指标</th></tr></thead>
-<tbody>
-<tr><td>4.1</td><td>碎片化存在且逐概念变化(100-concept 套件 + refusal)</td><td>C1 · 离散度分布</td></tr>
-<tr><td>4.2</td><td>routed-away:残差 steer 效果随碎片化下降</td><td>C2 · Δsuccess vs 离散度</td></tr>
-<tr><td>4.3</td><td>正面对比:Route-Then-Steer vs 4 个基线</td><td>C3 · 成功率、方差、off-target</td></tr>
-<tr><td>4.4</td><td>增益被碎片化预测 + refusal 持平</td><td>C4 · 相关性;低碎片化对照</td></tr>
-<tr><td>4.5</td><td>消融(每次一个变量)</td><td>§3 · 各组件必要性</td></tr>
-</tbody>
-</table>
-
-<h3>5 · Discussion / Conclusion(各一句主题句)</h3>
-<ul>
-  <li><strong>Discussion:</strong>碎片化调和了领域内的矛盾——残差 steering 在低碎片化概念(如 refusal)上"有效"、在高碎片化概念上失败,所以 routing-aware 必须是有条件的,而非默认。</li>
-  <li><strong>Conclusion:</strong>MoE 里的 steering 可靠性是一个路由几何问题,而且有一个便宜、可预测、推理期的修复。</li>
-</ul>
+<p class="sub">章节顺序 / 篇幅 / 图表数量在 <code>/paper-write</code> Step 0 由结构参照论文 ManipLVM-R1（<code>song2025maniplvm</code>）的全文测得后对齐。</p>
+<h3>1 · Introduction</h3>
+<p class="sub">钩子/gap（对齐→越狱依旧、且攻击越来越贵）→ 问题（有没有更内在的输入性质）→ 诊断（风格化在表征上遮蔽有害意图）→ 方法（Style Jailbreak，黑盒、无攻击模型）→ 贡献三条。<strong>Fig 1 = 动机图</strong>（直接被拒 vs 风格化得逞），非结果预览。</p>
+<h3>2 · Related Work</h3>
+<p class="sub">安全对齐与拒绝行为 · 越狱攻击（PAIR/TAP/ReNeLLM/DeepInception/FlipAttack/DRAttack）· 风格/叙事型攻击 + 表征层面安全分析。</p>
+<h3>3 · Method</h3>
+<p class="sub">3.1 威胁模型 + 目标；3.2 离线风格图（SBERT→k-means→kNN）；在线图游走（grade/warmup/probe/update/jump）；两轮执行；3.x 预算与复用；轻理论（图游走 reward-ascent 命题 + 机械验证）。<strong>Fig 2 = 模型图（整页宽 figure*，在 Method 里）</strong>。</p>
+<h3>4 · Experiment / Analysis</h3>
+<p class="sub">4.1 主结果（两基准×五模型，Table 1/2）；4.2 消融；4.3 成本；5.1 表征分析；4.6 缓解 guard。</p>
+<h3>5 · Conclusion</h3>
+<p class="sub">安全对齐留了一片风格化盲区;暴露它、并给出便宜可预测的输入侧诊断。</p>
 
 <h1>§1 · Claims → 证据</h1>
 <table>
-<thead><tr><th>Claim</th><th>支撑实验</th><th>成功长什么样</th></tr></thead>
+<thead><tr><th>Claim</th><th>支撑实验</th><th>成功长什么样（已由 results 填）</th></tr></thead>
 <tbody>
-<tr><td class="c">C1</td><td>概念 steering 方向在 MoE 里碎片化;离散度可测且逐概念变化(§4.1)。</td><td>逐概念离散度有明显分布;refusal 偏低,若干概念偏高 <span class="ph">[X]</span>。</td></tr>
-<tr><td class="c">C2</td><td>高碎片化 → 单个残差向量被路由甩开,steering 效果下降(§4.2,因果强制路由检验)。</td><td>残差 steer 成功率随离散度下降;强制路由挽回 <span class="ph">[X%]</span> 流失效果。</td></tr>
-<tr><td class="c">C3</td><td>Route-Then-Steer 在高碎片化概念上打败 仅残差 / 仅 expert-output / 仅 router(§4.3)。</td><td>成功率更高 <span class="ph">[X%]→[X%]</span>、跨样本方差更低 <span class="ph">[−X%]</span>、off-target/效用不差于基线。</td></tr>
-<tr><td class="c">C4</td><td>增益被碎片化预测,且在低碎片化 refusal 上与普通 steering 持平(§4.4)。</td><td>正相关(离散度 vs 增益)<span class="ph">[r=X]</span>;refusal 上 Route-Then-Steer ≈ 残差。</td></tr>
+<tr><td class="c">C1</td><td>风格化在表征空间削弱有害意图识别（§5.1，Vicuna-13B 中层）。</td><td>探针 <span class="ph">0.98→0.63</span>；包裹率 <span class="ph">0.94→0.55</span>；半径 ~2.1×、类均值间距 ~3×。→ <code>results/representation_analysis.json</code></td></tr>
+<tr><td class="c">C2</td><td>两基准五模型取得最高平均 ASR（§4.1，Table 1/2）。</td><td>AdvBench <span class="ph">91.3%</span>（GPT-4o 95.7 / DeepSeek-V3 97.2），TrustLLM <span class="ph">83.1%</span>；Direct ≈ 3%。→ <code>results/headtohead_*.json</code></td></tr>
+<tr><td class="c">C3</td><td>更严 StrongREJECT 下仍领先（§4.1，SR 列）。</td><td>平均 SR AdvBench <span class="ph">66.8%</span> / TrustLLM <span class="ph">48.3%</span>（TrustLLM 五模型全第一）。</td></tr>
+<tr><td class="c">C4</td><td>消融:风格化是主因，两轮放大（§4.2）。</td><td>Direct <span class="ph">0.0</span> · +Multi <span class="ph">0.7</span> · Style <span class="ph">31.7</span> · 完整 <span class="ph">78.0</span>。→ <code>results/ablation_components.json</code></td></tr>
+<tr><td class="c">C5</td><td>无攻击模型，端到端更快（§4.3）。</td><td>每目标 <span class="ph">1.3–5.5</span> 查询；AdvBench <span class="ph">~3h</span> vs PAIR ~12h / TAP ~19h。→ <code>results/cost_efficiency.json</code></td></tr>
+<tr><td class="c">C6</td><td>输入侧风格归一化 guard 作缓解诊断（§4.6）。</td><td>guard 后平均 ASR <span class="ph">91.3→~3.0</span>（≈ Direct）。→ <code>results/mitigation_guard.json</code></td></tr>
 </tbody>
 </table>
-<p class="sub">纪律:无实验不立 claim;C4 是内置的证伪臂——若离散度预测不了增益、或 Route-Then-Steer 从不胜过残差,就如实报告机制为假(仍是干净结果)。</p>
+<p class="sub">纪律:无实验不立 claim;每个数字追溯到 <code>results/</code>，抓不到标 <code>[UNVERIFIED]</code>，绝不编。</p>
 
-<h1>§2 · Systems — 方法 + 必须打败的基线</h1>
-<p class="sub">基线取自 <a href="#grounding">grounding 表</a>(真实、非杜撰)。数据集 + 指标前置固定(W7)。</p>
-<table>
-<thead><tr><th>System</th><th>是什么</th><th>来源</th></tr></thead>
-<tbody>
-<tr><td class="c">Route-Then-Steer</td><td><strong>我们的。</strong>router-logit nudge δ 推向表达专家 + 残差概念向量。</td><td>新(δ 原语取自 <a href="https://arxiv.org/abs/2510.14853">Rewiring</a>)</td></tr>
-<tr><td>仅残差(ActAdd / DiffMean)</td><td>普通残差流 steering <code>r←r+λv</code>。要打败的"照常起效"基线。</td><td><a href="https://arxiv.org/abs/2606.04160">2606.04160</a> / <a href="https://arxiv.org/abs/2605.01844">CRH</a></td></tr>
-<tr><td>仅 expert-output</td><td>专家 FFN 输出上的 difference-in-means,按路由概率加权(SafetySE / AllAE)。</td><td><a href="https://arxiv.org/abs/2606.04160">2606.04160</a></td></tr>
-<tr><td>仅 router</td><td>router-logit / 门控 steering,不加残差向量(Rewiring-δ / MASCing-mask)。</td><td><a href="https://arxiv.org/abs/2510.14853">2510.14853</a> / <a href="https://arxiv.org/abs/2604.27818">2604.27818</a></td></tr>
-<tr><td>整专家开关</td><td>SteerMoE 开/关行为相关专家(粗控参照)。</td><td><a href="https://arxiv.org/abs/2509.09660">2509.09660</a></td></tr>
-</tbody>
-</table>
-<p><span class="lbl">数据集</span> — <strong>CRH 100-concept 套件</strong>(复用 <code>mbzuai-nlp/CRH</code>)作主概念集;<strong>refusal</strong> 用 200 harmful + 200 harmless(Arditi)+ 100 JailbreakBench 评测,作已知的低碎片化对照。效用副作用测 <strong>MMLU(5-shot)</strong> + <strong>GSM8K(5-shot)</strong>(同 MASCing)。</p>
-<p><span class="lbl">指标</span> — (1)<strong>steering 成功率</strong> = 目标概念激活(CRH steerability;<strong>GPT-4o 评判</strong>,同 <a href="https://arxiv.org/abs/2606.04160">2606.04160</a>——评判结果缓存/去重,W2,控 API 成本);(2)<strong>跨样本方差</strong>(CRH 核心不可预测性信号);(3)<strong>off-target / 效用损失</strong> = MMLU/GSM8K 下降 + <strong>KL-divergence</strong> 连贯性(取自 2606.04160);(4)<strong>碎片化离散度</strong>(新);(5)<strong>routed-away 占比</strong>(新,因果)。</p>
-
-<h1>§3 · 消融矩阵(每行只动一个变量)</h1>
-<table>
-<thead><tr><th>消融</th><th>相对完整 Route-Then-Steer,只改</th><th>验什么</th></tr></thead>
-<tbody>
-<tr><td class="c">A1</td><td>去掉 router nudge(只留残差向量)</td><td>"route"这一步是否必要?</td></tr>
-<tr><td class="c">A2</td><td>去掉残差向量(只留 router nudge)</td><td>"steer"这一步是否必要?</td></tr>
-<tr><td class="c">A3</td><td>nudge 到随机专家而非表达专家</td><td>是否是<em>对的</em>专家,而非任意扰动?</td></tr>
-<tr><td class="c">A4</td><td>碎片化度量变体(两两 cosine ↔ 顶方向方差)</td><td>预测器稳健性</td></tr>
-<tr><td class="c">A5</td><td>nudge top-1 vs top-k 表达专家</td><td>需要几个专家接住 token</td></tr>
-</tbody>
-</table>
-
-<h1>§4 · 运行顺序(便宜 → 昂贵,W1)</h1>
-<ol>
-  <li><strong>Smoke test</strong> — 1 概念 × OLMoE-1B-7B:抽逐专家方向、算离散度、跑一次 Route-Then-Steer 前向。端到端确认 hook + router-logit offset + 评判接线(1 天,单 A100)。</li>
-  <li><strong>碎片化图谱(§4.1)</strong> — OLMoE 上 100 概念 + refusal;离散度分布。纯前向,便宜。</li>
-  <li><strong>routed-away(§4.2)</strong> — 在按碎片化分层的子集上做强制路由因果检验。</li>
-  <li><strong>正面对比(§4.3)</strong> — Route-Then-Steer vs 4 基线,全概念,OLMoE。</li>
-  <li><strong>预测器 + refusal 持平(§4.4)</strong> — 离散度↔增益相关性;refusal 低碎片化对照。</li>
-  <li><strong>消融(§4.5)</strong> — A1–A5。</li>
-  <li><strong>泛化(本轮)</strong> — 在 <strong>Qwen1.5-MoE-A2.7B</strong>(14.3B/2.7B,单 A100)上重跑 §4.1 + §4.3 头条。<strong>Qwen3-30B-A3B 泛化推到首投后</strong>。</li>
-</ol>
-
-<h1>§5 · Configs(贴你的 Experiment Templates)</h1>
-<ul>
-  <li><strong>模型:</strong>主 <a href="https://arxiv.org/abs/2409.02060">OLMoE-1B-7B-Instruct</a>(7B/1B active,16 层,64 专家,top-8——两篇最接近论文都用它,单 A100);次 <strong>Qwen1.5-MoE-A2.7B-Chat</strong>(14.3B/2.7B,64 专家=60 routed+4 shared,单 A100,本轮泛化用它,贴你 Qwen 栈)。<strong>Qwen3-30B-A3B(30.5B/3.3B,需 A100-80G 或量化)推到首投后。</strong></li>
-  <li><strong>服务 / hook:</strong>HF <code>transformers</code> 前向 hook 做残差 + router-logit 干预;<code>vLLM</code> 做评测/评判的批量生成。(基本是推理——不微调,DeepSpeed/TRL 闲置。)</li>
-  <li><strong>干预层:</strong>中段、CRH 式——扫一小组(OLMoE ≈ 6–10 层;Qwen1.5-MoE ≈ 12–16);逐模型按 CRH 的做法选。</li>
-  <li><strong>steering 强度 λ:</strong>扫(CRH 协议),报 dose-response,不是单个 λ。</li>
-  <li><strong>router nudge α:</strong>router logit 上的小加性偏置(Rewiring 式);A5 里扫;默认取能把 top-k 翻成包含表达专家的最小 α。</li>
-  <li><strong>probe 数 k / nudge 的专家数:</strong>top-1 vs top-k(消融 A5)。</li>
-  <li><strong>seed:</strong>方差指标 ≥5 seed(方差本身是头条数字,必须估计而非单跑)。</li>
-  <li><strong>OOM-safe(你的头号失败):</strong>30B 用低 batch + 激活缓存;OLMoE/Qwen1.5-MoE 从容。缓存逐专家方向 + 离散度(W2)——绝不重算;写带时间戳结果文件(W3)。</li>
-</ul>
-
-<h1>§6 · Budget(粗略 GPU 小时)</h1>
-<table>
-<thead><tr><th>模块</th><th>GPU</th><th>粗略成本</th><th>要签核?</th></tr></thead>
-<tbody>
-<tr><td>Smoke + 碎片化图谱(OLMoE)</td><td>1× A100</td><td>&lt; 1 天</td><td>否</td></tr>
-<tr><td>routed-away + 正面对比 + 预测器(OLMoE)</td><td>1× A100</td><td>~1–2 天</td><td>否</td></tr>
-<tr><td>消融 A1–A5(OLMoE)</td><td>1× A100</td><td>~1 天</td><td>否</td></tr>
-<tr><td>泛化(Qwen1.5-MoE-A2.7B,本轮)</td><td>1× A100</td><td>~1 天</td><td>否</td></tr>
-<tr><td>泛化(Qwen3-30B-A3B)—— <strong>首投后</strong></td><td>1–2× A100-80G</td><td>推后再定</td><td>首投后</td></tr>
-</tbody>
-</table>
-
-<h2 class="gate box" id="gate">GATE — 开跑前等你批准</h2>
-<ul>
-  <li><strong>Claims:</strong>C1 碎片化存在 · C2 routed-away(因果)· C3 Route-Then-Steer 打败 4 基线 · C4 增益被碎片化预测、refusal 上持平。</li>
-  <li><strong>必打败的基线:</strong>仅残差(ActAdd/DiffMean)· 仅 expert-output(SafetySE/AllAE)· 仅 router(Rewiring-δ/MASCing)· 整专家开关(SteerMoE)。</li>
-  <li><strong>消融行:</strong>A1 无 route · A2 无 steer · A3 随机专家 · A4 度量变体 · A5 top-1/top-k。</li>
-  <li><strong>前 3 个 run:</strong>(1)OLMoE 上 1 概念 smoke ·(2)100 概念碎片化图谱 ·(3)routed-away 因果检验。</li>
-  <li><strong>预算:</strong>本轮<strong>全部单 A100、无 &gt;1 天签核</strong>(OLMoE 主体各 &lt;1–2 天 + Qwen1.5-MoE 泛化 ~1 天)。</li>
-</ul>
-<p class="lbl" style="margin-top:.8em">已定(2026-07-05)</p>
-<ul>
-  <li><strong>(a) 主模型:</strong>OLMoE-1B-7B(主)+ <strong>Qwen1.5-MoE-A2.7B</strong>(次/泛化,全程单 A100)。</li>
-  <li><strong>(b) 概念成功评判:</strong><strong>GPT-4o</strong>(同 2606.04160;判定缓存去重控成本)。</li>
-  <li><strong>(c) Qwen3-30B-A3B 泛化:</strong>推到<strong>首投后</strong>。</li>
-</ul>
-<p>三个决定都已锁进上面各节。<strong>计划就绪。</strong>你说 go,我就进 <code>/run-plan</code>——先从 OLMoE 上的 1 概念 smoke test 开始;不说 go 就不跑。</p>
-
-<h2 id="grounding">附录 · Grounding 表(最接近论文,读的是全文)</h2>
-<p class="sub">上面每个 baseline / 数据集 / 指标都取自这里——从每篇论文全文读到的真实实验设置,不是凭记忆。抓不到的标 <code>[UNVERIFIED]</code>。</p>
-<table>
-<thead><tr><th>论文</th><th>模型</th><th>基线</th><th>数据集</th><th>指标</th></tr></thead>
-<tbody>
-<tr>
-  <td><a href="https://arxiv.org/abs/2605.01844">CRH(2605.01844)</a> — <em>你的;理论 + 指标模板</em></td>
-  <td>Gemma-2B-IT(L9/13)、LLaMA2-7B-Chat(L16/24),残差流</td>
-  <td>DiffMean、PCA/RepE、probe/ITI;<code>r←r+λv</code> 扫 λ</td>
-  <td>100 concepts</td>
-  <td>steerability = 目标概念 success rate(每单位 λ 斜率);cosine(diff-vec) vs Δstrength 非对称</td>
-</tr>
-<tr>
-  <td><a href="https://arxiv.org/abs/2606.04160">Expert-Aware Refusal Steering(2606.04160)</a> — <em>最接近;结构模板</em></td>
-  <td>GPT-OSS-20B(32e/top-4)、Mixtral-8x7B(8e/top-2)、OLMoE-1B-7B(64e/top-8)</td>
-  <td>ActAdd(残差)、SafetySE、FixedSE、AllAE、FixedAE × 3 种 system-prompt 条件</td>
-  <td>200 harmful + 200 harmless(Arditi);100 harmful JailbreakBench;GPT-4o 评判</td>
-  <td>ASR(Refusal / Full-response / Non-response);Refusal score(log-odds);KL-divergence(连贯性)</td>
-</tr>
-<tr>
-  <td><a href="https://arxiv.org/abs/2604.27818">MASCing(2604.27818)</a></td>
-  <td>DeepSeek-MoE-16B、GPT-OSS-20B、Hunyuan-A13B、Mixtral-8x7B、Phi-3.5-MoE、Qwen1.5-MoE-A2.7B、Qwen3-30B-A3B</td>
-  <td>SteerMoE;Expert-Steering 变体</td>
-  <td>AdvBench(520)、MHJ(2912)、EroticaAnalysis、NaturalReasoning;MMLU + GSM8K(5-shot)效用</td>
-  <td>Success Rate;Defense Success Rate(52.5→83.9%);效用 acc(~4.1% 损失)</td>
-</tr>
-<tr>
-  <td><a href="https://arxiv.org/abs/2510.14853">Rewiring Experts(2510.14853)</a> — <em>route-nudge 原语</em></td>
-  <td>OLMoE(64e/top-8)、DeepSeek-V2-Lite(64e/top-6)、Qwen1.5-MoE、GPT-OSS-20B</td>
-  <td>ICL 3/5-shot;C3PO</td>
-  <td>HumanEval、MBPP、GSM8K、MATH500、MMLU-redux、AIME24/25</td>
-  <td>Pass@k、Accuracy、Maj@k;免数据 router-logit δ(l),每 128 token 重优化;OLMoE HumanEval +5.5%</td>
-</tr>
-</tbody>
-</table>
+<h1>§2 · Systems / 基线 / 数据 / 指标</h1>
+<p><span class="lbl">方法</span> Style Jailbreak（风格图 + 图游走 + 两轮，纯黑盒无攻击模型）。
+<span class="lbl">基线</span> Direct · DeepInception · FlipAttack · DRAttack · TAP · PAIR · ReNeLLM。
+<span class="lbl">数据集</span> AdvBench(n=470) · TrustLLM(n=200)。
+<span class="lbl">目标模型</span> DeepSeek-V3 · GPT-4o · Llama-3.3-70B · Nemotron-70B · Qwen2.5-72B。
+<span class="lbl">指标</span> ASR（GPT-4o 评判）· StrongREJECT（DeepSeek-V4-Flash）;表征分析 Vicuna-13B 中层。</p>
 
 <p class="foot">
-  接地纪律:baseline/数据集/指标读自各篇全文(本 session 抓取);计划正文里的数字都是占位 <span class="ph">[X%]</span>,要等 <code>/run-plan</code> 从真实结果文件填。Configs 贴你的 Experiment Templates(OLMoE/Qwen-MoE · HF hook + vLLM · OOM-safe)。人是判官 —— 你在 GATE 处批准前什么都不跑。
+  结果已落在 <code>results/*.json</code>（见 <a href="05_FINDINGS.html">05_FINDINGS.html</a>）。<code>/paper-write</code> 从本文件取 claim、从 <code>results/</code> 取数、以 <code>song2025maniplvm</code> 为结构参照写 AAAI 2027 稿。人是判官——每节到 GATE 停下等你批。
 </p>
 
 </div>

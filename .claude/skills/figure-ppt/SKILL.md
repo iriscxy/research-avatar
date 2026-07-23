@@ -1,6 +1,6 @@
 ---
 name: figure-ppt
-description: Draw a paper's model / method / Figure-1 mechanism figure by (1) applying a fixed "expert scientific-figure designer" meta-prompt to the paper's method text to GENERATE a BioRender-style image prompt, (2) calling an image model (gpt-image) to draw the imagery from that prompt, (3) compositing it into an EDITABLE PowerPoint (image background + every label a hand-editable text box) and exporting a PDF. The image drawer is swappable (gpt-image now via OPENAI_API_KEY; Gemini later). Use for "画模型图", "方法图", "机制图", "framework/model figure", "Figure 1", or when /paper-write needs the Fig 1 slot filled. Invocable as /figure-ppt.
+description: Draw a paper's model / method / Figure-1 mechanism figure by (1) applying a fixed "expert scientific-figure designer" meta-prompt to the paper's method text to GENERATE a BioRender-style image prompt, (2) calling an image model (gpt-image) to draw the imagery from that prompt, (3) compositing it into an EDITABLE PowerPoint (image background + every label a hand-editable text box) and exporting a PDF. The image drawer is swappable (gpt-image now via OPENAI_API_KEY; Gemini later). Use for "model figure", "method figure", "mechanism figure", "framework figure", "Figure 1", or when /paper-write needs the Fig 1 slot filled. Invocable as /figure-ppt.
 allowed-tools: Bash(*), Read, Write, Edit, AskUserQuestion
 ---
 
@@ -15,8 +15,9 @@ A fixed meta-prompt is applied to the paper's method/mechanism text via GPT (cha
 produce a BioRender-style image prompt. The meta-prompt (verbatim, in the tool as
 `META_PROMPT`) is:
 
-> 你现在是一名专业且经验丰富的科研绘图设计师，请仔细阅读以下文献内容，深入理解核心机制、
-> 关键方法，以及深度模型实验流程后，生成BioRender风格的机制图提示词。
+> You are a professional and experienced scientific-figure designer. Carefully read the following
+> paper content, deeply understand its core mechanism, key method, and deep-model experimental
+> pipeline, and then generate a BioRender-style prompt for the mechanism figure.
 
 ```bash
 python3 tools/figure_ppt.py genprompt --paper <method.tex-or-txt> --spec spec.json [--model gpt-4o]
@@ -65,10 +66,13 @@ python3 tools/figure_ppt.py pdf         <fig>.pptx                      # soffic
 Renders a **shape spec** into **native PowerPoint shapes** — every module a rounded rect, every
 flow an arrow (connector with an arrowhead), every label a text box, ovals/hexagons as needed —
 so **every element is selectable and editable** in PowerPoint and **text is crisp (never garbled)**.
-**Flat design (enforced in code): solid fills only, NO drop shadows on any element — shapes AND
-connectors both set `shadow.inherit=False` — no gradients, no 3D bevels.** The schematic must read
-as clean flat blocks and lines; do not add shadows/gradients (they look like slideware, not a
-paper figure). YOU author `shapes.json` (Write it) by reconstructing the mechanism from the
+**Flat design (enforced in code): solid fills only, NO drop shadows on any element, no gradients, no
+3D bevels.** The schematic must read as clean flat blocks and lines. NOTE: `shadow.inherit=False`
+alone is NOT enough — python-pptx adds an empty `<a:effectLst/>` that PowerPoint honours but
+LibreOffice/`soffice` ignores, so on the pptx→pdf export it still renders the THEME shadow that each
+shape's `<p:style>/<a:effectRef idx="2">` points at. The `buildshapes` `_flat()` helper therefore
+also rewrites every `a:effectRef` to `idx="0"` (shapes, connectors, and text boxes), which kills the
+shadow in every renderer. After exporting, READ the PDF and confirm there are no shadows. YOU author `shapes.json` (Write it) by reconstructing the mechanism from the
 gpt-image reference (`iterations/…/round_NN.png`) — the raster becomes the *visual guide*, the PPT
 is real shapes.
 Shape schema — `x,y,w,h` (and arrow `x1,y1,x2,y2`) are FRACTIONS of the canvas:
@@ -106,6 +110,21 @@ genprompt → draw → (refine → draw)×N → build → pdf.
 7. Copy the PDF to `paper/fig/model.pdf` and `\includegraphics{fig/model.pdf}` into the Fig 1 slot.
 
 ## Rules
+- **Keep `paper/fig/` clean — deliverables ONLY.** After building, `paper/fig/` should contain only the
+  figures the paper includes plus their editable/source-of-truth artifacts: the final figure PDFs
+  (`model.pdf`, `motiv.pdf`, data plots), the editable `*.pptx`, and each gpt-generated image saved AS A
+  PDF (`stylejb_*.gpt.pdf`). Move generation sources (`make_figs.py`, `style.py`, `*_shapes.json`,
+  `*_spec.json`, `*_method.txt`, the `iterations/` gpt-draft archive) to `paper/figsrc/`, and delete the
+  clutter (`*.bg.png` raster working copies, duplicate PDFs). Do not leave json/txt/png/scripts loose in `fig/`.
+- **For a paper model figure the flow is `draw` (gpt-image, as a DRAFT) → `buildshapes`** — gpt drafts
+  the composition, then you rebuild it as native PPT shapes so EVERY element (icons, arrows, labels) is
+  individually editable. The `build` path (gpt raster background + editable labels only) is NOT enough
+  when every element must be editable, because its icons stay a non-editable raster. gpt is still used
+  (it drafts the figure), it is just not the final deliverable.
+- **A model figure must be PAGE-WIDTH** — a two-column `figure*` at `\includegraphics[width=\textwidth]`,
+  never a single-column half-width include. Set the `buildshapes` `canvas_in` to a full-width banner
+  aspect (e.g. `[7.0, 2.4]`). An opening / motivation figure is instead single-column (half width).
+  After `pdf`, READ the rendered PDF and confirm it is the right width and nothing is clipped.
 - **Draw prompt is GENERATED from the paper via the meta-prompt** — never hand-written.
 - **Refine from the IMAGE, agent-driven** — after drawing, YOU look at the figure and rewrite
   `spec.draw_prompt` from what is actually rendered; no fixed refine instruction (first-draft

@@ -1,6 +1,6 @@
 ---
 name: paper-logic-check
-description: After a paper is drafted, check that its narrative logic is tight — that each section resolves the needs earlier sections raised (or states its own role), that every argumentative need is answered nearby, that reader understanding-cost is low, and that the whole reads as one closed loop with no dead ends. Combines a deterministic cross-reference map (grep-built, no external program) with a fresh agentic read of the compiled PDF. A review sub-skill of /paper-write; also usable standalone. Invoke when the user says "逻辑检查", "narrative logic", "叙事检测", "does it flow", "逻辑闭环", or /paper-logic-check.
+description: After a paper is drafted, check that its narrative logic is tight — that each section resolves the needs earlier sections raised (or states its own role), that every argumentative need is answered nearby, that reader understanding-cost is low, and that the whole reads as one closed loop with no dead ends. Combines a deterministic cross-reference map (grep-built, no external program) with a fresh agentic read of the compiled PDF. A review sub-skill of /paper-write; also usable standalone. Invoke when the user says "narrative logic", "check the logic", "does it flow", "logic loop", or /paper-logic-check.
 ---
 
 # paper-logic-check

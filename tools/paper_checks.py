@@ -216,6 +216,23 @@ def label_page(paper_dir, main_base, label_substr):
     return int(m.group(1)) if m else None
 
 
+def _references_page(paper_dir, main_base):
+    """Page where the References section starts (used for venues with no Limitations section, where
+    References is the thing that follows the Conclusion). Uses pdftotext; None if unavailable."""
+    import subprocess
+    pdf = os.path.join(paper_dir, main_base + ".pdf")
+    if not os.path.exists(pdf):
+        return None
+    try:
+        out = subprocess.run(["pdftotext", pdf, "-"], capture_output=True, text=True).stdout
+    except Exception:
+        return None
+    for i, pg in enumerate(out.split("\f"), 1):
+        if any(line.strip() == "References" for line in pg.splitlines()):
+            return i
+    return None
+
+
 def check_length(args):
     """Length is judged by WHERE THE CONCLUSION ENDS, not by a page count. The venue-counted
     content (Intro..Conclusion) must end EXACTLY on the target page (e.g. the ACL 8th page) —
@@ -232,6 +249,11 @@ def check_length(args):
     conc = label_page(args.paper_dir, args.main_base, "endconclusion")
     lim = label_page(args.paper_dir, args.main_base, "limstart")  # start of Limitations
     tgt = args.body_target
+    # Some venues (e.g. AAAI) have NO Limitations section — the body ends at Conclusion -> References.
+    # There, `endconclusion == target` is the fill signal; the limstart check does not apply.
+    tex = read(os.path.join(args.paper_dir, args.main))
+    has_limitations = bool(re.search(r"\\section\*?\s*\{\s*Limitations\s*\}", tex))
+    refs_pg = None if has_limitations else _references_page(args.paper_dir, args.main_base)
     viol = []
     if total is None:
         return {"check": "length", "ok": False, "issue": "no compile log — build first"}
@@ -248,17 +270,26 @@ def check_length(args):
         elif conc > tgt:
             viol.append({"issue": "conclusion_past_limit", "conclusion_end_page": conc,
                          "target_page": tgt, "note": "content overflows the page limit — trim."})
-        elif lim is None:
+        elif has_limitations and lim is None:
             viol.append({"issue": "no_limstart_label",
                          "fix": r"add \label{paper:limstart} right after \section*{Limitations}"})
-        elif lim <= tgt:
+        elif has_limitations and lim <= tgt:
             viol.append({"issue": "conclusion_not_at_page_bottom", "conclusion_end_page": conc,
                          "limitations_start_page": lim, "target_page": tgt,
                          "note": "Conclusion ends on page %d but ABOVE its bottom — Limitations still starts on "
                                  "page %d. Add counted content so the Conclusion fills page %d to the bottom and "
                                  "Limitations starts on page %d." % (tgt, lim, tgt, tgt + 1)})
+        elif not has_limitations and refs_pg is not None and refs_pg <= tgt:
+            # No Limitations section (AAAI): References follow the Conclusion. If they start on the
+            # target page too, the Conclusion ended MID-PAGE and the body is under-filled.
+            viol.append({"issue": "conclusion_not_at_page_bottom", "conclusion_end_page": conc,
+                         "references_start_page": refs_pg, "target_page": tgt,
+                         "note": "Conclusion ends on page %d but References start on the same page — the "
+                                 "Conclusion does not fill it to the bottom. Add BODY content so References "
+                                 "start on page %d." % (tgt, tgt + 1)})
+        # else: References start on target+1 (or no page data) — the Conclusion fills the target page.
     return {"check": "length", "ok": not viol, "conclusion_end_page": conc,
-            "limitations_start_page": lim, "total_pages": total, "target_page": tgt,
+            "limitations_start_page": lim, "references_start_page": refs_pg, "total_pages": total, "target_page": tgt,
             "note": "pass = Conclusion ends on the target page AND Limitations starts on target+1 (page full)",
             "violations": viol}
 
@@ -339,8 +370,53 @@ def check_format(args):
             "violations": viol}
 
 
+def check_floats(args):
+    """Each figure/table must be DEFINED in the source at/near the section that first
+    REFERENCES it, and figures must appear in first-reference order. Catches the common
+    failure where the model/architecture figure is \\ref'd in the Method but its
+    \\begin{figure} is dropped among the results floats, so it renders a section too late
+    (Fig 2 landing after the results teaser instead of beside the Method that introduces it).
+    A float defined in a LATER section than its first reference is the signal."""
+    tex = strip_comments(read(os.path.join(args.paper_dir, args.main)))
+    section_pos = [m.start() for m in re.finditer(r"\\section\b\*?\s*\{", tex)]
+
+    def sections_between(a, b):
+        lo, hi = (a, b) if a <= b else (b, a)
+        return sum(1 for p in section_pos if lo < p < hi)
+
+    floats = []
+    for m in re.finditer(r"\\begin\{(figure|table)\*?\}(.*?)\\end\{\1\*?\}", tex, re.S):
+        lab = re.search(r"\\label\{([^}]*)\}", m.group(2))
+        if not lab:
+            continue
+        key = lab.group(1)
+        refs = [r.start() for r in
+                re.finditer(r"\\(?:ref|autoref|cref|Cref)\{" + re.escape(key) + r"\}", tex)]
+        floats.append({"kind": m.group(1), "label": key, "def_pos": m.start(),
+                       "first_ref": min(refs) if refs else None})
+    viol = []
+    for f in floats:
+        if f["first_ref"] is None:
+            viol.append({"issue": "float_never_referenced", "label": f["label"],
+                         "fix": "add a \\ref to it in the text, or drop the float"})
+        elif f["first_ref"] < f["def_pos"] and sections_between(f["first_ref"], f["def_pos"]) >= 1:
+            viol.append({"issue": "float_defined_after_its_reference_section", "label": f["label"],
+                         "sections_between_ref_and_def": sections_between(f["first_ref"], f["def_pos"]),
+                         "fix": "move \\begin{%s}..\\end{%s} to right after the paragraph that first "
+                                "\\ref's %s (the model figure belongs beside the Method, not the results)"
+                                % (f["kind"], f["kind"], f["label"])})
+    figs = [f for f in floats if f["kind"] == "figure" and f["first_ref"] is not None]
+    by_def = [f["label"] for f in sorted(figs, key=lambda f: f["def_pos"])]
+    by_ref = [f["label"] for f in sorted(figs, key=lambda f: f["first_ref"])]
+    if by_def != by_ref:
+        viol.append({"issue": "figures_out_of_first_reference_order",
+                     "by_definition": by_def, "by_first_reference": by_ref,
+                     "fix": "reorder figure environments so definition order matches first-reference order"})
+    return {"check": "floats", "ok": not viol, "n_floats": len(floats), "violations": viol}
+
+
 CHECKS = {"budget": check_budget, "style": check_style, "length": check_length,
-          "formal": check_formal, "format": check_format}
+          "formal": check_formal, "format": check_format, "floats": check_floats}
 
 
 def measure_ref_shares(ref_txt):

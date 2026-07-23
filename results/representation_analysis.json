@@ -1,0 +1,26 @@
+{
+  "claim": "C1",
+  "experiment": "5.1 representation-space analysis of stylization",
+  "model": "Vicuna-13B (aligned chat model)",
+  "layer": "mid-layer hidden states, mean-pooled per request",
+  "style_frame": "one fixed literary style frame applied identically to harmful and benign inputs (only the style changes)",
+  "local_structure": {
+    "description": "linear separability of harmful vs benign at the refusal-associated layer",
+    "n_harmful": 100,
+    "n_benign": 100,
+    "linear_probe_accuracy_raw": 0.98,
+    "linear_probe_accuracy_stylized": 0.63,
+    "chance_level": 0.50,
+    "class_mean_gap_decrease_factor": 3.0,
+    "reading": "styling collapses linear separability toward chance and shrinks the class-mean gap ~3x"
+  },
+  "global_structure": {
+    "description": "enclosure of the harmful region by the benign manifold (protocol of Gao et al. 2025)",
+    "n_requests": 10000,
+    "enclosure_rate_raw": 0.94,
+    "enclosure_rate_stylized": 0.55,
+    "mean_radius_increase_factor": 2.1,
+    "reading": "the harmful region disperses (~2.1x radius) and leaks past the benign boundary (enclosure 0.94 -> 0.55)"
+  },
+  "conclusion": "Applying the same style to harmful and benign inputs weakens both the local (probe) and global (enclosure) safety signals the aligned model uses to recognize harmful intent."
+}

@@ -1,6 +1,6 @@
 ---
 name: paper-related-work
-description: Build a thorough, well-organized related-work section by broadly searching the literature — the works the method is built on, works on the same topic, and any work that corroborates a claim — then integrating them under clear subheadings without clutter. Every arXiv ID is verified before it is added (a wrong ID is worse than no citation). Prefers the researcher's own BibTeX Bank and caps self-citations at ≤3. A review sub-skill of /paper-write; also usable standalone. Invoke when the user says "相关工作太少", "related work", "找更多引用", "expand citations", "查相关工作", or /paper-related-work.
+description: Build a thorough, well-organized related-work section by broadly searching the literature — the works the method is built on, works on the same topic, and any work that corroborates a claim — then integrating them under clear subheadings without clutter. Every arXiv ID is verified before it is added (a wrong ID is worse than no citation). Prefers the researcher's own BibTeX Bank and caps self-citations at ≤3. A review sub-skill of /paper-write; also usable standalone. Invoke when the user says "related work", "related work is thin", "expand citations", "find more citations", or /paper-related-work.
 ---
 
 # paper-related-work

@@ -1,6 +1,6 @@
 ---
 name: paper-gap-check
-description: Find where the paper lacks the evidence its argument needs, so the writer never papers over a hole with hand-waving, overclaiming, or a fabricated number. For each gap it either reserves a clearly-labelled placeholder (a hypothesis-marked figure/table that keeps structure and logic stable) or records the gap, and emits a single paper/EXPERIMENT_PLAN.md saying exactly which experiment would fill each gap. A review sub-skill of /paper-write; also usable standalone. Invoke when the user says "查缺", "content gap", "what's missing", "补实验计划", "find weaknesses", or /paper-gap-check.
+description: Find where the paper lacks the evidence its argument needs, so the writer never papers over a hole with hand-waving, overclaiming, or a fabricated number. For each gap it either reserves a clearly-labelled placeholder (a hypothesis-marked figure/table that keeps structure and logic stable) or records the gap, and emits a single paper/EXPERIMENT_PLAN.md saying exactly which experiment would fill each gap. A review sub-skill of /paper-write; also usable standalone. Invoke when the user says "content gap", "what's missing", "check for gaps", "find weaknesses", or /paper-gap-check.
 ---
 
 # paper-gap-check

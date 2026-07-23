@@ -37,8 +37,9 @@ import urllib.request
 
 # ---------- the fixed prompt-generation meta-prompt (verbatim, per the researcher) ----------
 META_PROMPT = (
-    "你现在是一名专业且经验丰富的科研绘图设计师，请仔细阅读以下文献内容，深入理解核心机制、"
-    "关键方法，以及深度模型实验流程后，生成BioRender风格的机制图提示词。"
+    "You are a professional and experienced scientific-figure designer. Carefully read the "
+    "following paper content, deeply understand its core mechanism, key method, and deep-model "
+    "experimental pipeline, and then generate a BioRender-style prompt for the mechanism figure."
 )
 def _openai_chat_raw(model, messages):
     key = os.environ.get("OPENAI_API_KEY") or sys.exit("OPENAI_API_KEY not set")
@@ -190,6 +191,15 @@ def cmd_buildshapes(args):
         if sh.get("font_color"):
             r.font.color.rgb = RGBColor.from_string(_hx(sh["font_color"]))
 
+    def _flat(shape):
+        # Flat design: NO drop shadow. shadow.inherit=False only adds an empty <a:effectLst/>, but the
+        # shape's <p:style> still carries <a:effectRef idx="2"> pointing at the THEME's outer shadow,
+        # and LibreOffice/soffice renders THAT on the pptx->pdf export (PowerPoint honours the override,
+        # soffice does not). Neutralize the reference (idx="0") so no renderer draws a shadow.
+        shape.shadow.inherit = False
+        for eff in shape._element.iter(qn("a:effectRef")):
+            eff.set("idx", "0")
+
     for sh in spec.get("shapes", []):
         k = sh["kind"]
         if k in SH:
@@ -202,18 +212,18 @@ def cmd_buildshapes(args):
                 s.line.color.rgb = RGBColor.from_string(_hx(sh["line"])); s.line.width = Pt(sh.get("line_w", 1))
             else:
                 s.line.fill.background()
-            s.shadow.inherit = False
+            _flat(s)
             if sh.get("text"):
                 _text(s, sh)
         elif k == "textbox":
             tb = slide.shapes.add_textbox(IX(sh["x"]), IY(sh["y"]), IX(sh.get("w", 0.2)), IY(sh.get("h", 0.08)))
-            _text(tb, sh)
+            _text(tb, sh); _flat(tb)
         elif k in ("arrow", "line"):
             c = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, IX(sh["x1"]), IY(sh["y1"]),
                                            IX(sh["x2"]), IY(sh["y2"]))
             c.line.color.rgb = RGBColor.from_string(_hx(sh.get("color", "5B6B73")))
             c.line.width = Pt(sh.get("weight", 2))
-            c.shadow.inherit = False  # flat — connectors must not inherit the theme drop-shadow either
+            _flat(c)  # flat — connectors must not inherit or reference the theme drop-shadow either
             if k == "arrow":
                 ln = c.line._get_or_add_ln()
                 ln.append(ln.makeelement(qn("a:tailEnd"), {"type": "triangle", "w": "med", "len": "med"}))

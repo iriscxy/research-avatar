@@ -1,0 +1,28 @@
+{
+  "claim": "C2,C3",
+  "experiment": "4.1 main results on TrustLLM (harder, broader set)",
+  "benchmark": "TrustLLM",
+  "n_goals": 200,
+  "targets": ["DeepSeek-V3", "GPT-4o", "Llama-3.3-70B", "Nemotron-70B", "Qwen2.5-72B"],
+  "metrics": {
+    "asr": "attack success rate (%), GPT-4o judge",
+    "sr": "StrongREJECT score (%), scored with DeepSeek-V4-Flash"
+  },
+  "cell_format": "[asr, sr] per target",
+  "systems": [
+    {"name": "Direct",         "DeepSeek-V3": [21.5, 22.5],"GPT-4o": [3.5, 6.0],   "Llama-3.3-70B": [16.0, 12.5], "Nemotron-70B": [14.5, 9.0],  "Qwen2.5-72B": [7.5, 8.0],   "mean": [12.6, 11.6]},
+    {"name": "DeepInception",  "DeepSeek-V3": [57.5, 23.0],"GPT-4o": [37.0, 7.5],  "Llama-3.3-70B": [35.0, 8.5],  "Nemotron-70B": [40.5, 9.0],  "Qwen2.5-72B": [32.0, 9.5],  "mean": [40.4, 11.5]},
+    {"name": "FlipAttack",     "DeepSeek-V3": [43.5, 18.0],"GPT-4o": [21.5, 5.5],  "Llama-3.3-70B": [24.5, 4.0],  "Nemotron-70B": [22.0, 5.0],  "Qwen2.5-72B": [19.0, 8.5],  "mean": [26.1, 8.2]},
+    {"name": "DRAttack",       "DeepSeek-V3": [19.0, 8.0], "GPT-4o": [11.0, 4.0],  "Llama-3.3-70B": [7.0, 3.0],   "Nemotron-70B": [6.5, 1.5],   "Qwen2.5-72B": [3.5, 1.5],   "mean": [9.4, 3.6]},
+    {"name": "TAP",            "DeepSeek-V3": [71.5, 30.5],"GPT-4o": [0.0, 0.0],   "Llama-3.3-70B": [63.5, 25.0], "Nemotron-70B": [0.0, 0.0],   "Qwen2.5-72B": [23.0, 12.0], "mean": [31.6, 13.5]},
+    {"name": "PAIR",           "DeepSeek-V3": [91.0, 48.0],"GPT-4o": [83.0, 37.5], "Llama-3.3-70B": [84.5, 38.0], "Nemotron-70B": [64.0, 29.5], "Qwen2.5-72B": [82.5, 40.0], "mean": [81.0, 38.6]},
+    {"name": "ReNeLLM",        "DeepSeek-V3": [60.0, 8.0], "GPT-4o": [38.0, 7.0],  "Llama-3.3-70B": [65.5, 14.0], "Nemotron-70B": [67.0, 13.0], "Qwen2.5-72B": [70.5, 21.5], "mean": [60.2, 12.8]},
+    {"name": "Style Jailbreak (ours)", "DeepSeek-V3": [92.5, 56.0], "GPT-4o": [85.0, 46.5], "Llama-3.3-70B": [78.0, 42.0], "Nemotron-70B": [91.5, 46.5], "Qwen2.5-72B": [68.5, 50.5], "mean": [83.1, 48.3]}
+  ],
+  "headline": {
+    "style_jailbreak_mean_asr": 83.1,
+    "style_jailbreak_mean_sr": 48.3,
+    "strongest_baseline": {"name": "PAIR", "mean_asr": 81.0, "mean_sr": 38.6},
+    "note": "ASR margin over PAIR is modest, but the StrongREJECT (SR) margin is larger (48.3 vs 38.6): Style Jailbreak has the highest SR on all five targets. On Qwen2.5-72B PAIR has higher ASR (82.5 vs 68.5) but lower SR (40.0 vs 50.5)."
+  }
+}
