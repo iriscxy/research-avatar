@@ -59,7 +59,7 @@ researcher-profile/PROFILE.md
 
 **1. 可交互论文工作台**——`$paperwrite` 写作前先把大纲写进 `paper/outline.txt` 供你确认，承接 `$expdesign` 中已批准的论文骨架。确认后会自动启动 Paper Studio 并打开本地浏览器界面：左侧是可编辑的论文正文，右侧实时预览。写作的模型可自由配置 GPT、Claude 等 LLM API，走的是自然语言撰写而非 Codex 这类编程工具的代码生成路径。每个 section 有独立对话，可选参考段落、写 comment 修改，接受后自动同步 LaTeX、编译 PDF，全程不用离开这个界面手动改 `.tex`。
 
-**2. 论文写作风格个性化**——以你在目标会议发表过的一篇论文作结构参考（章节/长度/图表布局），套用画像中的 Writing Style，自引 ≤3 篇，并比对你过往摘要防止无意自我重复。
+**2. 论文写作风格个性化**——以你在目标会议发表过的一篇论文作结构参考（章节/长度/图表布局），套用画像中的 Writing Style，自引 ≤3 篇，并比对你过往摘要防止无意自我重复。完整稿会自动检查理论是否统一、引用是否可靠、claim 是否能追溯到实验结果，以及全文逻辑是否闭环。
 
 **3. 自动化可编辑图表**——intro/motivation 图在第一个引用它的段落确定后生成；model/method 图在定义模型结构所需的 Method 内容完成后生成。两类图都支持 GPT Image 构图、重绘以及可编辑 PPT/PDF 导出；实验分析图只读取 `results/` 中的真实结果，不生成虚假数据。
 
@@ -70,8 +70,8 @@ researcher-profile/PROFILE.md
 | Skill | 作用 |
 |---|---|
 | `$profileconstruct` | 根据 Google Scholar 和历史 session 创建/更新研究者画像 |
-| `$researchlit "你的研究主题"` | 文献综述，可用 `angles` 指定并行检索角度（默认 5） |
-| `$ideagen` | 挖掘你的 publication list，按 `lens`（engineering / theory / benchmark）生成候选 idea |
+| `$researchlit "你的研究主题"` | 多角度检索并生成文献综述；只收录实际检索核对过的论文，每条引用可回到原始来源 |
+| `$ideagen` | 按 engineering / theory / benchmark 生成并核查候选 idea；可基于指定论文寻找突破口，也可显式开启 `--disruptive-wildcard on`，追加一个经证据、可证伪性和“不可被现有路线轻易吸收”检查的大胆候选 D1 |
 | `$expdesign` | 先写预期摘要与论文骨架，再反推出实验计划 |
 | `$runplan` | 生成整体 plan，然后提示你逐个 `/goal` 完成 |
 | `$paperwrite` | 交互写作、作图、编译与审查 |
