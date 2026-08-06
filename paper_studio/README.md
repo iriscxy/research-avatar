@@ -7,8 +7,9 @@ export OPENAI_API_KEY=...
 python3 -m paper_studio.server
 ```
 
-Open <http://127.0.0.1:8765>. The API key remains in the server process and is
-never sent to the browser.
+The system browser opens <http://127.0.0.1:8765> automatically unless startup
+explicitly includes `--no-browser`. The API key remains in the server process
+and is never sent to the browser.
 
 The application under `paper_studio/` is a reusable engine. Project-specific
 identity, section order and LaTeX filenames, result bindings, Figure/Table

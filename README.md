@@ -57,7 +57,7 @@ researcher-profile/PROFILE.md
 
 ### 论文写作：
 
-**1. 可交互论文工作台**——`$paperwrite` 写作前先把大纲写进 `paper/outline.txt` 供你确认，承接 `$expdesign` 中已批准的论文骨架。确认后运行 `python3 -m paper_studio.server` 启动本地编辑界面：左侧是可编辑的论文正文，右侧实时预览。写作的模型可自由配置 GPT、Claude 等 LLM API，走的是自然语言撰写而非 Codex 这类编程工具的代码生成路径。每个 section 有独立对话，可选参考段落、写 comment 修改，接受后自动同步 LaTeX、编译 PDF，全程不用离开这个界面手动改 `.tex`。
+**1. 可交互论文工作台**——`$paperwrite` 写作前先把大纲写进 `paper/outline.txt` 供你确认，承接 `$expdesign` 中已批准的论文骨架。确认后会自动启动 Paper Studio 并打开本地浏览器界面：左侧是可编辑的论文正文，右侧实时预览。写作的模型可自由配置 GPT、Claude 等 LLM API，走的是自然语言撰写而非 Codex 这类编程工具的代码生成路径。每个 section 有独立对话，可选参考段落、写 comment 修改，接受后自动同步 LaTeX、编译 PDF，全程不用离开这个界面手动改 `.tex`。
 
 **2. 论文写作风格个性化**——以你在目标会议发表过的一篇论文作结构参考（章节/长度/图表布局），套用画像中的 Writing Style，自引 ≤3 篇，并比对你过往摘要防止无意自我重复。
 
