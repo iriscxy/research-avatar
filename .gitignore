@@ -21,8 +21,5 @@ results/
 code/
 tmp/
 
-# Keep only the reusable project presentation from local outputs.
-outputs/*
-!outputs/research-twin-pitch/
-outputs/research-twin-pitch/*
-!outputs/research-twin-pitch/Research_Twin_Project_Discussion.pptx
+# Generated presentations and process artifacts stay local.
+outputs/
