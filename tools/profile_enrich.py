@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Enrich a Google Scholar publication list with abstracts, DOIs, and BibTeX.
 
-Used by the ``profile-builder`` skill. Input is the JSON emitted by
+Used by the ``profileconstruct`` skill. Input is the JSON emitted by
 ``scholar_profile.py``. For each paper we:
 
 1. Build a clean BibTeX entry *locally* from the Scholar metadata (title,
@@ -22,8 +22,8 @@ Rules
 Examples
 --------
 python3 tools/scholar_profile.py --from-html gs.html > gs.json
-python3 tools/profile_enrich.py --input gs.json --output enriched.json
-python3 tools/profile_enrich.py --input gs.json --output enriched.json --no-network
+python3 tools/profile_enrich.py --input gs.json --output publications.json
+python3 tools/profile_enrich.py --input gs.json --output publications.json --no-network
 """
 
 from __future__ import annotations

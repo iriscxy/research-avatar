@@ -8,7 +8,21 @@ __pycache__/
 venv/
 dist/
 build/
+node_modules
 *.egg-info/
 .watson/
 experiments/
 paper/
+
+# Local researcher and paper-run data. Skills regenerate these per project.
+researcher-profile/
+reports/
+results/
+code/
+tmp/
+
+# Keep only the reusable project presentation from local outputs.
+outputs/*
+!outputs/research-twin-pitch/
+outputs/research-twin-pitch/*
+!outputs/research-twin-pitch/Research_Twin_Project_Discussion.pptx

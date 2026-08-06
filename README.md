@@ -1,179 +1,96 @@
-# Research Buddy · 个性化科研助手
+# Research Buddy：个性化科研助手
 
-一个**轻量、个性化**的科研助手——给**有经验的研究者**用,不是全自动 autoresearch。
+Research Buddy 是一套面向**有经验研究者**的轻量级、个性化科研助手。它不是全自动的 AutoResearch 系统，也不会替你做研究判断——
 
-它的定位很明确:**机械活我来加速,关键决策你来拍板。** 所有动作都贴着你自己的研究记录(发表、写作风格、实验习惯),并在每个决策点**停下来给你审**——没有"AI 自己判断成功了"这种事,**你才是裁判**。
-
-整套东西只有 **6 个 skill + 5 个工具 + 1 份画像**,没有任何框架依赖。
+> **机械性工作交给助手加速，关键研究决策由你完成；而"怎么加速"，全部围绕你自己的研究品味、写作风格和实验习惯来定制。**
 
 ---
 
-## 核心思想:单一真源
+## 项目亮点
 
-所有个性化都读一份文件:
+### 🧭 整体思想
+个性化主流程读取你的研究者画像（发表经历、写作风格、实验习惯），并在关键节点停下来等你审核。
 
-```
-aris-profile/PROFILE_AUTO.md      # 项目内(经 $ARIS_PROFILE 定位),不是全局 ~/aris-profile
-```
+### 🎭 个性化
+一份权威画像驱动选题、实验和论文写作：从你的 Google Scholar 和可用的 coding-agent 历史中提炼研究脉络、写作风格与实验习惯，让产出贴近你，而不是套用通用模板。
 
-它里面有:
-- **Research Identity**(研究身份)
-- **发表索引**(每篇标了 `task_type`:engineering / theory / benchmark)
-- **BibTeX 库**(你自己的论文)
-- **写作风格**(论证弧、贡献句习惯)
-- **研究脉络**(Research Lineage)
-- **Experiment Templates**:从历史 Claude session 挖出的**实验环境指纹**(惯用启动器 / 框架 / 底座模型 / 显卡 / OOM 记忆)——注意:**不存超参值**(超参由任务决定,不个性化)
-- **Workflow Preferences (W1–W7)**:你**怎么做研究**的习惯(便宜步先行、缓存可恢复、一次只动一个变量……)
+### 🧪 实验：从想法到证据
+1. **从论文反推实验**——先写预期摘要与论文骨架，再为每条 claim 设计能支持或证伪它的实验，倒推出 baseline / 数据集 / 指标；
+2. **有计划的实验执行**——先出整体 plan，再一次给一个 goal，你确认后手动执行 `/goal`，做完一个再给下一个；
+3. **重要决定始终由你做**——过程全程透明可控，每个节点的结果是否支持 claim、要不要补实验、要不要继续，都由你裁决。
 
-与它同目录:`enriched.json`(摘要 + BibTeX)、`habits.json` / `prefs_bundle.json`(内部挖掘)、`fulltext/`(每篇论文的 PDF + 抽取文本),以及 **`PROFILE_AUTO.zh.md`**——面向人的中文镜像(同一遍生成;**英文 `PROFILE_AUTO.md` 才是权威**,所有 skill 读的是它)。
-
-> 这份画像由 `/profile-construct` 生成,其余五个 skill 只**读**它,不重复挖掘。缺失或过时就重跑 `/profile-construct`。
+### ✍️ 论文写作
+1. **可交互论文工作台**——按 section 分对话逐段写作、改图、编译，随时看到 PDF 效果；
+2. **写作风格个性化**——套用你在目标会议发表过的论文作结构参考，语气和篇章组织都贴你自己的风格；
+3. **自动化可编辑图表**——intro/motivation 图和 model/method 图支持 GPT Image 构图、重绘及可编辑 PPT/PDF 导出；实验分析图由代码读取真实结果生成，不造假数据。
 
 ---
 
-## 六个 skill(按顺序用 — W6)
+## 亮点是怎么实现的
 
-每个都是 `.claude/skills/<name>/SKILL.md` 里的一个 Skill:对话匹配时 Claude 会自动触发,你也能用同名 `/<name>` 显式调用。
+### 个性化：
 
-| 顺序 | Skill | 干什么 | 你在哪拍板 |
-|---|---|---|---|
-| 1 | `/profile-construct` | 从 Google Scholar + 历史 session 建/刷新 `PROFILE_AUTO.md` | 确认 Workflow Preferences |
-| 2 | `/research-lit` | 多路并行、逐篇核验的 arXiv/web 检索 → 白底、母语中文、杂志风自包含 HTML 综述(`outputs/01_LIT_SURVEY.html`) | 看综述(可独立用) |
-| 3 | `/ideagen` | **读 `outputs/01_LIT_SURVEY.html`**(不再自己 survey)→ 三透镜想 idea(方法优先)→ 对照自己工作 + 并行工作查新 → 排序 idea 榜(`outputs/02_IDEA_REPORT.html`) | **选一个 idea** |
-/ideagen "multimodal CoT — lens: engineering"  # default: also append one disruptive wildcard
-/ideagen "multimodal CoT — lens: engineering — disruptive-wildcard: off"
-| 4 | `/workplan` | 从选定 idea → claim 驱动的 `outputs/03_EXPERIMENT_PLAN.html`(从投影摘要倒推)。**论文骨架就在 `03` 的 §0.5 里**,不单出文件;只有你明确要更完整的可视化大纲时才出 `03b_PAPER_PLAN.html` | 批准 plan |
-| 5 | `/run-plan` | 用 `/goal` 执行 plan,跑到关口停 | 每个结果块审"支不支持 claim" |
-| 6 | `/paper-write` | 个性化写论文(套风格 / 自引 / 反自抄)。**自动串起四个审查子 skill**:`/paper-theorization`(统一理论骨架 + 机器验证)· `/paper-related-work`(广搜 + 逐个核对 arXiv id)· `/paper-gap-check`(每条 claim 回溯 `results/` → `paper/EXPERIMENT_PLAN.md`,绝不编数)· `/paper-logic-check`(另起 reviewer 查逻辑闭环)。四个也都能单独 `/paper-<name>` 调 | 逐节审稿 |
+个性化的入口是一份权威画像：
 
-### `/profile-construct` — 建画像
-- 去 Google Scholar 个人主页,点开 **Show more** 展开全部论文,DevTools → 右键 `<html>` → Copy → **Copy outerHTML** → 存成 HTML(直接 `Cmd+S` 只会存前 20 篇)。
-- 命令会:抓文献 → 补摘要/DOI/BibTeX → 抓全文 PDF → 挖历史 session 的实验习惯 → 让你**确认** Workflow Preferences → 写出 `PROFILE_AUTO.md`(+ 中文镜像)。
-
-### `/research-lit` — 文献综述
+```text
+researcher-profile/PROFILE.md
 ```
-/research-lit "MoE 机制可解释与 steering"
-/research-lit "… — angles: 6"          # 并行检索角度数(默认 5)
-/research-lit "… — for: ideagen"       # 顺带把 landscape 交给 ideagen 接地
-```
-- 把主题拆成多路子方向,**并行** fan-out 检索(arXiv + web),逐篇核验 id,只引真正检索到的论文(其余标 `[UNVERIFIED]`,绝不编造)。
-- 出一份**白底、直接中文、杂志风**的自包含 HTML 综述 `outputs/01_LIT_SURVEY.html`(hero + 目录 + taxonomy 流程图 + 卡片 + 总览表 + 趋势/空白 + 分组参考文献)。可独立用,也是 `/ideagen` 的接地。
 
-### `/ideagen` — 想 idea
-```
-/ideagen "safety steering — lens: engineering"
-/ideagen "… — ref paper: <某篇论文>"     # 可选:在某篇论文上做增量
-```
-- **先读 `outputs/01_LIT_SURVEY.html`**(不再自己 survey;综述缺失/跑题时会先替你跑 `/research-lit`)。
-- `— lens:` 选 `engineering`(沿你惯用方法迭代)/ `theory`(读你脉络找断层)/ `benchmark`(综述 / 数据集 / 复现超越)。
-- 出一份排序 idea 榜(带假设、最小验证实验、对照你自己论文 + 并行工作的查新)→ **你选一个**。
+**数据来源**：`$profileconstruct` 会读取你的 Google Scholar 论文列表，并结合可用的 coding-agent 历史提取实验环境和工作习惯。
 
-### `/workplan` — 写实验计划
-- 从你选的 idea 出发,**先读最接近的几篇论文全文**扎根 baseline/数据集/指标 → 从投影摘要**倒推**出 claim 驱动的 `outputs/03_EXPERIMENT_PLAN.html`(对照实验一次只动一个变量;可选嵌入论文骨架)→ **你批准**。
+**画像里的个性化内容**包括：
 
-### `/run-plan` — 执行实验
-- 用 CC 自带的 `/goal` 自动干活:**先 smoke test** → 部署 → 收结果到真实文件。
-- 贴你的栈(DeepSpeed/Qwen3…),按你 OOM 历史默认降 batch。
-- **每个关口停下来给你看真实数字**,你来判"支不支持 claim / 要不要继续"。**它绝不自己宣布成功,也不会编数。**
+- **Research Identity / Lineage**：你的研究身份，以及研究主题之间的发展脉络；
+- **Writing Style**：摘要层（论证结构、方法命名、贡献表述等语气）+ 全文层（章节主干、Related Work 位置、图表写法等篇章结构）；
+- **Experiment Templates**：常用启动器、训练框架、基础模型、GPU 配置、历史 OOM 记录；
+- **Workflow Preferences**：个人科研习惯，如优先低成本步骤、缓存中间结果、保证实验可恢复。
 
-### `/paper-write` — 写论文
-```
-/paper-write ICLR
-```
-- 自动套你的写作风格、建议自引(你自己的论文)、反自抄(比对你过往摘要)、逐节生成。
-- 每个数字都追溯到 `results/` 真实文件。**逐节给你审**。
+> **用谁的 Scholar 由你定。** 默认建自己的画像，也可以指向一位你想学习的前辈——idea 品味和论文写法会照着他来（Workflow Preferences 仍取自你本机历史）。对刚起步、还没什么发表的 junior 尤其有用。
+
+### 实验：
+
+**1. 从论文反推实验**——`$expdesign` 从选定 idea 出发，先写出「预计的论文」：一段预期摘要 + 一份论文骨架（Intro 逻辑、Related Work 分节、Method 模块、打算跑哪些实验），再反向拆出每条 claim 需要的实验（一次只改一个变量），最后把 baseline/数据集/指标的选材依据整理成 grounding 表放在附录。
+
+**2. 有计划的实验执行**——`$runplan` 先写整体决策图 `code/RUN_PLAN.md`（`code/RUN_STATE.json` 记录可恢复状态），默认顺序是：环境 smoke → 验证 hypothesis/motivation → 验证方法可行性 → 冻结调参 → 主结果 → 完整 baseline/消融/敏感性。每次只提出**一个当前 goal**，你认可后手动执行给出的 `/goal`；完成后停下展示证据和下一条 goal，不自动往下走。
+
+**3. 重要决定由你做**——每个节点，当前结果是否支持 claim、是否需要补实验、是否继续下一阶段，都由你判断；结果不达预期时系统只会提出 refine / pivot / 停止三个选项，不会擅自开始调参或补实验。
+
+### 论文写作：
+
+**1. 可交互论文工作台**——`$paperwrite` 写作前先把大纲写进 `paper/outline.txt` 供你确认，承接 `$expdesign` 中已批准的论文骨架。确认后运行 `python3 -m paper_studio.server` 启动本地编辑界面：左侧是可编辑的论文正文，右侧实时预览。写作的模型可自由配置 GPT、Claude 等 LLM API，走的是自然语言撰写而非 Codex 这类编程工具的代码生成路径。每个 section 有独立对话，可选参考段落、写 comment 修改，接受后自动同步 LaTeX、编译 PDF，全程不用离开这个界面手动改 `.tex`。
+
+**2. 论文写作风格个性化**——以你在目标会议发表过的一篇论文作结构参考（章节/长度/图表布局），套用画像中的 Writing Style，自引 ≤3 篇，并比对你过往摘要防止无意自我重复。
+
+**3. 自动化可编辑图表**——intro/motivation 图在第一个引用它的段落确定后生成；model/method 图在定义模型结构所需的 Method 内容完成后生成。两类图都支持 GPT Image 构图、重绘以及可编辑 PPT/PDF 导出；实验分析图只读取 `results/` 中的真实结果，不生成虚假数据。
 
 ---
 
-## 交付物:全部是 `outputs/` 里的自包含 HTML
+## Skills
 
-按工作流步骤编号:
-
-```
-outputs/
-├── 01_LIT_SURVEY.html          /research-lit 的文献综述(白底中文)
-├── 00_REF_PAPER_SUMMARY.html   (可选)ref paper 摘读
-├── 02_IDEA_REPORT.html         /ideagen 的 idea 榜
-├── 03_EXPERIMENT_PLAN.html     /workplan 的实验计划(论文骨架在 §0.5)
-├── 03b_PAPER_PLAN.html          (少见)仅你明确要更完整可视化大纲时才出
-├── 04_EXPERIMENT_TRACKER.html  /run-plan 的实验追踪
-└── 05_FINDINGS.html            结果汇总
-```
-
-默认按你的 instruction 输出**单一语言**一份;要双语时才另出 `.zh.html` 镜像(母语级、非逐字机翻,第二人称"你/你的")。
-**例外**(保留原生格式):`PROFILE_AUTO.md`(真源,工具读)、`results/*.json|csv` + 日志(原始数据)、论文稿(`paper/main.tex`)。
+| Skill | 作用 |
+|---|---|
+| `$profileconstruct` | 根据 Google Scholar 和历史 session 创建/更新研究者画像 |
+| `$researchlit "你的研究主题"` | 文献综述，可用 `angles` 指定并行检索角度（默认 5） |
+| `$ideagen` | 挖掘你的 publication list，按 `lens`（engineering / theory / benchmark）生成候选 idea |
+| `$expdesign` | 先写预期摘要与论文骨架，再反推出实验计划 |
+| `$runplan` | 生成整体 plan，然后提示你逐个 `/goal` 完成 |
+| `$paperwrite` | 交互写作、作图、编译与审查 |
 
 ---
 
-## 七条全局纪律(写在 `CLAUDE.md`,始终生效)
+## 交付文件
 
-这些是赶 deadline 时最容易偷懒跳过、但最不该跳的:
+交付物分四类：
 
-1. **你是裁判** —— 不自动判 idea 新、实验成、claim 成立;每个关口停下等你(W5)。
-2. **smoke test 先行(W1)** —— 跑全量前先跑最小版抓 setup bug;便宜/确定的步在贵/GPU 步之前。
-3. **消融一次只动一个变量** —— 不把两个改动混在一次 run。
-4. **数字必须追溯 raw 文件** —— 进 plan/幻灯/论文的每个数都来自真实结果文件,否则标 `[UNVERIFIED]`,不许凭记忆写。
-5. **匹配你的栈,不匹配你的超参** —— 代码贴你环境(Experiment Templates);lr/batch/seed 由 `03_EXPERIMENT_PLAN.html` 定(任务决定)。
-6. **缓存、不覆盖(W2/W3)** —— 中间产物留存、可恢复、版本化/时间戳输出,绝不覆盖既有结果。
-7. **每份输出都是自然、母语的中文** —— HTML 里的中文读起来要像领域研究者写的,不是逐字机翻;面向研究者本人,用第二人称(你 / 你的),不用第三人称。
-
----
-
-## 目录结构
-
+```text
+paper/
+├── main.tex                 # 1. 论文——可编辑的 LaTeX 源文件
+└── main.pdf                 #    编译后的最终论文
+results/                     # 2. 实验结果——原始记录、指标、配置与 provenance
+code/                        # 3. 代码——每个实验 goal 生成，贴合你的技术栈，可重跑
+reports/
+├── 01_LIT_SURVEY.html       # 4. 过程报告——文献综述
+├── 02_IDEA_REPORT.html      #    Idea 排序与选择
+├── 03_EXPERIMENT_PLAN.html  #    实验计划
+└── 04_EXP_RESULT.html       #    实验结果的人类可读汇总
 ```
-research-buddy/
-├── README.md                  本文件
-├── CLAUDE.md                  定位 + 单一真源 + 7 条纪律(开 CC 自动加载)
-├── .claude/
-│   ├── settings.json          设 $ARIS_PROFILE 指向 aris-profile/
-│   └── skills/                6 个流程 skill + paper-write 的 4 个审查子 skill
-│       │                       (+ figure-ppt 画模型图、scholar-translation-zh 翻译规范)
-│       ├── profile-construct/SKILL.md
-│       ├── research-lit/SKILL.md
-│       ├── ideagen/SKILL.md
-│       ├── workplan/SKILL.md
-│       ├── run-plan/SKILL.md
-│       ├── paper-write/SKILL.md          总编排(自动调下面 4 个)
-│       ├── paper-theorization/SKILL.md   统一理论骨架 + 机器验证
-│       ├── paper-related-work/SKILL.md   广搜 + 逐个核对 arXiv id
-│       ├── paper-gap-check/SKILL.md      查缺 → paper/EXPERIMENT_PLAN.md
-│       └── paper-logic-check/SKILL.md    逻辑闭环(另起 reviewer)
-├── aris-profile/              单一真源(画像 + 语料 + 全文)
-│   ├── PROFILE_AUTO.md        权威画像(工具读)
-│   ├── PROFILE_AUTO.zh.md     中文镜像
-│   ├── enriched.json          摘要 + BibTeX
-│   └── fulltext/              每篇论文 PDF + 抽取文本
-├── outputs/                   自包含 HTML 交付物(见上)
-└── tools/                     5 个 stdlib 工具(无第三方依赖)
-    ├── scholar_profile.py     读 Google Scholar HTML → JSON
-    ├── profile_enrich.py      补摘要/DOI + 建 BibTeX
-    ├── experiment_history.py  挖历史 session 的实验环境指纹
-    ├── workflow_prefs.py      挖候选 workflow 偏好
-    └── bib_manager.py         导出 .bib / 查重 / 建议自引
-```
-
----
-
-## 快速开始
-
-```bash
-cd ~/code/research-buddy        # 在这里开 Claude Code
-# 第一次:建画像
-/profile-construct gs.html
-# 然后按顺序:
-/ideagen "你的方向 — lens: engineering"    # 选一个 idea
-/workplan                                  # 批准实验计划
-/run-plan                                  # 跑到关口停
-/paper-write ICLR                          # 逐节审稿
-```
-
-画像在项目内 `aris-profile/`(经 `.claude/settings.json` 里的 `$ARIS_PROFILE` 定位),所有 skill 读的都是它。
-
----
-
-## 设计取舍(为什么这么简单)
-
-这类 agent 框架的本质 = **结构化提示 + 跨模型评审 + 编排胶水**,没有秘密算法。对有经验的研究者,真正值钱的只有两样:**你会偷懒跳过的纪律** 和 **你当不了的独立裁判**。
-
-本助手保留了前者(7 条纪律),把后者**交给了你本人**(人审,不引入第二个模型当裁判)。其余的全部砍掉——所以它只有 6 个 skill,而不是几十个。

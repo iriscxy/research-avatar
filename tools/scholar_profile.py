@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Read a Google Scholar profile into structured JSON.
 
-Used by the ``profile-builder`` skill (skills/profile-builder/SKILL.md) — the
+Used by the ``profileconstruct`` skill (skills/profileconstruct/SKILL.md) — the
 substrate for ARIS personalization. Google Scholar has no public API and blocks
 script scrapers, so this helper reads the *rendered* page three ways:
 

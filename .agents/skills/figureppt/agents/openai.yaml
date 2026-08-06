@@ -1,0 +1,4 @@
+interface:
+  display_name: "Editable Figure PPT"
+  short_description: "Create an editable scientific method figure in PowerPoint"
+  default_prompt: "Use $figureppt to create an editable method figure for this paper."

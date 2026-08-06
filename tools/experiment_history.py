@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mine coding-agent interaction history into experiment habits.
 
-Used by `/profile-builder` (to fill PROFILE_AUTO.md's *Experiment Templates*) and
+Used by `/profileconstruct` (to fill PROFILE.md's *Experiment Templates*) and
 by `/experiment-bridge` (resource- and failure-aware planning). Scans, in order of
 preference:
 

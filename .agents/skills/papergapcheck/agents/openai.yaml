@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Evidence Gap Check"
+  short_description: "Find unsupported claims and missing experimental evidence"
+  default_prompt: "Use $papergapcheck to audit this draft for evidence gaps and missing experiments."

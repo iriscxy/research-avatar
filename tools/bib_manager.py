@@ -2,21 +2,21 @@
 """Manage the researcher's personal BibTeX bank.
 
 Used by the `/bib-manager` skill (Module 3 of ARIS personalization). Backed by the
-BibTeX Bank that `/profile-builder` produced (in `~/aris-profile/enriched.json` or
-inline in `PROFILE_AUTO.md`). Pure stdlib.
+BibTeX Bank that `/profileconstruct` produced (in `researcher-profile/publications.json` or
+inline in `PROFILE.md`). Pure stdlib.
 
 Subcommands
 -----------
-export    Write the bank to a .bib file (from enriched.json).
+export    Write the bank to a .bib file (from publications.json).
 check     Lint a .bib file: duplicate keys, key-naming convention, missing fields.
 selfcite  Given a draft (.tex / .md / text), list the researcher's own papers that
           are NOT yet cited — candidate self-citations.
 
 Examples
 --------
-python3 tools/bib_manager.py export --enriched ~/aris-profile/enriched.json --out mybank.bib
+python3 tools/bib_manager.py export --enriched researcher-profile/publications.json --out mybank.bib
 python3 tools/bib_manager.py check paper/references.bib
-python3 tools/bib_manager.py selfcite --enriched ~/aris-profile/enriched.json --draft paper/main.tex
+python3 tools/bib_manager.py selfcite --enriched researcher-profile/publications.json --draft paper/main.tex
 """
 
 from __future__ import annotations

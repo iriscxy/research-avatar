@@ -1,0 +1,4 @@
+interface:
+  display_name: "Run Plan"
+  short_description: "Plan experiments as one manual goal at a time"
+  default_prompt: "Use $runplan to show my evidence-ordered experiment sequence and propose only the current manual /goal."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Studio"
+  short_description: "Build and regression-test the local paper editing studio"
+  default_prompt: "Use $paperstudio to modify and verify the local Paper Studio workflow."

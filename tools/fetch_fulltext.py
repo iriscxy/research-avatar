@@ -6,8 +6,12 @@ text extraction. Multi-source, resumable, cache-first (W2/W3): nothing is
 re-downloaded or clobbered; a run can be interrupted and resumed.
 
 Per paper, in priority order:
-  abstract/DOI/arxiv-id : arXiv API  ->  Crossref  ->  Semantic Scholar (backoff)
-  open PDF              : arXiv pdf  ->  S2 openAccessPdf  ->  Unpaywall  ->  ACL anthology
+  abstract/DOI/arxiv-id : arXiv API  ->  Crossref  ->  Semantic Scholar (backoff)  ->  DBLP
+  open PDF              : arXiv pdf  ->  S2 openAccessPdf  ->  ACL anthology (via DOI)
+                          ->  ACL anthology (via DBLP `ee`)  ->  Unpaywall
+DBLP is the DOI-less/arXiv-less bridge: it resolves a DOI and/or a direct ACL
+Anthology URL by title, so conference papers with no arXiv id (ACL/EMNLP/NAACL/
+AAAI/IJCAI/SIGIR) are no longer silently skipped when Crossref/S2 are throttled.
 Closed venues (IEEE / TOIS / Nature / closed AAAI) typically yield abstract
 only; full text is marked unavailable, never faked.
 
@@ -17,8 +21,8 @@ Abstracts are also merged back into the --enriched JSON in place.
 
 Examples
 --------
-python3 tools/fetch_fulltext.py --enriched aris-profile/enriched.json --keys guo2024large --limit 5
-python3 tools/fetch_fulltext.py --enriched aris-profile/enriched.json          # full run
+python3 tools/fetch_fulltext.py --enriched researcher-profile/publications.json --keys guo2024large --limit 5
+python3 tools/fetch_fulltext.py --enriched researcher-profile/publications.json          # full run
 """
 from __future__ import annotations
 
@@ -197,12 +201,58 @@ def unpaywall_pdf(doi: str):
 
 
 def acl_pdf_from_doi(doi: str):
-    # ACL Anthology DOIs: 10.18653/v1/<anthology-id>
-    if doi and "10.18653" in doi:
-        m = re.search(r"10\.18653/v1/(.+)$", doi)
+    # ACL Anthology DOIs: 10.18653/v1/<anthology-id> (DBLP returns them UPPERCASE;
+    # Anthology ids are lowercase, so match case-insensitively and lowercase the stub).
+    if doi:
+        m = re.search(r"10\.18653/v1/(.+)$", doi, re.IGNORECASE)
         if m:
-            return f"https://aclanthology.org/{m.group(1)}.pdf"
+            return f"https://aclanthology.org/{m.group(1).lower()}.pdf"
     return None
+
+
+def acl_pdf_from_url(url: str):
+    """An ACL Anthology page URL -> its .pdf URL.
+    e.g. https://aclanthology.org/2021.acl-long.473  ->  .../2021.acl-long.473.pdf"""
+    if not url or "aclanthology.org" not in url:
+        return None
+    m = re.search(r"aclanthology\.org/([^/?#]+?)/?$", url)
+    if not m:
+        return None
+    stub = m.group(1)
+    if stub.endswith(".pdf"):
+        return url if url.startswith("http") else f"https://{url}"
+    return f"https://aclanthology.org/{stub}.pdf"
+
+
+def dblp_lookup(title: str):
+    """DBLP title search -> (doi, pdf_url) or (None, None).
+
+    The DOI-less/arXiv-less bridge to ACL Anthology & co. DBLP is un-throttled and
+    covers ACL/EMNLP/NAACL/AAAI/IJCAI/SIGIR; its ``ee`` field is usually the ACL
+    Anthology page (or a doi.org link), so a conference paper with NO arXiv id and
+    NO resolved DOI (e.g. when Crossref/S2 were rate-limited) is still reachable.
+    """
+    q = urllib.parse.quote(title)
+    url = f"https://dblp.org/search/publ/api?q={q}&format=json&h=5"
+    raw = http(url, retries=3)
+    if not raw:
+        return None, None
+    try:
+        hits = json.loads(raw)["result"]["hits"].get("hit", [])
+    except Exception:  # noqa: BLE001
+        return None, None
+    if isinstance(hits, dict):  # DBLP returns a bare object for a single hit
+        hits = [hits]
+    for h in hits:
+        info = h.get("info", {})
+        if not title_match(title, info.get("title", "")):
+            continue
+        doi = info.get("doi")
+        ee = info.get("ee")
+        if isinstance(ee, list):
+            ee = next((u for u in ee if "aclanthology.org" in u), ee[0] if ee else None)
+        return doi, ee
+    return None, None
 
 
 # --------------------------------------------------------------------------- #
@@ -279,6 +329,16 @@ def process(p: dict, outdir: Path, use_s2: bool, delay: float) -> dict:
             abstract, rec["abstract_source"] = s_abs, "s2"
         time.sleep(delay)
 
+    # 3.5) DBLP fallback (un-throttled) — the fix for no-arXiv conference papers:
+    #      resolve a DOI and/or a direct ACL-Anthology PDF URL by title when the
+    #      arXiv/Crossref/S2 chain gave neither. Run whenever there is no arXiv id.
+    dblp_pdf = None
+    if not arxiv_id:
+        d_doi, d_ee = dblp_lookup(title)
+        doi = doi or d_doi
+        dblp_pdf = acl_pdf_from_url(d_ee) if d_ee else None
+        time.sleep(delay)
+
     if abstract:
         p["abstract"] = abstract
         if rec["abstract_source"] is None:
@@ -310,6 +370,8 @@ def process(p: dict, outdir: Path, use_s2: bool, delay: float) -> dict:
     acl = acl_pdf_from_doi(doi)
     if acl:
         candidates.append(("acl", acl))
+    if dblp_pdf:
+        candidates.append(("acl-dblp", dblp_pdf))
     up = unpaywall_pdf(doi)
     if up:
         candidates.append(("unpaywall", up))

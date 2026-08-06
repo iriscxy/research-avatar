@@ -1,0 +1,4 @@
+interface:
+  display_name: "Researcher Profile Builder"
+  short_description: "Build or refresh the personalized researcher profile"
+  default_prompt: "Use $profileconstruct to refresh my researcher profile from current sources."

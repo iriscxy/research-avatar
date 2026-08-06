@@ -1,0 +1,4 @@
+interface:
+  display_name: "Literature Survey"
+  short_description: "Create a verified and polished literature survey"
+  default_prompt: "Use $researchlit to survey the literature on my research topic."

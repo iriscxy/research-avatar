@@ -11,8 +11,9 @@ Subcommands (each prints one JSON object with an `ok` bool + details):
            MEASURED shares (refshares) — the analysis section is typically largest, NOT
            Experiments; the Conclusion share is small (the ref's is a short paragraph)
   style    LLM-tell budgets per 1k body words + zero contractions + equation floor
-  length   Conclusion ends at the bottom of the target page (endconclusion==target AND
-           limstart==target+1) — reached by BODY content, never by padding the Conclusion
+  length   Conclusion ends AT/NEAR the bottom of the target page (endconclusion==target; the
+           following section may start on target+1, OR on the target page within ±5 lines of the
+           bottom) — reached by BODY content, never by padding the Conclusion
   formal   theory/verify.py present + body equation count + derivations appendix
   format   overfull hboxes (from log) + widow/club penalty set + wide-table-as-table*
            + caption position (figures AND tables) matches the reference (--caption-pos)
@@ -233,6 +234,39 @@ def _references_page(paper_dir, main_base):
     return None
 
 
+LENGTH_LINE_TOL = 5   # ±N text lines: the Conclusion may end within N lines of the target-page
+                      # bottom instead of exactly at it (float repacking makes exact-bottom fragile;
+                      # the researcher confirmed ±5 lines is acceptable, 2026-07-26).
+
+
+def _page_bottom_slack(paper_dir, main_base, page, heading_regex):
+    """How many text lines sit BELOW a heading on `page`, i.e. how far the heading is from the page
+    bottom, measured with `pdftotext -layout` (columns kept side by side so vertical position is
+    preserved). Returns None if it cannot be measured. A SMALL slack means the section that follows
+    the Conclusion (e.g. Limitations) starts near the bottom, so the Conclusion filled the page to
+    within `slack` lines of the bottom."""
+    import subprocess
+    pdf = os.path.join(paper_dir, main_base + ".pdf")
+    if not os.path.exists(pdf):
+        return None
+    try:
+        out = subprocess.run(["pdftotext", "-layout", "-f", str(page), "-l", str(page), pdf, "-"],
+                             capture_output=True, text=True).stdout
+    except Exception:
+        return None
+    # strip a leading review-mode line number (e.g. "592   Limitations ...") before matching
+    lines = [re.sub(r"^\s*\d{1,4}\s+", "", ln) for ln in out.split("\n")]
+    while lines and not lines[-1].strip():
+        lines.pop()
+    if not lines:
+        return None
+    total = len(lines)
+    for i, ln in enumerate(lines):
+        if re.search(heading_regex, ln):
+            return total - i - 1   # lines strictly below the heading on this page
+    return None
+
+
 def check_length(args):
     """Length is judged by WHERE THE CONCLUSION ENDS, not by a page count. The venue-counted
     content (Intro..Conclusion) must end EXACTLY on the target page (e.g. the ACL 8th page) —
@@ -274,19 +308,29 @@ def check_length(args):
             viol.append({"issue": "no_limstart_label",
                          "fix": r"add \label{paper:limstart} right after \section*{Limitations}"})
         elif has_limitations and lim <= tgt:
-            viol.append({"issue": "conclusion_not_at_page_bottom", "conclusion_end_page": conc,
-                         "limitations_start_page": lim, "target_page": tgt,
-                         "note": "Conclusion ends on page %d but ABOVE its bottom — Limitations still starts on "
-                                 "page %d. Add counted content so the Conclusion fills page %d to the bottom and "
-                                 "Limitations starts on page %d." % (tgt, lim, tgt, tgt + 1)})
+            # Limitations starts ON the target page rather than target+1. That is acceptable IF the
+            # Conclusion still ended within LENGTH_LINE_TOL lines of the page bottom (the ±5-line
+            # tolerance) — measured by how few lines sit below the Limitations heading on the page.
+            slack = _page_bottom_slack(args.paper_dir, args.main_base, tgt, r"^\s*Limitations\b")
+            if slack is None or slack > LENGTH_LINE_TOL:
+                viol.append({"issue": "conclusion_not_at_page_bottom", "conclusion_end_page": conc,
+                             "limitations_start_page": lim, "target_page": tgt,
+                             "lines_below_target_bottom": slack, "line_tolerance": LENGTH_LINE_TOL,
+                             "note": "Conclusion ends on page %d but ABOVE its bottom by more than %d lines "
+                                     "(Limitations starts on page %d). Add counted content so the Conclusion "
+                                     "fills page %d to within %d lines of the bottom." %
+                                     (tgt, LENGTH_LINE_TOL, lim, tgt, LENGTH_LINE_TOL)})
         elif not has_limitations and refs_pg is not None and refs_pg <= tgt:
-            # No Limitations section (AAAI): References follow the Conclusion. If they start on the
-            # target page too, the Conclusion ended MID-PAGE and the body is under-filled.
-            viol.append({"issue": "conclusion_not_at_page_bottom", "conclusion_end_page": conc,
-                         "references_start_page": refs_pg, "target_page": tgt,
-                         "note": "Conclusion ends on page %d but References start on the same page — the "
-                                 "Conclusion does not fill it to the bottom. Add BODY content so References "
-                                 "start on page %d." % (tgt, tgt + 1)})
+            # No Limitations section (AAAI): References follow the Conclusion. Accept if they start
+            # within LENGTH_LINE_TOL lines of the target-page bottom (±5-line tolerance).
+            slack = _page_bottom_slack(args.paper_dir, args.main_base, tgt, r"^\s*References\b")
+            if slack is None or slack > LENGTH_LINE_TOL:
+                viol.append({"issue": "conclusion_not_at_page_bottom", "conclusion_end_page": conc,
+                             "references_start_page": refs_pg, "target_page": tgt,
+                             "lines_below_target_bottom": slack, "line_tolerance": LENGTH_LINE_TOL,
+                             "note": "Conclusion ends on page %d but References start on the same page more than "
+                                     "%d lines above the bottom. Add BODY content so References start on page %d "
+                                     "(or within %d lines of the bottom)." % (tgt, LENGTH_LINE_TOL, tgt + 1, LENGTH_LINE_TOL)})
         # else: References start on target+1 (or no page data) — the Conclusion fills the target page.
     return {"check": "length", "ok": not viol, "conclusion_end_page": conc,
             "limitations_start_page": lim, "references_start_page": refs_pg, "total_pages": total, "target_page": tgt,

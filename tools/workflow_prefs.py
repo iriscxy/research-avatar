@@ -9,7 +9,7 @@ ones that carry a *preference signal* (mandates, prohibitions, trade-offs,
 corrections, process/order cues, rigor cues). It does NOT decide the final
 preferences — that is an LLM judgement made by the consuming skill, which reads
 this bundle and distills 1-line preference statements for the user to confirm
-before they land in ``PROFILE_AUTO.md`` (*Workflow Preferences* / *Tacit
+before they land in ``PROFILE.md`` (*Workflow Preferences* / *Tacit
 Knowledge*).
 
 Why a bundle, not an answer: "I always smoke-test on 1 epoch first" is a behaviour
@@ -169,8 +169,8 @@ def mine(transcripts: list[Path], min_len: int, max_len: int,
         "category_counts": {k: len(v) for k, v in by_cat.items()},
         "snippets": capped,
         "note": ("Candidate preference-bearing user turns. NOT final preferences — "
-                 "feed to the LLM (profile-builder) to distill & confirm before "
-                 "writing PROFILE_AUTO Workflow Preferences."),
+                 "feed to the LLM (profileconstruct) to distill & confirm before "
+                 "writing PROFILE Workflow Preferences."),
     }
 
 
