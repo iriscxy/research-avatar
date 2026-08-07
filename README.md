@@ -51,7 +51,7 @@ researcher-profile/PROFILE.md
 
 **1. 先规划论文，再反推实验**——`$expplan` 从选定 idea 出发，先写预期摘要，再写出 Projected Paper：每个 section 的每个段落用一句话说明要写什么。随后逐条冻结 claim，为每条 claim 明确“什么结果支持它、什么结果证伪它”，再据此设计实验并倒推出 baseline、数据集、指标和待填图表。实验不是独立清单，而是为论文中明确的证据空位服务。
 
-**2. 有计划的实验执行**——`$runplan` 把已批准的证据需求写成自然语言计划网页 `code/RUN_PLAN.html`，默认顺序是：环境 smoke → 验证 hypothesis/motivation → 验证方法可行性 → 冻结调参 → 主结果 → 完整 baseline/消融/敏感性。每次只提出**一个当前 goal**，你认可后手动执行给出的 `/goal`；每完成一项，先整理该 goal 的代码和文件，再在网页上标记 **✅**，然后才提出下一项。可恢复状态嵌入同一个网页，不再维护单独的 `RUN_STATE.json`。
+**2. 有计划的实验执行**——`$runplan` 把已批准的证据需求写成自然语言计划网页 `reports/04_RUN_PLAN.html`，默认顺序是：环境 smoke → 验证 hypothesis/motivation → 验证方法可行性 → 冻结调参 → 主结果 → 完整 baseline/消融/敏感性。每次只提出**一个当前 goal**，你认可后手动执行给出的 `/goal`；每完成一项，先整理该 goal 的代码和文件，再在网页上标记 **✅**，然后才提出下一项。可恢复状态嵌入同一个网页，不再维护单独的 `RUN_STATE.json`。
 
 **3. 重要决定由你做**——每个节点，当前结果是否支持 claim、是否需要补实验、是否继续下一阶段，都由你判断；结果不达预期时系统只会提出 refine / pivot / 停止三个选项，不会擅自开始调参或补实验。
 
@@ -92,5 +92,6 @@ reports/
 ├── 01_LIT_SURVEY.html       # 4. 过程报告——文献综述
 ├── 02_IDEA_REPORT.html      #    Idea 排序与选择
 ├── 03_EXPERIMENT_PLAN.html  #    实验计划
-└── 04_EXP_RESULT.html       #    实验结果的人类可读汇总
+├── 04_RUN_PLAN.html         #    可恢复的实验执行计划与 goal 进度
+└── 05_EXP_RESULT.html       #    实验结果的人类可读汇总
 ```
