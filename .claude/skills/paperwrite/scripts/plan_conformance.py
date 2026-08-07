@@ -89,6 +89,21 @@ def load_json_files(results_dir: Path) -> list[tuple[Path, Any]]:
     return loaded
 
 
+def normalized_names(values: list[Any]) -> list[str]:
+    return [re.sub(r"[^a-z0-9]+", "", str(value).lower()) for value in values]
+
+
+def configured_table_columns(definition: dict[str, Any]) -> list[str]:
+    grid = definition.get("data_grid", {})
+    if grid.get("type") == "records":
+        return [str(item.get("label") or item.get("key") or "") for item in grid.get("columns", [])]
+    if grid.get("type") == "benchmark_rows":
+        return [str(grid.get("row_key", ""))] + [
+            str(item.get("label") or item.get("key") or "") for item in grid.get("metrics", [])
+        ]
+    return []
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--plan", default="reports/03_EXPERIMENT_PLAN.html", type=Path)
@@ -163,6 +178,32 @@ def main() -> int:
     all_float_labels: set[str] = set()
     artifact_results = []
     if not args.results_only:
+        amendment = args.paper_dir / "ARTIFACT_LEDGER_AMENDMENT.md"
+        if amendment.exists():
+            violations.append(
+                {
+                    "issue": "posthoc_artifact_amendment_forbidden",
+                    "path": str(amendment),
+                    "remedy": "return to expplan and reapprove the canonical contract",
+                }
+            )
+        studio_config_path = args.paper_dir / "paper_studio.json"
+        studio_config: dict[str, Any] = {}
+        if not studio_config_path.exists():
+            violations.append(
+                {"issue": "missing_paper_studio_config", "path": str(studio_config_path)}
+            )
+        else:
+            try:
+                studio_config = json.loads(read_text(studio_config_path))
+            except json.JSONDecodeError as exc:
+                violations.append(
+                    {
+                        "issue": "invalid_paper_studio_config",
+                        "path": str(studio_config_path),
+                        "error": str(exc),
+                    }
+                )
         main_tex = args.paper_dir / args.main
         if not main_tex.exists():
             violations.append({"issue": "missing_paper_main", "path": str(main_tex)})
@@ -230,6 +271,48 @@ def main() -> int:
                             "actual": actual["placement"],
                         }
                     )
+            configured_group = (
+                studio_config.get("figures", {})
+                if artifact.get("kind") == "figure"
+                else studio_config.get("tables", {})
+            )
+            configured = configured_group.get(artifact.get("id"))
+            if not isinstance(configured, dict):
+                artifact_result["ok"] = False
+                violations.append(
+                    {
+                        "issue": "artifact_missing_from_paper_studio_config",
+                        "id": artifact.get("id"),
+                    }
+                )
+            else:
+                shell = artifact.get("shell", {})
+                expected_panels = list(shell.get("plotting", {}).get("panels", {}))
+                if expected_panels:
+                    actual_panels = [str(item.get("id", "")) for item in configured.get("panels", [])]
+                    if actual_panels != expected_panels:
+                        artifact_result["ok"] = False
+                        violations.append(
+                            {
+                                "issue": "artifact_panel_dimension_mismatch",
+                                "id": artifact.get("id"),
+                                "expected": expected_panels,
+                                "actual": actual_panels,
+                            }
+                        )
+                expected_columns = shell.get("column_labels", [])
+                if expected_columns:
+                    actual_columns = configured_table_columns(configured)
+                    if normalized_names(actual_columns) != normalized_names(expected_columns):
+                        artifact_result["ok"] = False
+                        violations.append(
+                            {
+                                "issue": "artifact_table_dimension_mismatch",
+                                "id": artifact.get("id"),
+                                "expected": expected_columns,
+                                "actual": actual_columns,
+                            }
+                        )
             artifact_results.append(artifact_result)
 
         for label in sorted(all_float_labels - expected_labels):

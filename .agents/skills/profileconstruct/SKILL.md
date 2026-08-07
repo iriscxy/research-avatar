@@ -18,7 +18,7 @@ downstream skill is a consumer:
 | `$ideagen — lens: engineering` | *Dominant Methods* − *Known Dead-Ends* |
 | `$ideagen — lens: theory` | *Research Lineage* + *Publications Index* (time-ordered) |
 | `$ideagen — lens: benchmark` | *Active Venues* + *Niche Subfields* |
-| `$expdesign` | *Experiment Templates* + closest-work grounding |
+| `$expplan` | *Experiment Templates* + closest-work grounding |
 | `$runplan` | *Experiment Templates* (stack / OOM memory) |
 | `$paperwrite` | `paper/WRITING_STYLE.md` (detailed voice/structure guide) + per-paper `task_type` + BibTeX (from `publications.json`) |
 
@@ -104,7 +104,7 @@ python3 tools/experiment_history.py --events .aris/meta/events.jsonl --output "r
 # Optional, only when a compatible transcript path is supplied:
 python3 tools/workflow_prefs.py --transcripts "<compatible-transcript-dir-or-jsonl>" --output "researcher-profile/prefs_bundle.json"
 ```
-- **Fold `habits.json` → *Experiment Templates*** (deterministic): habitual launcher · framework/deps · base-model backbone · GPUs · failure memory (OOM hits, top error types). **Do NOT write hyperparameter values** (lr/batch/epochs/seed) — those are task-determined, decided by `$expdesign`.
+- **Fold `habits.json` → *Experiment Templates*** (deterministic): habitual launcher · framework/deps · base-model backbone · GPUs · failure memory (OOM hits, top error types). **Do NOT write hyperparameter values** (lr/batch/epochs/seed) — those are task-determined, decided by `$expplan`.
 - **Fold `prefs_bundle.json` → *Workflow Preferences* W1–Wn** (LLM-distill, written directly — NO confirmation gate): cluster recurring candidates into 1-line preference statements, each with an evidence quote + why/how-to-apply; discard project-specific one-offs. **Write them straight from the mining** — Workflow Preferences are descriptive mined data, not a research decision, so this step does NOT stop to confirm them; if one is off, the researcher edits `PROFILE.md` directly. **The count is emergent — write as many W's as the mining yields, NOT a fixed 7.**
 
 **Phase 7 — Write profile + detailed style guide**: write `PROFILE.md` with sections: header (source/affiliation/stats/generated/publications + ⚠ if truncated) · Research Identity · Research Lineage · concise Writing Style summary pointing to `paper/WRITING_STYLE.md` · Experiment Templates · Workflow Preferences (W1–Wn table — as many as mined) · Publications Index (one row/paper with `task_type` + PDF/full-text status) · a short **BibTeX** pointer (full BibTeX stays in `publications.json`, NOT duplicated inline). Write/refresh the detailed `paper/WRITING_STYLE.md` specified in Phase 4. Do not generate `PROFILE.<lang>.md`.

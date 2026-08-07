@@ -138,14 +138,88 @@ def load_project_config(
                 raise ProjectConfigError(f"{kind}.{artifact_id} panel ids must be unique")
             if kind == "tables" and not isinstance(definition.get("data_grid"), dict):
                 raise ProjectConfigError(f"tables.{artifact_id}.data_grid is required")
+            if kind == "tables":
+                grid = definition["data_grid"]
+                grid_type = grid.get("type")
+                if not isinstance(grid.get("path"), str) or not grid["path"].strip():
+                    raise ProjectConfigError(f"tables.{artifact_id}.data_grid.path is required")
+                if grid_type == "records":
+                    columns = grid.get("columns")
+                    if not isinstance(columns, list) or not columns:
+                        raise ProjectConfigError(
+                            f"tables.{artifact_id}.data_grid.columns must be a non-empty list"
+                        )
+                    keys = []
+                    for index, column in enumerate(columns):
+                        if not isinstance(column, dict):
+                            raise ProjectConfigError(
+                                f"tables.{artifact_id}.data_grid.columns[{index}] must be an object"
+                            )
+                        key = str(column.get("key", "")).strip()
+                        label = str(column.get("label", "")).strip()
+                        if not key or not label:
+                            raise ProjectConfigError(
+                                f"tables.{artifact_id}.data_grid columns require key and label"
+                            )
+                        keys.append(key)
+                    if len(keys) != len(set(keys)):
+                        raise ProjectConfigError(
+                            f"tables.{artifact_id}.data_grid column keys must be unique"
+                        )
+                elif grid_type == "benchmark_rows":
+                    row_key = str(grid.get("row_key", "")).strip()
+                    benchmarks = grid.get("benchmarks")
+                    metrics = grid.get("metrics")
+                    if not row_key:
+                        raise ProjectConfigError(
+                            f"tables.{artifact_id}.data_grid.row_key is required"
+                        )
+                    if (
+                        not isinstance(benchmarks, list)
+                        or not benchmarks
+                        or any(not isinstance(item, str) or not item.strip() for item in benchmarks)
+                        or len(benchmarks) != len(set(benchmarks))
+                    ):
+                        raise ProjectConfigError(
+                            f"tables.{artifact_id}.data_grid.benchmarks must be a non-empty unique string list"
+                        )
+                    if not isinstance(metrics, list) or not metrics:
+                        raise ProjectConfigError(
+                            f"tables.{artifact_id}.data_grid.metrics must be a non-empty list"
+                        )
+                    metric_keys = []
+                    for metric in metrics:
+                        if not isinstance(metric, dict):
+                            raise ProjectConfigError(
+                                f"tables.{artifact_id}.data_grid.metrics entries must be objects"
+                            )
+                        key = str(metric.get("key", "")).strip()
+                        label = str(metric.get("label", "")).strip()
+                        if not key or not label:
+                            raise ProjectConfigError(
+                                f"tables.{artifact_id}.data_grid metrics require key and label"
+                            )
+                        metric_keys.append(key)
+                    if len(metric_keys) != len(set(metric_keys)):
+                        raise ProjectConfigError(
+                            f"tables.{artifact_id}.data_grid metric keys must be unique"
+                        )
+                else:
+                    raise ProjectConfigError(
+                        f"tables.{artifact_id}.data_grid.type must be records or benchmark_rows"
+                    )
     labels = [item["label"] for item in config["figures"].values()]
     labels += [item["label"] for item in config["tables"].values()]
     if len(labels) != len(set(labels)):
         raise ProjectConfigError("Figure and table LaTeX labels must be unique")
-    metrics_value = str(config.get("paths", {}).get("metrics", "")).strip()
-    if not metrics_value:
-        raise ProjectConfigError("paper_studio.json paths.metrics is required")
-    _project_path(root, metrics_value, "paths.metrics")
+    paths = config.get("paths")
+    if not isinstance(paths, dict):
+        raise ProjectConfigError("paper_studio.json paths is required")
+    for field in ("metrics", "main", "reference"):
+        value = str(paths.get(field, "")).strip()
+        if not value:
+            raise ProjectConfigError(f"paper_studio.json paths.{field} is required")
+        _project_path(root, value, f"paths.{field}")
     return config
 
 
@@ -683,6 +757,16 @@ def validate_project_workspace() -> None:
             raise StudioError(f"paragraph_plan section {section} has invalid paragraph ids.")
         paragraph_ids[section] = set(ids)
         for paragraph in paragraphs:
+            reference_lines = paragraph.get("reference_lines")
+            if (
+                not isinstance(reference_lines, list)
+                or len(reference_lines) != 2
+                or any(not isinstance(item, int) or isinstance(item, bool) or item < 1 for item in reference_lines)
+                or reference_lines[0] > reference_lines[1]
+            ):
+                raise StudioError(
+                    f"段落 {paragraph['id']} 的 reference_lines 必须是两个递增的正整数。"
+                )
             bound = paragraph.get("artifacts", [])
             if not isinstance(bound, list) or len(bound) != len(set(bound)):
                 raise StudioError(
@@ -695,6 +779,11 @@ def validate_project_workspace() -> None:
                 )
             for artifact_id in bound:
                 artifact_bindings[artifact_id].append(f"{section}/{paragraph['id']}")
+    configured_reference = str(PROJECT_CONFIG.get("paths", {}).get("reference", "")).strip()
+    if str(plan.get("reference_file", "")).strip() != configured_reference:
+        raise StudioError(
+            "paragraph_plan.reference_file 必须与 paper_studio.json paths.reference 完全一致。"
+        )
     unbound = sorted(
         artifact_id for artifact_id, bindings in artifact_bindings.items() if not bindings
     )
@@ -7045,6 +7134,11 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument(
+        "--validate-project",
+        action="store_true",
+        help="Validate project config, paragraph plan, and artifact bindings, then exit.",
+    )
+    parser.add_argument(
         "--empty",
         action="store_true",
         help="Start the permanent Paper Studio shell without loading paper/ project data.",
@@ -7052,6 +7146,9 @@ def main() -> None:
     args = parser.parse_args()
 
     validate_project_workspace()
+    if args.validate_project:
+        print("PASS: Paper Studio project preflight")
+        return
     recover_interrupted_agent_chat_job()
     if not EMPTY_PROJECT_MODE:
         recover_interrupted_figure_jobs()

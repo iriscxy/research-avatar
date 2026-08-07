@@ -815,6 +815,41 @@ class PaperStudioTests(unittest.TestCase):
             with self.assertRaisesRegex(studio.ProjectConfigError, "inside the workspace"):
                 studio.load_project_config(path, root=root)
 
+    def test_project_config_requires_main_and_reference_paths(self):
+        config = json.loads(
+            (studio.PAPER / "paper_studio.json").read_text(encoding="utf-8")
+        )
+        config["paths"].pop("main")
+        config["paths"].pop("reference")
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "paper_studio.json"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            with self.assertRaisesRegex(studio.ProjectConfigError, "paths.main is required"):
+                studio.load_project_config(path, root=root)
+
+    def test_project_config_rejects_malformed_data_grid(self):
+        config = json.loads(
+            (studio.PAPER / "paper_studio.json").read_text(encoding="utf-8")
+        )
+        config["tables"]["T1"]["data_grid"]["metrics"] = "mean_asr"
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "paper_studio.json"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            with self.assertRaisesRegex(studio.ProjectConfigError, "metrics must be a non-empty list"):
+                studio.load_project_config(path, root=root)
+
+    def test_project_workspace_rejects_invalid_reference_lines(self):
+        plan = studio.paragraph_plan()
+        plan["sections"]["abstract"][0]["reference_lines"] = [33, 6]
+        with TemporaryDirectory() as directory:
+            plan_path = Path(directory) / "paragraph_plan.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            with patch.object(studio, "PARAGRAPH_PLAN_FILE", plan_path):
+                with self.assertRaisesRegex(StudioError, "reference_lines"):
+                    studio.validate_project_workspace()
+
     def test_project_id_change_starts_fresh_runtime_state(self):
         state = _default_state()
         state["project_id"] = "old-project"

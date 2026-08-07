@@ -27,6 +27,7 @@ import json
 import os
 import re
 import sys
+from pathlib import Path
 
 # ---- tunable thresholds (per 1000 words of body text unless noted) ----------
 STYLE_BUDGETS = {
@@ -52,6 +53,51 @@ WORD_RE = re.compile(r"[A-Za-z]{2,}")
 def read(path):
     with open(path, encoding="utf-8", errors="replace") as f:
         return f.read()
+
+
+class TexTreeError(RuntimeError):
+    """Raised when the manuscript's modular LaTeX tree is not safely readable."""
+
+
+def read_tex_tree(main_path, *, root=None):
+    """Recursively expand \input/\include from one workspace-contained TeX tree.
+
+    Checks must inspect the manuscript that LaTeX compiles, not only main.tex.
+    Commented includes are ignored; missing files, cycles, and paths escaping the
+    paper directory fail closed instead of silently reducing checker coverage.
+    """
+    main = Path(main_path).resolve()
+    boundary = Path(root).resolve() if root is not None else main.parent
+
+    def expand(path, stack):
+        resolved = path.resolve()
+        try:
+            resolved.relative_to(boundary)
+        except ValueError as exc:
+            raise TexTreeError(f"TeX include escapes paper directory: {resolved}") from exc
+        if resolved in stack:
+            cycle = " -> ".join(p.name for p in (*stack, resolved))
+            raise TexTreeError(f"cyclic TeX include: {cycle}")
+        if not resolved.is_file():
+            raise TexTreeError(f"missing TeX include: {resolved}")
+        source = strip_comments(read(resolved))
+
+        def replace(match):
+            value = match.group(1).strip()
+            child = Path(value)
+            if child.suffix == "":
+                child = child.with_suffix(".tex")
+            return expand(resolved.parent / child, (*stack, resolved))
+
+        return re.sub(r"\\(?:input|include)\s*\{([^}]+)\}", replace, source)
+
+    return expand(main, ())
+
+
+def manuscript_tex(args):
+    return read_tex_tree(
+        os.path.join(args.paper_dir, args.main), root=args.paper_dir
+    )
 
 
 def strip_comments(tex):
@@ -122,7 +168,7 @@ def log_overfull(paper_dir, main_base):
 
 # ---------- checks ----------
 def check_budget(args):
-    tex = read(os.path.join(args.paper_dir, args.main))
+    tex = manuscript_tex(args)
     body = body_only(tex)
     secs = sections(body)
     counts = [(t, wordcount(x)) for t, x in secs]
@@ -155,7 +201,7 @@ def check_budget(args):
 
 
 def check_style(args):
-    tex = read(os.path.join(args.paper_dir, args.main))
+    tex = manuscript_tex(args)
     body = body_only(tex)
     clean = strip_comments(body)       # for the equation floor (counts equation envs)
     prose = prose_text(body)           # for emphasis / em-dash / paren budgets
@@ -285,7 +331,7 @@ def check_length(args):
     tgt = args.body_target
     # Some venues (e.g. AAAI) have NO Limitations section — the body ends at Conclusion -> References.
     # There, `endconclusion == target` is the fill signal; the limstart check does not apply.
-    tex = read(os.path.join(args.paper_dir, args.main))
+    tex = manuscript_tex(args)
     has_limitations = bool(re.search(r"\\section\*?\s*\{\s*Limitations\s*\}", tex))
     refs_pg = None if has_limitations else _references_page(args.paper_dir, args.main_base)
     viol = []
@@ -343,7 +389,7 @@ def check_formal(args):
     lean = os.path.join(args.paper_dir, "theory")
     has_verify = os.path.exists(theory) or (
         os.path.isdir(lean) and any(f.endswith(".lean") for f in os.listdir(lean)))
-    tex = read(os.path.join(args.paper_dir, args.main))
+    tex = manuscript_tex(args)
     body = strip_comments(body_only(tex))
     equations = len(re.findall(r"\\begin\{(equation|align|gather|multline)\*?\}", body)) \
         + len(re.findall(r"(?<!\\)\\\[", body))
@@ -361,7 +407,7 @@ def check_formal(args):
 
 
 def check_format(args):
-    tex = read(os.path.join(args.paper_dir, args.main))
+    tex = manuscript_tex(args)
     full = strip_comments(tex)
     overfull = log_overfull(args.paper_dir, args.main_base)
     widow = bool(re.search(r"\\widowpenalty\s*=?\s*10000", full))
@@ -421,7 +467,7 @@ def check_floats(args):
     \\begin{figure} is dropped among the results floats, so it renders a section too late
     (Fig 2 landing after the results teaser instead of beside the Method that introduces it).
     A float defined in a LATER section than its first reference is the signal."""
-    tex = strip_comments(read(os.path.join(args.paper_dir, args.main)))
+    tex = strip_comments(manuscript_tex(args))
     section_pos = [m.start() for m in re.finditer(r"\\section\b\*?\s*\{", tex)]
 
     def sections_between(a, b):

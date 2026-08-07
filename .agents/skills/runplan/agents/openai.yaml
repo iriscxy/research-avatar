@@ -1,4 +1,4 @@
 interface:
   display_name: "Run Plan"
-  short_description: "Plan experiments as one manual goal at a time"
-  default_prompt: "Use $runplan to show my evidence-ordered experiment sequence and propose only the current manual /goal."
+  short_description: "Fill approved paper cells with traceable data"
+  default_prompt: "Use $runplan to organize the approved evidence into major experiment parts and bounded subparts, map every figure or table target to a deterministic acquisition source, and propose only the next manual /goal."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Experiment Design"
-  short_description: "Design the evidence program for a selected idea"
-  default_prompt: "Use $expdesign to work backward from my selected idea and projected paper into a claim-driven experiment design for approval."
