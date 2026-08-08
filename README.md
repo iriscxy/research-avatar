@@ -6,6 +6,20 @@ Research Buddy 是一套面向**有经验研究者**的轻量级、个性化科�
 
 ---
 
+## 使用前准备
+
+首次使用前，需要你**手动下载完整的 Google Scholar 个人主页 HTML**：打开目标 Scholar 主页，持续点击 **Show more**，直到全部论文都已加载，再通过浏览器开发者工具复制页面的 `outerHTML` 并保存为 `.html` 文件。普通 `Cmd/Ctrl+S` 可能只保存最初加载的约 20 篇论文，因此不要使用未完整展开的页面建立画像。
+
+随后把该 HTML 文件的本地路径交给 `$profileconstruct`，例如：
+
+```text
+$profileconstruct 使用 ~/Downloads/scholar_profile.html
+```
+
+你可以下载自己的 Scholar 主页，也可以下载希望模仿其研究品味和论文结构的研究者主页。
+
+---
+
 ## 项目亮点
 
 ### 🧭 整体思想
