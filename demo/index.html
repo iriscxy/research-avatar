@@ -9,31 +9,18 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="focused-demo">
-  <div class="demo-warning" role="note">
-    <span>PUBLIC INTERACTIVE DEMO</span>
-    示例数据；访问本页会记录 IP 地址和访问时间
-  </div>
-
   <header class="site-header">
     <div class="brand" aria-label="Research Buddy">
       <span class="brand-mark" aria-hidden="true">RB</span>
       <span><strong>Research Buddy</strong><small>研究者掌舵的科研工作流</small></span>
     </div>
-    <div class="demo-title"><strong>交互式科研流程 Demo</strong><span>画像 → 选题 → 实验 → Goals → 论文 → 溯源</span></div>
-    <div class="header-actions">
-      <label class="compare-switch">
-        <span>对比模式</span>
-        <input id="compare-toggle" type="checkbox">
-        <i aria-hidden="true"></i>
-      </label>
-      <button id="autoplay" class="button quiet" type="button">▶ 自动演示</button>
-    </div>
+    <div class="demo-title"><strong>交互式科研流程 Demo</strong><span>画像 → 文献与选题 → 实验设计 → 实验执行 → 论文</span></div>
   </header>
 
   <main>
     <section id="journey" class="journey-section">
       <div class="section-heading">
-        <div><p class="eyebrow">RESEARCH WORKFLOW</p><h1>一项研究，六个可审核的阶段</h1></div>
+        <div><p class="eyebrow">RESEARCH WORKFLOW</p><h1>一项研究，五个可审核的阶段</h1></div>
         <p>点击顶部步骤探索完整界面；每个阶段都继承上一阶段批准的合同。</p>
       </div>
 
@@ -55,36 +42,18 @@
             </div>
           </aside>
           <section id="stage-content" class="stage-content" aria-live="polite"></section>
-          <aside id="compare-panel" class="compare-panel" hidden></aside>
+          <aside id="compare-panel" class="compare-panel"></aside>
         </div>
       </div>
 
       <div class="demo-controls">
         <button id="previous-stage" class="button quiet" type="button">← 上一步</button>
-        <div id="demo-status" class="demo-status">阶段 1 / 6</div>
+        <div id="demo-status" class="demo-status">阶段 1 / 5</div>
         <button id="next-stage" class="button primary" type="button">下一步 →</button>
       </div>
     </section>
 
   </main>
-
-  <dialog id="trace-dialog" class="trace-dialog">
-    <button id="trace-close" class="dialog-close" type="button" aria-label="Close">×</button>
-    <p class="eyebrow">RESULT PROVENANCE</p>
-    <h2>42.1% 从哪里来？</h2>
-    <p class="dialog-intro">这是示例溯源链。真实项目中的每一项都会指向实际文件、locator 和运行命令。</p>
-    <div class="trace-chain">
-      <div><span>论文</span><strong>Table 1 · AdvBench · ASR</strong><code>tab:main-results / cell-adv-ours-asr</code></div>
-      <i>↓</i>
-      <div><span>结果账本</span><strong>RESULTS_LEDGER.csv</strong><code>result_id=R-G4.2-017</code></div>
-      <i>↓</i>
-      <div><span>聚合指标</span><strong>metrics.json</strong><code>main.AdvBench.ours.asr.mean</code></div>
-      <i>↓</i>
-      <div><span>原始记录</span><strong>responses.jsonl</strong><code>request_id × seed × evaluator</code></div>
-      <i>↓</i>
-      <div><span>执行合同</span><strong>Goal G4.2</strong><code>python -m experiments.main --config …</code></div>
-    </div>
-  </dialog>
 
   <script src="app.js"></script>
 </body>

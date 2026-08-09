@@ -60,29 +60,16 @@ const stages = [
     render: () => `
       <div class="stage-head"><div><p class="eyebrow">STEP 05 · PAPERWRITE + PAPER STUDIO</p><h3>论文不是一次性生成物</h3><p>每个段落都有目的、参考结构和证据绑定；接受之后才进入 LaTeX。</p></div><span class="status-pill">LIVE PDF PREVIEW</span></div>
       <div class="studio-layout"><div class="studio-editor"><div class="studio-tabs"><span class="active">正文</span><span>图</span><span>表</span></div><div class="paragraph-box"><div class="paragraph-purpose"><strong>I3 · Paragraph purpose</strong><br>提出 representation contraction hypothesis，并明确它的可证伪预测。</div><p class="generated-copy">We hypothesize that literary stylization weakens the separability of harmful intent in aligned language models. This claim predicts both lower local probe accuracy and greater overlap with a benign reference region; failure of either signature would narrow the proposed mechanism.</p><div class="comment-box">修改意见：把 causal wording 收窄，并在最后一句引用 Figure 2。</div><div class="studio-actions"><button>GPT 修改</button><button>✓ Accept → LaTeX</button></div></div></div><div class="pdf-preview"><div class="pdf-top">main.pdf · page 2 / 8</div><div class="pdf-page"><h4>3 Representation Analysis</h4><p></p><p></p><p></p><p></p><div class="pdf-mini-figure"><i></i><i></i><i></i></div><small>Figure 2: Representation signatures under stylized inputs.</small><p></p><p></p></div></div></div>`
-  },
-  {
-    id: "trace", short: "证据溯源", label: "Evidence Trace", path: "evidence-trace",
-    title: "论文里的每个数字都能返回原始记录",
-    description: "从 Table cell 一路回到 ledger、metrics、raw JSONL 和执行命令。",
-    summary: ["Paper cell", "Result ledger", "Raw locator", "Exact command"],
-    compare: ["主要交付代码、运行日志与研究报告", "溯源粒度取决于具体项目实现", "Research Buddy 将 cell 级来源设计成执行前合同，并在写作时机械检查"],
-    render: state => `
-      <div class="stage-head"><div><p class="eyebrow">STEP 06 · RESULTS LEDGER</p><h3>点击数字，打开完整证据链</h3><p>来源不是写在备注中的一句话，而是可以由验证器重新读取和计算的结构化记录。</p></div><button class="trace-number" data-action="trace">${state.goalDone ? "42.1%" : "pending"}</button></div>
-      <div class="workspace-grid wide-left"><div class="panel"><div class="panel-head"><strong>Table 1 · Main benchmark</strong><span>示例数据</span></div><table class="result-shell"><thead><tr><th>Method</th><th>AdvBench ASR</th><th>StrongREJECT</th></tr></thead><tbody><tr><td>PAIR</td><td>${state.goalDone ? "31.7%" : '<span class="pending">pending</span>'}</td><td>${state.goalDone ? ".28" : '<span class="pending">pending</span>'}</td></tr><tr><td>Ours</td><td><button class="trace-number" data-action="trace">${state.goalDone ? "42.1%" : "pending"}</button></td><td>${state.goalDone ? ".39" : '<span class="pending">pending</span>'}</td></tr></tbody></table><p class="citation-row">点击高亮 cell 查看 source lineage。</p></div><div class="panel"><div class="panel-head"><strong>Preview: provenance chain</strong><span>deterministic</span></div><div class="trace-preview"><div class="trace-item"><span>1</span><div><strong>Paper target</strong><code>T1 / cell-adv-ours-asr</code></div></div><div class="trace-arrow">↓</div><div class="trace-item"><span>2</span><div><strong>Validated ledger row</strong><code>R-G4.2-017</code></div></div><div class="trace-arrow">↓</div><div class="trace-item"><span>3</span><div><strong>Raw source locator</strong><code>responses.jsonl#request_id</code></div></div></div></div></div>`
   }
 ];
 
-const state = { stage: 0, compare: false, autoplay: false, timer: null, goalDone: false };
+const state = { stage: 0, goalDone: false };
 const nav = document.querySelector("#journey-nav");
 const content = document.querySelector("#stage-content");
 const summary = document.querySelector("#stage-summary");
 const path = document.querySelector("#browser-path");
 const comparePanel = document.querySelector("#compare-panel");
 const browserBody = document.querySelector(".browser-body");
-const compareToggle = document.querySelector("#compare-toggle");
-const autoplayButton = document.querySelector("#autoplay");
-const traceDialog = document.querySelector("#trace-dialog");
 
 function renderNav() {
   nav.innerHTML = stages.map((stage, index) => `<button class="journey-step ${index === state.stage ? "active" : ""} ${index < state.stage ? "done" : ""}" data-stage="${index}" type="button"><span>0${index + 1}</span><strong>${stage.short}</strong></button>`).join("");
@@ -102,10 +89,8 @@ function renderStage() {
 
 function renderCompare() {
   const stage = stages[state.stage];
-  comparePanel.hidden = !state.compare;
-  browserBody.classList.toggle("comparing", state.compare);
-  if (!state.compare) return;
-  comparePanel.innerHTML = `<p class="eyebrow">SIDE-BY-SIDE</p><h4>${stage.short}的工作重心</h4><div class="compare-card bad"><span>开源 AUTORESEARCH 常见侧重</span><strong>${stage.compare[0]}</strong><p>${stage.compare[1]}</p></div><div class="compare-card good"><span>RESEARCH BUDDY 的侧重</span><strong>${stage.title}</strong><p>${stage.compare[2]}</p></div><div class="compare-verdict">两种路线解决的问题不同：这里选择让研究者持续掌握科学判断。</div>`;
+  browserBody.classList.add("comparing");
+  comparePanel.innerHTML = `<p class="eyebrow">README 对比</p><h4>${stage.short}的工作重心</h4><div class="compare-card bad"><span>开源 AUTORESEARCH 常见侧重</span><strong>${stage.compare[0]}</strong><p>${stage.compare[1]}</p></div><div class="compare-card good"><span>RESEARCH BUDDY 的侧重</span><strong>${stage.title}</strong><p>${stage.compare[2]}</p></div><div class="compare-verdict">两种路线解决的问题不同：这里选择让研究者持续掌握科学判断。</div>`;
 }
 
 function setStage(index) {
@@ -113,49 +98,24 @@ function setStage(index) {
   renderStage();
 }
 
-function stopAutoplay() {
-  state.autoplay = false;
-  clearInterval(state.timer);
-  state.timer = null;
-  autoplayButton.textContent = "▶ 自动演示";
-  autoplayButton.classList.remove("autoplaying");
-}
-
-function toggleAutoplay() {
-  if (state.autoplay) return stopAutoplay();
-  state.autoplay = true;
-  autoplayButton.textContent = "Ⅱ 暂停演示";
-  autoplayButton.classList.add("autoplaying");
-  state.timer = setInterval(() => setStage(state.stage + 1), 3200);
-}
-
 nav.addEventListener("click", event => {
   const button = event.target.closest("[data-stage]");
   if (!button) return;
-  stopAutoplay();
   setStage(Number(button.dataset.stage));
 });
-document.querySelector("#previous-stage").addEventListener("click", () => { stopAutoplay(); setStage(state.stage - 1); });
-document.querySelector("#next-stage").addEventListener("click", () => { stopAutoplay(); setStage(state.stage + 1); });
-autoplayButton.addEventListener("click", toggleAutoplay);
-compareToggle.addEventListener("change", () => { state.compare = compareToggle.checked; renderCompare(); });
+document.querySelector("#previous-stage").addEventListener("click", () => setStage(state.stage - 1));
+document.querySelector("#next-stage").addEventListener("click", () => setStage(state.stage + 1));
 content.addEventListener("click", event => {
   const action = event.target.closest("[data-action]")?.dataset.action;
   if (action === "complete-goal") { state.goalDone = true; renderStage(); }
-  if (action === "trace") traceDialog.showModal();
   if (action === "profile") {
     event.target.textContent = "✓ 画像已生成";
     event.target.disabled = true;
   }
 });
-document.querySelector("#trace-close").addEventListener("click", () => traceDialog.close());
-traceDialog.addEventListener("click", event => {
-  const box = traceDialog.getBoundingClientRect();
-  if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) traceDialog.close();
-});
 document.addEventListener("keydown", event => {
-  if (event.key === "ArrowRight" && !traceDialog.open) { stopAutoplay(); setStage(state.stage + 1); }
-  if (event.key === "ArrowLeft" && !traceDialog.open) { stopAutoplay(); setStage(state.stage - 1); }
+  if (event.key === "ArrowRight") setStage(state.stage + 1);
+  if (event.key === "ArrowLeft") setStage(state.stage - 1);
 });
 
 renderStage();
