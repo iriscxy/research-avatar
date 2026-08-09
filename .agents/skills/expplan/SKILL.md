@@ -775,3 +775,7 @@ changes the approved scientific scope or artifact ledger, reset the
 embedded contract to `pending` and return to this gate. Approval is an explicit human
 state, not a file-hash check. Regenerating fixtures/plots or hiding internal IDs
 without changing table/figure semantics is a presentation refresh and preserves approval.
+
+## Fixed HTML structure
+
+Render `03_EXPERIMENT_PLAN.html` only as: (1) target conference and exactly two reference papers, (2) Projected Paper title/abstract/one-line float budget/complete paragraph blueprint, (3) paper-shaped table and figure shells inline at their planned paragraphs, (4) compact claim → falsifier → evidence mapping, (5) compact implementation plan for the proposed method and selected baselines, and (6) budget plus stop/refine/pivot criteria and approval gate. Keep machine contracts in hidden JSON. Do not add visible registries, acquisition audits, grounding appendices, workflow logs, or generic dashboards. Research Studio adds only the approval control; the Live Demo must show these same slots with illustrative pending cells.

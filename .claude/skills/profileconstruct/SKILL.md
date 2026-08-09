@@ -130,3 +130,7 @@ python3 tools/workflow_prefs.py --transcripts "<compatible-transcript-dir-or-jso
 - **No duplicated publication index.** Keep counts, coverage, signature works, and research-line summaries in `PROFILE.md`; keep every per-paper row, abstract, citation count, `task_type`, BibTeX entry, and full-text status only in `publications.json`.
 - **Descriptive, not a claim; NO confirmation gate** — a profile (incl. Workflow Preferences) is mined data, not a research verdict, so this step writes it straight through and does NOT stop to confirm anything. The researcher reviews by editing `PROFILE.md`. This is deliberately distinct from the research gates in `/ideagen`…`/paperwrite`, which DO stop for the human — profile-building is data prep, not a judgment.
 - **Network throttle ≠ no network.** When S2/arXiv-API return 429 in sandbox Bash, fall back to direct `arxiv.org/abs|pdf/<id>` plus the local browser or `web open/fetch`/`web search`. Mark abstract and PDF coverage honestly and note unresolved failures in `publications.json`; never fabricate.
+
+## Fixed profile page structure
+
+Research Studio renders the single `PROFILE.md` as one fixed page: source/coverage header → Research Identity → Research Lineage → complete Writing Style → Experiment Templates → Workflow Preferences → short Publication Records pointer. Vary only the profile content inside these headings. Do not create extra profile tabs, upload controls, publication-index sections, or companion profile pages. The Live Demo must show these same slots with illustrative content.

@@ -6,25 +6,19 @@
   <meta name="description" content="Research Buddy project control plane">
   <title>Research Studio</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/demo/style.css?v=20260809-3">
-  <link rel="stylesheet" href="/style.css?v=20260809-3">
+  <link rel="stylesheet" href="/demo/style.css?v=20260809-4">
+  <link rel="stylesheet" href="/style.css?v=20260809-4">
 </head>
 <body class="research-app">
   <main class="studio-main">
     <nav id="pipeline" class="pipeline" aria-label="Research stages"></nav>
 
     <section class="project-toolbar">
-      <div class="project-meta"><span>ACTIVE PROJECT</span><strong id="project-name">Loading…</strong><small id="project-root">Loading workspace…</small></div>
-      <div class="pipeline-legend"><span><i class="complete"></i>完成</span><span><i class="in-progress"></i>进行中</span><span><i class="waiting"></i>等待确认</span><span><i></i>未开始</span></div>
+      <div class="project-meta"><span>ACTIVE PROJECT</span><strong id="project-name">Loading…</strong></div>
       <button id="refresh" class="button primary" type="button">↻ 刷新状态</button>
     </section>
 
     <section class="project-workspace">
-      <aside class="project-sidebar">
-        <div id="stage-identity"></div>
-        <div id="sidebar-command"></div>
-      </aside>
-
       <section class="stage-surface">
         <div id="stage-body"></div>
         <div class="artifact-preview">
@@ -42,6 +36,6 @@
   </main>
 
   <div id="toast" class="toast" role="status" hidden></div>
-  <script src="/app.js?v=20260809-3"></script>
+  <script src="/app.js?v=20260809-4"></script>
 </body>
 </html>

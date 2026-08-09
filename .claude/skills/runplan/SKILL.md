@@ -452,6 +452,15 @@ acquisition contract.
 Synthetic skill tests must carry a prominent `SKILL-TEST — fabricated data,
 NOT a scientific result` banner and `SYNTHETIC` watermark.
 
+## Fixed HTML structures
+
+Render exactly two user-facing experiment artifacts.
+
+- `04_RUN_PLAN.html`: header totals (Goals, GPUs, time) → ordered Parts and Goals → status and figure/table destination for every Goal → exactly one current Goal with copyable `/goal`, outputs, resources, and completion check → compact coverage checklist for all approved figures/tables.
+- `05_EXP_RESULT.html`: header and artifact completion → approved paper tables/figures in paper order with unchanged geometry and pending states → filled numbers as page-local provenance links → one collapsible `生成过程` index containing raw path, actual command, code/config, calculation, and verification.
+
+Never expose `RESULTS_LEDGER.csv` as a user-facing tab, table, preview, or download in Research Studio or the Live Demo. It remains an internal store used to generate and validate `05_EXP_RESULT.html`. Never add a third experiment-stage tab or a visible ledger-shaped table. The Live Demo must reproduce these two structures with illustrative content and a working numeric provenance jump.
+
 ## Output
 
 `reports/03_EXPERIMENT_PLAN.html` + `reports/04_RUN_PLAN.html` +

@@ -144,3 +144,7 @@ If any ethics risk is `HIGH` or `CRITICAL`, the gate must state that the candida
 **Persist the pick:** after she picks, stamp `reports/02_IDEA_REPORT.html` — a top banner `Selected: I<k> — <title>` (with date) + a `? SELECTED` tag on that row. If she redirects instead, regenerate and leave no stale stamp.
 
 **Handoff:** the chosen idea → **`$expplan`**, which reads the stamp and writes `reports/03_EXPERIMENT_PLAN.html`. Do not write the experiment plan here.
+
+## Fixed HTML structure
+
+Render `02_IDEA_REPORT.html` only as: optional Reference Paper Notes → literature landscape → ranked decision slate → candidate cards in rank order → human selection gate/selected banner. Each candidate card owns its novelty evidence, mechanism, falsifier, feasibility, strongest objection, and conditional ethics assessment. Keep audits as hidden JSON, not visible sections. Do not add workflow logs, dashboards, or tool comparisons. Research Studio adds selection controls around this report; the Live Demo must show these same slots with illustrative candidates.

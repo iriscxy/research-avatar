@@ -142,3 +142,7 @@ gaps found (2–4 bullets). Do **not** invent a "verdict" on the field.
 4. **White background**, house style, one `reports/` folder.
 5. **Human is the reader, not judged** — a survey maps the field; it does not
    accept/reject ideas (that's `/ideagen`'s gate).
+
+## Fixed HTML structure
+
+Render `01_LIT_SURVEY.html` only as: hero with scope/coverage → sticky contents → scope and taxonomy flow → theme card grids → landscape comparison table → live debates → trends and structural gaps → grouped verified references. Vary evidence inside these slots, not the top-level structure. Do not add workflow logs, agent traces, approval controls, tool comparisons, or arbitrary sections. The Live Demo must show these same slots with illustrative content.

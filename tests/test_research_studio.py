@@ -67,7 +67,10 @@ class ResearchStudioTests(unittest.TestCase):
         index_source = (
             root / "research_studio" / "static" / "index.html"
         ).read_text(encoding="utf-8")
-        self.assertIn('id="sidebar-command"', index_source)
+        self.assertNotIn('id="sidebar-command"', index_source)
+        self.assertNotIn('class="project-sidebar"', index_source)
+        self.assertNotIn('id="project-root"', index_source)
+        self.assertNotIn('class="pipeline-legend"', index_source)
         self.assertNotIn('id="stage-header"', index_source)
         self.assertNotIn('class="studio-header"', index_source)
         self.assertNotIn('class="pipeline-head"', index_source)
@@ -104,7 +107,7 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertIn('data-action="approve-expplan"', demo_source)
         self.assertIn("04_RUN_PLAN.html", demo_source)
         self.assertIn("05_EXP_RESULT.html", demo_source)
-        self.assertIn("RESULTS_LEDGER.csv", demo_source)
+        self.assertNotIn("RESULTS_LEDGER.csv", demo_source)
         self.assertIn("data-provenance-trigger", demo_source)
         self.assertIn("scrollIntoView", demo_source)
         self.assertIn('data-action="paper-view"', demo_source)
@@ -288,7 +291,7 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertEqual(state["stages"][4]["goals"][0]["status"], "completed")
         self.assertEqual(
             [item["key"] for item in state["stages"][4]["artifacts"]],
-            ["runplan", "results", "ledger"],
+            ["runplan", "results"],
         )
 
 

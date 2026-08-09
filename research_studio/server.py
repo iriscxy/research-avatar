@@ -47,7 +47,6 @@ ARTIFACTS = {
     "expplan": ("reports/03_EXPERIMENT_PLAN.html", "text/html; charset=utf-8"),
     "runplan": ("reports/04_RUN_PLAN.html", "text/html; charset=utf-8"),
     "results": ("reports/05_EXP_RESULT.html", "text/html; charset=utf-8"),
-    "ledger": ("code/RESULTS_LEDGER.csv", "text/csv; charset=utf-8"),
     "paper_pdf": ("paper/main.pdf", "application/pdf"),
     "paper_tex": ("paper/main.tex", "text/plain; charset=utf-8"),
 }
@@ -633,7 +632,6 @@ def expplan_stage(root: Path) -> dict[str, Any]:
 def runplan_stage(root: Path) -> dict[str, Any]:
     artifact = file_record(root, "runplan")
     results_artifact = file_record(root, "results")
-    ledger_artifact = file_record(root, "ledger")
     plan = extract_script_json(root / ARTIFACTS["runplan"][0], "run-plan-state")
     goals = plan.get("goals", []) if isinstance(plan.get("goals"), list) else []
     completed = [goal for goal in goals if goal.get("status") == "completed"]
@@ -650,7 +648,7 @@ def runplan_stage(root: Path) -> dict[str, Any]:
             {"label": "Acquisitions", "value": str(len(plan.get("acquisition_contracts", [])))},
             {"label": "State", "value": str(plan.get("state", "Pending"))},
         ],
-        "artifacts": [artifact, results_artifact, ledger_artifact],
+        "artifacts": [artifact, results_artifact],
         "message": proposed.get("instructions", plan.get("exact_next_authorized_action", "等待实验计划批准。")),
         "goals": [
             {
@@ -1062,9 +1060,6 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_bytes(rendered, "text/html; charset=utf-8")
             elif key == "publications":
                 rendered = render_publications_html(target).encode()
-                self.send_bytes(rendered, "text/html; charset=utf-8")
-            elif key == "ledger":
-                rendered = render_ledger_html(target).encode()
                 self.send_bytes(rendered, "text/html; charset=utf-8")
             else:
                 self.send_bytes(target.read_bytes(), mime)

@@ -47,11 +47,6 @@ function renderPipeline() {
   pipeline.innerHTML = app.state.stages.map((stage, index) => `<button class="pipeline-button ${index === app.stage ? "active" : ""}" data-stage="${index}" data-status="${escapeHtml(stage.status)}" type="button"><span>0${index + 1} · ${escapeHtml(statusLabel(stage.status))}</span><strong>${escapeHtml(stage.title)}</strong></button>`).join("");
 }
 
-function renderSidebar(stage) {
-  document.querySelector("#stage-identity").innerHTML = `<span class="stage-number">LIVE PROJECT · STAGE 0${app.stage + 1}</span><h2 class="stage-name">${escapeHtml(stage.title)}</h2><p class="stage-message">${escapeHtml(stage.message)}</p><span class="stage-status ${escapeHtml(stage.status)}"><i></i>${escapeHtml(statusLabel(stage.status))}</span>`;
-  document.querySelector("#sidebar-command").innerHTML = `<div class="sidebar-command"><span>下一条 Codex 命令</span><button class="copy-command" data-command="${escapeHtml(stage.command)}" title="复制 ${escapeHtml(stage.command)}" type="button"><code>${escapeHtml(stage.command)}</code><span class="copy-action">⧉ 复制</span></button></div>`;
-}
-
 function goalMarkup(stage) {
   if (!stage.goals?.length) return "";
   const currentId = stage.proposed_goal?.id;
@@ -91,7 +86,7 @@ function expplanApprovalMarkup(stage) {
 
 function renderStage() {
   const stage = app.state.stages[app.stage];
-  renderPipeline(); renderSidebar(stage);
+  renderPipeline();
   const primaryArtifact = stage.artifacts?.find(item => item.exists);
   const actionMarkup = `${paperMarkup(stage)}${ideaMarkup(stage)}${expplanApprovalMarkup(stage)}${goalMarkup(stage)}${artifactSelectorMarkup(stage)}`;
   const bodyMarkup = `${primaryArtifact ? "" : missingStageMarkup(stage)}${actionMarkup}`;
@@ -132,7 +127,6 @@ async function loadState({preserveStage = true} = {}) {
     if (!preserveStage) setStage(Math.min(savedStage(), app.state.stages.length - 1));
     else if (app.stage >= app.state.stages.length) setStage(0);
     document.querySelector("#project-name").textContent = app.state.project.name;
-    document.querySelector("#project-root").textContent = app.state.project.root;
     renderStage();
     showToast("已从项目文件刷新状态");
   } catch (error) {
@@ -210,10 +204,6 @@ stageBody.addEventListener("click", event => {
   if (terminalOpen) openTerminal(terminalOpen.dataset.terminalCommand);
   const artifact = event.target.closest("[data-artifact-key]");
   if (artifact) selectArtifact(artifact.dataset.artifactKey);
-});
-document.querySelector("#sidebar-command").addEventListener("click", event => {
-  const command = event.target.closest("[data-command]");
-  if (command) copyText(command.dataset.command, command);
 });
 document.querySelector("#refresh").addEventListener("click", () => loadState());
 document.addEventListener("keydown", event => {
