@@ -89,6 +89,9 @@ class ResearchStudioTests(unittest.TestCase):
         ]
         self.assertEqual(stage_positions, sorted(stage_positions))
         self.assertIn("grid-template-columns:repeat(6,1fr)", demo_style)
+        self.assertIn('id: "literature"', demo_source)
+        self.assertIn("compare: null", demo_source)
+        self.assertNotIn("README 对比", demo_source)
 
     def test_extract_script_json_reads_named_contract(self):
         with TemporaryDirectory() as directory:

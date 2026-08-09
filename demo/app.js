@@ -17,7 +17,7 @@ const stages = [
     title: "先建立文献地图，再进入 Idea 生成",
     description: "从多个检索角度覆盖领域，只保留实际核验过的来源。",
     summary: ["多角度检索", "来源逐篇核验", "研究版图", "趋势与空白"],
-    compare: ["围绕当前任务快速收集相关工作", "重点是为后续自动探索提供上下文", "Research Buddy 先产出可独立阅读、可核验的领域地图"],
+    compare: null,
     render: () => `
       <div class="stage-head"><div><p class="eyebrow">STEP 02 · RESEARCHLIT</p><h3>把检索结果组织成研究版图</h3><p>每篇工作都来自实际打开并核验的来源；taxonomy、趋势与结构性空白共同约束后续选题。</p></div><span class="status-pill">VERIFIED SOURCES</span></div>
       <div class="workspace-grid">
@@ -99,8 +99,14 @@ function renderStage() {
 
 function renderCompare() {
   const stage = stages[state.stage];
-  browserBody.classList.add("comparing");
-  comparePanel.innerHTML = `<p class="eyebrow">README 对比</p><h4>${stage.short}的工作重心</h4><div class="compare-card bad"><span>开源 AUTORESEARCH 常见侧重</span><strong>${stage.compare[0]}</strong><p>${stage.compare[1]}</p></div><div class="compare-card good"><span>RESEARCH BUDDY 的侧重</span><strong>${stage.title}</strong><p>${stage.compare[2]}</p></div><div class="compare-verdict">两种路线解决的问题不同：这里选择让研究者持续掌握科学判断。</div>`;
+  const hasComparison = Array.isArray(stage.compare);
+  comparePanel.hidden = !hasComparison;
+  browserBody.classList.toggle("comparing", hasComparison);
+  if (!hasComparison) {
+    comparePanel.innerHTML = "";
+    return;
+  }
+  comparePanel.innerHTML = `<p class="eyebrow">工作方式对比</p><h4>${stage.short}的工作重心</h4><div class="compare-card bad"><span>开源 AUTORESEARCH 常见侧重</span><strong>${stage.compare[0]}</strong><p>${stage.compare[1]}</p></div><div class="compare-card good"><span>RESEARCH BUDDY 的侧重</span><strong>${stage.title}</strong><p>${stage.compare[2]}</p></div><div class="compare-verdict">两种路线解决的问题不同：这里选择让研究者持续掌握科学判断。</div>`;
 }
 
 function setStage(index) {
