@@ -6,9 +6,9 @@ Research Buddy 是一套面向**有经验研究者**的轻量级、个性化科�
 
 ---
 
-## 交互 Demo
+## Live Demo
 
-**[在线打开交互 Demo →](https://research-buddy-demo.pages.dev/)**
+**[打开 Live Demo →](https://research-buddy-demo.pages.dev/)**
 
 ---
 
@@ -63,7 +63,7 @@ $profileconstruct 使用 ~/Downloads/scholar_profile.html
 
 ---
 
-## 亮点是怎么实现的
+## 具体实现
 
 ### 个性化：
 

@@ -81,9 +81,6 @@ function renderStage() {
   path.textContent = `research-buddy-demo.pages.dev/${stage.path}`;
   summary.innerHTML = `<span class="summary-kicker">STAGE 0${state.stage + 1}</span><h3 class="summary-title">${stage.label}</h3><ul class="summary-list">${stage.summary.map((item, index) => `<li class="${index === 0 ? "active" : ""}">${item}</li>`).join("")}</ul>`;
   content.innerHTML = stage.render(state);
-  document.querySelector("#demo-status").textContent = `阶段 ${state.stage + 1} / ${stages.length} · ${stage.short}`;
-  document.querySelector("#previous-stage").disabled = state.stage === 0;
-  document.querySelector("#next-stage").textContent = state.stage === stages.length - 1 ? "回到第一步 ↺" : "下一步 →";
   renderCompare();
 }
 
@@ -103,8 +100,6 @@ nav.addEventListener("click", event => {
   if (!button) return;
   setStage(Number(button.dataset.stage));
 });
-document.querySelector("#previous-stage").addEventListener("click", () => setStage(state.stage - 1));
-document.querySelector("#next-stage").addEventListener("click", () => setStage(state.stage + 1));
 content.addEventListener("click", event => {
   const action = event.target.closest("[data-action]")?.dataset.action;
   if (action === "complete-goal") { state.goalDone = true; renderStage(); }
@@ -113,9 +108,4 @@ content.addEventListener("click", event => {
     event.target.disabled = true;
   }
 });
-document.addEventListener("keydown", event => {
-  if (event.key === "ArrowRight") setStage(state.stage + 1);
-  if (event.key === "ArrowLeft") setStage(state.stage - 1);
-});
-
 renderStage();
