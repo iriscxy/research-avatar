@@ -58,6 +58,12 @@ function goalMarkup(stage) {
   return `<div class="content-section"><div class="content-section-title"><strong>多层 Goal 进度</strong><span>完成后自动推进到下一项</span></div><div class="goal-board">${stage.goals.map(goal => { const current = goal.id === currentId; return `<div class="live-goal ${goal.status === "completed" ? "complete" : ""} ${current ? "current" : ""}"><span>${goal.status === "completed" ? "✓" : current ? "→" : "○"}</span><div><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}</strong><small>${goal.artifact_ids?.length ? `对应 ${goal.artifact_ids.join(", ")}` : "基础设施 / 无直接图表"}</small></div>${current ? `<div class="goal-execution"><button data-command="${escapeHtml(stage.command)}" type="button">复制命令</button><button class="goal-terminal" data-terminal-command="${escapeHtml(stage.command)}" type="button">打开终端 →</button></div>` : `<b>${goal.status === "completed" ? "DONE" : escapeHtml(goal.status || "locked")}</b>`}</div>`; }).join("")}</div></div>`;
 }
 
+function artifactSelectorMarkup(stage) {
+  const artifacts = (stage.artifacts || []).filter(item => item.exists);
+  if (artifacts.length < 2) return "";
+  return `<div class="content-section artifact-selector"><div class="content-section-title"><strong>计划与实验结果</strong><span>同一阶段切换查看</span></div><div class="artifact-selector-buttons">${artifacts.map((item, index) => `<button class="${index === 0 ? "active" : ""}" data-artifact-key="${escapeHtml(item.key)}" type="button"><strong>${escapeHtml(item.title || item.path)}</strong><small>${escapeHtml(item.path)}</small></button>`).join("")}</div></div>`;
+}
+
 function missingStageMarkup(stage) {
   return `<div class="stage-command-card"><div><small>在终端中开始这一步</small><strong>${escapeHtml(stage.title)}尚未生成</strong><p>运行下面的命令。完成后回到这里刷新，页面会直接显示生成好的 canonical artifact。</p><code>${escapeHtml(stage.command)}</code></div><div class="stage-command-actions"><button data-command="${escapeHtml(stage.command)}" type="button">复制命令</button><button class="paper-launch" data-terminal-command="${escapeHtml(stage.command)}" type="button">打开终端 →</button></div></div>`;
 }
@@ -87,7 +93,7 @@ function renderStage() {
   const stage = app.state.stages[app.stage];
   renderPipeline(); renderSidebar(stage);
   const primaryArtifact = stage.artifacts?.find(item => item.exists);
-  const actionMarkup = `${paperMarkup(stage)}${ideaMarkup(stage)}${expplanApprovalMarkup(stage)}${goalMarkup(stage)}`;
+  const actionMarkup = `${paperMarkup(stage)}${ideaMarkup(stage)}${expplanApprovalMarkup(stage)}${goalMarkup(stage)}${artifactSelectorMarkup(stage)}`;
   const bodyMarkup = `${primaryArtifact ? "" : missingStageMarkup(stage)}${actionMarkup}`;
   stageBody.innerHTML = bodyMarkup;
   stageBody.hidden = !bodyMarkup.trim();
@@ -114,6 +120,7 @@ function selectArtifact(key) {
   else previewFrame.setAttribute("sandbox", artifactSandbox);
   previewFrame.src = isPdf ? `${artifact.url}#view=FitH` : artifact.url;
   previewFrame.hidden = false; previewEmpty.hidden = true;
+  document.querySelectorAll("[data-artifact-key]").forEach(button => button.classList.toggle("active", button.dataset.artifactKey === key));
 }
 
 async function loadState({preserveStage = true} = {}) {
@@ -201,6 +208,8 @@ stageBody.addEventListener("click", event => {
   if (event.target.closest("#expplan-approve")) approveExpplan();
   const terminalOpen = event.target.closest("[data-terminal-command]");
   if (terminalOpen) openTerminal(terminalOpen.dataset.terminalCommand);
+  const artifact = event.target.closest("[data-artifact-key]");
+  if (artifact) selectArtifact(artifact.dataset.artifactKey);
 });
 document.querySelector("#sidebar-command").addEventListener("click", event => {
   const command = event.target.closest("[data-command]");

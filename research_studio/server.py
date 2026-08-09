@@ -632,6 +632,8 @@ def expplan_stage(root: Path) -> dict[str, Any]:
 
 def runplan_stage(root: Path) -> dict[str, Any]:
     artifact = file_record(root, "runplan")
+    results_artifact = file_record(root, "results")
+    ledger_artifact = file_record(root, "ledger")
     plan = extract_script_json(root / ARTIFACTS["runplan"][0], "run-plan-state")
     goals = plan.get("goals", []) if isinstance(plan.get("goals"), list) else []
     completed = [goal for goal in goals if goal.get("status") == "completed"]
@@ -648,7 +650,7 @@ def runplan_stage(root: Path) -> dict[str, Any]:
             {"label": "Acquisitions", "value": str(len(plan.get("acquisition_contracts", [])))},
             {"label": "State", "value": str(plan.get("state", "Pending"))},
         ],
-        "artifacts": [artifact],
+        "artifacts": [artifact, results_artifact, ledger_artifact],
         "message": proposed.get("instructions", plan.get("exact_next_authorized_action", "等待实验计划批准。")),
         "goals": [
             {

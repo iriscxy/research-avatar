@@ -78,6 +78,9 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertNotIn("artifactMarkup", app_source)
         self.assertNotIn("该阶段尚未开始", app_source)
         self.assertNotIn("profileTerminalMarkup", app_source)
+        self.assertIn("artifactSelectorMarkup", app_source)
+        self.assertIn('data-artifact-key', app_source)
+        self.assertIn("selectArtifact(artifact.dataset.artifactKey)", app_source)
 
     def test_live_demo_matches_the_local_six_stage_navigation(self):
         root = Path(__file__).resolve().parents[1]
@@ -92,6 +95,18 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertIn('id: "literature"', demo_source)
         self.assertIn("compare: null", demo_source)
         self.assertNotIn("README 对比", demo_source)
+        self.assertNotIn("解析研究画像", demo_source)
+        self.assertNotIn("upload-zone", demo_source)
+        self.assertIn("$profileconstruct 使用 ~/Downloads/scholar_profile.html", demo_source)
+        self.assertIn('data-action="select-idea"', demo_source)
+        self.assertIn('data-action="approve-expplan"', demo_source)
+        self.assertIn("04_RUN_PLAN.html", demo_source)
+        self.assertIn("05_EXP_RESULT.html", demo_source)
+        self.assertIn("RESULTS_LEDGER.csv", demo_source)
+        self.assertIn("data-provenance-trigger", demo_source)
+        self.assertIn("scrollIntoView", demo_source)
+        self.assertIn('data-action="paper-view"', demo_source)
+        self.assertIn("overflow-y:auto", demo_style)
 
     def test_extract_script_json_reads_named_contract(self):
         with TemporaryDirectory() as directory:
@@ -238,6 +253,14 @@ class ResearchStudioTests(unittest.TestCase):
                 + "</script>",
                 encoding="utf-8",
             )
+            (root / "reports" / "05_EXP_RESULT.html").write_text(
+                '<title>Experiment Results</title><a href="#provenance-R1">42.1</a>',
+                encoding="utf-8",
+            )
+            (root / "code" / "RESULTS_LEDGER.csv").write_text(
+                "result_id,value,verification_status\nR1,42.1,verified\n",
+                encoding="utf-8",
+            )
             (root / "paper" / "paper_studio.json").write_text(
                 json.dumps(
                     {
@@ -261,6 +284,10 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertEqual(state["stages"][3]["status"], "complete")
         self.assertEqual(state["stages"][4]["metrics"][1]["value"], "G1.1")
         self.assertEqual(state["stages"][4]["goals"][0]["status"], "completed")
+        self.assertEqual(
+            [item["key"] for item in state["stages"][4]["artifacts"]],
+            ["runplan", "results", "ledger"],
+        )
 
 
 if __name__ == "__main__":
