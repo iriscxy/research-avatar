@@ -11,7 +11,7 @@
 <body class="focused-demo">
   <div class="demo-warning" role="note">
     <span>PUBLIC INTERACTIVE DEMO</span>
-    示例数据；匿名统计访问次数及粗略地区，不保存原始 IP
+    示例数据；访问本页会记录 IP 地址和访问时间
   </div>
 
   <header class="site-header">
@@ -66,32 +66,6 @@
       </div>
     </section>
 
-    <section class="visitor-section" aria-labelledby="visitor-title">
-      <div class="visitor-copy">
-        <p class="eyebrow">GLOBAL VISITORS</p>
-        <h2 id="visitor-title">研究工作流从哪里被看见</h2>
-        <p>统计完整页面打开次数，并以匿名访客标识去重。位置由网络地址粗略推断，VPN 或移动网络可能造成城市偏差。</p>
-        <div class="visitor-metrics" aria-live="polite">
-          <div><strong id="visitor-pageviews">—</strong><span>总访问次数</span></div>
-          <div><strong id="visitor-unique">—</strong><span>独立访客</span></div>
-          <div><strong id="visitor-countries">—</strong><span>国家 / 地区</span></div>
-        </div>
-        <p id="visitor-status" class="visitor-status">正在读取匿名访问统计…</p>
-      </div>
-      <div class="visitor-map" role="img" aria-label="访客所在地世界分布图">
-        <svg viewBox="0 0 900 440" aria-hidden="true">
-          <defs><linearGradient id="ocean" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#163f55"/><stop offset="1" stop-color="#0b293b"/></linearGradient></defs>
-          <rect width="900" height="440" rx="220" fill="url(#ocean)"/>
-          <g class="map-grid"><path d="M0 110H900M0 220H900M0 330H900M225 0V440M450 0V440M675 0V440"/></g>
-          <g class="continents">
-            <path d="M82 91l55-43 90 5 50 39-18 38-40 13-21 50-51 11-34-31-47-18zM231 214l39 19 24 55-22 91-28 31-19-83-20-51z"/>
-            <path d="M382 79l50-24 69 20 25 40-25 23-43-13-34 30-52-27zM430 156l73-10 61 36-14 72-53 100-37-25-23-94-36-33z"/>
-            <path d="M505 83l90-44 127 25 105 62-30 53-75-4-39 40-66-20-56 23-39-57 29-45zM726 278l63-22 56 32-20 49-75-3z"/>
-          </g>
-        </svg>
-        <div id="visitor-map-points" class="visitor-map-points"></div>
-      </div>
-    </section>
   </main>
 
   <dialog id="trace-dialog" class="trace-dialog">

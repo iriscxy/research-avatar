@@ -6,7 +6,7 @@
     {
       "binding": "ANALYTICS_DB",
       "database_name": "research-buddy-demo-visitors",
-      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+      "database_id": "7abed6fc-ed63-477e-9e54-8de8d6fe5613"
     }
   ]
 }

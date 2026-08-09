@@ -9,6 +9,7 @@ venv/
 dist/
 build/
 node_modules
+.wrangler/
 *.egg-info/
 .watson/
 experiments/

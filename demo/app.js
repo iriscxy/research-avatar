@@ -158,39 +158,4 @@ document.addEventListener("keydown", event => {
   if (event.key === "ArrowLeft" && !traceDialog.open) { stopAutoplay(); setStage(state.stage - 1); }
 });
 
-function addLocationPoint(location, largestCount) {
-  const latitude = Number(location.latitude);
-  const longitude = Number(location.longitude);
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
-
-  const point = document.createElement("span");
-  point.className = "visitor-point";
-  point.style.left = `${((longitude + 180) / 360) * 100}%`;
-  point.style.top = `${((90 - latitude) / 180) * 100}%`;
-  point.style.setProperty("--point-scale", String(.7 + Math.sqrt(Number(location.page_views) / largestCount) * 1.4));
-  point.title = `${location.city}, ${location.region}, ${location.country} · ${location.page_views} 次访问`;
-  document.querySelector("#visitor-map-points").append(point);
-}
-
-async function loadVisitorStats() {
-  const status = document.querySelector("#visitor-status");
-  try {
-    const response = await fetch("/api/stats", { headers: { accept: "application/json" } });
-    if (!response.ok) throw new Error(`stats endpoint returned ${response.status}`);
-    const stats = await response.json();
-    if (!stats.configured) throw new Error("visitor analytics is not configured");
-
-    document.querySelector("#visitor-pageviews").textContent = Number(stats.totals.pageViews).toLocaleString();
-    document.querySelector("#visitor-unique").textContent = Number(stats.totals.uniqueVisitors).toLocaleString();
-    document.querySelector("#visitor-countries").textContent = Number(stats.totals.countries).toLocaleString();
-    const largestCount = Math.max(1, ...stats.locations.map(location => Number(location.page_views)));
-    stats.locations.forEach(location => addLocationPoint(location, largestCount));
-    status.textContent = `最近更新：${new Date(stats.generatedAt).toLocaleString()}`;
-  } catch (error) {
-    status.textContent = "统计将在 Cloudflare Pages 与 D1 完成连接后开始显示。";
-    status.dataset.state = "waiting";
-  }
-}
-
 renderStage();
-loadVisitorStats();
