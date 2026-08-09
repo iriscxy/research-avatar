@@ -28,6 +28,10 @@ SOURCE_TYPES = {"RUN_LOCAL", "REUSE_REPORTED"}
 STATE_RE = re.compile(
     r'<script type="application/json" id="run-plan-state">(.*?)</script>', re.S
 )
+PROVENANCE_RE = re.compile(
+    r'<script\b(?=[^>]*\btype="application/json")'
+    r'(?=[^>]*\bid="result-provenance")[^>]*>(.*?)</script>', re.S
+)
 
 
 def load_plan_state(path: Path | None) -> dict[str, object]:
@@ -190,6 +194,101 @@ def validate_figure_sources(report: str, acquisitions: dict[str, dict[str, objec
                 generated_ids = set(generated.group(1).split()) if generated else set()
                 if generated_ids != target_ids:
                     errors.append(f"{artifact_id}: generated plot source IDs differ from displayed table")
+    return errors
+
+
+def validate_clickable_provenance(
+    report: str,
+    rows: list[dict[str, str]],
+    acquisitions: dict[str, dict[str, object]],
+) -> list[str]:
+    """Require each filled paper value to jump to exact generation evidence."""
+    paper_rows = [
+        row for row in rows
+        if row.get("status") == "REAL" and row.get("artifact_id", "").strip()
+    ]
+    if not paper_rows:
+        return []
+    errors: list[str] = []
+    if 'id="result-provenance-index"' not in report:
+        errors.append("report lacks the result-provenance-index jump destination")
+    payload_match = PROVENANCE_RE.search(report)
+    if not payload_match:
+        return errors + ["report lacks embedded result-provenance JSON"]
+    if "<" in payload_match.group(1):
+        errors.append("result-provenance JSON contains an unescaped '<' character")
+    try:
+        payload = json.loads(payload_match.group(1))
+    except json.JSONDecodeError as exc:
+        return errors + [f"result-provenance JSON is invalid: {exc}"]
+    if not isinstance(payload, dict):
+        return errors + ["result-provenance JSON must be an object keyed by result_id"]
+
+    interaction_markers = {
+        "scrollIntoView": "provenance interaction does not scroll to the selected record",
+        "focus(": "provenance interaction does not focus the selected record",
+        "provenance-": "provenance interaction does not resolve result jump targets",
+        "createElement": "provenance interaction does not build jump-target cards",
+        "textContent": "provenance cards are not rendered with safe textContent",
+    }
+    for marker, message in interaction_markers.items():
+        if marker not in report:
+            errors.append(message)
+    if "hashchange" not in report and "pushState" not in report:
+        errors.append("provenance interaction does not preserve page-hash navigation")
+
+    common_fields = (
+        "result_id", "goal_id", "metric", "value", "unit", "source_type",
+        "obtained_at", "verified_at", "verification_status",
+    )
+    local_fields = (
+        "raw_artifact", "raw_locator", "command", "code_files", "config_files",
+        "environment_files", "code_revision",
+    )
+    reported_fields = ("source_reference", "source_locator")
+    for row in paper_rows:
+        rid = row["result_id"].strip()
+        label = f"result {rid}"
+        anchor = re.search(
+            rf'<a\b(?=[^>]*\bdata-result-id="{re.escape(rid)}")'
+            rf'(?=[^>]*\bdata-provenance-trigger="{re.escape(rid)}")'
+            rf'(?=[^>]*\bhref="#provenance-{re.escape(rid)}")[^>]*>',
+            report,
+        )
+        if not anchor:
+            errors.append(f"{label}: filled value lacks a clickable provenance jump")
+        record = payload.get(rid)
+        if not isinstance(record, dict):
+            errors.append(f"{label}: provenance payload entry is missing")
+            continue
+        for field in common_fields:
+            if str(record.get(field, "")) != row.get(field, ""):
+                errors.append(f"{label}: provenance field {field} differs from ledger")
+        try:
+            dimensions = json.loads(row.get("dimensions_json") or "{}")
+        except json.JSONDecodeError:
+            dimensions = None
+        if record.get("dimensions") != dimensions:
+            errors.append(f"{label}: provenance dimensions differ from ledger")
+        acquisition = acquisitions.get(row.get("acquisition_id", ""), {})
+        kind = acquisition.get("atomic_or_aggregate")
+        if record.get("acquisition_kind") != kind:
+            errors.append(f"{label}: provenance acquisition kind differs from contract")
+        expected_calculation: object = (
+            acquisition.get("derivation") if kind == "derived" else {"kind": "atomic"}
+        )
+        if record.get("calculation") != expected_calculation:
+            errors.append(f"{label}: provenance calculation differs from contract")
+        if row.get("source_type") == "RUN_LOCAL":
+            for field in local_fields:
+                if str(record.get(field, "")) != row.get(field, ""):
+                    errors.append(f"{label}: provenance field {field} differs from ledger")
+        elif row.get("source_type") == "REUSE_REPORTED":
+            for field in reported_fields:
+                if str(record.get(field, "")) != row.get(field, ""):
+                    errors.append(f"{label}: provenance field {field} differs from ledger")
+            if record.get("reuse_notice") != "not rerun locally":
+                errors.append(f"{label}: reported reuse lacks the not-rerun notice")
     return errors
 
 
@@ -478,6 +577,7 @@ def validate(args: argparse.Namespace) -> list[str]:
             )
     if args.strict_report and report_text:
         errors.extend(validate_figure_sources(report_text, acquisitions))
+        errors.extend(validate_clickable_provenance(report_text, rows, acquisitions))
     return errors
 
 
@@ -557,6 +657,51 @@ def self_test() -> int:
         )
         if validate(args):
             return 1
+        provenance_payload = {
+            row["result_id"]: {
+                "result_id": row["result_id"], "goal_id": row["goal_id"],
+                "metric": row["metric"], "value": row["value"], "unit": row["unit"],
+                "dimensions": {}, "source_type": row["source_type"],
+                "acquisition_kind": "atomic", "calculation": {"kind": "atomic"},
+                "obtained_at": row["obtained_at"], "verified_at": row["verified_at"],
+                "verification_status": row["verification_status"],
+                "raw_artifact": row["raw_artifact"], "raw_locator": row["raw_locator"],
+                "command": row["command"], "code_files": row["code_files"],
+                "config_files": row["config_files"],
+                "environment_files": row["environment_files"],
+                "code_revision": row["code_revision"],
+            }
+        }
+        report_path = root / "05_EXP_RESULT.html"
+        report_path.write_text(
+            '<table><tr><td data-target-id="score.fixture">'
+            '<a href="#provenance-R-G00-001" data-result-id="R-G00-001" '
+            'data-provenance-trigger="R-G00-001">0.75</a></td></tr></table>'
+            '<section id="result-provenance-index"></section>'
+            '<script type="application/json" id="result-provenance">'
+            + json.dumps(provenance_payload).replace("<", "\\u003c")
+            + '</script><script>const card=document.createElement("details");'
+            'card.id="provenance-R-G00-001";card.textContent="generation evidence";'
+            'document.getElementById("result-provenance-index").appendChild(card);'
+            'addEventListener("hashchange",()=>{const target='
+            'document.getElementById("provenance-"+location.hash.slice(12));'
+            'target.open=true;target.focus();target.scrollIntoView();});</script>',
+            encoding="utf-8",
+        )
+        args.report = report_path
+        args.strict_report = True
+        if validate(args):
+            return 1
+        report_path.write_text(
+            report_path.read_text(encoding="utf-8").replace(
+                'href="#provenance-R-G00-001"', 'href="#broken"'
+            ),
+            encoding="utf-8",
+        )
+        if not any("clickable provenance jump" in error for error in validate(args)):
+            return 1
+        args.report = None
+        args.strict_report = False
         row["artifact_id"] = row["target_id"] = ""
         write_row()
         args.plan = None

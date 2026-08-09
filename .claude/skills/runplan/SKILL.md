@@ -322,7 +322,10 @@ and `04_RUN_PLAN.html` must require it to:
    code/config/environment files, not a planned command reconstructed from
    memory. For approved reported reuse, record the exact source and locator and
    never imply it was rerun. Aggregates must be computed from saved atomic rows,
-   then saved as their own ledger rows.
+   then saved as their own ledger rows. After each verified row is appended,
+   immediately refill the matching approved cell in `05_EXP_RESULT.html` and
+   regenerate its clickable provenance target; never wait until the whole goal
+   or whole table is complete to expose already verified evidence.
 5. Run `python3 .agents/skills/runplan/scripts/validate_results_ledger.py
    --ledger code/RESULTS_LEDGER.csv --plan reports/04_RUN_PLAN.html --report
    reports/05_EXP_RESULT.html --goal Gn.m --strict-report` before accepting a
@@ -330,6 +333,12 @@ and `04_RUN_PLAN.html` must require it to:
    work and reconcile failures first. Update embedded `run-plan-state.ledger_audit` with
    the check time/status and update `reports/05_EXP_RESULT.html` only from
    validated ledger rows. Missing evidence is `MISSING`, never an estimate.
+   Before that validation, after the matching cells have been regenerated with
+   their `data-result-id` attributes, run
+   `python3 .agents/skills/runplan/scripts/render_result_provenance.py --ledger
+   code/RESULTS_LEDGER.csv --plan reports/04_RUN_PLAN.html --report
+   reports/05_EXP_RESULT.html`. This deterministically linkifies every newly
+   filled value and refreshes the page-local generation-process cards.
 6. At each resume and goal boundary, organize experiment code and
    result files, remove only disposable temporary/build artifacts, and verify
    all ledger paths still exist. Do not maintain a separate file inventory.
@@ -354,7 +363,7 @@ plan. `stop` records why and lists missing evidence.
 `reports/05_EXP_RESULT.html` is its cumulative, stage-ordered human-readable
 view and the filled counterpart of the approved Projected Paper shells. Preserve
 `reports/03_EXPERIMENT_PLAN.html` as the approved blank blueprint; never replace
-its placeholders with run results. In `04`, each approved target is visibly
+its placeholders with run results. In `05`, each approved target is visibly
 `PENDING`, `FILLED`, `MISSING`, or `INVALIDATED`. Every displayed result must
 carry the ledger `result_id` (use
 `data-result-id` on the containing HTML row/element) and be regenerated or
@@ -363,10 +372,10 @@ dependencies, configuration, commands actually run, raw paths, result summary,
 falsifier status, gate decision, negative results, and next authorized action.
 Do not create a separate tracker HTML and never recover a value from chat.
 Only validated ledger rows may fill artifact targets; `/paperwrite` consumes
-those validated rows and the filled `04` view rather than copying numbers from
+those validated rows and the filled `05` view rather than copying numbers from
 conversation history.
 
-`04` must visibly render the **same approved paper artifacts**, not a prose
+`05` must visibly render the **same approved paper artifacts**, not a prose
 summary of them. Fill each result table's exact approved cells with validated
 real values and uncertainty; render each figure's approved panels as actual
 plots or traceable qualitative content generated from validated ledger rows and
@@ -387,9 +396,9 @@ figure as its approved multi-panel layout with axes, legend, and aggregation
 notes; pending panels remain empty labeled shells, and filled panels become the
 actual traceable plots or qualitative content. Ledger-shaped provenance tables
 belong in `code/RESULTS_LEDGER.csv`, not in the reader-facing artifact area of
-`04`.
+`05`.
 
-For every data-driven figure in `04`, render its approved source-data table
+For every data-driven figure in `05`, render its approved source-data table
 immediately beside the corresponding panel. That table is the sole numeric
 source for the plot: its cells remain `[PENDING]` until validated ledger rows
 fill them, and the figure remains a visibly pending shell while any required
@@ -402,6 +411,43 @@ after every ledger update. Record the exact source target IDs on the figure
 container (`data-source-target-ids`) and on the generated plot
 (`data-generated-from-target-ids`); the two sets must match exactly. A filled
 plot while its source table is not fully filled is a hard validation failure.
+
+Make every `FILLED` paper-facing number in a result table—and every filled
+number in a figure's adjacent source-data table—a page-local provenance link.
+Render the value inside an anchor carrying the same hidden result ID:
+`href="#provenance-<result_id>"`, `data-result-id="<result_id>"`, and
+`data-provenance-trigger="<result_id>"`. Pending, missing, or invalidated cells
+are plain status text and are never clickable. Keep the paper-shaped row ×
+column geometry; do not add a visible provenance column or one ledger row per
+result.
+
+At the end of `05_EXP_RESULT.html`, render one compact collapsible “生成过程”
+index with `id="result-provenance-index"` and a stable target
+`id="provenance-<result_id>"` for every clickable value. Clicking a value must
+update the page hash, open the matching card, move focus to it, and call
+`scrollIntoView`; the browser Back action must remain meaningful. The card must
+show:
+
+- common fields: goal, metric/value/unit, dimensions, source type, acquisition
+  kind, calculation/aggregation rule, obtained time, verified time, and
+  verification status;
+- `RUN_LOCAL`: raw artifact, exact JSON/JSONL locator, the command actually
+  run, code files, config files, environment files, and code revision;
+- `REUSE_REPORTED`: exact paper/dataset source and stable table/figure/row/
+  column locator, plus a prominent statement that it was not rerun locally.
+  Store that statement canonically as `reuse_notice="not rerun locally"` in
+  the provenance payload and render it in reader-facing language.
+
+Embed the exact provenance records once as escaped JSON in
+`<script type="application/json" id="result-provenance">...</script>` and
+render the cards from that payload with DOM `textContent`, not interpolated
+`innerHTML`. Escape `<` as `\u003c` in the JSON. For derived values, copy the
+structured acquisition-contract `derivation` object exactly into
+`calculation`; for atomic values use `{"kind":"atomic"}`. Never reconstruct a
+command from a template or conversation. The strict ledger validator must
+reject a filled value when its anchor, payload, jump target, interaction script,
+or any required provenance field is absent or differs from the ledger and
+acquisition contract.
 
 Synthetic skill tests must carry a prominent `SKILL-TEST — fabricated data,
 NOT a scientific result` banner and `SYNTHETIC` watermark.

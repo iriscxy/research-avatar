@@ -31,6 +31,10 @@ RUNPLAN = load_module(
     "mengyao_runplan_validator",
     ".agents/skills/runplan/scripts/validate_results_ledger.py",
 )
+PROVENANCE_RENDERER = load_module(
+    "mengyao_result_provenance_renderer",
+    ".agents/skills/runplan/scripts/render_result_provenance.py",
+)
 CONFORMANCE = ROOT / ".agents/skills/paperwrite/scripts/plan_conformance.py"
 
 
@@ -230,6 +234,55 @@ class MengyaoRegressionTests(unittest.TestCase):
             )
             self.assertFalse(any("atomic_or_aggregate" in error or "structured derivation" in error
                                  for error in RUNPLAN.validate(args)))
+
+    def test_4b_filled_result_jumps_to_exact_generation_process(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = root / "metrics.json"
+            code = root / "run.py"
+            raw.write_text('{"score": 0.75}', encoding="utf-8")
+            code.write_text("# fixture\n", encoding="utf-8")
+            row = {column: "" for column in RUNPLAN.COLUMNS}
+            row.update({
+                "result_id": "R1", "goal_id": "G1.1", "artifact_id": "T1",
+                "target_id": "T1.score", "acquisition_id": "A1",
+                "source_type": "RUN_LOCAL", "status": "REAL", "metric": "ASR",
+                "value": "0.75", "unit": "%", "dimensions_json": '{"model":"M1"}',
+                "raw_artifact": str(raw), "raw_locator": "/score",
+                "command": "python run.py", "code_files": str(code),
+                "code_revision": "abc123", "obtained_at": "2026-08-09T00:00:00Z",
+                "verified_at": "2026-08-09T00:01:00Z",
+                "verification_status": "VERIFIED",
+            })
+            ledger = root / "RESULTS_LEDGER.csv"
+            with ledger.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=RUNPLAN.COLUMNS)
+                writer.writeheader(); writer.writerow(row)
+            state = {"acquisition_contracts": [{
+                "id": "A1", "artifact_id": "T1", "target_id": "T1.score",
+                "source_type": "RUN_LOCAL", "producing_goal": "G1.1",
+                "atomic_or_aggregate": "atomic",
+            }]}
+            plan = root / "04_RUN_PLAN.html"
+            plan.write_text(
+                '<script type="application/json" id="run-plan-state">'
+                + json.dumps(state) + "</script>", encoding="utf-8"
+            )
+            report = root / "05_EXP_RESULT.html"
+            report.write_text(
+                '<html><body><table><tr><td data-target-id="T1.score" '
+                'data-result-id="R1">0.75</td></tr></table></body></html>',
+                encoding="utf-8",
+            )
+            self.assertEqual(PROVENANCE_RENDERER.update_report(report, ledger, plan), 1)
+            rendered = report.read_text(encoding="utf-8")
+            self.assertIn('href="#provenance-R1"', rendered)
+            self.assertIn('id="result-provenance-index"', rendered)
+            self.assertIn("Command actually run", rendered)
+            args = SimpleNamespace(
+                ledger=ledger, plan=plan, report=report, goal=None, strict_report=True
+            )
+            self.assertEqual(RUNPLAN.validate(args), [])
 
     def test_5_paper_studio_preflight_rejects_missing_paths_and_bad_grid(self):
         config = {
