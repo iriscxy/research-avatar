@@ -69,12 +69,26 @@ class ResearchStudioTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn('id="sidebar-command"', index_source)
         self.assertNotIn('id="stage-header"', index_source)
+        self.assertNotIn('class="studio-header"', index_source)
+        self.assertNotIn('class="pipeline-head"', index_source)
+        self.assertIn('class="project-toolbar"', index_source)
         self.assertIn('class="stage-surface"', index_source)
         self.assertIn("missingStageMarkup", app_source)
         self.assertIn('document.querySelector(".artifact-preview").hidden = !primaryArtifact', app_source)
         self.assertNotIn("artifactMarkup", app_source)
         self.assertNotIn("该阶段尚未开始", app_source)
         self.assertNotIn("profileTerminalMarkup", app_source)
+
+    def test_live_demo_matches_the_local_six_stage_navigation(self):
+        root = Path(__file__).resolve().parents[1]
+        demo_source = (root / "demo" / "app.js").read_text(encoding="utf-8")
+        demo_style = (root / "demo" / "style.css").read_text(encoding="utf-8")
+        stage_positions = [
+            demo_source.index(f'id: "{stage_id}"')
+            for stage_id in ("profile", "literature", "ideas", "expplan", "runplan", "paper")
+        ]
+        self.assertEqual(stage_positions, sorted(stage_positions))
+        self.assertIn("grid-template-columns:repeat(6,1fr)", demo_style)
 
     def test_extract_script_json_reads_named_contract(self):
         with TemporaryDirectory() as directory:
