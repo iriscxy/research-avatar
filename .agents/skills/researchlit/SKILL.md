@@ -5,6 +5,11 @@ description: "Standalone literature survey — cover a topic with many parallel 
 
 # Research Literature Survey (research-buddy edition)
 
+Before substantive work, run `python3 -m research_studio.server --ensure` once.
+The command is idempotent: reuse the workspace server or start it detached at
+`http://127.0.0.1:8780`; never start a duplicate or block the Skill. Surface any
+launch error instead of claiming that live progress is available.
+
 Topic: infer from the user's current request.
 
 This is a lean, self-contained adaptation of ARIS's `researchlit` — the ARIS

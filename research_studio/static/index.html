@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Research Buddy project control plane">
+  <title>Research Studio</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/demo/style.css?v=20260808-5">
+  <link rel="stylesheet" href="/style.css?v=20260808-5">
+</head>
+<body class="research-app">
+  <header class="studio-header">
+    <div class="studio-brand">
+      <span class="brand-mark">RB</span>
+      <div><strong>Research Studio</strong><small id="project-root">Loading workspace…</small></div>
+    </div>
+    <div class="project-identity">
+      <span>ACTIVE PROJECT</span>
+      <strong id="project-name">Loading…</strong>
+    </div>
+    <div class="research-actions">
+      <span class="privacy-chip" title="Research Studio does not persist visitor IP addresses.">Local · No IP storage</span>
+      <a class="button quiet" href="/demo/" target="_blank">查看 Demo</a>
+      <button id="refresh" class="button primary" type="button">↻ 刷新状态</button>
+    </div>
+  </header>
+
+  <main class="studio-main">
+    <section class="pipeline-head">
+      <div><p class="eyebrow">LIVE PROJECT WORKFLOW</p><h1>从研究画像到论文</h1></div>
+      <div class="pipeline-legend"><span><i class="complete"></i>完成</span><span><i class="in-progress"></i>进行中</span><span><i class="waiting"></i>等待确认</span><span><i></i>未开始</span></div>
+    </section>
+    <nav id="pipeline" class="pipeline" aria-label="Research stages"></nav>
+
+    <section class="project-workspace">
+      <aside class="project-sidebar">
+        <div id="stage-identity"></div>
+        <div id="sidebar-command"></div>
+      </aside>
+
+      <section class="stage-surface">
+        <div id="stage-body"></div>
+        <div class="artifact-preview">
+          <div class="preview-toolbar">
+            <div><span>CANONICAL ARTIFACT</span><strong id="preview-title">等待生成</strong></div>
+            <a id="preview-open" class="preview-open" target="_blank" hidden>新窗口打开 ↗</a>
+          </div>
+          <div id="preview-empty" class="preview-empty">
+            <span>⌁</span><strong>该步骤尚未生成</strong><small>复制终端命令执行后，点击“刷新状态”即可直接读取结果。</small>
+          </div>
+          <iframe id="preview-frame" title="Artifact preview" sandbox="allow-scripts allow-forms allow-popups allow-downloads" hidden></iframe>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/app.js?v=20260808-5"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "research-buddy-demo",
+  "pages_build_output_dir": "./demo",
+  "d1_databases": [
+    {
+      "binding": "ANALYTICS_DB",
+      "database_name": "research-buddy-demo-analytics",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+    }
+  ]
+}

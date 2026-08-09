@@ -193,6 +193,52 @@ def validate_figure_sources(report: str, acquisitions: dict[str, dict[str, objec
     return errors
 
 
+def validate_decision_handoff(experiment_contract: dict[str, object], state: dict[str, object]) -> list[str]:
+    """Preserve approved choices and freeze searched values before final evaluation."""
+    errors: list[str] = []
+    approved = experiment_contract.get("decision_space_contract", [])
+    if state.get("decision_space_contract") != approved:
+        errors.append("run-plan decision-space contract differs from the approved expplan")
+    goals = state.get("goals", [])
+    covered = {decision_id for goal in goals for decision_id in goal.get("decision_ids", [])}
+    expected = {item.get("id") for item in approved if item.get("id")}
+    if covered != expected:
+        errors.append("run-plan goals do not cover every approved decision ID")
+    for decision in approved:
+        if decision.get("disposition") != "SEARCHED":
+            continue
+        owners = [goal for goal in goals if decision.get("id") in goal.get("decision_ids", [])]
+        if not owners or any(goal.get("stage") != "S3" for goal in owners):
+            errors.append(f"{decision.get('id')}: SEARCHED decision must be owned by S3")
+    split_by_experiment = {
+        item.get("experiment_id"): item for item in state.get("execution_splits", [])
+        if isinstance(item, dict) and item.get("experiment_id")
+    }
+    searched_experiments = {
+        experiment_id for decision in approved if decision.get("disposition") == "SEARCHED"
+        for experiment_id in decision.get("experiment_ids", [])
+    }
+    for experiment_id in searched_experiments:
+        split = split_by_experiment.get(experiment_id, {})
+        required = ("development_source", "final_source", "protocol_source")
+        if any(not str(split.get(field, "")).strip() for field in required):
+            errors.append(f"{experiment_id}: searched experiment lacks a sourced dev/final split")
+        if split.get("disjoint") is not True or split.get("frozen_before_final") is not True:
+            errors.append(f"{experiment_id}: dev/final split must be disjoint and frozen before final evaluation")
+    final_started = any(
+        goal.get("stage") in {"S4", "S5"} and goal.get("status") == "completed"
+        for goal in goals
+    )
+    if final_started:
+        frozen = state.get("frozen_configuration", {})
+        for decision in approved:
+            if decision.get("disposition") == "SEARCHED":
+                record = frozen.get(decision.get("id"), {}) if isinstance(frozen, dict) else {}
+                if not record.get("value") or not record.get("source_goal"):
+                    errors.append(f"{decision.get('id')}: final evaluation lacks a frozen value/source")
+    return errors
+
+
 def validate(args: argparse.Namespace) -> list[str]:
     errors: list[str] = []
     if not args.ledger.exists():
@@ -250,6 +296,7 @@ def validate(args: argparse.Namespace) -> list[str]:
             approved_implementation = experiment_contract.get("implementation_contract", [])
             if state.get("implementation_contract") != approved_implementation:
                 errors.append("run-plan implementation contract differs from the approved expplan")
+            errors.extend(validate_decision_handoff(experiment_contract, state))
             runplan_text = args.plan.read_text(encoding="utf-8")
             runplan_visible = re.sub(r'<script\b.*?</script>', '', runplan_text, flags=re.S)
             for item in approved_implementation:
@@ -299,9 +346,18 @@ def validate(args: argparse.Namespace) -> list[str]:
             errors.append(
                 f"embedded acquisition contract {acquisition_id}: producing_goal is required"
             )
-        if contract.get("atomic_or_aggregate") == "derived" and not isinstance(contract.get("derivation"), dict):
+        value_kind = contract.get("atomic_or_aggregate")
+        if value_kind not in {"atomic", "derived"}:
+            errors.append(
+                f"embedded acquisition contract {acquisition_id}: atomic_or_aggregate must be atomic or derived"
+            )
+        if value_kind == "derived" and not isinstance(contract.get("derivation"), dict):
             errors.append(
                 f"embedded acquisition contract {acquisition_id}: derived values require a structured derivation"
+            )
+        if value_kind == "atomic" and isinstance(contract.get("derivation"), dict):
+            errors.append(
+                f"embedded acquisition contract {acquisition_id}: an acquisition with a derivation cannot be atomic"
             )
 
     if args.goal and not any(row["goal_id"] == args.goal for row in rows):
@@ -489,7 +545,7 @@ def self_test() -> int:
             "acquisition_contracts": [{
                 "id": "A-T1-score-fixture", "artifact_id": "T1",
                 "target_id": "score.fixture", "source_type": "RUN_LOCAL",
-                "producing_goal": "G00",
+                "producing_goal": "G00", "atomic_or_aggregate": "atomic",
             }],
         })
         plan_path.write_text(

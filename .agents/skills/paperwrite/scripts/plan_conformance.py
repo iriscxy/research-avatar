@@ -11,6 +11,7 @@ JSON key path.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -18,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 
-INPUT_RE = re.compile(r"\\(?:input|include)\{([^}]+)\}")
+INPUT_RE = re.compile(r"\\(?:input|include)\s*(?:\{([^}]+)\}|([^\s%]+))")
 FLOAT_RE = re.compile(
     r"\\begin\{(figure\*?|table\*?)\}(.*?)\\end\{\1\}",
     re.DOTALL,
@@ -29,10 +30,26 @@ CONTRACT_RE = re.compile(
     r"(.*?)</script>",
     re.DOTALL | re.IGNORECASE,
 )
+APPROVAL_FIELDS = {"approval_status", "approved_at", "approval_channel", "approval_contract_sha256"}
+
+
+def contract_digest(contract: dict[str, Any]) -> str:
+    unsigned = {key: value for key, value in contract.items() if key not in APPROVAL_FIELDS}
+    canonical = json.dumps(unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
+
+
+def visible_tex(source: str) -> str:
+    source = "\n".join(
+        re.split(r"(?<!\\)%", line, maxsplit=1)[0] for line in source.splitlines()
+    )
+    while re.search(r"\\iffalse\b.*?\\fi\b", source, re.S):
+        source = re.sub(r"\\iffalse\b.*?\\fi\b", "", source, flags=re.S)
+    return source
 
 
 def expand_tex(path: Path, seen: set[Path] | None = None) -> str:
@@ -42,10 +59,10 @@ def expand_tex(path: Path, seen: set[Path] | None = None) -> str:
     if path in seen:
         return ""
     seen.add(path)
-    text = read_text(path)
+    text = visible_tex(read_text(path))
 
     def replace(match: re.Match[str]) -> str:
-        child = path.parent / match.group(1)
+        child = path.parent / (match.group(1) or match.group(2))
         if child.suffix == "":
             child = child.with_suffix(".tex")
         if not child.exists():
@@ -173,13 +190,23 @@ def main() -> int:
                 "value": contract.get("approval_status"),
             }
         )
+    elif contract.get("approval_contract_sha256") != contract_digest(contract):
+        violations.append({"issue": "approved_contract_digest_mismatch"})
 
     actual_floats: dict[str, dict[str, Any]] = {}
     all_float_labels: set[str] = set()
     artifact_results = []
     if not args.results_only:
-        amendment = args.paper_dir / "ARTIFACT_LEDGER_AMENDMENT.md"
-        if amendment.exists():
+        waiver_files = [
+            path for path in args.paper_dir.rglob("*") if path.is_file()
+            and path.suffix.lower() in {".md", ".txt", ".json"}
+            and re.search(
+                r"(?:(?:artifact|ledger|plan|semantic).*(?:amend|waiv|override)|"
+                r"(?:amend|waiv).*(?:artifact|ledger|plan|semantic))",
+                path.name, re.I,
+            )
+        ]
+        for amendment in waiver_files:
             violations.append(
                 {
                     "issue": "posthoc_artifact_amendment_forbidden",
@@ -223,6 +250,7 @@ def main() -> int:
                 all_float_labels.add(label)
                 actual_floats[label] = {
                     "kind": kind,
+                    "block": block,
                     "placement": (
                         "body" if match.start() < appendix_at else "appendix"
                     ),
@@ -238,7 +266,8 @@ def main() -> int:
                 "label": label,
                 "expected_kind": artifact.get("kind"),
                 "expected_placement": artifact.get("placement", "body"),
-                "actual": actual,
+                "actual": ({key: value for key, value in actual.items() if key != "block"}
+                           if actual else None),
                 "ok": True,
             }
             if actual is None:
@@ -271,6 +300,22 @@ def main() -> int:
                             "actual": actual["placement"],
                         }
                     )
+                visible_dimensions = artifact.get("visible_dimensions", [])
+                if set(map(str, visible_dimensions)) != set(map(str, artifact.get("dimensions", []))):
+                    artifact_result["ok"] = False
+                    violations.append({"issue": "artifact_visible_dimension_contract_drift",
+                                       "id": artifact.get("id")})
+                normalized_block = normalized_names([actual.get("block", "")])[0]
+                missing_visible = [
+                    dimension for dimension in visible_dimensions
+                    if normalized_names([dimension])[0] not in normalized_block
+                ]
+                if missing_visible:
+                    artifact_result["ok"] = False
+                    violations.append({
+                        "issue": "planned_artifact_dimensions_not_visible",
+                        "id": artifact.get("id"), "missing": missing_visible,
+                    })
             configured_group = (
                 studio_config.get("figures", {})
                 if artifact.get("kind") == "figure"

@@ -3,7 +3,14 @@ name: "expplan"
 description: "Design the scientific experiment program for a chosen research idea by working backward from a PROJECTED paper: every section's paragraphs summarized in one concrete sentence each, plus fillable result-table and figure shells. Define claims, falsifiers, baselines, datasets, metrics, ablations, evidence requirements, budgets, and repository grounding in reports/03_EXPERIMENT_PLAN.html for researcher approval. This decides what evidence and paper cells later experiments must fill; it does not schedule or run experiments. Stops at the approval gate before /runplan converts the approved design into executable goals. Invoke explicitly as `/expplan`."
 ---
 
-Read `researcher-profile/PROFILE.md` (at the project-local `researcher-profile/` path) first; it is the only profile document and canonical source. If absent, tell the user to run `/profileconstruct`.
+Before substantive work, run `python3 -m research_studio.server --ensure` once.
+The command is idempotent: reuse the workspace server or start it detached at
+`http://127.0.0.1:8780`; never start a duplicate or block the Skill. Surface any
+launch error instead of claiming that live progress is available.
+
+Read `researcher-profile/PROFILE.md` first for the synthesized profile and `researcher-profile/publications.json` for per-paper metadata, BibTeX, and full-text paths. If either is absent, tell the user to run `/profileconstruct`. Never expect a duplicated Publications Index inside `PROFILE.md`.
+
+Do not replace a missing researcher profile or owned structure paper with a synthetic profile or an external author. Record the verified researcher identity and selected publication key in `profile_contract`; the structure reference must match that key. If no owned full text is available, stop for `/profileconstruct` rather than weakening personalization.
 
 **Which idea to plan (resolve in order):** (1) explicit argument wins — a standard idea id (`I3`), disruptive wildcard id (`D1`), rank number, or free-text idea; (2) else read the `SELECTED` stamp in `reports/02_IDEA_REPORT.html` and echo its exact `I<k> — <title>` or `D1 — <title>` so a wrong pick is caught early; (3) report present but nothing stamped / id mismatch → don't guess, ask the user directly to pick; (4) no report → point to `/ideagen` (or accept a full free-text idea). Read the chosen idea's full row and card (mechanism / hypothesis / decisive falsifier / MVE / closest work) as the plan seed. For `D1`, preserve its broken-assumption claim and decisive falsifier as the plan's first gate; do not normalize it back into an incremental module.
 
@@ -37,6 +44,7 @@ Fix the intended submission venue **before selecting either reference paper or d
 2. Recommend one candidate in plain language, but ask the researcher directly to `confirm venue: <venue/track/cycle>` or name a replacement.
 3. **STOP until the researcher explicitly confirms one exact venue/track/cycle.** Do not propose the two-reference pair, build the baseline registry, search repositories, or write/revise `03_EXPERIMENT_PLAN.html` before this confirmation.
 4. Treat the confirmed venue as part of the plan contract. Record it in the final HTML metadata and in the first top-level section, including the verified page/word limit, official rules link, and `deadline_status`. If the status is `passed`, confirmation must also capture a dated `deadline_override` with the researcher's explicit reason and intended use (`internal feasibility`, `preprint`, or `next cycle`); without that override, stop and do not generate `03`.
+Record ISO dates for venue confirmation, later reference confirmation, and plan generation; the validator rejects reversed stage order.
 5. If the researcher later changes the venue, invalidate the reference confirmation and every venue-dependent page-fill/structure decision; return to this gate, then reconfirm the two-reference pair. Baseline and repository decisions need reconfirmation only when the venue change affects their scientific or feasibility assumptions.
 
 The gate order is mandatory: **target venue → two references → baselines/reuse → datasets → repositories → write `03` → final plan approval**.
@@ -46,7 +54,7 @@ The gate order is mandatory: **target venue → two references → baselines/reu
 Every plan must use **two distinct, role-separated reference papers**:
 
 1. **External mechanism reference** — the closest non-author paper to the chosen idea. It is the **scientific-content authority**: use it to ground the paper's substantive problem, mechanism, claims, method/experiment content, datasets, metrics, baselines, analyses, and must-beat comparison floor.
-2. **Researcher-owned writing/structure reference** — one paper authored by the researcher, verified against the Publications Index in `researcher-profile/PROFILE.md`. It is the **structure-only authority**: use it for section order, each paragraph's rhetorical job, section proportions, and figure/table rhythm. Never import its research problem, theory, claims, method, experiments, or findings merely because its structure is being followed. Rank candidates by target-venue compatibility first, then by how well their section architecture matches the current contribution type and required evidence flow, then by task/method similarity; among viable owned papers, choose the one whose structure best fits the new paper.
+2. **Researcher-owned writing/structure reference** — one paper authored by the researcher, verified against `researcher-profile/publications.json`. It is the **structure-only authority**: use it for section order, each paragraph's rhetorical job, section proportions, and figure/table rhythm. Never import its research problem, theory, claims, method, experiments, or findings merely because its structure is being followed. Rank candidates by target-venue compatibility first, then by how well their section architecture matches the current contribution type and required evidence flow, then by task/method similarity; among viable owned papers, choose the one whose structure best fits the new paper.
 
 These roles may not collapse into one paper. If the closest mechanism paper is authored by the researcher, keep it in the researcher-owned role and select a separate external mechanism reference. **Only after the target venue is explicitly confirmed**, and before any baseline interaction, repository interaction, or `03_EXPERIMENT_PLAN.html` drafting:
 
@@ -63,7 +71,7 @@ Record the confirmed pair once in `1. Target Conference and Reference Papers`, w
 
 **Primary reference — whose datasets/metrics/baselines are the must-cover floor.** Before building the plan's dataset/baseline list, determine which grounded paper is the primary reference. Resolve in this order:
 
-- **Rule 1 — researcher's own closest paper.** If the idea builds on a paper the researcher authored (check PROFILE.md Publications Index), that paper IS the primary reference. Its datasets, metrics, and baselines are the **must-cover floor** (labeled `[P]` throughout the plan). Other papers' datasets/baselines are **recommended supplements** (labeled `[S]`), included only if they add coverage without conflicting with the primary.
+- **Rule 1 — researcher's own closest paper.** If the idea builds on a paper the researcher authored (check `researcher-profile/publications.json`), that paper IS the primary reference. Its datasets, metrics, and baselines are the **must-cover floor** (labeled `[P]` throughout the plan). Other papers' datasets/baselines are **recommended supplements** (labeled `[S]`), included only if they add coverage without conflicting with the primary.
 - **Rule 2 — highest relevance + impact among the closest papers.** If the researcher has no directly relevant paper of her own (new direction), score each grounded paper on: **relevance** (how closely its task/method matches the idea, 1–5) + **impact** (citations weighted by venue tier, 1–5). Take the highest total as the surrogate primary. If tied, relevance beats impact — matching the task matters more than raw prestige for experimental design.
 
 When grounded papers have **conflicting datasets/metrics** (same name but different version or computation), do NOT silently merge them. Keep both in the internal grounding record with their source paper noted, resolve the conflict in the existing decision meeting, and freeze only the approved choice into the Projected Paper shell and hidden contract. Data splits are outside `/expplan` and must not be discussed, selected, stored, or validated here.
@@ -301,6 +309,11 @@ full resolved decision in the hidden contract. In the visible Projected Paper:
   plain method names without repeated links. A generic control with no unique
   original paper links in Setup to the grounded paper whose protocol defines
   that control and is visibly labeled `control`;
+- in that Setup prose, introduce what each selected dataset/benchmark measures
+  and why it tests a named claim, and introduce what each baseline family does
+  and why it supplies a distinct control or comparison role. Describe an
+  individual baseline separately only when its role is unique. Do not emit an
+  unexplained list of names or invent one paragraph per method mechanically;
 - immediately after the Setup prose, show one concise implementation-source
   entry for every selected baseline and the proposed method. Each entry names
   exactly one resolved mode (`REUSE_OFFICIAL_MODULE`,
@@ -319,7 +332,10 @@ full resolved decision in the hidden contract. In the visible Projected Paper:
   source, and direct citation. A proposed metric cites its closest grounding
   protocol while remaining visibly marked `PROPOSED`. Store the identical
   definitions in `metric_contract`; a citation without the operational
-  definition it supports is incomplete;
+  definition it supports is incomplete. Add per-claim `claim_mappings` with
+  `DIRECT`/`PROXY`, construct, limits, alternatives, and required companions;
+  one metric may play different roles across claims, but a proxy cannot alone
+  establish a stronger headline construct;
 - a reused reported number is marked in its exact future cell/caption as
   `Reported result reused from <paper/table>; not rerun in this project.`;
 - an omitted Required baseline is mentioned only in the paragraph/limitation
@@ -502,7 +518,12 @@ Then, claim-driven (not a to-do list), **written backward from the abstract:**
 **Reader-facing opening — write the conference and references first, then the projected paper, before claims/method/experiments.** Use `1. Target Conference and Reference Papers` for exactly three entries: target conference, external mechanism reference, and researcher-owned structure reference. Keep the official-rules link inside the target-conference entry. Do not include the research question, object of study, implementation architecture, datasets, metrics, baselines, or any other setup material there. Immediately follow it with `2. Projected Paper`, containing parts (a)–(c):
 
 (a) **Projected Title + Abstract** — immediately **above the abstract, draft a working paper title** (`<h2>`-sized, styled as a title): a concrete, non-generic title naming the idea's ONE core mechanism (a short name + a claim-bearing subtitle is fine, e.g. "ABD++: One Modality-Invariant Harmful Axis for Deployable Jailbreak Defense"), not a topic label. It should read like a real paper title and match the idea's single mechanism — if the best honest title still sounds like "technique A applied to domain B", that is a signal the idea is a mashup (flag it, don't dress it up). Then the **projected abstract** — the abstract the paper *would* have if the idea succeeds, in her *Writing Style* (gap-first, "We propose/release" bullets). Mark **PROJECTED — not results**; every number a placeholder `[X%]`, never fabricated.
-   - Tight: ≤ ~180 words / 8–10 sentences (one gap · one "we present X" · 2–3 method · 1–2 result-with-placeholder · one takeaway).
+   - Derive a target length band from the venue's official abstract rule when one
+     exists; otherwise use the confirmed researcher-owned reference's measured
+     abstract length as the center of a reasonable band. Do not impose one universal
+     word count. Require the complete rhetorical sequence: motivation · precise gap ·
+     method · evaluation scope · 1–2 result-with-placeholder sentences · takeaway;
+     an abstract below the band or missing a role is incomplete, not merely concise.
    - **No em-dashes, no rare words**; use common words and keep only genuine terms of art.
    - **abstract↔claim self-check:** map each abstract claim-sentence to a §1 claim; a sentence with no backing experiment gets cut or gets an experiment.
 (b) **Projected Paper Blueprint (write right after the abstract, INSIDE `03`)** — show the paper that will be written, not merely a list of experiments. Use the confirmed pair already named and linked in Section 1; do not repeat it in a second references block. Model only the writing architecture on the **researcher-owned writing/structure reference**: its actual section order and proportions, every paragraph's rhetorical job, and its figure/table rhythm. Fill that architecture with scientific content from the approved idea and the **external mechanism reference**: the actual problem evidence, mechanism, claims, method, experiments, comparison logic, datasets, metrics, and analyses. Do not copy the owned paper's subject matter into the new paper. For example, if the best-fit owned structure uses §3 to establish that the problem exists and §4 to propose the method, keep those roles: §3 must validate the current mechanism problem using current external grounding and planned evidence, while §4 must present the new method.
@@ -692,21 +713,24 @@ The following design records are still mandatory, but keep them in the hidden
 contract and let their paper-facing consequences appear in the paragraph plan
 and artifact shells. Do not turn them into extra visible web sections:
 
-1. **Claims → evidence → variables** — each intended claim must map to (a) the experiment that supports it, (b) the variables that must be measured, (c) the raw fields that store those variables, and (d) the computation path from raw fields to final metric. No claim without planned measurable variables. No variable without a raw-field contract. Keep a compact pre-registered interpretation record per claim: primary metric/comparison, minimum practically meaningful effect or expected direction, uncertainty rule, and falsifying pattern. This is fixed before runs and is not an automatic accept/reject rule.
+1. **Claims → evidence → variables** — map each claim through experiment, observable, raw field, and computation to its metrics. Its `measurement_contract` records construct, direct/proxy role, limits/alternatives/companions, uncertainty, and support/weaken/falsify patterns. No measurable chain or only an unsupported proxy means narrow the claim or add direct evidence.
 2. **Systems, datasets, metrics, and baselines** — freeze the method, selected baselines, and source actions in hidden `grounding`. Determine datasets and metrics directly in each projected main result table and caption/note; do not create dataset or metric registries. The visible table must make both unambiguous without hidden JSON. Do not discuss, decide, require, render, store, or validate train/dev/test splits in `$expplan`; they are entirely outside this skill's contract. Resolve conflicts in dataset or metric meaning at the existing decision meeting.
 3. **Variable feasibility and provenance** — for every variable record `used_in`, `purpose`, `source`, `required_observable`, `available_now`, `fallback_or_proxy`, `raw_field`, and evidence grade. Do not mention a variable in the blueprint or an artifact unless it exists in this hidden record.
 4. **Ablation contract** — one record per ablated component; each changes exactly one variable versus the full method and maps to approved artifact targets.
 5. **Execution dependency sketch** — instrumentation sanity → generation smoke → baseline → diagnosis/main pilot → ablation → polish. This is not the final run schedule: `/runplan` later converts it into goals. Instrumentation sanity must verify raw fields and computation paths for every planned variable.
-6. **Configs** — launcher/framework/base-model from Experiment Templates; task-specific lr/batch/epochs/seeds and OOM-safe defaults.
-7. **Budget** — rough GPU-hours per experiment block; flag runs longer than one day for sign-off.
+6. **Experimental decision space** — cover every result-changing researcher choice, including models, prompts, preprocessing, retrieval, thresholds, decoding, judges, stopping, and training. Each validator-defined record is `SEARCHED`, `FIXED_BY_SOURCE`, `FIXED_BY_DESIGN`, or `NOT_APPLICABLE`, with bounded values, authority/selection rule, observable, budget, freeze point, final-value source, and no test access. `/runplan`, not `/expplan`, owns dev/final data and freezes searched values.
+7. **Paper consistency coverage** — `consistency_requirements` lists exactly every selected baseline/metric ID, decision ID, and claim marked `requires_formal_check`; `/paperwrite` must bind each to manuscript evidence instead of choosing a convenient subset.
+8. **Budget** — rough GPU-hours per experiment block; flag runs longer than one day for sign-off.
 
 **Embedded contract schema (required):** use top-level keys
-`schema_version`, `source_plan`, `approval_status`,
+`schema_version`, `source_plan`, `approval_status`, `profile_contract`,
 `target`, `references`, `dataset_confirmation`, `grounding`, `claims`, `variables`,
 `baseline_contract`, `repository_contract`, `experiment_contracts`,
+`metric_contract`, `decision_space_contract`, `consistency_requirements`,
 `paper_outline`, `paper_artifacts`, `required_labels`, and
 `result_requirements`. Each `paper_artifacts` entry must
 contain `id`, `kind`, `label`, `span`, `placement`, `supports`, `section_id`,
+matching `dimensions` and `visible_dimensions` for every result-bearing artifact,
 `introduced_after`, and `shell`. A table `shell` records caption, row labels,
 column labels, dataset-bearing headers, metric/uncertainty format, and stable
 pending cell IDs; a figure `shell` records caption,
@@ -734,13 +758,13 @@ reported reuse, also include the exact paper/dataset source and table/figure/
 row/column locator. For local work, `experiment_id` must resolve to an
 `experiment_contracts` entry that references the table-defined dataset/metric
 semantics and fixes only experiment-specific variables/raw fields, computation,
-seed/uncertainty exceptions, authorized configuration space, and repository
+seed/uncertainty exceptions, authorized decision-space IDs, and repository
 authority. Split selection is absent here and added by `$runplan`. This is the scientific source
 contract that `/runplan` later turns into an executable acquisition contract;
 it is not yet a goal schedule. Use `[]` for a required non-empty list. Before approval, set
 `approval_status` to `pending`.
 
-**GATE (human is judge — enforce it, don't just present):** in the approval conversation, summarize claims, selected baseline coverage/actions, exact reuse sources, omitted-Required risks, repository authority/fallbacks, the reference-aligned one-sentence-per-paragraph blueprint, every inline figure/table shell and its unfilled targets, variable feasibility, ablations, first three dependency-sketch experiments, budget, and artifact placement. Do not add these as extra visible HTML sections. Baseline and repository contracts must be resolved before the final HTML is written, so the GATE asks only for approval or revision of the complete plan. Reject the plan before this gate if any section/subsection omits its planned paragraphs, any paragraph lacks exactly one concrete planning sentence, any promised artifact lacks a visible shell, any numeric shell cell lacks exactly one result requirement, any result requirement lacks a single authorized source action and experiment/source locator, or any required target cannot be deterministically acquired. **Then STOP and call `ask the user directly`** for the researcher to `approve` / `revise` the plan (offer those options; `revise` collects what to change) — exactly as the intermediate baseline/reuse/repository gates already do. **Do NOT auto-proceed to `/runplan`; wait for the researcher's approval token.** This holds even in a skill-test run (fabricated data does not skip the gate).
+**GATE (human is judge — enforce it, don't just present):** in the approval conversation, summarize claims, selected baseline coverage/actions, exact reuse sources, omitted-Required risks, repository authority/fallbacks, the reference-aligned one-sentence-per-paragraph blueprint, every inline figure/table shell and its unfilled targets, variable feasibility, ablations, first three dependency-sketch experiments, budget, and artifact placement. Do not add these as extra visible HTML sections. Baseline and repository contracts must be resolved before the final HTML is written, so the GATE asks only for approval or revision of the complete plan. Reject the plan before this gate if any claim lacks a valid measurement contract, a proxy is asked to establish a stronger construct without a companion direct measure/control, any researcher-controlled decision is outside the authorized decision-space contract, any section/subsection omits its planned paragraphs, any paragraph lacks exactly one concrete planning sentence, any promised artifact lacks a visible shell, any numeric shell cell lacks exactly one result requirement, any result requirement lacks a single authorized source action and experiment/source locator, or any required target cannot be deterministically acquired. **Then STOP and call `ask the user directly`** for the researcher to `approve` / `revise` the plan (offer those options; `revise` collects what to change) — exactly as the intermediate baseline/reuse/repository gates already do. **Do NOT auto-proceed to `/runplan`; wait for the researcher's approval token.** This holds even in a skill-test run (fabricated data does not skip the gate).
 
 Before presenting the gate, run `python .agents/skills/expplan/scripts/validate_experiment_plan.py --plan reports/03_EXPERIMENT_PLAN.html`. Fix every failure. This validator enforces table-owned dataset/metric semantics, no expplan split, Python-generated projected figures, fixture isolation, target coverage, and non-visible internal result IDs.
 

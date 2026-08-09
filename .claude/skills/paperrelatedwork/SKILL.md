@@ -58,13 +58,28 @@ them; verify only newly added ones.)
 - Organize the section with `\paragraph` subheadings, one per sub-family.
 - Each subheading ends by positioning this method against that family in one sentence
   ("…unlike these, ours biases the router before steering, so the edit is not routed away").
-- Scatter a few citations into the right body sections too (the framework reference in
-  the method; the mechanism references in the analysis), not only related work.
+- Run a **whole-manuscript citation-obligation audit**, not a citation-count quota.
+  At first substantive use, cite every externally sourced method/component, dataset,
+  benchmark, metric/evaluator, pretrained model or checkpoint, protocol, adapted
+  equation, and prior empirical/mechanistic fact. Record the supported clause and
+  source in the paragraph plan/review log. Method and Experiments must carry their own
+  in-context citations; an Introduction or Related Work citation does not discharge a
+  later operational definition. Flag unsupported external facts as
+  `[CITATION NEEDED]`, and flag citation concentration when the body relies on outside
+  work but nearly all citations occur only in Introduction/Related Work. Do not add
+  decorative citations or impose a minimum count per section.
+  Persist each exact supported clause with its in-sentence citation and an exact excerpt/path
+  from the retrieved local primary source, plus Setup evidence,
+  in `paper/scholarship_contract.json`
+  for `paper_checks.py scholarship`; do not maintain a second citation inventory.
+  Before the gate, a fresh-context reviewer must compare every obligation and author/title
+  metadata against the retrieved primary sources, record checked keys and unsupported clauses
+  in `independent_source_audit`, and return red if any sourced sentence lacks coverage.
 - Add BibTeX to `paper/references.bib`, then `\cite` every new key. Run
   `python3 tools/bib_manager.py check paper/references.bib` (duplicate / non-standard
   keys / missing fields) and recompile after.
 
 ## Output
 Updated `paper/references.bib` (verified entries) + an expanded, subheading-organized
-related-work section + scattered in-context citations, references spanning ~2–4
-columns, `bib_manager check` clean, self-cites ≤3.
+related-work section + a whole-manuscript citation-obligation audit with in-context
+citations, references spanning ~2–4 columns, `bib_manager check` clean, self-cites ≤3.

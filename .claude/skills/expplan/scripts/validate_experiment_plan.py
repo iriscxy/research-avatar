@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
+import hashlib
 import html as html_module
 import json
 import re
@@ -14,6 +16,26 @@ from pathlib import Path
 CONTRACT_RE = re.compile(
     r'<script type="application/json" id="experiment-plan-contract">(.*?)</script>', re.S
 )
+APPROVAL_FIELDS = {"approval_status", "approved_at", "approval_channel", "approval_contract_sha256"}
+
+
+def contract_digest(contract: dict) -> str:
+    unsigned = {key: value for key, value in contract.items() if key not in APPROVAL_FIELDS}
+    canonical = json.dumps(unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def identity_matches_authors(identity: str, authors: object) -> bool:
+    """Accept a full author name or its conventional first-initial + surname form."""
+    author_text = " ".join(map(str, authors)) if isinstance(authors, list) else str(authors)
+    clean_identity = re.sub(r"[^a-z ]+", " ", identity.lower()).split()
+    clean_authors = re.sub(r"[^a-z ]+", " ", author_text.lower())
+    if identity.lower() in author_text.lower():
+        return True
+    if len(clean_identity) >= 2:
+        initial_surname = rf"\b{re.escape(clean_identity[0][0])}\s+{re.escape(clean_identity[-1])}\b"
+        return re.search(initial_surname, clean_authors) is not None
+    return False
 PENDING_TD_RE = re.compile(
     r'<td\b[^>]*class\s*=\s*["\'][^"\']*\bpending\b[^"\']*["\'][^>]*>\s*\[PENDING\]\s*</td>',
     re.I,
@@ -73,6 +95,53 @@ def validate(plan: Path) -> list[str]:
         return [f"invalid experiment-plan-contract JSON: {exc}"]
     if contract.get("approval_status") not in {"pending", "approved"}:
         errors.append("approval_status must be pending or approved")
+    if contract.get("approval_status") == "approved" and contract.get("approval_contract_sha256") != contract_digest(contract):
+        errors.append("approved experiment contract digest is missing or does not match")
+    profile = contract.get("profile_contract", {})
+    if profile.get("profile_path") != "researcher-profile/PROFILE.md":
+        errors.append("profile_contract.profile_path must point to researcher-profile/PROFILE.md")
+    if profile.get("publications_path") != "researcher-profile/publications.json":
+        errors.append("profile_contract.publications_path must point to researcher-profile/publications.json")
+    if profile.get("authorship_verified") is not True or not str(profile.get("researcher_identity", "")).strip():
+        errors.append("profile_contract requires a researcher identity and verified authorship")
+    structure_key = str(profile.get("structure_reference_key", "")).strip()
+    if not structure_key:
+        errors.append("profile_contract.structure_reference_key is required")
+    project_root = plan.parent.parent if plan.parent.name == "reports" else plan.parent
+    profile_path = project_root / "researcher-profile/PROFILE.md"
+    publications_path = project_root / "researcher-profile/publications.json"
+    publication_keys: set[str] = set()
+    structure_publication: dict = {}
+    if not profile_path.is_file() or not publications_path.is_file():
+        errors.append("profile_contract source files do not exist; run profileconstruct")
+    else:
+        if str(profile.get("researcher_identity", "")).lower() not in profile_path.read_text(
+            encoding="utf-8", errors="replace"
+        ).lower():
+            errors.append("profile_contract researcher identity is not present in PROFILE.md")
+        try:
+            publication_payload = json.loads(publications_path.read_text(encoding="utf-8"))
+            publications = (publication_payload.get("publications", [])
+                            if isinstance(publication_payload, dict) else publication_payload)
+            for item in publications if isinstance(publications, list) else []:
+                if isinstance(item, dict):
+                    item_keys = {
+                        str(item.get(field, "")).strip()
+                        for field in ("citation_key", "bibtex_key", "key", "id")
+                        if str(item.get(field, "")).strip()
+                    }
+                    publication_keys.update(item_keys)
+                    if structure_key in item_keys:
+                        structure_publication = item
+        except json.JSONDecodeError:
+            errors.append("researcher-profile/publications.json is invalid JSON")
+        if structure_key and structure_key not in publication_keys:
+            errors.append("profile_contract structure reference key is absent from publications.json")
+        elif structure_key:
+            authors = structure_publication.get("authors", [])
+            identity = str(profile.get("researcher_identity", "")).strip()
+            if not identity or not identity_matches_authors(identity, authors):
+                errors.append("researcher identity is not an author of the structure reference publication")
     target = contract.get("target", {})
     deadline_status = target.get("deadline_status")
     if deadline_status not in {"open", "upcoming", "passed", "call_pending"}:
@@ -83,15 +152,136 @@ def validate(plan: Path) -> list[str]:
             errors.append("a passed venue cycle requires an explicitly confirmed target.deadline_override")
         elif not all(str(override.get(key, "")).strip() for key in ("confirmed_at", "reason", "intended_use")):
             errors.append("target.deadline_override requires confirmed_at, reason, and intended_use")
+        else:
+            try:
+                override_confirmed = dt.date.fromisoformat(str(override["confirmed_at"]))
+                venue_date = dt.date.fromisoformat(str(target.get("confirmed_at", "")))
+                generated_date = dt.date.fromisoformat(str(contract.get("generated_at", "")))
+                if not venue_date <= override_confirmed <= generated_date:
+                    errors.append("target.deadline_override confirmation must follow venue confirmation and precede plan generation")
+            except ValueError:
+                errors.append("target.deadline_override.confirmed_at must be an ISO date")
+            if override.get("intended_use") not in {"internal feasibility", "preprint", "next cycle"}:
+                errors.append("target.deadline_override.intended_use must be internal feasibility, preprint, or next cycle")
+            if len(str(override.get("reason", "")).strip()) < 12:
+                errors.append("target.deadline_override.reason must state a concrete purpose")
+    try:
+        venue_confirmed = dt.date.fromisoformat(str(target.get("confirmed_at", "")))
+        references_confirmed = dt.date.fromisoformat(str(contract.get("references", {}).get("confirmed_at", "")))
+        plan_generated = dt.date.fromisoformat(str(contract.get("generated_at", "")))
+        if not venue_confirmed <= references_confirmed <= plan_generated:
+            errors.append("venue confirmation must precede reference confirmation and plan generation")
+    except ValueError:
+        errors.append("target, references, and plan require ISO confirmation/generation dates")
     if contract.get("dataset_confirmation", {}).get("confirmed") is not True:
         errors.append("dataset slate was not explicitly confirmed before HTML generation")
     for index, metric in enumerate(contract.get("metric_contract", [])):
         required_metric_fields = (
-            "name", "provenance", "definition", "range", "decision_rule", "aggregation", "url"
+            "id", "name", "provenance", "definition", "range", "decision_rule", "aggregation", "url",
+            "construct", "claim_mappings", "cannot_establish",
+            "alternative_explanations", "companion_requirements",
         )
         missing = [field for field in required_metric_fields if not str(metric.get(field, "")).strip()]
         if missing:
             errors.append(f"metric_contract[{index}] missing operational fields: {', '.join(missing)}")
+        mappings = metric.get("claim_mappings")
+        if not isinstance(mappings, list) or not mappings:
+            errors.append(f"metric_contract[{index}].claim_mappings must be a non-empty list")
+        else:
+            for mapping_index, mapping in enumerate(mappings):
+                if not str(mapping.get("claim_id", "")).strip():
+                    errors.append(f"metric_contract[{index}].claim_mappings[{mapping_index}] lacks claim_id")
+                if mapping.get("measurement_role") not in {"DIRECT", "PROXY"}:
+                    errors.append(
+                        f"metric_contract[{index}].claim_mappings[{mapping_index}].measurement_role "
+                        "must be DIRECT or PROXY"
+                    )
+                if "cannot_establish" not in mapping or "companion_requirements" not in mapping:
+                    errors.append(
+                        f"metric_contract[{index}].claim_mappings[{mapping_index}] lacks limitations/companions"
+                    )
+        for field in ("alternative_explanations", "companion_requirements"):
+            if not isinstance(metric.get(field), list):
+                errors.append(f"metric_contract[{index}].{field} must be a list")
+    measurement_fields = {
+        "construct_definition", "primary_observable", "metric_ids", "measurement_role",
+        "cannot_establish", "alternative_explanations", "required_controls",
+        "support_pattern", "weaken_pattern", "falsify_pattern", "uncertainty_rule",
+    }
+    metrics_by_id = {
+        metric.get("id"): metric for metric in contract.get("metric_contract", []) if metric.get("id")
+    }
+    for index, claim in enumerate(contract.get("claims", [])):
+        measurement = claim.get("measurement_contract", {})
+        missing = measurement_fields - set(measurement)
+        if missing:
+            errors.append(f"claims[{index}].measurement_contract missing {sorted(missing)}")
+        if measurement.get("measurement_role") not in {"DIRECT", "PROXY_WITH_COMPANION"}:
+            errors.append(
+                f"claims[{index}].measurement_contract.measurement_role must be DIRECT or PROXY_WITH_COMPANION"
+            )
+        if not measurement.get("metric_ids"):
+            errors.append(f"claims[{index}].measurement_contract.metric_ids must be non-empty")
+        claim_id = claim.get("id")
+        mapped_roles = []
+        for metric_id in measurement.get("metric_ids", []):
+            metric = metrics_by_id.get(metric_id)
+            if metric is None:
+                errors.append(f"claims[{index}] references unknown metric_id {metric_id}")
+                continue
+            mapped_roles.extend(
+                mapping.get("measurement_role")
+                for mapping in metric.get("claim_mappings", [])
+                if mapping.get("claim_id") == claim_id
+            )
+        if measurement.get("measurement_role") == "DIRECT" and "DIRECT" not in mapped_roles:
+            errors.append(f"claims[{index}] is marked DIRECT but has no directly mapped metric")
+        if measurement.get("measurement_role") == "PROXY_WITH_COMPANION" and not measurement.get("required_controls"):
+            errors.append(f"claims[{index}] uses a proxy without a required companion control/measure")
+    decisions = contract.get("decision_space_contract", [])
+    if not decisions:
+        errors.append("contract lacks decision_space_contract")
+    decision_fields = {
+        "id", "experiment_ids", "decision_variable", "disposition", "allowed_values",
+        "source", "selection_rule", "selection_observable", "budget", "freeze_point",
+        "final_value_source", "test_access_prohibited",
+    }
+    for index, decision in enumerate(decisions):
+        missing = decision_fields - set(decision)
+        if missing:
+            errors.append(f"decision_space_contract[{index}] missing {sorted(missing)}")
+        if decision.get("disposition") not in {
+            "SEARCHED", "FIXED_BY_SOURCE", "FIXED_BY_DESIGN", "NOT_APPLICABLE"
+        }:
+            errors.append(f"decision_space_contract[{index}] has invalid disposition")
+        if decision.get("test_access_prohibited") is not True:
+            errors.append(f"decision_space_contract[{index}].test_access_prohibited must be true")
+        if not isinstance(decision.get("experiment_ids"), list):
+            errors.append(f"decision_space_contract[{index}].experiment_ids must be a list")
+    consistency = contract.get("consistency_requirements", {})
+    if not all(isinstance(consistency.get(key), list)
+               for key in ("canonical_terms", "source_values", "formal_links")):
+        errors.append("consistency_requirements must contain three ID lists")
+    else:
+        baseline_ids = {
+            str(item.get("id") or item.get("name") or "").strip()
+            for item in contract.get("baseline_contract", {}).get("selected", [])
+            if isinstance(item, dict) and str(item.get("id") or item.get("name") or "").strip()
+        }
+        metric_ids = {str(item.get("id")) for item in contract.get("metric_contract", []) if item.get("id")}
+        formal_ids = {
+            str(item.get("id")) for item in contract.get("claims", [])
+            if item.get("id") and item.get("requires_formal_check") is True
+        }
+        expected = {
+            "canonical_terms": baseline_ids | metric_ids,
+            "source_values": {str(item.get("id")) for item in decisions if item.get("id")},
+            "formal_links": formal_ids,
+        }
+        for key, wanted in expected.items():
+            actual = {str(item) for item in consistency.get(key, [])}
+            if actual != wanted:
+                errors.append(f"consistency_requirements.{key} must exactly cover approved IDs: {sorted(wanted)}")
     if set(contract.get("dataset_confirmation", {})) != {"confirmed", "confirmed_at"}:
         errors.append("dataset_confirmation must contain only confirmed and confirmed_at")
     grounding = contract.get("grounding", {})
@@ -149,6 +339,13 @@ def validate(plan: Path) -> list[str]:
         kind = artifact.get("kind")
         if aid not in result_artifacts:
             continue
+        if not isinstance(artifact.get("visible_dimensions"), list) or not artifact.get("visible_dimensions"):
+            errors.append(f"{aid}: result artifact requires visible_dimensions preserved in the paper float")
+        dimensions = artifact.get("dimensions", [])
+        if not isinstance(dimensions, list) or not dimensions:
+            errors.append(f"{aid}: result artifact requires scientific dimensions")
+        elif set(map(str, artifact.get("visible_dimensions", []))) != set(map(str, dimensions)):
+            errors.append(f"{aid}: visible_dimensions must exactly match scientific dimensions")
         if kind == "table":
             block = visible_shell(page, aid)
             if not block or 'class="shell result-table-shell"' not in block:
@@ -168,10 +365,10 @@ def validate(plan: Path) -> list[str]:
             if not shell.get("column_labels") or not shell.get("metric_uncertainty"):
                 errors.append(f"{aid}: hidden table shell lacks metric-bearing columns/uncertainty")
             if "ablation" in str(artifact.get("label", "")).lower():
-                for token in (
-                    "Style Jailbreak (full)", "Literary style", "Style-graph search",
-                    "Two-turn continuation", "AdvBench", "TrustLLM Safety",
-                ):
+                required_tokens = shell.get("required_visible_tokens", [])
+                if not required_tokens:
+                    errors.append(f"{aid}: ablation shell must declare required_visible_tokens")
+                for token in required_tokens:
                     if token not in block_text:
                         errors.append(f"{aid}: ablation matrix lacks {token}")
                 if "Full-benchmark confirmation" in block_text:
@@ -254,8 +451,10 @@ def validate(plan: Path) -> list[str]:
                     kind = panel_schema.get("table_kind")
                     if kind in {"fixed_x_points", "scatter_points", "case_record"}:
                         expected_rows = len(panel_schema.get("x_values", [])) if kind == "fixed_x_points" else len(panel_schema.get("rows", []))
-                        if expected_rows != expected_marks:
-                            errors.append(f"{aid} panel {index}: frozen table defines {expected_rows} rows but schema declares {expected_marks} marks")
+                        series_count = len(panel_schema.get("series", [])) or 1
+                        row_marks = expected_rows * series_count
+                        if row_marks != expected_marks:
+                            errors.append(f"{aid} panel {index}: frozen table defines {expected_rows} rows × {series_count} series but schema declares {expected_marks} marks")
                         actual_rows = len(re.findall(r'class="plot-point"', pair))
                         if actual_rows != expected_rows:
                             errors.append(f"{aid} panel {index}: expected {expected_rows} point rows, found {actual_rows}")
@@ -288,6 +487,14 @@ def validate(plan: Path) -> list[str]:
     structure_ref = contract.get("references", {}).get("researcher_owned_structure", {})
     if not structure_ref.get("url") or not structure_ref.get("local_full_text"):
         errors.append("researcher-owned structure reference must have a URL and local full text")
+    if not structure_key or structure_ref.get("publication_key") != structure_key:
+        errors.append("researcher-owned structure reference must match the profile-verified publication key")
+    local_full_text = str(structure_ref.get("local_full_text", "")).strip()
+    if local_full_text and not (project_root / local_full_text).is_file():
+        errors.append("researcher-owned structure reference local full text does not exist")
+    publication_fulltext = str(structure_publication.get("fulltext_path", "")).strip()
+    if structure_publication and publication_fulltext != local_full_text:
+        errors.append("structure reference local full text must match its publications.json record")
 
     body_figures = sum(item.get("kind") == "figure" for item in artifacts)
     body_tables = sum(item.get("kind") == "table" for item in artifacts)
@@ -344,11 +551,20 @@ def validate(plan: Path) -> list[str]:
         implementation_contract = contract.get("implementation_contract", [])
         if not implementation_contract:
             errors.append("contract lacks the per-method implementation plan")
-        if {item.get("method") for item in implementation_contract} != {
-            "Direct Request", "DeepInception", "PAIR", "CL-GSO", "AdvPoetry",
-            "Vernacular Attack", "Style Jailbreak",
-        }:
-            errors.append("implementation plan must cover every baseline and the proposed method exactly once")
+        proposed_method = contract.get("grounding", {}).get("proposed_method")
+        expected_methods = {
+            item.get("name")
+            for item in contract.get("baseline_contract", {}).get("selected", [])
+            if item.get("name")
+        }
+        if proposed_method:
+            expected_methods.add(proposed_method)
+        actual_methods = {item.get("method") for item in implementation_contract if item.get("method")}
+        if actual_methods != expected_methods or len(actual_methods) != len(implementation_contract):
+            errors.append(
+                "implementation plan must cover every selected baseline and the proposed method exactly once: "
+                f"expected={sorted(expected_methods)}, actual={sorted(actual_methods)}"
+            )
         setup_text = visible_text(setup)
         for item in implementation_contract:
             for token in (item.get("method"), item.get("mode"), item.get("plan")):

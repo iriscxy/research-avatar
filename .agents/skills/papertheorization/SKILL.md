@@ -65,8 +65,13 @@ not by vibes:
 - **Assumptions are explicit.** State each assumption, label it, and say whether it is
   proven, standard, or empirical. Never upgrade an assumption to a fact.
 
-Write the result, its assumptions, and a one-line "verified by `theory/verify.py`"
-note. If a check fails, the statement is wrong — fix the statement, not the check.
+Keep the mechanical evidence in the repository, not in manuscript prose. Write the
+result, assumptions, and mathematical justification in scientific language. If the
+verification materially matters to reproducibility, the appendix may say that the
+algebra or numerical cases were independently checked and describe the check's scope;
+it must not expose a local path, script name, command, agent workflow, or internal
+artifact identifier. Never write phrases such as "verified by `theory/verify.py`" in
+the paper. If a check fails, the statement is wrong — fix the statement, not the check.
 
 ## Workflow
 
@@ -77,7 +82,7 @@ note. If a check fails, the statement is wrong — fix the statement, not the ch
 4. **Place them.** Body: the central definition, the result *statements*, and the one
    sentence each buys. Appendix (`paper/sections/app_derivations.tex` or the
    appendix block in `main.tex`): assumptions, full derivations/proofs, the
-   verification note. Keep body math minimal but real — a few numbered equations that
+   scientific verification summary when material. Keep body math minimal but real — a few numbered equations that
    are referred to later.
 5. **Tie to data.** The strongest theory predicts a number you already measured
    (`results/`). Point the body result at the table/figure it explains.
@@ -85,7 +90,8 @@ note. If a check fails, the statement is wrong — fix the statement, not the ch
 ## Output
 - `paper/theory/verify.py` (or `paper/theory/*.lean`) — the mechanical checks, runnable.
 - Body edits: central definition + result statements + their load-bearing sentence.
-- The derivations appendix: assumptions, derivations, verification note.
+- The derivations appendix: assumptions, derivations, and an optional scientific
+  verification summary with no implementation paths or commands.
 - `paper/theory/NOTES.md` — which candidate results were cut and why (gate failures) —
   evidence the formalization is disciplined.
 

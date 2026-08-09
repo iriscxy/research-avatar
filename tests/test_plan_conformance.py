@@ -1,4 +1,5 @@
 import json
+import importlib.util
 import subprocess
 import unittest
 from pathlib import Path
@@ -6,6 +7,9 @@ from tempfile import TemporaryDirectory
 
 
 SCRIPT = Path(".agents/skills/paperwrite/scripts/plan_conformance.py").resolve()
+SPEC = importlib.util.spec_from_file_location("plan_conformance_fixture", SCRIPT)
+CONFORMANCE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(CONFORMANCE)
 
 
 class PlanConformanceTests(unittest.TestCase):
@@ -30,6 +34,7 @@ class PlanConformanceTests(unittest.TestCase):
             ],
             "result_requirements": [],
         }
+        contract["approval_contract_sha256"] = CONFORMANCE.contract_digest(contract)
         plan = root / "plan.html"
         plan.write_text(
             '<script type="application/json" id="experiment-plan-contract">'

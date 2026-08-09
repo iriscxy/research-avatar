@@ -5,6 +5,12 @@ description: "Turn an approved EXPERIMENT_PLAN.html into a resumable, evidence-o
 
 # Run Plan
 
+Before substantive work, run `python3 -m research_studio.server --ensure` once.
+The command is idempotent: reuse the workspace server or start it detached at
+`http://127.0.0.1:8780`; never start a duplicate or block the Skill. Run the
+same preflight when a proposed `/goal` begins. Surface any launch error instead
+of claiming that live progress is available.
+
 `/runplan` is the only experiment-execution planning skill. It converts the
 approved Projected Paper's empty figure/table targets into bounded goals and
 deterministic acquisition contracts; it does not execute them.
@@ -36,6 +42,14 @@ decisive motivation probe, tuning budget, runnable
 next-stage configuration, result schema, acquisition/source information, or
 required evidence, return to `/expplan`; do not invent research design during
 execution planning.
+Require and preserve `metric_contract`, every claim's `measurement_contract`,
+and `decision_space_contract`. Copy the decision space byte-for-byte into the
+run-plan state, assign every decision ID to a goal, and place every `SEARCHED`
+decision in S3. Before any S4/S5 goal can complete, record its chosen value and
+source goal in `frozen_configuration`; fixed and `NOT_APPLICABLE` decisions are
+recorded without tuning. For every searched experiment, record protocol-sourced,
+disjoint development/final data in `execution_splits` before S3. No goal may
+introduce a choice outside this contract or tune on final data.
 
 Treat each approved projected main table and its caption/note as the authority
 for dataset and metric semantics. Do not require or invent dataset/metric
@@ -193,8 +207,8 @@ stable `acquisition_id` and records:
 - `artifact_id` and exact table `cell_id` or figure `panel_id` (`target_id`);
 - `figure_source_cell=true` when the target is one numeric cell in an approved
   figure source-data table; these targets drive the final plot directly;
-- metric, unit, dimensions, and whether the target is an atomic observation or
-  an aggregate;
+- metric, unit, dimensions, and exactly `atomic` or `derived`; every aggregate,
+  gap, ratio, mean, or transformed value is `derived` and needs its derivation;
 - exactly one `source_type`: `RUN_LOCAL` or `REUSE_REPORTED`;
 - for `RUN_LOCAL`: experiment, method/baseline, the dataset and metric read from
   the approved table plus the execution split fixed by `/runplan`, model,

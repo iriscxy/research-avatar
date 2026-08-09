@@ -15,6 +15,8 @@ Subcommands (each prints one JSON object with an `ok` bool + details):
            following section may start on target+1, OR on the target page within ±5 lines of the
            bottom) — reached by BODY content, never by padding the Conclusion
   formal   theory/verify.py present + body equation count + derivations appendix
+  scholarship claim-level citation obligations + Setup what/why evidence
+  consistency canonical terminology + source-value + manuscript/verifier bindings
   format   overfull hboxes (from log) + widow/club penalty set + wide-table-as-table*
            + caption position (figures AND tables) matches the reference (--caption-pos)
   all      run every check; exit 1 if any fails
@@ -26,7 +28,10 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
+import tokenize
+from io import StringIO
 from pathlib import Path
 
 # ---- tunable thresholds (per 1000 words of body text unless noted) ----------
@@ -59,6 +64,26 @@ class TexTreeError(RuntimeError):
     """Raised when the manuscript's modular LaTeX tree is not safely readable."""
 
 
+def strip_inactive_tex(tex):
+    """Remove simple/nested \iffalse branches so hidden evidence cannot satisfy gates."""
+    token_re = re.compile(r"\\iffalse\b|\\iftrue\b|\\fi\b")
+    output, stack, cursor = [], [], 0
+    for match in token_re.finditer(tex):
+        if all(stack):
+            output.append(tex[cursor:match.start()])
+        token = match.group(0)
+        if token == r"\iffalse":
+            stack.append(False)
+        elif token == r"\iftrue":
+            stack.append(True)
+        elif stack:
+            stack.pop()
+        cursor = match.end()
+    if all(stack):
+        output.append(tex[cursor:])
+    return "".join(output)
+
+
 def read_tex_tree(main_path, *, root=None):
     """Recursively expand \input/\include from one workspace-contained TeX tree.
 
@@ -80,16 +105,21 @@ def read_tex_tree(main_path, *, root=None):
             raise TexTreeError(f"cyclic TeX include: {cycle}")
         if not resolved.is_file():
             raise TexTreeError(f"missing TeX include: {resolved}")
-        source = strip_comments(read(resolved))
+        source = strip_inactive_tex(strip_comments(read(resolved)))
 
         def replace(match):
-            value = match.group(1).strip()
+            value = (match.group(1) or match.group(2)).strip()
             child = Path(value)
             if child.suffix == "":
                 child = child.with_suffix(".tex")
             return expand(resolved.parent / child, (*stack, resolved))
 
-        return re.sub(r"\\(?:input|include)\s*\{([^}]+)\}", replace, source)
+        # TeX accepts both ``\input{file}`` and the primitive ``\input file`` form.
+        return re.sub(
+            r"\\(?:input|include)\s*(?:\{([^}]+)\}|([^\s%]+))",
+            replace,
+            source,
+        )
 
     return expand(main, ())
 
@@ -240,6 +270,52 @@ def check_style(args):
         viol.append({"metric": "body_bullets", "value": bullets, "budget": 0,
                      "note": "write contributions/lists as prose, not itemize/enumerate"})
 
+    # Internal workflow artifacts belong in code/reproducibility records, never in
+    # scientific prose. Inspect running prose rather than LaTeX include/figure paths.
+    leak_patterns = {
+        "workspace_path": r"\b(?:paper|results|reports|tools|code)/[A-Za-z0-9_.\-/]+",
+        "implementation_file": r"\b[A-Za-z0-9_.-]+\.(?:py|json|csv|md)\b",
+        "agent_command": r"(?:\$(?:paperwrite|expplan|runplan|ideagen)|/(?:goal|paperwrite|expplan|runplan|ideagen))\b",
+        "workflow_jargon": r"\b(?:RUN_STATE|RESULTS_LEDGER|canonical artifact|Coding Agent)\b",
+    }
+    for kind, pattern in leak_patterns.items():
+        hits = sorted(set(re.findall(pattern, prose, flags=re.I)))
+        if hits:
+            viol.append({"metric": "internal_workflow_leak", "kind": kind, "hits": hits})
+
+    # Abstract length/completeness is venue/reference-derived and therefore stored
+    # alongside the paper rather than hard-coded here.
+    abstract_contract_path = os.path.join(args.paper_dir, "abstract_contract.json")
+    abstract_match = re.search(r"\\begin\{abstract\}(.*?)\\end\{abstract\}", tex, re.S)
+    if not os.path.exists(abstract_contract_path):
+        viol.append({"metric": "abstract_contract", "issue": "missing abstract_contract.json"})
+    elif not abstract_match:
+        viol.append({"metric": "abstract_contract", "issue": "abstract environment not found"})
+    else:
+        with open(abstract_contract_path, encoding="utf-8") as contract_file:
+            abstract_contract = json.load(contract_file)
+        abstract = CTRL_SEQ_RE.sub(" ", strip_comments(abstract_match.group(1)))
+        abstract_words = len(WORD_RE.findall(abstract))
+        minimum = abstract_contract.get("min_words")
+        maximum = abstract_contract.get("max_words")
+        if not isinstance(minimum, int) or not isinstance(maximum, int) or minimum <= 0 or maximum < minimum:
+            viol.append({"metric": "abstract_contract", "issue": "invalid min_words/max_words"})
+        elif not minimum <= abstract_words <= maximum:
+            viol.append({"metric": "abstract_length", "words": abstract_words,
+                         "allowed": [minimum, maximum]})
+        required_slots = {"motivation", "gap", "method", "evaluation_scope", "principal_result", "takeaway"}
+        evidence = abstract_contract.get("slot_evidence", {})
+        if set(evidence) != required_slots:
+            viol.append({"metric": "abstract_slots", "issue": "slot_evidence must contain all six roles",
+                         "missing": sorted(required_slots - set(evidence))})
+        else:
+            normalized_abstract = re.sub(r"\s+", " ", abstract).strip().lower()
+            missing_slots = [slot for slot, phrase in evidence.items()
+                             if not str(phrase).strip() or re.sub(r"\s+", " ", str(phrase)).strip().lower()
+                             not in normalized_abstract]
+            if missing_slots:
+                viol.append({"metric": "abstract_slots", "missing_or_stale": sorted(missing_slots)})
+
     # long section with no \paragraph subheading — exempt narrative sections that
     # conventionally have none (Intro/Conclusion/Limitations/Ethics/Discussion).
     NARRATIVE = ("introduction", "conclusion", "limitation", "ethic", "discussion", "future")
@@ -252,6 +328,253 @@ def check_style(args):
     return {"check": "style", "ok": not viol, "body_words": words,
             "counts": counts, "rates": rates, "equations": equations,
             "budgets": STYLE_BUDGETS, "violations": viol}
+
+
+def check_scholarship(args):
+    """Check explicit citation and experimental-setup obligations without quotas."""
+    tex = manuscript_tex(args)
+    section_map = {title.lower(): text for title, text in sections(body_only(tex))}
+    contract_path = os.path.join(args.paper_dir, "scholarship_contract.json")
+    violations = []
+    if not os.path.exists(contract_path):
+        return {"check": "scholarship", "ok": False,
+                "violations": [{"issue": "missing scholarship_contract.json"}]}
+    with open(contract_path, encoding="utf-8") as contract_file:
+        contract = json.load(contract_file)
+
+    def section_text(label):
+        matches = [text for title, text in section_map.items() if label.lower() in title]
+        return "\n".join(matches)
+
+    obligations = contract.get("citation_obligations", [])
+    if not obligations:
+        violations.append({"issue": "citation_obligations must be non-empty"})
+    for index, item in enumerate(obligations):
+        required = ("name", "kind", "section", "citation_key", "supported_clause",
+                    "source_evidence_path", "source_evidence_excerpt")
+        missing = [key for key in required if not str(item.get(key, "")).strip()]
+        if missing:
+            violations.append({"issue": "citation_obligation_incomplete", "index": index,
+                               "missing": missing})
+            continue
+        evidence_path = (Path(args.paper_dir).resolve().parent / item["source_evidence_path"]).resolve()
+        project_root = Path(args.paper_dir).resolve().parent
+        try:
+            evidence_path.relative_to(project_root)
+            evidence_text = evidence_path.read_text(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
+            evidence_text = ""
+        if str(item["source_evidence_excerpt"]).strip() not in evidence_text:
+            violations.append({"issue": "citation_source_evidence_missing", "name": item["name"],
+                               "path": str(item["source_evidence_path"])})
+        text = section_text(item["section"])
+        if not text:
+            violations.append({"issue": "citation_section_missing", "name": item["name"],
+                               "section": item["section"]})
+        else:
+            cited = {
+                key.strip()
+                for group in re.findall(r"\\cite\w*\{([^}]*)\}", text)
+                for key in group.split(",")
+            }
+        if text and item["citation_key"] not in cited:
+            violations.append({"issue": "citation_missing_at_use", "name": item["name"],
+                               "section": item["section"], "citation_key": item["citation_key"]})
+        elif text:
+            clause = re.sub(r"\s+", " ", str(item["supported_clause"])).strip().lower()
+            sentences = re.split(r"(?<=[.!?])\s+", re.sub(r"\s+", " ", text))
+            if not any(
+                clause in sentence.lower()
+                and item["citation_key"] in {
+                    key.strip() for group in re.findall(r"\\cite\w*\{([^}]*)\}", sentence)
+                    for key in group.split(",")
+                }
+                for sentence in sentences
+            ):
+                violations.append({"issue": "citation_not_bound_to_supported_clause",
+                                   "name": item["name"], "section": item["section"],
+                                   "citation_key": item["citation_key"]})
+
+    normalized_obligations = [
+        {
+            "section": str(item.get("section", "")).lower(),
+            "key": str(item.get("citation_key", "")),
+            "clause": re.sub(r"\s+", " ", str(item.get("supported_clause", ""))).lower(),
+            "name": str(item.get("name", "")).lower(),
+        }
+        for item in obligations if isinstance(item, dict)
+    ]
+    for title, section in section_map.items():
+        for sentence in re.split(r"(?<=[.!?])\s+", re.sub(r"\s+", " ", section)):
+            sentence_lower = sentence.lower()
+            keys = {
+                key.strip() for group in re.findall(r"\\cite\w*\{([^}]*)\}", sentence)
+                for key in group.split(",")
+            }
+            for key in keys:
+                if not any(item["section"] in title and item["key"] == key
+                           and item["clause"] in sentence_lower for item in normalized_obligations):
+                    violations.append({"issue": "cited_sentence_missing_support_obligation",
+                                       "section": title, "citation_key": key})
+            for item in normalized_obligations:
+                if item["section"] in title and item["name"] and item["name"] in sentence_lower:
+                    if item["key"] not in keys or item["clause"] not in sentence_lower:
+                        violations.append({"issue": "named_source_claim_outside_supported_clause",
+                                           "section": title, "name": item["name"]})
+
+    audit = contract.get("independent_source_audit", {})
+    audit_keys = {str(key) for key in audit.get("checked_keys", [])} if isinstance(audit, dict) else set()
+    obligation_keys = {str(item.get("citation_key")) for item in obligations if isinstance(item, dict)}
+    try:
+        dt_value = __import__("datetime").date.fromisoformat(str(audit.get("reviewed_at", "")))
+        del dt_value
+        date_valid = True
+    except (ValueError, TypeError):
+        date_valid = False
+    if not (
+        isinstance(audit, dict) and audit.get("verdict") == "pass"
+        and audit.get("metadata_verified") is True and date_valid
+        and audit_keys == obligation_keys and audit.get("unsupported_clauses") == []
+    ):
+        violations.append({"issue": "independent_source_audit_incomplete_or_red"})
+
+    entities = contract.get("setup_entities", [])
+    if not entities:
+        violations.append({"issue": "setup_entities must be non-empty"})
+    for index, item in enumerate(entities):
+        required = ("name", "kind", "section", "description_evidence",
+                    "rationale_evidence", "claim_ids", "citation_key")
+        missing = [key for key in required if key not in item or item[key] in (None, "", [])]
+        if missing:
+            violations.append({"issue": "setup_entity_incomplete", "index": index,
+                               "missing": missing})
+            continue
+        text = re.sub(r"\s+", " ", section_text(item["section"])).lower()
+        for field in ("description_evidence", "rationale_evidence"):
+            phrase = re.sub(r"\s+", " ", str(item[field])).lower()
+            if phrase not in text:
+                violations.append({"issue": f"setup_{field}_missing", "name": item["name"],
+                                   "section": item["section"]})
+    return {"check": "scholarship", "ok": not violations,
+            "citation_obligations": len(obligations), "setup_entities": len(entities),
+            "violations": violations}
+
+
+def _json_pointer(value, pointer):
+    node = value
+    for token in str(pointer).strip("/").split("/") if str(pointer).strip("/") else []:
+        token = token.replace("~1", "/").replace("~0", "~")
+        node = node[int(token)] if isinstance(node, list) else node[token]
+    return node
+
+
+def check_consistency(args):
+    """Bind canonical names, source values, and checked formulas across the paper."""
+    paper_dir = Path(args.paper_dir).resolve()
+    project_root = paper_dir.parent
+    tex = manuscript_tex(args)
+    contract_path = paper_dir / "scientific_consistency.json"
+    violations = []
+    if not contract_path.is_file():
+        return {"check": "consistency", "ok": False,
+                "violations": [{"issue": "missing scientific_consistency.json"}]}
+    try:
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return {"check": "consistency", "ok": False,
+                "violations": [{"issue": "invalid scientific_consistency.json", "error": str(exc)}]}
+
+    terms = contract.get("canonical_terms", [])
+    values = contract.get("source_values", [])
+    formal_links = contract.get("formal_links", [])
+    source_plan_value = str(contract.get("source_plan", "")).strip()
+    try:
+        source_plan = (project_root / source_plan_value).resolve()
+        source_plan.relative_to(project_root)
+        plan_source = source_plan.read_text(encoding="utf-8")
+        plan_match = re.search(
+            r'<script\b[^>]*id=["\']experiment-plan-contract["\'][^>]*>(.*?)</script>',
+            plan_source, re.S | re.I,
+        )
+        if not plan_match:
+            raise ValueError("missing experiment-plan-contract")
+        plan_contract = json.loads(plan_match.group(1))
+        if plan_contract.get("approval_status") != "approved":
+            raise ValueError("source experiment plan is not approved")
+        required_ids = plan_contract.get("consistency_requirements", {})
+    except (ValueError, OSError, json.JSONDecodeError) as exc:
+        required_ids = {}
+        violations.append({"issue": "consistency_source_plan_invalid", "error": str(exc)})
+
+    actual_ids = {
+        "canonical_terms": {str(item.get("id")) for item in terms if isinstance(item, dict)},
+        "source_values": {str(item.get("id")) for item in values if isinstance(item, dict)},
+        "formal_links": {str(item.get("id")) for item in formal_links if isinstance(item, dict)},
+    }
+    for key, actual in actual_ids.items():
+        expected = {str(item) for item in required_ids.get(key, [])}
+        if actual != expected:
+            violations.append({"issue": "consistency_coverage_mismatch", "kind": key,
+                               "expected": sorted(expected), "actual": sorted(actual)})
+    if not terms:
+        violations.append({"issue": "canonical_terms must be non-empty"})
+    for index, item in enumerate(terms):
+        if not all(key in item for key in ("id", "canonical", "forbidden_aliases")):
+            violations.append({"issue": "canonical_term_incomplete", "index": index})
+            continue
+        canonical = str(item["canonical"])
+        if canonical.lower() not in tex.lower():
+            violations.append({"issue": "canonical_term_missing", "id": item["id"]})
+        for alias in item["forbidden_aliases"]:
+            if str(alias).lower() in tex.lower():
+                violations.append({"issue": "forbidden_term_alias", "id": item["id"],
+                                   "alias": alias})
+
+    if not values:
+        violations.append({"issue": "source_values must be non-empty"})
+    for index, item in enumerate(values):
+        required = ("id", "source_path", "source_locator", "expected_value",
+                    "manuscript_evidence")
+        if any(key not in item for key in required):
+            violations.append({"issue": "source_value_incomplete", "index": index})
+            continue
+        source = (project_root / str(item["source_path"])).resolve()
+        try:
+            source.relative_to(project_root)
+            observed = _json_pointer(json.loads(source.read_text(encoding="utf-8")),
+                                     item["source_locator"])
+        except (ValueError, OSError, KeyError, IndexError, json.JSONDecodeError) as exc:
+            violations.append({"issue": "source_value_unreadable", "id": item["id"],
+                               "error": str(exc)})
+            continue
+        if observed != item["expected_value"]:
+            violations.append({"issue": "source_value_mismatch", "id": item["id"],
+                               "expected": item["expected_value"], "observed": observed})
+        if str(item["manuscript_evidence"]) not in tex:
+            violations.append({"issue": "source_value_manuscript_evidence_missing",
+                               "id": item["id"]})
+
+    verifier = paper_dir / "theory" / "verify.py"
+    for index, item in enumerate(formal_links):
+        required = ("id", "manuscript_evidence", "verifier_evidence")
+        if any(not str(item.get(key, "")).strip() for key in required):
+            violations.append({"issue": "formal_link_incomplete", "index": index})
+            continue
+        if str(item["manuscript_evidence"]) not in tex:
+            violations.append({"issue": "formal_manuscript_evidence_missing", "id": item["id"]})
+        verifier_text = verifier.read_text(encoding="utf-8") if verifier.is_file() else ""
+        try:
+            verifier_text = tokenize.untokenize(
+                token for token in tokenize.generate_tokens(StringIO(verifier_text).readline)
+                if token.type != tokenize.COMMENT
+            )
+        except (tokenize.TokenError, IndentationError):
+            verifier_text = ""
+        if str(item["verifier_evidence"]) not in verifier_text:
+            violations.append({"issue": "formal_verifier_evidence_missing", "id": item["id"]})
+    return {"check": "consistency", "ok": not violations,
+            "canonical_terms": len(terms), "source_values": len(values),
+            "formal_links": len(formal_links), "violations": violations}
 
 
 def label_page(paper_dir, main_base, label_substr):
@@ -398,6 +721,41 @@ def check_formal(args):
     viol = []
     if not has_verify:
         viol.append({"issue": "no_mechanical_check", "want": "paper/theory/verify.py or *.lean"})
+    elif os.path.exists(theory):
+        try:
+            process = subprocess.run(
+                [sys.executable, str(Path(theory).resolve())], cwd=args.paper_dir, text=True,
+                capture_output=True, timeout=30, check=False,
+            )
+            if process.returncode != 0:
+                viol.append({"issue": "mechanical_check_failed", "returncode": process.returncode,
+                             "output": (process.stdout + process.stderr)[-1000:]})
+            else:
+                consistency_path = Path(args.paper_dir) / "scientific_consistency.json"
+                required_formal = []
+                if consistency_path.is_file():
+                    required_formal = [
+                        str(item.get("id")) for item in json.loads(
+                            consistency_path.read_text(encoding="utf-8")
+                        ).get("formal_links", []) if isinstance(item, dict) and item.get("id")
+                    ]
+                if required_formal:
+                    try:
+                        payload = json.loads(process.stdout.strip().splitlines()[-1])
+                        checks = payload.get("checks", [])
+                        checked = {str(item.get("id")): item for item in checks if isinstance(item, dict)}
+                        valid_methods = {"sympy", "lean", "numeric", "symbolic"}
+                        if set(checked) != set(required_formal) or any(
+                            item.get("passed") is not True
+                            or item.get("method") not in valid_methods
+                            or "residual" not in item
+                            for item in checked.values()
+                        ):
+                            raise ValueError("formal check coverage/status is incomplete")
+                    except (json.JSONDecodeError, IndexError, AttributeError, ValueError) as exc:
+                        viol.append({"issue": "mechanical_check_protocol_invalid", "error": str(exc)})
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            viol.append({"issue": "mechanical_check_failed", "error": str(exc)})
     if equations < EQUATION_FLOOR:
         viol.append({"issue": "too_few_equations", "value": equations, "want": EQUATION_FLOOR})
     if not has_deriv:
@@ -505,8 +863,10 @@ def check_floats(args):
     return {"check": "floats", "ok": not viol, "n_floats": len(floats), "violations": viol}
 
 
-CHECKS = {"budget": check_budget, "style": check_style, "length": check_length,
-          "formal": check_formal, "format": check_format, "floats": check_floats}
+CHECKS = {"budget": check_budget, "style": check_style, "scholarship": check_scholarship,
+          "consistency": check_consistency,
+          "length": check_length, "formal": check_formal, "format": check_format,
+          "floats": check_floats}
 
 
 def measure_ref_shares(ref_txt):

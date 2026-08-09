@@ -215,11 +215,29 @@ def load_project_config(
     paths = config.get("paths")
     if not isinstance(paths, dict):
         raise ProjectConfigError("paper_studio.json paths is required")
+    resolved_paths: dict[str, Path] = {}
     for field in ("metrics", "main", "reference"):
         value = str(paths.get(field, "")).strip()
         if not value:
             raise ProjectConfigError(f"paper_studio.json paths.{field} is required")
-        _project_path(root, value, f"paths.{field}")
+        resolved = _project_path(root, value, f"paths.{field}")
+        if not resolved.is_file():
+            raise ProjectConfigError(f"paper_studio.json paths.{field} does not exist: {value}")
+        resolved_paths[field] = resolved
+    if len(set(resolved_paths.values())) != 3:
+        raise ProjectConfigError("paper_studio.json main, reference, and metrics paths must be distinct")
+    if resolved_paths["main"].suffix.lower() != ".tex" or r"\begin{document}" not in resolved_paths[
+        "main"
+    ].read_text(encoding="utf-8", errors="replace"):
+        raise ProjectConfigError("paper_studio.json paths.main must be a LaTeX document entry point")
+    if not resolved_paths["reference"].read_text(encoding="utf-8", errors="replace").strip():
+        raise ProjectConfigError("paper_studio.json paths.reference must contain extracted reference text")
+    try:
+        metrics_payload = json.loads(resolved_paths["metrics"].read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ProjectConfigError("paper_studio.json paths.metrics must contain valid JSON") from exc
+    if not isinstance(metrics_payload, (dict, list)) or not metrics_payload:
+        raise ProjectConfigError("paper_studio.json paths.metrics must contain a non-empty JSON object or list")
     return config
 
 
