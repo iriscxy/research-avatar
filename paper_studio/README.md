@@ -32,7 +32,7 @@ LaTeX in the approved plan order.
 
 Each manuscript section stores its own `previous_response_id` in
 `paper/.paper_studio/state.json`. The first request in a section bootstraps the
-approved outline, writing style, and complete BibTeX catalog. Later requests rely
+approved outline, the Writing Style section of `researcher-profile/PROFILE.md`, and complete BibTeX catalog. Later requests rely
 on that conversation state and send only changing paragraph context. Developer
 instructions are still sent on every request because Responses API instructions
 are not inherited through `previous_response_id`.

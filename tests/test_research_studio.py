@@ -97,6 +97,8 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertNotIn("README 对比", demo_source)
         self.assertNotIn("解析研究画像", demo_source)
         self.assertNotIn("upload-zone", demo_source)
+        self.assertNotIn("paper/WRITING_STYLE.md", demo_source)
+        self.assertIn("PROFILE.md · Writing Style", demo_source)
         self.assertIn("$profileconstruct 使用 ~/Downloads/scholar_profile.html", demo_source)
         self.assertIn('data-action="select-idea"', demo_source)
         self.assertIn('data-action="approve-expplan"', demo_source)

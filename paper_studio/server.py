@@ -1233,9 +1233,6 @@ def read_text(path: Path, limit: int = 24000) -> str:
 
 
 def writing_style_context() -> str:
-    detailed = PAPER / "WRITING_STYLE.md"
-    if detailed.exists():
-        return read_text(detailed, 20000)
     profile = read_text(ROOT / "researcher-profile/PROFILE.md", 50000)
     match = re.search(
         r"## Writing Style\s*(.*?)(?=\n## Experiment Templates)",

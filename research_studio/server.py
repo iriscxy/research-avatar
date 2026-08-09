@@ -830,15 +830,14 @@ def profile_progress_state(job: dict[str, Any], root: Path = ROOT) -> dict[str, 
         pdf_dir = root / "researcher-profile/fulltext/pdf"
         pdfs = len(list(pdf_dir.glob("*.pdf"))) if pdf_dir.exists() else 0
 
-    style_path = root / "paper/WRITING_STYLE.md"
     profile_path = root / ARTIFACTS["profile"][0]
     publications_path = root / ARTIFACTS["publications"][0]
-    style_text = read_text(style_path) if style_path.exists() else ""
+    style_text = read_text(profile_path) if profile_path.exists() else ""
     style_read = _style_fulltext_count(style_text)
     style_target = _profile_style_target(root)
     started_at = int(job.get("started_at") or 0)
 
-    relevant_paths = [publications_path, profile_path, style_path]
+    relevant_paths = [publications_path, profile_path]
     fulltext_dir = root / "researcher-profile/fulltext"
     if fulltext_dir.exists():
         relevant_paths.extend(path for path in fulltext_dir.rglob("*") if path.is_file())
@@ -879,7 +878,7 @@ def profile_progress_state(job: dict[str, Any], root: Path = ROOT) -> dict[str, 
         (4, "研究身份与写作风格", f"阅读全文 {style_read}/{style_target or '—'}"),
         (5, "失败经验与隐性知识", "可用证据归纳"),
         (6, "实验与工作流偏好", "读取可用历史"),
-        (7, "生成画像与写作指南", "PROFILE.md + WRITING_STYLE.md"),
+        (7, "生成完整研究画像", "PROFILE.md"),
         (8, "清理与最终校验", "检查 canonical artifacts"),
     )
     phases = []
@@ -995,11 +994,10 @@ def run_profileconstruct_job(upload_path: Path, publication_count: int, input_na
         return_code = process.wait()
         profile_ready = (ROOT / ARTIFACTS["profile"][0]).exists()
         publications_ready = (ROOT / ARTIFACTS["publications"][0]).exists()
-        writing_style_ready = (ROOT / "paper/WRITING_STYLE.md").exists()
-        if return_code == 0 and profile_ready and publications_ready and writing_style_ready:
+        if return_code == 0 and profile_ready and publications_ready:
             update_profile_job(
                 status="complete",
-                message="研究画像已生成，可以查看 PROFILE.md、publications.json 与 WRITING_STYLE.md。",
+                message="研究画像已生成；身份、研究脉络、写作风格与实验习惯均在同一个 PROFILE.md 中查看。",
                 completed_at=int(time.time()),
             )
         else:
@@ -1008,8 +1006,6 @@ def run_profileconstruct_job(upload_path: Path, publication_count: int, input_na
                 missing.append("PROFILE.md")
             if not publications_ready:
                 missing.append("publications.json")
-            if not writing_style_ready:
-                missing.append("WRITING_STYLE.md")
             missing_text = ", ".join(missing)
             if return_code == 0:
                 message = f"Coding Agent 已结束，但未生成 {missing_text}。可查看日志、清除提示后重新上传。"
