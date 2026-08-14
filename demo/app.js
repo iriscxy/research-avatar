@@ -6,34 +6,102 @@ const commandStrip = (title, command, detail = "在终端中的 Coding Agent 执
 
 const pendingRows = (xs, series) => xs.map(x => `<tr><th>${x}</th>${series.map(() => `<td class="demo-pending">PENDING</td>`).join("")}</tr>`).join("");
 
-const blankFigureWithSource = ({ id, title, dataset, metric, xLabel, xs, series }) => `
-  <section class="evidence-artifact">
-    <p class="artifact-kicker">${id} · DATA-DRIVEN FIGURE</p>
-    <h4>${title}</h4>
-    <p>${dataset} · ${metric}。左侧数字表是唯一绘图来源；任何一格未验证，右图都保持空白。</p>
+const pendingTable = ({ headers, rows, className = "" }) => `
+  <div class="table-scroll"><table class="result-shell source-table ${className}"><thead><tr>${headers.map(name => `<th>${name}</th>`).join("")}</tr></thead><tbody>${rows.map(name => `<tr><th>${name}</th>${headers.slice(1).map(() => `<td class="demo-pending">PENDING</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+
+const projectedPanel = ({ title, dataset, metric, fields, xLabel, xs, series, image }) => `
+  <section class="projected-panel">
+    <h5>${title}</h5>
+    <p><strong>Dataset / benchmark:</strong> ${dataset}</p>
+    <p><strong>Metric / axes:</strong> ${metric}</p>
     <div class="figure-data-pair">
       <div class="numeric-source">
-        <div class="table-scroll"><table class="result-shell source-table"><thead><tr><th>${xLabel}</th>${series.map(name => `<th>${name}</th>`).join("")}</tr></thead><tbody>${pendingRows(xs, series)}</tbody></table></div>
-        <p class="field-line">Required fields → model_id · intent_id · style_id · layer_id · judge_label</p>
+        ${pendingTable({headers:[xLabel,...series],rows:xs})}
+        <p class="field-line">Required fields → ${fields}</p>
       </div>
-      <div class="blank-chart" aria-label="Empty chart waiting for verified data">
-        <div class="blank-axis blank-y"></div><div class="blank-axis blank-x"></div>
-        <strong>等待验证数据</strong><span>表格全部 FILLED 后，才调用同一 Python 脚本画图</span>
-      </div>
+      <figure class="projected-chart">
+        <img src="${image}" alt="${title} projected preview">
+        <figcaption>PROJECTED SHAPE — NOT RESULTS · 左表才是后续实验必须填入的真实数字来源。</figcaption>
+      </figure>
     </div>
   </section>`;
 
-const mainPendingTable = () => {
-  const methods = ["No Defense", "ABD", "RTV", "JBShield", "TrajGuard", "First-Divergence Repair"];
-  return `<section class="evidence-artifact"><p class="artifact-kicker">T1 · MAIN RESULTS</p><h4>安全、过度拒答与通用能力必须同表出现</h4><div class="table-scroll"><table class="result-shell main-result"><thead><tr><th>Method</th><th>AdvBench DSR ↑</th><th>HarmBench DSR ↑</th><th>XSTest false refusal ↓</th><th>Just-Eval retention ↑</th></tr></thead><tbody>${methods.map(name => `<tr><th>${name}</th>${[0,1,2,3].map(() => `<td class="demo-pending">PENDING</td>`).join("")}</tr>`).join("")}</tbody></table></div><p class="field-line">24 个单元格全部 RUN_LOCAL；不复制论文数字。每格绑定 raw JSON/JSONL、实际命令、配置与 bootstrap 区间。</p></section>`;
-};
+const resultTable = ({ id, title, headers, rows, note }) => `
+  <section class="evidence-artifact result-table-artifact">
+    <p class="artifact-kicker">${id} · RESULT PLACEHOLDER — NO NUMBERS FABRICATED</p>
+    <h4>${title}</h4>
+    ${pendingTable({headers,rows,className:"main-result"})}
+    <p>${note}</p>
+  </section>`;
 
-const experimentPlanDemo = () => `
-  <section class="plain-section"><p class="artifact-kicker">PROJECTED PAPER</p><h4>First-Divergence Repair: Causal Single-Layer Recovery from Style-Induced Jailbreaks</h4><ul><li><strong>C1</strong>：匹配语义的风格变换产生可复现的首次 safety-tube exit。</li><li><strong>C2</strong>：只修首次偏离层，后续轨迹应自行恢复；错误层或重复修复若并列，主张失败。</li><li><strong>C3</strong>：必须同时改善 DSR、XSTest、Just-Eval 与部署成本，而不是只降低 ASR。</li></ul></section>
-  ${mainPendingTable()}
-  ${blankFigureWithSource({id:"F3A",title:"修复层偏移：首次偏离层是否有唯一峰值？",dataset:"AdvBench 50 + XSTest",metric:"Safety recovery + benign utility retention",xLabel:"Offset from first exit",xs:[-3,-2,-1,0,1,2,3],series:["Safety recovery","Utility retention"]})}
-  ${blankFigureWithSource({id:"F4",title:"修复强度的 safety–utility 曲线",dataset:"AdvBench + HarmBench + XSTest",metric:"DSR / 1−false refusal / Just-Eval retention",xLabel:"Repair strength",xs:[0.25,0.5,0.75,1.0,1.25],series:["Defense success","1−false refusal","Just-Eval"]})}
-  <section class="plain-section"><p class="artifact-kicker">CAUSAL ABLATIONS</p><h4>T2 不做装饰性消融，只攻击核心因果主张</h4><ul><li>Full first-exit repair</li><li>Random layer</li><li>ABD-selected layer</li><li>Latest-exit layer</li><li>Repeated multi-layer repair</li></ul></section>`;
+const experimentPlanDemo = () => {
+  const methods = ["No Defense", "ABD", "RTV", "JBShield", "TrajGuard", "First-Divergence Repair"];
+  return `
+    <article class="actual-expplan">
+      <header class="expplan-title">
+        <p class="artifact-kicker">EXPERIMENT PLAN · I1 · APPROVED 2026-08-09</p>
+        <h4>First-Divergence Repair</h4>
+        <p>从预计论文反推证据：每一个数字都保持待填，每一个图形都绑定旁侧真实数据表。</p>
+        <div class="expplan-facts"><span>ACL 2027</span><span>4 figures</span><span>3 tables</span><span>144 pending cells</span><span>4×A100 · 428 GPU-hours</span></div>
+      </header>
+
+      <section class="plain-section">
+        <p class="artifact-kicker">1 · TARGET AND REFERENCES</p>
+        <h4>Target Conference and Reference Papers</h4>
+        <ul><li><strong>Target:</strong> ACL 2027 Main Conference / Long Paper.</li><li><strong>Mechanism reference:</strong> RTV，负责科学问题、轨迹机制和必须击败的比较地板。</li><li><strong>Researcher-owned structure reference:</strong> ABD，只负责段落功能、章节比例和图表节奏。</li></ul>
+      </section>
+
+      <section class="plain-section projected-abstract">
+        <p class="artifact-kicker">2.1 · PROJECTED TITLE AND ABSTRACT</p>
+        <h4>First-Divergence Repair: Causal Single-Layer Recovery from Style-Induced Jailbreaks</h4>
+        <p>We test whether intent-preserving style transformations cause a reproducible first exit from a model's safety trajectory and whether repairing only that layer restores downstream safety. A unified white-box framework compares five rerun representation defenses across AdvBench, HarmBench, XSTest, and Just-Eval. The claim survives only if first-exit repair uniquely beats wrong-layer and repeated-repair controls while improving the safety–utility–cost frontier.</p>
+      </section>
+
+      <section class="plain-section setup-section">
+        <p class="artifact-kicker">5.1 · SETUP</p><h4>统一模型、数据、基线与评测通路</h4>
+        <dl class="setup-grid"><dt>Models</dt><dd>Llama-3.1-8B-Instruct · Mistral-7B-Instruct-v0.3 · Qwen2.5-7B-Instruct</dd><dt>Harmful</dt><dd>AdvBench 50-behavior subset · HarmBench 1.0</dd><dt>Benign / quality</dt><dd>XSTest · Just-Eval · Alpaca benign controls</dd><dt>Safety judge</dt><dd>SORRY-Bench evaluator</dd><dt>Baselines</dt><dd>No Defense · ABD · RTV · JBShield · TrajGuard</dd><dt>Metrics</dt><dd>First-exit stability · Downstream trajectory recovery · DSR · XSTest false refusal · Just-Eval retention · latency overhead</dd></dl>
+      </section>
+
+      <section class="plain-section claim-contract">
+        <p class="artifact-kicker">2.4 · CLAIM–FALSIFIER–EVIDENCE</p><h4>三个主张都预先写明失败条件</h4>
+        <div class="claim-rows"><div><b>C1</b><p>匹配意图的风格变换产生可复现的最早 safety-tube exit。</p><span>若 exit depth 跨 paraphrase、seed 或 model 不稳定，则失败。</span></div><div><b>C2</b><p>只修 first-exit layer 足以恢复下游安全几何并降低 harmful compliance。</p><span>若随机层、ABD 层、后续层或重复修复并列或更优，则失败。</span></div><div><b>C3</b><p>一次修复改善 safety–utility–cost frontier。</p><span>若 DSR 增益必须以更差的 XSTest、Just-Eval 或 latency 换取，则失败。</span></div></div>
+      </section>
+
+      <section class="evidence-artifact motivation-artifact">
+        <p class="artifact-kicker">F1 · MOTIVATION · NON-DATA-DRIVEN</p><h4>Same harmful intent, different style, first divergent depth highlighted</h4>
+        <div class="motivation-figure"><div class="intent-node">Same harmful intent</div><div class="style-path direct"><strong>Direct harmful</strong><span>L0</span><i></i><span>L1</span><i></i><span>L2</span><i></i><span>L3</span></div><div class="style-path transformed"><strong>Style-transformed</strong><span>L0</span><i></i><span>L1</span><i class="exit"></i><span class="exit-label">FIRST EXIT · L2</span><i></i><span>L3</span></div><div class="repair-node">one-shot repair at first exit → downstream recovery?</div></div>
+      </section>
+
+      <section class="evidence-artifact">
+        <p class="artifact-kicker">F2 · CLAIM C1 · TWO PANELS</p><h4>Where the safety trajectory first leaves its tube</h4>
+        ${projectedPanel({title:"F2A · Where safety trajectories leave the tube",dataset:"AdvBench 50 + matched-style counterfactuals",metric:"Safety-tube exit rate; x = normalized transformer depth; y = exit rate",fields:"model_id · intent_id · style_id · layer_id · tube_exit",xLabel:"Normalized transformer depth",xs:["0.0","0.14","0.29","0.43","0.57","0.71","0.86","1.0"],series:["Direct harmful","Style-transformed harmful"],image:"assets/expplan/F2_exit_depth.png"})}
+        ${projectedPanel({title:"F2B · First exits concentrate for successful jailbreaks",dataset:"HarmBench 1.0 + matched-style counterfactuals",metric:"First-exit probability; x = normalized transformer depth; y = probability",fields:"model_id · intent_id · style_id · layer_id · first_exit_layer · judge_label",xLabel:"Normalized transformer depth",xs:["0.0","0.14","0.29","0.43","0.57","0.71","0.86","1.0"],series:["Successful jailbreak","Unsuccessful jailbreak"],image:"assets/expplan/F2_first_exit_concentration.png"})}
+      </section>
+
+      <section class="evidence-artifact">
+        <p class="artifact-kicker">F3 · CLAIM C2 · TWO PANELS</p><h4>Does one repair restore the downstream trajectory?</h4>
+        ${projectedPanel({title:"F3A · Only the first-exit layer should recover safety",dataset:"AdvBench 50 + XSTest",metric:"Normalized safety recovery and benign utility retention",fields:"model_id · intent_id · first_exit_layer · repair_layer · judge_label · benign_refusal",xLabel:"Repair-layer offset",xs:["-3","-2","-1","0","1","2","3"],series:["Safety recovery","Benign utility retention"],image:"assets/expplan/F3_repair_offset.png"})}
+        ${projectedPanel({title:"F3B · One repair should restore downstream geometry",dataset:"HarmBench 1.0 + matched-style counterfactuals",metric:"Safe-reference trajectory cosine similarity",fields:"model_id · intent_id · layer_id · repair_condition · safe_reference_similarity",xLabel:"Depth after first exit",xs:["0","1","2","3","4","5","6"],series:["No repair","First-exit repair","Wrong-layer repair"],image:"assets/expplan/F3_downstream_recovery.png"})}
+      </section>
+
+      ${resultTable({id:"T1",title:"Main safety–utility comparison",headers:["Method / condition","AdvBench DSR ↑ (%, 95% CI)","HarmBench DSR ↑ (%, 95% CI)","XSTest false refusal ↓ (%, 95% CI)","Just-Eval retention ↑ (%, 95% CI)"],rows:methods,note:"每一行都在统一 decoding 与 judge contract 下本地重跑；不复用论文中的已发表数字。"})}
+      ${resultTable({id:"T2",title:"Single-site causal ablation matrix",headers:["Method / condition","First-exit stability ↑","Downstream recovery ↑","HarmBench DSR ↑","XSTest false refusal ↓"],rows:["Full first-exit repair","Random layer","ABD-selected layer","Latest-exit layer","Repeated multi-layer repair"],note:"决定性比较是完整 first-exit repair 对随机、ABD-selected、latest-exit 与 repeated-repair controls。"})}
+
+      <section class="evidence-artifact">
+        <p class="artifact-kicker">F4 · CLAIM C3 · SENSITIVITY</p><h4>Repair-strength safety–utility sensitivity</h4>
+        ${projectedPanel({title:"F4 · Safety–utility sensitivity to repair strength",dataset:"AdvBench 50 + HarmBench 1.0 + XSTest",metric:"DSR, false-refusal complement, and Just-Eval retention",fields:"model_id · repair_strength · judge_label · benign_refusal · just_eval_score",xLabel:"Repair strength",xs:["0.25","0.5","0.75","1.0","1.25"],series:["Defense success","1 − false refusal","Just-Eval retention"],image:"assets/expplan/F4_repair_strength.png"})}
+      </section>
+
+      ${resultTable({id:"T3",title:"Efficiency and failure surface",headers:["Method / condition","Latency overhead ↓ (ms/query)","Peak memory overhead ↓ (GiB)","Unrecovered cases ↓ (%, 95% CI)"],rows:methods,note:"Failure cases 在 metric 冻结后分类；不把定性原因转换成虚构分数。"})}
+
+      <section class="plain-section implementation-section">
+        <p class="artifact-kicker">2.5 · IMPLEMENTATION PLAN</p><h4>所有方法接入同一个本地框架</h4>
+        <div class="table-scroll"><table class="implementation-table"><thead><tr><th>Method</th><th>How it is implemented</th></tr></thead><tbody><tr><th>No Defense</th><td>共享 generation path，关闭全部 defense。</td></tr><tr><th>ABD</th><td>本地实现 safety-boundary estimation、penalty 与 layer selection，复用统一 hooks。</td></tr><tr><th>RTV</th><td>本地实现 refusal-direction fingerprints 与 multi-layer Mahalanobis trajectory scoring。</td></tr><tr><th>JBShield</th><td>通过 local adapter 接入官方 concept extraction、scoring、mitigation 与 mixed-input gating；<a href="https://github.com/NISPLab/JBShield" target="_blank" rel="noreferrer">Official GitHub</a>。</td></tr><tr><th>TrajGuard</th><td>本地实现 sliding-window hidden-state aggregation、persistence thresholding 与 semantic adjudication。</td></tr><tr><th>Our method — First-Divergence Repair</th><td>在同一 model、trace、generation、evaluator 接口上实现 first-exit localization、one-shot repair 与 downstream recovery。</td></tr></tbody></table></div>
+      </section>
+
+      <section class="approval-line"><strong>3 · APPROVAL</strong><span>APPROVED · 2026-08-09</span><p>实验开始前冻结 7 个 claim-bearing floats、144 个数字目标、预算与 decision criteria；结果不支持时按 falsifier 收窄或放弃主张。</p></section>
+    </article>`;
+};
 
 const runParts = [
   ["P1", "Instrumentation", [["→", "G1.1", "最小可复现轨迹通路", "F1 · 非实验动机图规格"]]],
@@ -96,12 +164,10 @@ const stages = [
   },
   {
     id: "expplan", short: "实验设计", path: "experiment-plan", title: "先固定证据空位，再反推实验",
-    compare: ["从任务目标和实验空间开始探索", "论文结构通常在结果后整理", "先固定图表与证据空位，避免漏证据和事后叙事"],
+    compare: null,
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">STEP 04 · EXPPLAN</p><h3>Projected Paper 先于实验任务</h3><p>下面直接依据真实的 03 HTML：I1、ACL 2027、7 个正文图表、144 个逐格待填数字。</p></div><span class="status-pill">APPROVED</span></div>
+      <div class="stage-head"><div><p class="eyebrow">STEP 04 · EXPPLAN</p><h3>Projected Paper 先于实验任务</h3><p>以下内容与实际 reports/03_EXPERIMENT_PLAN.html 对齐：完整展示 4 图、3 表、相邻图源数据表、基线实现和预注册 falsifier。</p></div><span class="status-pill">APPROVED</span></div>
       ${commandStrip("生成实验设计与待填图表", "$expplan")}
-      ${reportDocument("expplan")}
-      ${reportDocument("projected-paper", "PROJECTED PAPER · FIXED SUBSECTIONS")}
       ${experimentPlanDemo()}`
   },
   {
@@ -191,7 +257,7 @@ document.addEventListener("click", async event => {
 
 async function initializeDemo() {
   try {
-    const response = await fetch("report-structures.json?v=20260814-persistent-tabs");
+    const response = await fetch("report-structures.json?v=20260814-expplan-parity");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     reportStructures = await response.json();
     state.stage = stageIndexFromLocation();
