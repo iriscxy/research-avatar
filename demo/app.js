@@ -57,14 +57,16 @@ const experimentPlanDemo = () => {
         <p>We test whether intent-preserving style transformations cause a reproducible first exit from a model's safety trajectory and whether repairing only that layer restores downstream safety. A unified white-box framework compares five rerun representation defenses across AdvBench, HarmBench, XSTest, and Just-Eval. The claim survives only if first-exit repair uniquely beats wrong-layer and repeated-repair controls while improving the safety–utility–cost frontier.</p>
       </section>
 
-      <section class="plain-section setup-section">
-        <p class="artifact-kicker">5.1 · SETUP</p><h4>统一模型、数据、基线与评测通路</h4>
-        <dl class="setup-grid"><dt>Models</dt><dd>Llama-3.1-8B-Instruct · Mistral-7B-Instruct-v0.3 · Qwen2.5-7B-Instruct</dd><dt>Harmful</dt><dd>AdvBench 50-behavior subset · HarmBench 1.0</dd><dt>Benign / quality</dt><dd>XSTest · Just-Eval · Alpaca benign controls</dd><dt>Safety judge</dt><dd>SORRY-Bench evaluator</dd><dt>Baselines</dt><dd>No Defense · ABD · RTV · JBShield · TrajGuard</dd><dt>Metrics</dt><dd>First-exit stability · Downstream trajectory recovery · DSR · XSTest false refusal · Just-Eval retention · latency overhead</dd></dl>
+      <section class="plain-section">
+        <p class="artifact-kicker">2.2 · FIGURE/TABLE COUNT</p>
+        <h4>7 个 claim-bearing floats</h4>
+        <p>计划冻结为 4 figures 和 3 tables；Demo 展示其中所有数据图 F2–F4 的 5 个 projected panels，以及 T1–T3 的完整待填结构。</p>
       </section>
 
-      <section class="plain-section claim-contract">
-        <p class="artifact-kicker">2.4 · CLAIM–FALSIFIER–EVIDENCE</p><h4>三个主张都预先写明失败条件</h4>
-        <div class="claim-rows"><div><b>C1</b><p>匹配意图的风格变换产生可复现的最早 safety-tube exit。</p><span>若 exit depth 跨 paraphrase、seed 或 model 不稳定，则失败。</span></div><div><b>C2</b><p>只修 first-exit layer 足以恢复下游安全几何并降低 harmful compliance。</p><span>若随机层、ABD 层、后续层或重复修复并列或更优，则失败。</span></div><div><b>C3</b><p>一次修复改善 safety–utility–cost frontier。</p><span>若 DSR 增益必须以更差的 XSTest、Just-Eval 或 latency 换取，则失败。</span></div></div>
+      <section class="plain-section setup-section">
+        <p class="artifact-kicker">2.3 · PARAGRAPH BLUEPRINT AND EVIDENCE SHELLS</p><h4>论文段落与图表证据逐项绑定</h4>
+        <h5 class="embedded-heading">Projected Experiments Setup</h5>
+        <dl class="setup-grid"><dt>Models</dt><dd>Llama-3.1-8B-Instruct · Mistral-7B-Instruct-v0.3 · Qwen2.5-7B-Instruct</dd><dt>Harmful</dt><dd>AdvBench 50-behavior subset · HarmBench 1.0</dd><dt>Benign / quality</dt><dd>XSTest · Just-Eval · Alpaca benign controls</dd><dt>Safety judge</dt><dd>SORRY-Bench evaluator</dd><dt>Baselines</dt><dd>No Defense · ABD · RTV · JBShield · TrajGuard</dd><dt>Metrics</dt><dd>First-exit stability · Downstream trajectory recovery · DSR · XSTest false refusal · Just-Eval retention · latency overhead</dd></dl>
       </section>
 
       <section class="evidence-artifact">
@@ -89,9 +91,19 @@ const experimentPlanDemo = () => {
 
       ${resultTable({id:"T3",title:"Efficiency and failure surface",headers:["Method / condition","Latency overhead ↓ (ms/query)","Peak memory overhead ↓ (GiB)","Unrecovered cases ↓ (%, 95% CI)"],rows:methods,note:"Failure cases 在 metric 冻结后分类；不把定性原因转换成虚构分数。"})}
 
+      <section class="plain-section claim-contract">
+        <p class="artifact-kicker">2.4 · CLAIM–FALSIFIER–EVIDENCE</p><h4>三个主张都预先写明失败条件</h4>
+        <div class="claim-rows"><div><b>C1</b><p>匹配意图的风格变换产生可复现的最早 safety-tube exit。</p><span>若 exit depth 跨 paraphrase、seed 或 model 不稳定，则失败。</span></div><div><b>C2</b><p>只修 first-exit layer 足以恢复下游安全几何并降低 harmful compliance。</p><span>若随机层、ABD 层、后续层或重复修复并列或更优，则失败。</span></div><div><b>C3</b><p>一次修复改善 safety–utility–cost frontier。</p><span>若 DSR 增益必须以更差的 XSTest、Just-Eval 或 latency 换取，则失败。</span></div></div>
+      </section>
+
       <section class="plain-section implementation-section">
         <p class="artifact-kicker">2.5 · IMPLEMENTATION PLAN</p><h4>所有方法接入同一个本地框架</h4>
         <div class="table-scroll"><table class="implementation-table"><thead><tr><th>Method</th><th>How it is implemented</th></tr></thead><tbody><tr><th>No Defense</th><td>共享 generation path，关闭全部 defense。</td></tr><tr><th>ABD</th><td>本地实现 safety-boundary estimation、penalty 与 layer selection，复用统一 hooks。</td></tr><tr><th>RTV</th><td>本地实现 refusal-direction fingerprints 与 multi-layer Mahalanobis trajectory scoring。</td></tr><tr><th>JBShield</th><td>通过 local adapter 接入官方 concept extraction、scoring、mitigation 与 mixed-input gating；<a href="https://github.com/NISPLab/JBShield" target="_blank" rel="noreferrer">Official GitHub</a>。</td></tr><tr><th>TrajGuard</th><td>本地实现 sliding-window hidden-state aggregation、persistence thresholding 与 semantic adjudication。</td></tr><tr><th>Our method — First-Divergence Repair</th><td>在同一 model、trace、generation、evaluator 接口上实现 first-exit localization、one-shot repair 与 downstream recovery。</td></tr></tbody></table></div>
+      </section>
+
+      <section class="plain-section">
+        <p class="artifact-kicker">2.6 · BUDGET AND DECISION CRITERIA</p><h4>预算与停止条件在实验前冻结</h4>
+        <p>预算为 4×A100、约 428 GPU-hours；先验证首次偏离现象，再冻结 threshold 与 repair strength。最终数据禁止继续调参，任一 decisive falsifier 成立时收窄或放弃对应 claim。</p>
       </section>
 
       <section class="approval-line"><strong>3 · APPROVAL</strong><span>APPROVED · 2026-08-09</span><p>实验开始前冻结 7 个 claim-bearing floats、144 个数字目标、预算与 decision criteria；结果不支持时按 falsifier 收窄或放弃主张。</p></section>
@@ -252,7 +264,7 @@ document.addEventListener("click", async event => {
 
 async function initializeDemo() {
   try {
-    const response = await fetch("report-structures.json?v=20260814-expplan-unified-type");
+    const response = await fetch("report-structures.json?v=20260814-expplan-sequence");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     reportStructures = await response.json();
     state.stage = stageIndexFromLocation();
