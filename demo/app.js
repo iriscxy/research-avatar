@@ -120,7 +120,13 @@ const goalHierarchy = () => {
   const goals = Object.fromEntries(runPlanDemoState.goals.map(goal => [goal.id, goal]));
   const currentId = runPlanDemoState.active_goal || runPlanDemoState.proposed_goal_id;
   const completed = runPlanDemoState.goals.filter(goal => goal.status === "completed").length;
-  return `<section class="goal-hierarchy"><p class="artifact-kicker">SYNCED FROM ${escapeHtml(runPlanDemoState.source)} · ${runPlanDemoState.parts.length} PARTS · ${runPlanDemoState.goals.length} GOALS · ${completed} COMPLETE · ONE CURRENT</p>${runPlanDemoState.parts.map(part => `<div class="part-row"><h4><span>${escapeHtml(part.id)}</span>${escapeHtml(part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p>${part.goals.map(goalId => { const goal = goals[goalId]; const destination = goal.artifact_ids?.length ? goal.artifact_ids.join("、") : "无直接图表"; return `<div class="expanded-goal"><b>${runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}</strong><span>对应图表：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成检查：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? currentGoalPanel(goal) : ""}</div>`;}).join("")}</div>`).join("")}</section>`;
+  const representativeGoalIds = [currentId, "G2.1", "G5.1"].filter((id, index, ids) => id && goals[id] && ids.indexOf(id) === index);
+  const representativeParts = representativeGoalIds.map(goalId => {
+    const goal = goals[goalId];
+    const part = runPlanDemoState.parts.find(item => item.id === goal.part_id);
+    return {part, goal};
+  });
+  return `<section class="goal-hierarchy"><p class="artifact-kicker">SYNCED FROM ${escapeHtml(runPlanDemoState.source)} · CURRENT STATE + 3 REPRESENTATIVE GOALS</p><p class="runplan-demo-note">真实报告仍保存 ${runPlanDemoState.parts.length} Parts / ${runPlanDemoState.goals.length} Goals 的完整计划；Demo 只展示当前执行、下一阶段和主结果三种代表状态。</p>${representativeParts.map(({part, goal}) => { const destination = goal.artifact_ids?.length ? goal.artifact_ids.join("、") : "无直接图表"; return `<div class="part-row"><h4><span>${escapeHtml(part.id)}</span>${escapeHtml(part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p><div class="expanded-goal"><b>${runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}</strong><span>对应图表：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成检查：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? currentGoalPanel(goal) : ""}</div></div>`;}).join("")}<div class="runplan-omitted"><strong>完整计划没有丢失</strong><span>其余 ${runPlanDemoState.goals.length - representativeParts.length} 个 Goal 保存在真实 reports/04_RUN_PLAN.html；Demo 用下方完成示例展示 ✅、数字填表、绘图与 provenance 功能。</span></div></section>`;
 };
 
 const completedF2Rows = [
@@ -142,17 +148,16 @@ const resultProvenanceDemo = () => `
     <div class="completed-result-grid"><div class="table-scroll"><table class="result-shell source-table completed-source"><thead><tr><th>Normalized depth</th><th>Direct harmful</th><th>Style-transformed harmful</th></tr></thead><tbody>${completedF2Rows.map(([depth,direct,styled]) => `<tr><th>${depth}</th><td>${provenanceNumber(direct,depth,"direct harmful")}</td><td>${provenanceNumber(styled,depth,"style-transformed harmful")}</td></tr>`).join("")}</tbody></table><p class="hover-instruction">鼠标停在任一数字上，或用键盘聚焦，即可查看 raw path、筛选、公式、命令与验证过程。</p></div>${completedF2Chart()}</div>
   </section>`;
 
-let paperDemoView = "writing";
-
-const paperPdfPreview = (caption = "每次确认后，右侧 PDF 自动刷新") => `<div class="paper-demo-pdf"><div class="paper-demo-pdfbar"><strong>LaTeX PDF</strong><span>第 2 / 8 页</span></div><div class="paper-demo-page"><h6>First-Divergence Repair</h6><p></p><p></p><p class="short"></p><div class="paper-demo-figure"><i></i><i></i><i></i></div><small>${escapeHtml(caption)}</small><p></p><p></p><p class="short"></p></div></div>`;
-
-const paperDemoScenes = {
-  writing: () => `<div class="paper-demo-workspace"><section class="paper-demo-editor"><div class="paper-demo-toolbar"><span>Introduction</span><span class="active">P2 · Motivation gap</span><span>P3 · Contributions</span></div><div class="paper-demo-form"><label>Matched reference context</label><div class="paper-demo-context">参考论文只约束这一段的写作风格与论证节奏；证据来自已验证结果。</div><label>当前段落 candidate</label><textarea rows="9">Existing defenses observe jailbreak trajectories after the model has already departed from its safety-consistent path. We instead identify the earliest reproducible departure and test whether a single intervention at that layer is sufficient to recover downstream behavior.</textarea><label>给 GPT 的修改意见</label><textarea rows="3" placeholder="例如：压缩第一句，并更明确地引出 Figure 2。"></textarea><div class="paper-demo-actions"><button>GPT 生成 / 修改 candidate</button><button class="accept">Accept → LaTeX</button></div></div></section>${paperPdfPreview()}</div>`,
-  figures: () => `<div class="paper-demo-workspace"><section class="paper-demo-editor"><div class="paper-demo-toolbar"><span>F1 · Mechanism</span><span class="active">F2 · First exit</span><span>F3 · Recovery</span></div><div class="paper-demo-form"><label>本地 Agent 绘图 Prompt</label><textarea rows="4">Use the verified F2 source-data table. Plot matched direct and style-transformed trajectories across normalized depth; preserve uncertainty intervals and do not infer missing values.</textarea><div class="paper-demo-flow"><b>源数据已验证</b><i>→</i><b>矢量 PDF candidate</b><i>→</i><b>可编辑 PPTX</b></div><div class="paper-demo-chart"><i></i><i></i><i></i><i></i><i></i><i></i></div><label>图片 Caption</label><textarea rows="3">Style transformations induce an earlier and more concentrated departure from the safety-consistent trajectory.</textarea><div class="paper-demo-placement"><span>插入位置：Observation P2 后</span><span>布局：双栏</span></div><button class="paper-demo-wide-action">确认并插入正文</button></div></section>${paperPdfPreview("图确认后替换正文占位符，并保留 Caption 与 label")}</div>`,
-  tables: () => `<div class="paper-demo-workspace"><section class="paper-demo-editor"><div class="paper-demo-toolbar"><span class="active">T1 · Main comparison</span><span>T2 · Ablation</span><span>T3 · Cost</span></div><div class="paper-demo-form"><label>可编辑 Table LaTeX</label><textarea rows="8">\\begin{table*}[t]\n\\centering\n\\caption{Safety--utility comparison under the shared evaluation protocol.}\n\\begin{tabular}{lcccc}\nMethod & AdvBench & HarmBench & XSTest & Just-Eval \\\\n... verified ledger values only ...\n\\end{tabular}\n\\end{table*}</textarea><div class="paper-demo-table"><b>Method</b><b>DSR ↑</b><b>False refusal ↓</b><span>ABD</span><span>—</span><span>—</span><span>Our method</span><span>—</span><span>—</span></div><div class="paper-demo-placement"><span>插入位置：Experiments E2 后</span><span>布局：双栏 table*</span></div><div class="paper-demo-actions"><button>调用本地 Agent</button><button class="accept">保存表格 → PDF</button></div></div></section>${paperPdfPreview("表格只从 validated ledger 填值；确认后重新编译")}</div>`
-};
-
-const paperStudioDemo = () => `<section class="paper-studio-demo"><div class="paper-demo-appbar"><div><strong>Paper Studio</strong><span>逐段对话、确认后写入 LaTeX</span></div><div><button class="active">正文</button><button>图片</button><button>表格</button><button>编译 PDF</button></div></div><nav class="paper-demo-scenes" aria-label="Paper Studio feature screens">${[["writing","正文写作"],["figures","图片工作台"],["tables","表格工作台"]].map(([id,label]) => `<button type="button" data-paper-demo-view="${id}" class="${paperDemoView === id ? "active" : ""}">${label}</button>`).join("")}</nav><div id="paper-demo-scene">${paperDemoScenes[paperDemoView]()}</div></section>`;
+const paperStudioScreenshots = () => `<section class="paper-studio-screenshots">
+  <p class="artifact-kicker">REAL PAPER STUDIO SCREENSHOTS · CAPTURED FROM THE LOCAL APP</p>
+  <h4>真实界面，不在 Demo 中重画</h4>
+  <p>以下三张图直接截取自仓库中的 Paper Studio：同一个固定应用根据当前视图显示正文、图片和表格工作台。</p>
+  ${[
+    ["writing.png", "正文写作", "逐段 candidate、修改意见、Accept → LaTeX 与右侧 Live PDF。"],
+    ["figures.png", "图片工作台", "按论证依赖选择图，编辑 BioRender Prompt，并进入 GPT Image → 可编辑 PPT/PDF 流程。"],
+    ["tables.png", "表格工作台", "调用本地 Agent、编辑 Table LaTeX、选择正文位置并更新 PDF。"],
+  ].map(([file, title, caption]) => `<figure><img src="assets/paper-studio/${file}" alt="Paper Studio ${title}真实截图" loading="lazy"><figcaption><strong>${title}</strong><span>${caption}</span></figcaption></figure>`).join("")}
+</section>`;
 
 let reportStructures = {};
 
@@ -220,9 +225,9 @@ const stages = [
     id: "paper", short: "论文写作", path: "paper-writing", title: "逐段写作、实时编译、图表可编辑",
     compare: ["倾向批量生成 Markdown 或 LaTeX 草稿", "适合快速获得整体版本", "逐段确认，接受后才写入 LaTeX 并实时编译"],
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">PAPERWRITE → PAPER STUDIO</p><h3>真实写作界面：正文、图片、表格分别处理</h3><p>下面复现 Paper Studio 的实际工作台和真实控件名称。切换三个界面即可查看逐段候选与 Accept → LaTeX、图片生成与 Caption、可编辑 Table LaTeX 与 PDF 更新。</p></div><span class="status-pill">INTERACTIVE UI</span></div>
+      <div class="stage-head"><div><p class="eyebrow">PAPERWRITE → PAPER STUDIO</p><h3>直接展示真实 Paper Studio 截图</h3><p>不在 Demo 中自创写作界面或 Tab。下面的正文、图片和表格三张截图全部来自仓库中实际运行的 Paper Studio。</p></div><span class="status-pill">REAL SCREENSHOTS</span></div>
       ${commandStrip("结果完成后启动论文写作", "$paperwrite", "Paperwrite 准备项目数据并打开固定 Paper Studio；LLM API 负责流畅正文，本地 Agent 负责可复现图表与排版。")}
-      ${paperStudioDemo()}
+      ${paperStudioScreenshots()}
       <section class="plain-section"><p class="artifact-kicker">真实工作方式</p><h4>候选不会自动写入论文</h4><ul><li>正文：GPT 生成可编辑 candidate，研究者点击 Accept → LaTeX 后才编译。</li><li>图片：实验结果驱动矢量图；机制图同时保留 GPT 构图参考和可编辑 PPT/PDF。</li><li>表格：只允许 verified ledger 数字进入可编辑 LaTeX，确认后刷新右侧 PDF。</li></ul></section>`
   }
 ];
@@ -282,19 +287,30 @@ window.addEventListener("popstate", syncStageFromLocation);
 window.addEventListener("hashchange", syncStageFromLocation);
 
 document.addEventListener("click", async event => {
-  const paperView = event.target.closest("[data-paper-demo-view]");
-  if (paperView) {
-    paperDemoView = paperView.dataset.paperDemoView;
-    document.querySelectorAll("[data-paper-demo-view]").forEach(button => button.classList.toggle("active", button === paperView));
-    const scene = document.querySelector("#paper-demo-scene");
-    if (scene) scene.innerHTML = paperDemoScenes[paperDemoView]();
-    return;
-  }
   const button = event.target.closest("[data-copy]");
   if (!button) return;
   const original = button.textContent;
-  try { await navigator.clipboard.writeText(button.dataset.copy); button.textContent = "已复制 ✓"; }
-  catch { button.textContent = "请手动复制"; }
+  const value = button.dataset.copy || "";
+  try {
+    if (!navigator.clipboard || !window.isSecureContext) throw new Error("clipboard API unavailable");
+    await navigator.clipboard.writeText(value);
+    button.textContent = "已复制 ✓";
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = value;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.left = "-9999px";
+    area.style.top = "0";
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    area.setSelectionRange(0, value.length);
+    let copied = false;
+    try { copied = document.execCommand("copy"); } catch {}
+    area.remove();
+    button.textContent = copied ? "已复制 ✓" : "请选中命令复制";
+  }
   setTimeout(() => { button.textContent = original; }, 1400);
 });
 

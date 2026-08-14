@@ -21,18 +21,20 @@ class DemoSyncTests(unittest.TestCase):
         self.assertEqual(len(current_goals), 1)
         self.assertTrue(current_goals[0]["goal_command"].startswith(f"/goal Complete {current}:"))
 
-    def test_paper_demo_exposes_three_real_workbench_views(self):
+    def test_paper_demo_uses_three_real_application_screenshots(self):
         source = (ROOT / "demo/app.js").read_text(encoding="utf-8")
-        for view, label in (
-            ("writing", "正文写作"),
-            ("figures", "图片工作台"),
-            ("tables", "表格工作台"),
-        ):
-            self.assertIn(f'{view}: () =>', source)
-            self.assertIn(label, source)
-        self.assertIn("Accept → LaTeX", source)
-        self.assertIn("可编辑 Table LaTeX", source)
-        self.assertIn("确认并插入正文", source)
+        self.assertNotIn("data-paper-demo-view", source)
+        for filename in ("writing.png", "figures.png", "tables.png"):
+            self.assertIn(filename, source)
+            image = ROOT / "demo/assets/paper-studio" / filename
+            self.assertTrue(image.exists(), filename)
+            self.assertGreater(image.stat().st_size, 10_000, filename)
+
+    def test_demo_copy_has_a_legacy_fallback_and_plan_is_sampled(self):
+        source = (ROOT / "demo/app.js").read_text(encoding="utf-8")
+        self.assertIn('document.execCommand("copy")', source)
+        self.assertIn('representativeGoalIds = [currentId, "G2.1", "G5.1"]', source)
+        self.assertIn("完整计划没有丢失", source)
 
 
 if __name__ == "__main__":
