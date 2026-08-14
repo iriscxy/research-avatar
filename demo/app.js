@@ -126,7 +126,11 @@ const goalHierarchy = () => {
     const part = runPlanDemoState.parts.find(item => item.id === goal.part_id);
     return {part, goal};
   });
-  return `<section class="goal-hierarchy"><p class="artifact-kicker">SYNCED FROM ${escapeHtml(runPlanDemoState.source)} · CURRENT STATE + 3 REPRESENTATIVE GOALS</p><p class="runplan-demo-note">真实报告仍保存 ${runPlanDemoState.parts.length} Parts / ${runPlanDemoState.goals.length} Goals 的完整计划；Demo 只展示当前执行、下一阶段和主结果三种代表状态。</p>${representativeParts.map(({part, goal}) => { const destination = goal.artifact_ids?.length ? goal.artifact_ids.join("、") : "无直接图表"; return `<div class="part-row"><h4><span>${escapeHtml(part.id)}</span>${escapeHtml(part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p><div class="expanded-goal"><b>${runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}</strong><span>对应图表：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成检查：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? currentGoalPanel(goal) : ""}</div></div>`;}).join("")}<div class="runplan-omitted"><strong>完整计划没有丢失</strong><span>其余 ${runPlanDemoState.goals.length - representativeParts.length} 个 Goal 保存在真实 reports/04_RUN_PLAN.html；Demo 用下方完成示例展示 ✅、数字填表、绘图与 provenance 功能。</span></div></section>`;
+  return `<section class="goal-hierarchy"><p class="artifact-kicker">SYNCED FROM ${escapeHtml(runPlanDemoState.source)} · CURRENT STATE + 3 REPRESENTATIVE GOALS</p><p class="runplan-demo-note">真实报告仍保存 ${runPlanDemoState.parts.length} Parts / ${runPlanDemoState.goals.length} Goals 的完整计划；Demo 只展示当前执行、下一阶段和主结果三种代表状态。G2.1 同时演示 Goal 完成后，图表如何直接出现在原卡片内。</p>${representativeParts.map(({part, goal}) => {
+    const destination = goal.artifact_ids?.length ? goal.artifact_ids.join("、") : "无直接图表";
+    const completedExample = goal.id === "G2.1";
+    return `<div class="part-row"><h4><span>${escapeHtml(part.id)}</span>${escapeHtml(part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p><div class="expanded-goal ${completedExample ? "demo-completed-goal" : ""}"><b>${completedExample ? "✅" : runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}${completedExample ? '<small>完成后的界面示例 · DEMO DATA</small>' : ""}</strong><span>对应图表：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成检查：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? currentGoalPanel(goal) : ""}${completedExample ? resultProvenanceDemo() : ""}</div></div>`;
+  }).join("")}<div class="runplan-omitted"><strong>完整计划没有丢失</strong><span>其余 ${runPlanDemoState.goals.length - representativeParts.length} 个 Goal 保存在真实 reports/04_RUN_PLAN.html；05_EXP_RESULT.html 只作为数字点击后的完整 provenance 后端，不再单独占一个执行页面。</span></div></section>`;
 };
 
 const completedF2Rows = [
@@ -142,8 +146,8 @@ const completedF2Chart = () => {
 };
 
 const resultProvenanceDemo = () => `
-  <section class="evidence-artifact completed-result future-result-example"><p class="artifact-kicker">完成后的交互示例 · 与当前 RUN PLAN 状态分开 · DEMO DATA</p><h4>F2A · Safety-tube exit rate by normalized depth</h4>
-    <p>真实 Run Plan 当前尚未产生论文数字。这里只演示未来完成首个结果 Goal 后，数据表、图和 provenance 如何出现；这些数字不是当前结果，也不是科学结论。</p>
+  <section class="evidence-artifact completed-result future-result-example"><p class="artifact-kicker">已完成 Goal 的图表 · DEMO DATA</p><h4>F2A · Safety-tube exit rate by normalized depth</h4>
+    <p>这组演示数据直接放在 G2.1 卡片内，展示该 Goal 完成后的“源数据表＋图”；它不是当前项目结果，也不是科学结论。真实数字可点击进入 05 的完整 provenance。</p>
     <div class="provenance-flow"><span>raw JSONL</span><i>→</i><span>已验证结果记录</span><i>→</i><span>验证公式</span><i>→</i><span>填入源数据表</span><i>→</i><span>生成图</span></div>
     <div class="completed-result-grid"><div class="table-scroll"><table class="result-shell source-table completed-source"><thead><tr><th>Normalized depth</th><th>Direct harmful</th><th>Style-transformed harmful</th></tr></thead><tbody>${completedF2Rows.map(([depth,direct,styled]) => `<tr><th>${depth}</th><td>${provenanceNumber(direct,depth,"direct harmful")}</td><td>${provenanceNumber(styled,depth,"style-transformed harmful")}</td></tr>`).join("")}</tbody></table><p class="hover-instruction">鼠标停在任一数字上，或用键盘聚焦，即可查看 raw path、筛选、公式、命令与验证过程。</p></div>${completedF2Chart()}</div>
   </section>`;
@@ -213,12 +217,10 @@ const stages = [
       const currentId = runPlanDemoState?.active_goal || runPlanDemoState?.proposed_goal_id || "NONE";
       const current = runPlanDemoState?.goals.find(goal => goal.id === currentId);
       return `
-      <div class="stage-head"><div><p class="eyebrow">STEP 05 · RUNPLAN + /GOAL</p><h3>与真实 04 Run Plan 使用同一份状态</h3><p>以下层级、状态和 Current Goal 由 reports/04_RUN_PLAN.html 的 embedded state 导出。当前没有完成的实验结果时，Demo 也不会把示例数字冒充成真实进度。</p></div><span class="status-pill">${escapeHtml(currentId)} ${runPlanDemoState?.active_goal ? "RUNNING" : "UNLOCKED"}</span></div>
+      <div class="stage-head"><div><p class="eyebrow">STEP 05 · RUNPLAN + /GOAL</p><h3>执行进度和已完成图表都在 04 Run Plan</h3><p>层级、Current Goal 和真实完成状态来自 reports/04_RUN_PLAN.html；Demo 另外在 G2.1 卡片内明确标注一组完成后的交互示例。05 只保留完整 provenance，不再单独展示。</p></div><span class="status-pill">${escapeHtml(currentId)} ${runPlanDemoState?.active_goal ? "RUNNING" : "UNLOCKED"}</span></div>
       ${current ? commandStrip(`执行当前唯一 Goal ${current.id}`, current.goal_command, "命令与真实 Run Plan 的 Current Goal 完全一致。") : ""}
       ${reportDocument("runplan")}
-      ${goalHierarchy()}
-      ${reportDocument("results", "EXPERIMENT RESULTS · CURRENT REAL STATUS")}
-      ${resultProvenanceDemo()}`;
+      ${goalHierarchy()}`;
     }
   },
   {
