@@ -216,10 +216,8 @@ const stages = [
     compare: ["强调连续自主探索与整体吞吐", "适合可自动判分的大规模搜索", "每个 Goal 落盘、验证、填表、打勾，再解锁下一项"],
     render: () => {
       const currentId = runPlanDemoState?.active_goal || runPlanDemoState?.proposed_goal_id || "NONE";
-      const current = runPlanDemoState?.goals.find(goal => goal.id === currentId);
       return `
       <div class="stage-head"><div><p class="eyebrow">STEP 05 · RUNPLAN + /GOAL</p><h3>执行进度和已完成图表都在 04 Run Plan</h3><p>层级、Current Goal 和真实完成状态来自 reports/04_RUN_PLAN.html；Demo 另外在 G2.1 卡片内明确标注一组完成后的交互示例。05 只保留完整 provenance，不再单独展示。</p></div><span class="status-pill">${escapeHtml(currentId)} ${runPlanDemoState?.active_goal ? "RUNNING" : "UNLOCKED"}</span></div>
-      ${current ? commandStrip(`执行当前唯一 Goal ${current.id}`, current.goal_command, "命令与真实 Run Plan 的 Current Goal 完全一致。") : ""}
       ${reportDocument("runplan")}
       ${goalHierarchy()}`;
     }

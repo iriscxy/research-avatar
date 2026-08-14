@@ -41,6 +41,8 @@ class DemoSyncTests(unittest.TestCase):
         source = (ROOT / "demo/app.js").read_text(encoding="utf-8")
         self.assertIn('document.execCommand("copy")', source)
         self.assertIn('representativeGoalIds = [currentId, "G2.1", "G5.1"]', source)
+        self.assertNotIn("执行当前唯一 Goal", source)
+        self.assertNotIn("命令与真实 Run Plan 的 Current Goal 完全一致", source)
         self.assertNotIn("完整计划没有丢失", source)
 
 
