@@ -244,12 +244,12 @@ const stages = [
       ${experimentPlanDemo()}`
   },
   {
-    id: "runplan", short: "实验执行", path: "run-plan", title: "一次完成一个任务，确认结果后再继续",
+    id: "runplan", short: "实验执行", path: "run-plan", title: "把实验拆成一个个 Goal，完成一个再继续下一个",
     compare: ["强调连续自主探索与整体吞吐", "适合可自动判分的大规模搜索", "每个 Goal 落盘、验证、填表、打勾，再解锁下一项"],
     render: () => {
       const currentId = runPlanDemoState?.active_goal || runPlanDemoState?.proposed_goal_id || "NONE";
       return `
-      <div class="stage-head"><div><p class="eyebrow">第五步 · 实验执行</p><h3>实验做到哪里，结果就更新到哪里</h3><p>一次只做一个可验证任务。完成后保存证据、更新对应图表，再继续下一项。</p></div><span class="status-pill">${escapeHtml(currentId)} ${runPlanDemoState?.active_goal ? "执行中" : "可开始"}</span></div>
+      <div class="stage-head"><div><p class="eyebrow">第五步 · 实验执行</p><h3>把实验拆成一个个 Goal，逐项完成</h3><p>每个 Goal 都有明确的任务、完成标准和对应图表；完成并核验一个后，再继续下一个。</p></div><span class="status-pill">${escapeHtml(currentId)} ${runPlanDemoState?.active_goal ? "执行中" : "可开始"}</span></div>
       ${reportDocument("runplan")}
       ${goalHierarchy()}`;
     }
