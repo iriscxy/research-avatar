@@ -11,6 +11,8 @@ class DemoRunPlanMergeTests(unittest.TestCase):
         hierarchy = source[source.index("const goalHierarchy"):source.index("const completedF2Rows")]
         self.assertIn('completedExample ? resultProvenanceDemo() : ""', hierarchy)
         self.assertIn('goal.id === "G2.1"', hierarchy)
+        self.assertNotIn("完整计划没有丢失", source)
+        self.assertNotIn('class="runplan-omitted"', source)
         self.assertNotIn('reportDocument("results"', source)
         self.assertIn("05 只保留完整 provenance，不再单独展示", source)
 
@@ -19,6 +21,8 @@ class DemoRunPlanMergeTests(unittest.TestCase):
         self.assertIn('class="result-shell source-table completed-source"', source)
         self.assertIn('class="completed-chart"', source)
         self.assertIn('class="provenance-tooltip"', source)
+        self.assertIn("16 / 16 source cells verified", source)
+        self.assertIn("raw JSONL reopen PASS", source)
         self.assertIn("<strong>Command</strong>", source)
         style = (ROOT / "demo/style.css").read_text(encoding="utf-8")
         self.assertIn(".expanded-goal>.completed-result", style)
