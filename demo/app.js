@@ -60,7 +60,7 @@ const experimentPlanDemo = () => {
       <section class="plain-section">
         <p class="artifact-kicker">2.2 · FIGURE/TABLE COUNT</p>
         <h4>7 个 claim-bearing floats</h4>
-        <p>计划冻结为 4 figures 和 3 tables；Demo 展示其中所有数据图 F2–F4 的 5 个 projected panels，以及 T1–T3 的完整待填结构。</p>
+        <p>计划冻结为 4 figures 和 3 tables；Demo 只展开两个代表性证据壳：一张数据图 F2A 和一张主结果表 T1。其余图表保留在真实实验计划中，不在首页重复铺开。</p>
       </section>
 
       <section class="plain-section setup-section">
@@ -70,26 +70,11 @@ const experimentPlanDemo = () => {
       </section>
 
       <section class="evidence-artifact">
-        <p class="artifact-kicker">F2 · CLAIM C1 · TWO PANELS</p><h4>Where the safety trajectory first leaves its tube</h4>
+        <p class="artifact-kicker">FIGURE EXAMPLE · F2A · CLAIM C1</p><h4>Where the safety trajectory first leaves its tube</h4>
         ${projectedPanel({title:"F2A · Where safety trajectories leave the tube",dataset:"AdvBench 50 + matched-style counterfactuals",metric:"Safety-tube exit rate; x = normalized transformer depth; y = exit rate",fields:"model_id · intent_id · style_id · layer_id · tube_exit",xLabel:"Normalized transformer depth",xs:["0.0","0.14","0.29","0.43","0.57","0.71","0.86","1.0"],series:["Direct harmful","Style-transformed harmful"],image:"assets/expplan/F2_exit_depth.png"})}
-        ${projectedPanel({title:"F2B · First exits concentrate for successful jailbreaks",dataset:"HarmBench 1.0 + matched-style counterfactuals",metric:"First-exit probability; x = normalized transformer depth; y = probability",fields:"model_id · intent_id · style_id · layer_id · first_exit_layer · judge_label",xLabel:"Normalized transformer depth",xs:["0.0","0.14","0.29","0.43","0.57","0.71","0.86","1.0"],series:["Successful jailbreak","Unsuccessful jailbreak"],image:"assets/expplan/F2_first_exit_concentration.png"})}
       </section>
 
-      <section class="evidence-artifact">
-        <p class="artifact-kicker">F3 · CLAIM C2 · TWO PANELS</p><h4>Does one repair restore the downstream trajectory?</h4>
-        ${projectedPanel({title:"F3A · Only the first-exit layer should recover safety",dataset:"AdvBench 50 + XSTest",metric:"Normalized safety recovery and benign utility retention",fields:"model_id · intent_id · first_exit_layer · repair_layer · judge_label · benign_refusal",xLabel:"Repair-layer offset",xs:["-3","-2","-1","0","1","2","3"],series:["Safety recovery","Benign utility retention"],image:"assets/expplan/F3_repair_offset.png"})}
-        ${projectedPanel({title:"F3B · One repair should restore downstream geometry",dataset:"HarmBench 1.0 + matched-style counterfactuals",metric:"Safe-reference trajectory cosine similarity",fields:"model_id · intent_id · layer_id · repair_condition · safe_reference_similarity",xLabel:"Depth after first exit",xs:["0","1","2","3","4","5","6"],series:["No repair","First-exit repair","Wrong-layer repair"],image:"assets/expplan/F3_downstream_recovery.png"})}
-      </section>
-
-      ${resultTable({id:"T1",title:"Main safety–utility comparison",headers:["Method / condition","AdvBench DSR ↑ (%, 95% CI)","HarmBench DSR ↑ (%, 95% CI)","XSTest false refusal ↓ (%, 95% CI)","Just-Eval retention ↑ (%, 95% CI)"],rows:methods,note:"每一行都在统一 decoding 与 judge contract 下本地重跑；不复用论文中的已发表数字。"})}
-      ${resultTable({id:"T2",title:"Single-site causal ablation matrix",headers:["Method / condition","First-exit stability ↑","Downstream recovery ↑","HarmBench DSR ↑","XSTest false refusal ↓"],rows:["Full first-exit repair","Random layer","ABD-selected layer","Latest-exit layer","Repeated multi-layer repair"],note:"决定性比较是完整 first-exit repair 对随机、ABD-selected、latest-exit 与 repeated-repair controls。"})}
-
-      <section class="evidence-artifact">
-        <p class="artifact-kicker">F4 · CLAIM C3 · SENSITIVITY</p><h4>Repair-strength safety–utility sensitivity</h4>
-        ${projectedPanel({title:"F4 · Safety–utility sensitivity to repair strength",dataset:"AdvBench 50 + HarmBench 1.0 + XSTest",metric:"DSR, false-refusal complement, and Just-Eval retention",fields:"model_id · repair_strength · judge_label · benign_refusal · just_eval_score",xLabel:"Repair strength",xs:["0.25","0.5","0.75","1.0","1.25"],series:["Defense success","1 − false refusal","Just-Eval retention"],image:"assets/expplan/F4_repair_strength.png"})}
-      </section>
-
-      ${resultTable({id:"T3",title:"Efficiency and failure surface",headers:["Method / condition","Latency overhead ↓ (ms/query)","Peak memory overhead ↓ (GiB)","Unrecovered cases ↓ (%, 95% CI)"],rows:methods,note:"Failure cases 在 metric 冻结后分类；不把定性原因转换成虚构分数。"})}
+      ${resultTable({id:"TABLE EXAMPLE · T1",title:"Main safety–utility comparison",headers:["Method / condition","AdvBench DSR ↑ (%, 95% CI)","HarmBench DSR ↑ (%, 95% CI)","XSTest false refusal ↓ (%, 95% CI)","Just-Eval retention ↑ (%, 95% CI)"],rows:methods,note:"每一行都在统一 decoding 与 judge contract 下本地重跑；不复用论文中的已发表数字。"})}
 
       <section class="plain-section claim-contract">
         <p class="artifact-kicker">2.4 · CLAIM–FALSIFIER–EVIDENCE</p><h4>三个主张都预先写明失败条件</h4>
@@ -111,8 +96,8 @@ const experimentPlanDemo = () => {
 };
 
 const runParts = [
-  ["P1", "Instrumentation", [["→", "G1.1", "最小可复现轨迹通路", "F1 · 非实验动机图规格"]]],
-  ["P2", "Problem-Existence Validation", [["○", "G2.1", "AdvBench 首次偏离探针", "F2 · exit depth"],["○", "G2.2", "HarmBench 成功/失败退出集中度", "F2 · concentration"]]],
+  ["P1", "Instrumentation", [["✅", "G1.1", "最小可复现轨迹通路", "共享 trace / evaluator 基础设施"]]],
+  ["P2", "Problem-Existence Validation", [["✅", "G2.1", "AdvBench 首次偏离探针", "F2A · exit depth"],["→", "G2.2", "HarmBench 成功/失败退出集中度", "F2B · concentration"]]],
   ["P3", "Method Feasibility", [["○", "G3.1", "单模型单点修复可行性", "无直接图表"]]],
   ["P4", "Development Tuning", [["○", "G4.1", "冻结 safety-tube threshold", "无直接图表"],["○", "G4.2", "冻结最小有效 repair strength", "无直接图表"]]],
   ["P5", "Primary Evidence", [["○", "G5.1", "三模型、五基线统一协议主比较", "T1"]]],
@@ -121,13 +106,31 @@ const runParts = [
   ["P8", "Cost and Failure Analysis", [["○", "G8.1", "延迟、显存与未恢复案例", "T3"]]]
 ];
 
-const goalHierarchy = () => `<section class="goal-hierarchy"><p class="artifact-kicker">8 PARTS · 12 GOALS · ONE UNLOCKED</p>${runParts.map(([pid,title,goals]) => `<div class="part-row"><h4><span>${pid}</span>${title}</h4>${goals.map(([mark,gid,name,dest]) => `<div class="expanded-goal"><b>${mark}</b><strong>${gid} · ${name}</strong><span>对应图表：${dest}</span><p>${gid === "G1.1" ? "先打通一个模型、极小输入切片、层×token trace、judge 与 provenance；重复两次结果结构一致后才解锁下一 Goal。" : "前置 Gate 完成后才解锁；每个原子结果先落盘并写 ledger，再计算聚合值。"}</p></div>`).join("")}</div>`).join("")}</section>`;
+const goalDetail = gid => ({
+  "G1.1": "已完成：一个模型与极小输入切片的 layer×token trace、judge、重复运行和 provenance 路径均通过验证。",
+  "G2.1": "已完成：F2A 的 16 个 Demo 数字已由同一源表生成下方曲线；数字悬停可检查取得过程。",
+  "G2.2": "当前唯一解锁项：完成后命令与箭头继续向下移动，G2.1 的结果仍保留可追溯。"
+}[gid] || "前置 Gate 完成后才解锁；每个原子结果先落盘并写 ledger，再计算聚合值。");
+
+const goalHierarchy = () => `<section class="goal-hierarchy"><p class="artifact-kicker">8 PARTS · 12 GOALS · 2 COMPLETE · ONE UNLOCKED</p>${runParts.map(([pid,title,goals]) => `<div class="part-row"><h4><span>${pid}</span>${title}</h4>${goals.map(([mark,gid,name,dest]) => `<div class="expanded-goal"><b>${mark}</b><strong>${gid} · ${name}</strong><span>对应图表：${dest}</span><p>${goalDetail(gid)}</p></div>`).join("")}</div>`).join("")}</section>`;
+
+const completedF2Rows = [
+  ["0.00", 0.04, 0.06], ["0.14", 0.05, 0.11], ["0.29", 0.08, 0.26], ["0.43", 0.13, 0.47],
+  ["0.57", 0.19, 0.68], ["0.71", 0.25, 0.79], ["0.86", 0.29, 0.84], ["1.00", 0.32, 0.86]
+];
+
+const provenanceNumber = (value, depth, series) => `<span class="provenance-number" tabindex="0">${value.toFixed(2)}<span class="provenance-tooltip" role="tooltip"><b>DEMO VALUE · NOT A SCIENTIFIC RESULT</b><span><strong>Goal</strong> G2.1</span><span><strong>Slice</strong> depth=${depth} · ${series}</span><span><strong>Raw</strong> results/demo/g2_1/raw_trace.jsonl</span><span><strong>Filter</strong> approved model + matched intent/style IDs</span><span><strong>Formula</strong> sum(tube_exit) / valid records = ${value.toFixed(4)}</span><span><strong>Command</strong> python -m code.first_divergence.acquire --goal G2.1</span><span><strong>Check</strong> ledger schema, config digest, rerun match, source path reopen</span></span></span>`;
+
+const completedF2Chart = () => {
+  const points = column => completedF2Rows.map((row, index) => `${54 + index * 61},${202 - row[column] * 170}`).join(" ");
+  return `<figure class="completed-chart"><svg viewBox="0 0 520 245" role="img" aria-label="Demo F2A safety tube exit rate chart"><g class="chart-grid"><line x1="54" y1="32" x2="481" y2="32"/><line x1="54" y1="117" x2="481" y2="117"/><line x1="54" y1="202" x2="481" y2="202"/></g><g class="chart-axis"><line x1="54" y1="25" x2="54" y2="202"/><line x1="54" y1="202" x2="486" y2="202"/></g><g class="chart-labels"><text x="18" y="36">1.0</text><text x="18" y="121">0.5</text><text x="18" y="206">0.0</text><text x="51" y="224">0.0</text><text x="256" y="224">depth</text><text x="466" y="224">1.0</text></g><polyline class="series-direct" points="${points(1)}"/><polyline class="series-style" points="${points(2)}"/>${completedF2Rows.map((row,index) => `<circle class="point-direct" cx="${54 + index * 61}" cy="${202 - row[1] * 170}" r="3.5"/><circle class="point-style" cx="${54 + index * 61}" cy="${202 - row[2] * 170}" r="3.5"/>`).join("")}<g class="chart-legend"><line x1="286" y1="18" x2="309" y2="18" class="series-direct"/><text x="315" y="22">Direct harmful</text><line x1="397" y1="18" x2="420" y2="18" class="series-style"/><text x="426" y="22">Styled</text></g></svg><figcaption>由左侧同一张数字源表生成；没有独立的 plot-only 数据源。</figcaption></figure>`;
+};
 
 const resultProvenanceDemo = () => `
-  <section class="evidence-artifact"><p class="artifact-kicker">05_EXP_RESULT · PENDING COUNTERPART</p><h4>图表几何与 03 完全相同，未完成数字不会被插值</h4>
+  <section class="evidence-artifact completed-result"><p class="artifact-kicker">05_EXP_RESULT · FIRST ARTIFACT COMPLETE · DEMO DATA</p><h4>F2A · Safety-tube exit rate by normalized depth</h4>
+    <p>这里演示完成第一个结果 Goal 后的状态。数字是 UI 示例，不是本项目的科学结果；表和图使用同一组值。</p>
     <div class="provenance-flow"><span>raw JSONL</span><i>→</i><span>已验证结果记录</span><i>→</i><span>验证公式</span><i>→</i><span>填入源数据表</span><i>→</i><span>生成图</span></div>
-    <p class="demo-value-line">下面是<strong>界面功能示例，不是本项目实验结果</strong>：<a href="#demo-provenance" class="trace-value">0.81</a> 点击数字跳到同页、已展开的生成过程。</p>
-    <div id="demo-provenance" class="open-provenance"><h5>生成过程 · DEMO VALUE 0.81</h5><dl><dt>Goal</dt><dd>G7.1</dd><dt>Metric</dt><dd>Just-Eval retention</dd><dt>Raw artifact</dt><dd>results/first_divergence_repair/g7_1.json</dd><dt>Calculation</dt><dd>三个批准模型的 full-precision macro mean；display rounding only</dd><dt>Command</dt><dd>python -m code.first_divergence.acquire --artifact F4</dd><dt>Status</dt><dd>界面演示数据 · NOT A SCIENTIFIC RESULT</dd></dl></div>
+    <div class="completed-result-grid"><div class="table-scroll"><table class="result-shell source-table completed-source"><thead><tr><th>Normalized depth</th><th>Direct harmful</th><th>Style-transformed harmful</th></tr></thead><tbody>${completedF2Rows.map(([depth,direct,styled]) => `<tr><th>${depth}</th><td>${provenanceNumber(direct,depth,"direct harmful")}</td><td>${provenanceNumber(styled,depth,"style-transformed harmful")}</td></tr>`).join("")}</tbody></table><p class="hover-instruction">鼠标停在任一数字上，或用键盘聚焦，即可查看 raw path、筛选、公式、命令与验证过程。</p></div>${completedF2Chart()}</div>
   </section>`;
 
 let reportStructures = {};
@@ -173,7 +176,7 @@ const stages = [
     id: "expplan", short: "实验设计", path: "experiment-plan", title: "先固定证据空位，再反推实验",
     compare: null,
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">STEP 04 · EXPPLAN</p><h3>Projected Paper 先于实验任务</h3><p>以下内容与实际 reports/03_EXPERIMENT_PLAN.html 对齐：展示数据图 F2–F4 的 5 个面板、T1–T3、相邻图源数据表、基线实现和预注册 falsifier。</p></div><span class="status-pill">APPROVED</span></div>
+      <div class="stage-head"><div><p class="eyebrow">STEP 04 · EXPPLAN</p><h3>Projected Paper 先于实验任务</h3><p>以下内容与实际 reports/03_EXPERIMENT_PLAN.html 的结构对齐，但首页只举两个代表性例子：F2A 图及其待填源表、T1 主结果表。</p></div><span class="status-pill">APPROVED</span></div>
       ${commandStrip("生成实验设计与待填图表", "$expplan")}
       ${experimentPlanDemo()}`
   },
@@ -181,11 +184,11 @@ const stages = [
     id: "runplan", short: "实验执行", path: "run-plan", title: "一次执行一个 Goal，完成即填表并整理",
     compare: ["强调连续自主探索与整体吞吐", "适合可自动判分的大规模搜索", "每个 Goal 落盘、验证、填表、打勾，再解锁下一项"],
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">STEP 05 · RUNPLAN + /GOAL</p><h3>计划、执行状态和结果证据连续呈现</h3><p>真实 Run Plan 有 8 Parts、12 Goals；当前只解锁最小基础设施 G1.1，结果页保持 0/144。</p></div><span class="status-pill">G1.1 UNLOCKED</span></div>
-      ${commandStrip("执行当前唯一 Goal G1.1", "/goal Complete G1.1: build and verify the minimal reproducible layer×token trace path")}
+      <div class="stage-head"><div><p class="eyebrow">STEP 05 · RUNPLAN + /GOAL</p><h3>完成一项，状态与命令就向下移动</h3><p>Demo 展示首个结果图 F2A 已完成：G1.1 与 G2.1 保留 ✅，当前唯一解锁项移动到 G2.2；16 个示例数字都能悬停查看 provenance。</p></div><span class="status-pill">G2.2 UNLOCKED</span></div>
+      ${commandStrip("执行当前唯一 Goal G2.2", "/goal Complete G2.2: acquire and verify the HarmBench first-exit concentration panel")}
       ${reportDocument("runplan")}
       ${goalHierarchy()}
-      ${reportDocument("results", "EXPERIMENT RESULTS · PENDING COUNTERPART")}
+      ${reportDocument("results", "EXPERIMENT RESULTS · FIRST ARTIFACT COMPLETE · DEMO")}
       ${resultProvenanceDemo()}`
   },
   {
@@ -264,7 +267,7 @@ document.addEventListener("click", async event => {
 
 async function initializeDemo() {
   try {
-    const response = await fetch("report-structures.json?v=20260814-expplan-sequence");
+    const response = await fetch("report-structures.json?v=20260814-first-result");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     reportStructures = await response.json();
     state.stage = stageIndexFromLocation();

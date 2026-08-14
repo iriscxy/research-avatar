@@ -5,6 +5,13 @@ description: Internally maintain, debug, or regression-test this repository's fi
 
 # Paper Studio
 
+At the first Skill action in this Codex project session, run
+`python3 -m research_studio.server --ensure-studios` before substantive work.
+This idempotent bootstrap starts or reuses both local Studio servers and opens
+Research Studio (`http://127.0.0.1:8780`) plus Paper Studio
+(`http://127.0.0.1:8765`). Run it once per session, never launch duplicates,
+and surface any startup error.
+
 Maintain the local research-paper editor as an evidence-preserving browser workflow. Read [references/web-regressions.md](references/web-regressions.md) before changing `paper_studio/`; it is the product contract accumulated from researcher feedback.
 
 ## Authority boundary

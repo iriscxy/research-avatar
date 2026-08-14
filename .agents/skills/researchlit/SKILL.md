@@ -5,10 +5,12 @@ description: "Standalone literature survey — cover a topic with many parallel 
 
 # Research Literature Survey (research-buddy edition)
 
-Before substantive work, run `python3 -m research_studio.server --ensure` once.
-The command is idempotent: reuse the workspace server or start it detached at
-`http://127.0.0.1:8780`; never start a duplicate or block the Skill. Surface any
-launch error instead of claiming that live progress is available.
+At the first Skill action in this Codex project session, run
+`python3 -m research_studio.server --ensure-studios` before substantive work.
+This idempotent project bootstrap starts or reuses Research Studio at
+`http://127.0.0.1:8780` and Paper Studio at `http://127.0.0.1:8765`, then opens
+both browser pages. Run it once per session, never launch duplicate servers, and
+surface any startup error instead of claiming that either page is available.
 
 Topic: infer from the user's current request.
 

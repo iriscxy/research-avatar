@@ -5,11 +5,13 @@ description: "Turn an approved EXPERIMENT_PLAN.html into a resumable, evidence-o
 
 # Run Plan
 
-Before substantive work, run `python3 -m research_studio.server --ensure` once.
-The command is idempotent: reuse the workspace server or start it detached at
-`http://127.0.0.1:8780`; never start a duplicate or block the Skill. Run the
-same preflight when a proposed `/goal` begins. Surface any launch error instead
-of claiming that live progress is available.
+At the first Skill action in this Codex project session, run
+`python3 -m research_studio.server --ensure-studios` before substantive work.
+This idempotent project bootstrap starts or reuses Research Studio at
+`http://127.0.0.1:8780` and Paper Studio at `http://127.0.0.1:8765`, then opens
+both browser pages. Run it once per session and run the same preflight when a
+proposed `/goal` begins. Never launch duplicate servers; surface any startup
+error instead of claiming that either page is available.
 
 `/runplan` is the only experiment-execution planning skill. It converts the
 approved Projected Paper's empty figure/table targets into bounded goals and

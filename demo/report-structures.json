@@ -62,16 +62,16 @@
       {"number": "1", "title": "Execution Estimate", "content": "共 12 个 goals、8 个 major parts；预计 4×A100、428 GPU-hours，单 GPU 仍可执行但 compute wall time 约 428 小时。"},
       {"number": "2", "title": "Implementation Sources", "content": "所有 baseline 与 Our method 都运行在同一个本地统一框架中；本地实现不放链接，实际采用的官方模块通过 adapter 接入并只链接官方 GitHub。"},
       {"number": "3", "title": "Figure/Table Coverage", "content": "F1–F4 与 T1–T3 全部映射到 Goal；F2 分给 G2.1/G2.2，T1 由 G5.1，F3 与 T2 由 P6 因果检验填充。"},
-      {"number": "4", "title": "Parts and Goals", "content": "P1 基础设施 → P2 现象验证 → P3 方法可行性 → P4 开发调参 → P5 主证据 → P6 因果消融 → P7 鲁棒性 → P8 成本失败。Current Goal 嵌在当前解锁的 Goal 卡片内；完成后，该卡保留 ✅，命令面板自动下移到下一项。拥有论文结果目标的已完成 Goal 会原样回显 05 中的图源数据表或结果表，每个数字可点击查看 provenance。", "details": ["当前只解锁 G1.1：打通一个批准模型和极小输入切片的 layer×token trace、judge 与 provenance，重复一致后停止。"]}
+      {"number": "4", "title": "Parts and Goals", "content": "P1 基础设施 → P2 现象验证 → P3 方法可行性 → P4 开发调参 → P5 主证据 → P6 因果消融 → P7 鲁棒性 → P8 成本失败。Demo 状态中 G1.1 与首个结果 Goal G2.1 保留 ✅，Current Goal 已下移到 G2.2；已完成图源表中的每个示例数字都可悬停查看 provenance。", "details": ["Demo completion example：G1.1、G2.1 complete；G2.2 是当前唯一解锁项。"]}
     ]
   },
   "results": {
     "artifact": "reports/05_EXP_RESULT.html",
     "note": "只展示论文结果与可追溯生成过程",
     "sections": [
-      {"number": "1", "title": "Artifact Completion", "content": "真实状态为 0/7 artifacts complete、0/144 numeric targets filled；所有经验单元格保持 PENDING。"},
-      {"number": "2", "title": "Paper Tables and Figures", "content": "05 保持 03 批准的行列与面板几何；每张数据图旁边是唯一数字源表，未填完整时图保持空白。"},
-      {"number": "3", "title": "生成过程", "content": "未来每个 FILLED 数字都跳到同页已展开的 raw path、实际命令、代码配置、计算公式、时间与验证状态。"}
+      {"number": "1", "title": "Artifact Completion", "content": "Demo completion example 为首个结果面板 F2A 已完成、16/144 numeric targets filled；这些数值只演示完成状态，不是科学结果。"},
+      {"number": "2", "title": "Paper Tables and Figures", "content": "F2A 的曲线与旁侧唯一数字源表使用同一组 16 个 Demo 数值；其余未完成图表仍保持 PENDING。"},
+      {"number": "3", "title": "生成过程", "content": "鼠标停在任一 FILLED 数字上即可看到 raw path、筛选条件、实际命令、计算公式与验证状态；键盘聚焦同样可用。"}
     ]
   },
   "paper-studio": {

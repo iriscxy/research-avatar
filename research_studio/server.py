@@ -727,18 +727,43 @@ def start_paper_studio() -> dict[str, Any]:
         if paper_studio_alive():
             return {"ok": True, "url": PAPER_STUDIO_URL, "already_running": True}
         if PAPER_STUDIO_PROCESS is None or PAPER_STUDIO_PROCESS.poll() is not None:
+            workspace_hash = hashlib.sha256(str(ROOT).encode("utf-8")).hexdigest()[:12]
+            log_path = Path(tempfile.gettempdir()) / f"paper-studio-{workspace_hash}.log"
+            log_handle = log_path.open("ab")
             PAPER_STUDIO_PROCESS = subprocess.Popen(
-                ["python3", "-m", "paper_studio.server", "--no-browser"],
+                [sys.executable, "-m", "paper_studio.server", "--no-browser"],
                 cwd=ROOT,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+                close_fds=True,
             )
+            log_handle.close()
         deadline = time.time() + 4
         while time.time() < deadline:
             if paper_studio_alive():
                 return {"ok": True, "url": PAPER_STUDIO_URL, "already_running": False}
             time.sleep(0.15)
     return {"ok": False, "error": "Paper Studio did not become ready within 4 seconds."}
+
+
+def ensure_project_studios(
+    host: str = "127.0.0.1",
+    port: int = 8780,
+    *,
+    open_browser: bool = True,
+) -> dict[str, Any]:
+    """Idempotently make both project Studio applications available."""
+    research = ensure_research_studio(host, port)
+    paper = start_paper_studio()
+    if not paper.get("ok"):
+        raise RuntimeError(str(paper.get("error") or "Paper Studio failed to start"))
+    urls = [str(research["url"]), str(paper["url"])]
+    if open_browser:
+        for url in urls:
+            webbrowser.open(url)
+    return {"research_studio": research, "paper_studio": paper, "urls": urls}
 
 
 def open_project_terminal() -> dict[str, Any]:
@@ -1142,7 +1167,21 @@ def main() -> None:
         action="store_true",
         help="reuse the current server or start it once in the background",
     )
+    parser.add_argument(
+        "--ensure-studios",
+        action="store_true",
+        help="reuse or start both Research Studio and Paper Studio, then open them",
+    )
     args = parser.parse_args()
+    if args.ensure_studios:
+        result = ensure_project_studios(
+            args.host,
+            args.port,
+            open_browser=not args.no_browser,
+        )
+        print(f"Research Studio ready: {result['research_studio']['url']}")
+        print(f"Paper Studio ready: {result['paper_studio']['url']}")
+        return
     if args.ensure:
         result = ensure_research_studio(args.host, args.port)
         action = "started" if result["started"] else "already running"
