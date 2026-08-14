@@ -24,6 +24,12 @@ class DemoSyncTests(unittest.TestCase):
     def test_paper_demo_uses_three_real_application_screenshots(self):
         source = (ROOT / "demo/app.js").read_text(encoding="utf-8")
         self.assertNotIn("data-paper-demo-view", source)
+        self.assertIn("右侧真实 Live PDF", source)
+        self.assertIn("正文由 LLM API 写作", source)
+        self.assertIn("不是 Code Agent 生成正文", source)
+        self.assertIn("真实 GPT Image 已生成并显示", source)
+        self.assertIn("真实 DEMO DATA 已通过 LaTeX 编译", source)
+        self.assertIn("?v=20260814-real-artifacts", source)
         for filename in ("writing.png", "figures.png", "tables.png"):
             self.assertIn(filename, source)
             image = ROOT / "demo/assets/paper-studio" / filename
@@ -34,7 +40,7 @@ class DemoSyncTests(unittest.TestCase):
         source = (ROOT / "demo/app.js").read_text(encoding="utf-8")
         self.assertIn('document.execCommand("copy")', source)
         self.assertIn('representativeGoalIds = [currentId, "G2.1", "G5.1"]', source)
-        self.assertIn("完整计划没有丢失", source)
+        self.assertNotIn("完整计划没有丢失", source)
 
 
 if __name__ == "__main__":

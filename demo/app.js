@@ -156,12 +156,12 @@ const resultProvenanceDemo = () => `
 const paperStudioScreenshots = () => `<section class="paper-studio-screenshots">
   <p class="artifact-kicker">REAL PAPER STUDIO SCREENSHOTS · CAPTURED FROM THE LOCAL APP</p>
   <h4>真实界面，不在 Demo 中重画</h4>
-  <p>以下三张图直接截取自仓库中的 Paper Studio：同一个固定应用根据当前视图显示正文、图片和表格工作台。</p>
+  <p>以下三张图直接截取自仓库中的 Paper Studio：同一个固定应用根据当前视图显示正文、图片和表格工作台；正文截图右侧展示真实编译后的 Live PDF。</p>
   ${[
-    ["writing.png", "正文写作", "逐段 candidate、修改意见、Accept → LaTeX 与右侧 Live PDF。"],
-    ["figures.png", "图片工作台", "按论证依赖选择图，编辑 BioRender Prompt，并进入 GPT Image → 可编辑 PPT/PDF 流程。"],
-    ["tables.png", "表格工作台", "调用本地 Agent、编辑 Table LaTeX、选择正文位置并更新 PDF。"],
-  ].map(([file, title, caption]) => `<figure><img src="assets/paper-studio/${file}" alt="Paper Studio ${title}真实截图" loading="lazy"><figcaption><strong>${title}</strong><span>${caption}</span></figcaption></figure>`).join("")}
+    ["writing.png", "正文写作", "逐段 candidate、修改意见、Accept → LaTeX 与右侧真实 Live PDF。", true],
+    ["figures.png", "图片工作台", "真实 GPT Image 已生成并显示；后续继续重建为可编辑 PPT/PDF。", false],
+    ["tables.png", "表格工作台", "真实 DEMO DATA 已通过 LaTeX 编译成表格预览，并保留可编辑源码与正文位置。", false],
+  ].map(([file, title, caption, isWriting]) => `<figure><img src="assets/paper-studio/${file}?v=20260814-real-artifacts" alt="Paper Studio ${title}真实截图" loading="lazy"><figcaption><div><strong>${title}</strong><span>${caption}</span></div>${isWriting ? `<aside class="writing-api-note"><b>正文由 LLM API 写作</b><span>不是 Code Agent 生成正文</span></aside>` : ""}</figcaption></figure>`).join("")}
 </section>`;
 
 let reportStructures = {};
