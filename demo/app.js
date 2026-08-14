@@ -161,7 +161,7 @@ const paperStudioScreenshots = () => `<section class="paper-studio-screenshots">
     ["writing.png", "正文写作", "逐段 candidate、修改意见、Accept → LaTeX 与右侧真实 Live PDF。", true],
     ["figures.png", "图片工作台", "真实 GPT Image 已生成并显示；后续继续重建为可编辑 PPT/PDF。", false],
     ["tables.png", "表格工作台", "真实 DEMO DATA 已通过 LaTeX 编译成表格预览，并保留可编辑源码与正文位置。", false],
-  ].map(([file, title, caption, isWriting]) => `<figure><img src="assets/paper-studio/${file}?v=20260814-real-artifacts" alt="Paper Studio ${title}真实截图" loading="lazy"><figcaption><div><strong>${title}</strong><span>${caption}</span></div>${isWriting ? `<aside class="writing-api-note"><b>正文由 LLM API 写作</b><span>不是 Code Agent 生成正文</span></aside>` : ""}</figcaption></figure>`).join("")}
+  ].map(([file, title, caption, isWriting]) => `<figure><img src="assets/paper-studio/${file}?v=20260814-real-artifacts-v2" alt="Paper Studio ${title}真实截图" loading="lazy"><figcaption><div><strong>${title}</strong><span>${caption}</span></div>${isWriting ? `<aside class="writing-api-note"><b>正文由 LLM API 写作</b><span>不是 Code Agent 生成正文</span></aside>` : ""}</figcaption></figure>`).join("")}
 </section>`;
 
 let reportStructures = {};

@@ -30,7 +30,7 @@ class DemoSyncTests(unittest.TestCase):
         self.assertIn("正文调用 LLM API（不是 Code Agent）逐段生成", source)
         self.assertIn("真实 GPT Image 已生成并显示", source)
         self.assertIn("真实 DEMO DATA 已通过 LaTeX 编译", source)
-        self.assertIn("?v=20260814-real-artifacts", source)
+        self.assertIn("?v=20260814-real-artifacts-v2", source)
         for filename in ("writing.png", "figures.png", "tables.png"):
             self.assertIn(filename, source)
             image = ROOT / "demo/assets/paper-studio" / filename
