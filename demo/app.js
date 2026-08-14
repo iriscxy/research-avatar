@@ -67,11 +67,6 @@ const experimentPlanDemo = () => {
         <div class="claim-rows"><div><b>C1</b><p>匹配意图的风格变换产生可复现的最早 safety-tube exit。</p><span>若 exit depth 跨 paraphrase、seed 或 model 不稳定，则失败。</span></div><div><b>C2</b><p>只修 first-exit layer 足以恢复下游安全几何并降低 harmful compliance。</p><span>若随机层、ABD 层、后续层或重复修复并列或更优，则失败。</span></div><div><b>C3</b><p>一次修复改善 safety–utility–cost frontier。</p><span>若 DSR 增益必须以更差的 XSTest、Just-Eval 或 latency 换取，则失败。</span></div></div>
       </section>
 
-      <section class="evidence-artifact motivation-artifact">
-        <p class="artifact-kicker">F1 · MOTIVATION · NON-DATA-DRIVEN</p><h4>Same harmful intent, different style, first divergent depth highlighted</h4>
-        <div class="motivation-figure"><div class="intent-node">Same harmful intent</div><div class="style-path direct"><strong>Direct harmful</strong><span>L0</span><i></i><span>L1</span><i></i><span>L2</span><i></i><span>L3</span></div><div class="style-path transformed"><strong>Style-transformed</strong><span>L0</span><i></i><span>L1</span><i class="exit"></i><span class="exit-label">FIRST EXIT · L2</span><i></i><span>L3</span></div><div class="repair-node">one-shot repair at first exit → downstream recovery?</div></div>
-      </section>
-
       <section class="evidence-artifact">
         <p class="artifact-kicker">F2 · CLAIM C1 · TWO PANELS</p><h4>Where the safety trajectory first leaves its tube</h4>
         ${projectedPanel({title:"F2A · Where safety trajectories leave the tube",dataset:"AdvBench 50 + matched-style counterfactuals",metric:"Safety-tube exit rate; x = normalized transformer depth; y = exit rate",fields:"model_id · intent_id · style_id · layer_id · tube_exit",xLabel:"Normalized transformer depth",xs:["0.0","0.14","0.29","0.43","0.57","0.71","0.86","1.0"],series:["Direct harmful","Style-transformed harmful"],image:"assets/expplan/F2_exit_depth.png"})}
@@ -166,7 +161,7 @@ const stages = [
     id: "expplan", short: "实验设计", path: "experiment-plan", title: "先固定证据空位，再反推实验",
     compare: null,
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">STEP 04 · EXPPLAN</p><h3>Projected Paper 先于实验任务</h3><p>以下内容与实际 reports/03_EXPERIMENT_PLAN.html 对齐：完整展示 4 图、3 表、相邻图源数据表、基线实现和预注册 falsifier。</p></div><span class="status-pill">APPROVED</span></div>
+      <div class="stage-head"><div><p class="eyebrow">STEP 04 · EXPPLAN</p><h3>Projected Paper 先于实验任务</h3><p>以下内容与实际 reports/03_EXPERIMENT_PLAN.html 对齐：展示数据图 F2–F4 的 5 个面板、T1–T3、相邻图源数据表、基线实现和预注册 falsifier。</p></div><span class="status-pill">APPROVED</span></div>
       ${commandStrip("生成实验设计与待填图表", "$expplan")}
       ${experimentPlanDemo()}`
   },
@@ -257,7 +252,7 @@ document.addEventListener("click", async event => {
 
 async function initializeDemo() {
   try {
-    const response = await fetch("report-structures.json?v=20260814-expplan-parity");
+    const response = await fetch("report-structures.json?v=20260814-expplan-unified-type");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     reportStructures = await response.json();
     state.stage = stageIndexFromLocation();
