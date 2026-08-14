@@ -53,7 +53,7 @@ class DemoSyncTests(unittest.TestCase):
             self.assertNotIn(internal_copy, source)
         for reader_copy in (
             "从论文主张反推实验和证据",
-            "按里程碑推进实验并同步结果",
+            "实验做到哪里，结果就更新到哪里",
             "在统一工作区中完成正文、图片和表格",
         ):
             self.assertIn(reader_copy, source)
