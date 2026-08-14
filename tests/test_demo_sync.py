@@ -57,6 +57,7 @@ class DemoSyncTests(unittest.TestCase):
             "在统一工作区中完成正文、图片和表格",
         ):
             self.assertIn(reader_copy, source)
+        self.assertIn("先确定论文要证明什么，再为每个主张安排图表、指标和失败条件", source)
 
 
 if __name__ == "__main__":
