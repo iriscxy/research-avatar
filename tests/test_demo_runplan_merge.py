@@ -14,16 +14,18 @@ class DemoRunPlanMergeTests(unittest.TestCase):
         self.assertNotIn("完整计划没有丢失", source)
         self.assertNotIn('class="runplan-omitted"', source)
         self.assertNotIn('reportDocument("results"', source)
-        self.assertIn("05 只保留完整 provenance，不再单独展示", source)
+        self.assertNotIn("05 只保留完整 provenance，不再单独展示", source)
+        self.assertNotIn("执行进度和已完成图表都在 04 Run Plan", source)
+        self.assertIn("按里程碑推进实验并同步结果", source)
 
     def test_completed_goal_contains_source_table_plot_and_hover_process(self):
         source = (ROOT / "demo/app.js").read_text(encoding="utf-8")
         self.assertIn('class="result-shell source-table completed-source"', source)
         self.assertIn('class="completed-chart"', source)
         self.assertIn('class="provenance-tooltip"', source)
-        self.assertIn("16 / 16 source cells verified", source)
-        self.assertIn("raw JSONL reopen PASS", source)
-        self.assertIn("<strong>Command</strong>", source)
+        self.assertIn("16 个数据点全部核验", source)
+        self.assertIn("原始记录可重新打开", source)
+        self.assertIn("<strong>运行命令</strong>", source)
         style = (ROOT / "demo/style.css").read_text(encoding="utf-8")
         self.assertIn(".expanded-goal>.completed-result", style)
 
