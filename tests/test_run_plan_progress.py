@@ -55,6 +55,8 @@ class RunPlanProgressTests(unittest.TestCase):
         self.assertIn('id="goal-command-G1-1">' + expected, rendered)
         self.assertIn('>复制 /goal</button>', rendered)
         self.assertIn('navigator.clipboard.writeText(value)', rendered)
+        self.assertIn('research-studio-copy-goal', rendered)
+        self.assertIn('research-studio-copy-goal-result', rendered)
         self.assertIn('aria-live="polite"', rendered)
 
     def test_refresh_moves_panel_after_state_advances(self):

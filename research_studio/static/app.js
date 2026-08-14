@@ -11,6 +11,41 @@ const artifactSandbox = "allow-scripts allow-forms allow-popups allow-downloads"
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
 const statusLabel = status => ({complete:"完成",in_progress:"进行中",waiting_confirmation:"等待确认",not_started:"未开始"}[status] || status);
+async function copyGoalFromArtifact(value) {
+  if (!value.startsWith("/goal ") || value.length > 20000) return false;
+  try {
+    if (!navigator.clipboard || !window.isSecureContext) throw new Error("clipboard unavailable");
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = value;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.left = "-9999px";
+    area.style.top = "0";
+    document.body.appendChild(area);
+    area.focus();
+    area.select();
+    area.setSelectionRange(0, value.length);
+    let copied = false;
+    try { copied = document.execCommand("copy"); } catch {}
+    area.remove();
+    return copied;
+  }
+}
+
+window.addEventListener("message", async event => {
+  if (event.source !== previewFrame.contentWindow) return;
+  const message = event.data || {};
+  if (message.type !== "research-studio-copy-goal" || typeof message.requestId !== "string") return;
+  const copied = await copyGoalFromArtifact(String(message.value || ""));
+  event.source.postMessage({
+    type: "research-studio-copy-goal-result",
+    requestId: message.requestId,
+    copied,
+  }, "*");
+});
 const extension = path => path.split(".").pop().toUpperCase();
 function savedStage() {
   const value = Number.parseInt(localStorage.getItem(stageStorageKey) || "0", 10);
