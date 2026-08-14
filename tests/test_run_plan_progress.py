@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from tools.run_plan_progress import refresh, render_parts_and_goals
+from tools.run_plan_progress import goal_command, refresh, render_parts_and_goals
 
 
 def fixture_state(proposed="G1.1"):
@@ -46,6 +46,17 @@ class RunPlanProgressTests(unittest.TestCase):
         self.assertIn('data-current-goal-id="G1.1"', g1.group(0))
         self.assertNotIn('class="current-goal"', g2.group(0))
 
+    def test_current_goal_has_one_button_that_targets_the_full_command(self):
+        state = fixture_state()
+        rendered = render_parts_and_goals(state)
+        expected = goal_command(state["goals"][0])
+        self.assertEqual(rendered.count('data-copy-goal-target='), 1)
+        self.assertIn('data-copy-goal-target="goal-command-G1-1"', rendered)
+        self.assertIn('id="goal-command-G1-1">' + expected, rendered)
+        self.assertIn('>复制 /goal</button>', rendered)
+        self.assertIn('navigator.clipboard.writeText(value)', rendered)
+        self.assertIn('aria-live="polite"', rendered)
+
     def test_refresh_moves_panel_after_state_advances(self):
         state = fixture_state(proposed="G2.1")
         with TemporaryDirectory() as directory:
@@ -63,6 +74,7 @@ class RunPlanProgressTests(unittest.TestCase):
             result = refresh(path)
             source = path.read_text(encoding="utf-8")
         self.assertEqual(result["current_goal"], "G2.1")
+        self.assertEqual(result["copy_goal_button_count"], 1)
         self.assertNotIn('data-report-section="current-goal"', source)
         self.assertIn('data-current-goal-id="G2.1"', source)
         self.assertRegex(source, r'✅ G1\.1')

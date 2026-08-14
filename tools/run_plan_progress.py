@@ -41,6 +41,30 @@ GOAL_RESULT_PROVENANCE_STYLE = (
     'transform:translateX(-50%)}.goal-results .result-value:hover::after,'
     '.goal-results .result-value:focus-visible::after{display:block}</style>'
 )
+GOAL_COPY_ASSETS = (
+    '<style>.goal-command-copy{position:relative}.goal-copy-actions{display:flex;align-items:center;'
+    'gap:10px;margin-top:9px}.copy-goal-button{appearance:none;border:1px solid #087f74;'
+    'border-radius:8px;background:#087f74;color:#fff;padding:8px 13px;font:700 14px/1.2 '
+    'Inter,system-ui,sans-serif;cursor:pointer}.copy-goal-button:hover{background:#066b62}'
+    '.copy-goal-button:focus-visible{outline:3px solid #7bd3c7;outline-offset:2px}'
+    '.goal-copy-status{min-height:1.2em;color:#087f74;font-size:13px;font-weight:700}</style>'
+    '<script>(()=>{const script=document.currentScript;const root=script&&script.closest('
+    '\'[data-report-section="parts-and-goals"]\');if(!root||root.dataset.goalCopyBound==='
+    '"true")return;root.dataset.goalCopyBound="true";const fallback=text=>{const area='
+    'document.createElement("textarea");area.value=text;area.setAttribute("readonly","");'
+    'area.style.position="fixed";area.style.opacity="0";document.body.appendChild(area);'
+    'area.select();const copied=document.execCommand("copy");area.remove();if(!copied)throw '
+    'new Error("copy command failed")};root.addEventListener("click",async event=>{const '
+    'button=event.target.closest("[data-copy-goal-target]");if(!button||!root.contains(button))'
+    'return;const source=document.getElementById(button.dataset.copyGoalTarget);const status='
+    'document.getElementById(button.getAttribute("aria-describedby"));if(!source)return;const '
+    'original=button.textContent;try{const value=source.textContent;if(navigator.clipboard&&'
+    'window.isSecureContext)await navigator.clipboard.writeText(value);else fallback(value);'
+    'button.textContent="已复制 ✓";if(status)status.textContent="完整 /goal 命令已复制"}'
+    'catch(error){button.textContent="复制失败";if(status)status.textContent="请选中上方命令手动复制"}'
+    'window.setTimeout(()=>{button.textContent=original;if(status)status.textContent=""},2200)'
+    '})})();</script>'
+)
 
 
 def goal_command(goal: dict) -> str:
@@ -69,6 +93,9 @@ def goal_command(goal: dict) -> str:
 
 def current_goal_html(goal: dict, *, active_goal: str | None) -> str:
     goal_id = str(goal["id"])
+    safe_goal_id = re.sub(r"[^A-Za-z0-9_-]+", "-", goal_id).strip("-") or "current"
+    command_id = f"goal-command-{safe_goal_id}"
+    status_id = f"goal-copy-status-{safe_goal_id}"
     running = active_goal == goal_id or goal.get("status") == "running"
     label = "▶ running" if running else "→ unlocked"
     outputs = "、".join(str(value) for value in goal.get("outputs", [])) or "按 embedded state 保存目标输出"
@@ -79,7 +106,13 @@ def current_goal_html(goal: dict, *, active_goal: str | None) -> str:
         f'<h4>Current Goal · {html.escape(goal_id)}</h4>'
         f'<p><span class="pill">{label}</span> '
         f'{html.escape(str(goal.get("title", goal_id)))}；只执行这一项，不启动后继 Goal。</p>'
-        f'<pre class="copybox">{html.escape(goal_command(goal))}</pre>'
+        '<div class="goal-command-copy">'
+        f'<pre class="copybox" id="{html.escape(command_id)}">{html.escape(goal_command(goal))}</pre>'
+        '<div class="goal-copy-actions">'
+        f'<button type="button" class="copy-goal-button" data-copy-goal-target="{html.escape(command_id)}" '
+        f'aria-describedby="{html.escape(status_id)}">复制 /goal</button>'
+        f'<span class="goal-copy-status" id="{html.escape(status_id)}" aria-live="polite"></span>'
+        '</div></div>'
         f'<p><strong>Outputs:</strong> {html.escape(outputs)}</p>'
         f'<p><strong>Resources:</strong> {html.escape(budget)}</p>'
         f'<p><strong>Completion:</strong> {html.escape(completion)}</p>'
@@ -137,9 +170,16 @@ def render_parts_and_goals(state: dict, completed_artifacts: dict[str, list[str]
                 )
             chunks.append('</article>')
         chunks.append('</div>')
+    if current_id:
+        chunks.append(GOAL_COPY_ASSETS)
     chunks.append('</section>')
     if current_id and current_count != 1:
         raise ValueError(f"expected one nested Current Goal for {current_id}, rendered {current_count}")
+    copy_button_count = sum(chunk.count('data-copy-goal-target=') for chunk in chunks)
+    if current_id and copy_button_count != 1:
+        raise ValueError(f"expected one /goal copy button for {current_id}, rendered {copy_button_count}")
+    if not current_id and copy_button_count:
+        raise ValueError("rendered a /goal copy button without a current goal")
     return "".join(chunks)
 
 
@@ -226,6 +266,7 @@ def refresh(path: Path) -> dict:
         "file": str(path),
         "current_goal": state.get("active_goal") or state.get("proposed_goal_id") or "",
         "nested_current_goal_count": rendered.count('class="current-goal"'),
+        "copy_goal_button_count": rendered.count('data-copy-goal-target='),
         "completed_artifact_snapshots": sum(len(value) for value in snapshots.values()),
     }
 

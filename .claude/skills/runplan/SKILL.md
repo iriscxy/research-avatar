@@ -163,7 +163,9 @@ with prose such as “status: completed.”
 
 Render the one active or proposed **Current Goal inside its matching `Gn.m` goal
 card**, immediately after that goal's description and `对应图表` line. The nested
-panel contains the copyable `/goal`, outputs, resources, and completion check.
+panel contains the complete `/goal` in a selectable `<pre>`, a dedicated
+`复制 /goal` button that copies that exact text with visible success/failure status,
+outputs, resources, and completion check. Never shorten the copied command.
 Never render Current Goal as a separate top-level section. When a goal completes,
 regenerate from embedded state: the completed card keeps `✅`, and the Current
 Goal panel moves downward to the newly proposed/unlocked goal. There must be
@@ -509,7 +511,7 @@ Render exactly two user-facing experiment artifacts. In both files, each `<secti
 1. `1. Execution Estimate` (`execution-estimate`): Goals, GPUs, approximate time, and assumptions;
 2. `2. Implementation Sources` (`implementation-sources`): the inherited per-method implementation contract;
 3. `3. Figure/Table Coverage` (`artifact-coverage`): the complete approved artifact checklist;
-4. `4. Parts and Goals` (`parts-and-goals`): ordered `Pn` parts with nested `Gn.m` goals, status, and destination. The exactly one copyable Current Goal panel is nested inside the matching goal card and moves with `proposed_goal_id` / `active_goal`.
+4. `4. Parts and Goals` (`parts-and-goals`): ordered `Pn` parts with nested `Gn.m` goals, status, and destination. The exactly one copyable Current Goal panel, including its dedicated `复制 /goal` button, is nested inside the matching goal card and moves with `proposed_goal_id` / `active_goal`.
 
 `05_EXP_RESULT.html` has exactly these ordered top-level sections:
 
