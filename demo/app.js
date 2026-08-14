@@ -51,6 +51,12 @@ const experimentPlanDemo = () => {
         <ul><li><strong>Target:</strong> ACL 2027 Main Conference / Long Paper.</li><li><strong>Mechanism reference:</strong> RTV，负责科学问题、轨迹机制和必须击败的比较地板。</li><li><strong>Researcher-owned structure reference:</strong> ABD，只负责段落功能、章节比例和图表节奏。</li></ul>
       </section>
 
+      <section class="plain-section projected-paper-overview">
+        <p class="artifact-kicker">2 · PROJECTED PAPER</p>
+        <h4>Projected Paper</h4>
+        <p>这一整节固定预计论文的标题摘要、段落蓝图、代表性图表证据壳、可证伪主张、实现方式与预算；下面的 2.1–2.6 都属于本节。</p>
+      </section>
+
       <section class="plain-section projected-abstract">
         <p class="artifact-kicker">2.1 · PROJECTED TITLE AND ABSTRACT</p>
         <h4>First-Divergence Repair: Causal Single-Layer Recovery from Style-Induced Jailbreaks</h4>
@@ -267,7 +273,7 @@ document.addEventListener("click", async event => {
 
 async function initializeDemo() {
   try {
-    const response = await fetch("report-structures.json?v=20260814-first-result");
+    const response = await fetch("report-structures.json?v=20260814-real-provenance");
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     reportStructures = await response.json();
     state.stage = stageIndexFromLocation();

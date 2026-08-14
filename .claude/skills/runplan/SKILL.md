@@ -34,7 +34,7 @@ Default input: `reports/03_EXPERIMENT_PLAN.html`.
 Read the JSON in its
 `<script type="application/json" id="experiment-plan-contract">` block first.
 Require `approval_status=approved`; a missing, invalid, or pending contract is
-a hard stop back to `/expplan`. Read `researcher-profile/PROFILE.md` only for
+a hard stop back to `/expplan`. Read `researcher-profile/PROFILE.html` only for
 environment, stack, and OOM context. The researcher—not the agent—judges
 whether scientific evidence supports a claim.
 
@@ -147,17 +147,40 @@ goal, and every visible `对应图表` mapping agrees with the hidden state.
 
 Copy `03.implementation_contract` byte-for-byte into the embedded run-plan
 state and render the same per-method implementation list before the hierarchy.
-For every baseline and the proposed method, visibly preserve its exact mode,
-GitHub/paper source, reused module versus locally written scope, and shared
-framework boundary. Goals may schedule that contract but may not reinterpret
-it. Validation must fail if the Expplan and Runplan implementation lists differ
-in order or content, or if any entry is absent from the visible Runplan.
+Render only `Method` and `How it is implemented`: local methods have no link;
+methods that actually use verified official code link only the official GitHub.
+The complete mode, repository, reuse, local-write, shared-boundary, and fallback
+details remain in embedded state for execution checks. Goals may schedule that
+contract but may not reinterpret it. Validation must fail if the Expplan and
+Runplan implementation lists differ in order or content, or if any method or
+`implementation_summary` is absent from the visible Runplan.
 
 Show goal progress with one status mark derived from the embedded run-plan state whenever
 the webpage is generated or resumed: `✅` for `completed`, `▶` for `running`,
 `→` for the one proposed goal, `○` for locked/pending, and `⚠` for blocked or
 invalidated. A completed goal must visibly retain its `✅`; do not replace it
 with prose such as “status: completed.”
+
+Render the one active or proposed **Current Goal inside its matching `Gn.m` goal
+card**, immediately after that goal's description and `对应图表` line. The nested
+panel contains the copyable `/goal`, outputs, resources, and completion check.
+Never render Current Goal as a separate top-level section. When a goal completes,
+regenerate from embedded state: the completed card keeps `✅`, and the Current
+Goal panel moves downward to the newly proposed/unlocked goal. There must be
+exactly one nested Current Goal whenever `active_goal` or `proposed_goal_id` is
+set, and its `data-current-goal-id` must equal that state ID.
+
+For every completed goal that owns paper-facing acquisition targets, render a
+`Completed Goal Evidence` block inside that same goal card. Copy the matching
+approved artifact/table snapshot from `05_EXP_RESULT.html`; never hand-author a
+second numeric source. Figure snapshots include their adjacent source-data
+table, and table snapshots include the result table. Every filled number keeps
+its `data-result-id` and links to
+`05_EXP_RESULT.html#provenance-<result_id>`. The copied value also retains a
+compact `data-provenance-summary` plus matching native `title`: mouse hover or
+keyboard focus previews its raw source, calculation, actual command, and
+verification, while click opens the complete record in `05`. Regeneration must fail if a scoped
+target is missing, pending, lacks a result ID, or lacks its provenance link.
 
 ## 3. Write one durable webpage with embedded state
 
@@ -295,7 +318,7 @@ Store it as embedded `run-plan-state.proposed_goal_id`, then print one self-cont
 command in this form:
 
 ```text
-/goal Complete Gn.m: <plain-language description of the exact data slice, methods/comparisons, engineering work, checks, metrics, and stopping condition>; follow reports/04_RUN_PLAN.html and its embedded run-plan state; save each result immediately; before completing the goal, organize its code and files, remove only disposable temporary artifacts, and verify every recorded path; append and validate every result in code/RESULTS_LEDGER.csv; update the embedded state, regenerate reports/04_RUN_PLAN.html so the goal shows ✅, and update the matching shells in reports/05_EXP_RESULT.html from the ledger; stop after Gn.m, do not start the successor goal, and only propose the next unlocked /goal.
+/goal Complete Gn.m: <plain-language description of the exact data slice, methods/comparisons, engineering work, checks, metrics, and stopping condition>; follow reports/04_RUN_PLAN.html and its embedded run-plan state; save each result immediately; before completing the goal, organize its code and files, remove only disposable temporary artifacts, and verify every recorded path; append and validate every result in code/RESULTS_LEDGER.csv; update the embedded state, regenerate reports/04_RUN_PLAN.html so the goal shows ✅ and, for paper-facing targets, embeds the matching 05 figure source-data table or result table with every filled number linked to provenance; update the matching shells in reports/05_EXP_RESULT.html from the ledger; stop after Gn.m, do not start the successor goal, and only propose the next unlocked /goal.
 ```
 
 Replace every placeholder with actual work. The command must make sense without
@@ -328,7 +351,7 @@ and `04_RUN_PLAN.html` must require it to:
    immediately refill the matching approved cell in `05_EXP_RESULT.html` and
    regenerate its clickable provenance target; never wait until the whole goal
    or whole table is complete to expose already verified evidence.
-5. Run `python3 .agents/skills/runplan/scripts/validate_results_ledger.py
+5. Run `python3 .claude/skills/runplan/scripts/validate_results_ledger.py
    --ledger code/RESULTS_LEDGER.csv --plan reports/04_RUN_PLAN.html --report
    reports/05_EXP_RESULT.html --goal Gn.m --strict-report` before accepting a
    gate or completing the goal. On every resume, run the validator before new
@@ -337,17 +360,34 @@ and `04_RUN_PLAN.html` must require it to:
    validated ledger rows. Missing evidence is `MISSING`, never an estimate.
    Before that validation, after the matching cells have been regenerated with
    their `data-result-id` attributes, run
-   `python3 .agents/skills/runplan/scripts/render_result_provenance.py --ledger
+   `python3 .claude/skills/runplan/scripts/render_result_provenance.py --ledger
    code/RESULTS_LEDGER.csv --plan reports/04_RUN_PLAN.html --report
    reports/05_EXP_RESULT.html`. This deterministically linkifies every newly
-   filled value and refreshes the page-local generation-process cards.
+   filled value, attaches its hover/focus provenance summary, and refreshes the
+   page-local generation-process cards.
 6. At each resume and goal boundary, organize experiment code and
    result files, remove only disposable temporary/build artifacts, and verify
    all ledger paths still exist. Do not maintain a separate file inventory.
-   Regenerate the visible `reports/04_RUN_PLAN.html` from its embedded state so every newly
-   completed item visibly changes to `✅` before reporting completion.
+   After provenance rendering and strict ledger/report validation, regenerate
+   the visible `reports/04_RUN_PLAN.html` from its embedded state so every newly
+   completed item visibly changes to `✅` before reporting completion. Run
+   `python3 tools/run_plan_progress.py reports/04_RUN_PLAN.html`; this also moves
+   the one nested Current Goal panel to the next `proposed_goal_id` and embeds
+   each completed goal's exact paper-facing artifact snapshot from
+   `05_EXP_RESULT.html`. Validate that the panel is a child of that goal's card,
+   not a detached top-level section.
 7. Complete the goal only when its declared files, scoped evidence, and
-   mechanical checks exist.
+   mechanical checks exist. If the goal owns paper-facing acquisition targets,
+   it cannot be completed until every target scoped to that goal is filled from
+   validated ledger rows, every numeric value is clickable to its provenance,
+   every numeric value exposes the same provenance summary on mouse hover and
+   keyboard focus,
+   and the corresponding figure source-data table or result table is visibly
+   embedded beneath the completed goal card. A data-driven figure must show its
+   actual source-data table; a table target must show the result table itself.
+   Partially owned artifacts may keep other goals' cells pending, but the
+   completed goal's own cells may not be pending. Infrastructure-only goals
+   marked `无直接图表` are exempt from the snapshot requirement.
    Report negative results and uncertainty honestly; a goal means “produce
    evidence,” not “make the hypothesis succeed.”
 8. Evaluate only the preregistered gate, record the result, propose the next
@@ -418,7 +458,13 @@ Make every `FILLED` paper-facing number in a result table—and every filled
 number in a figure's adjacent source-data table—a page-local provenance link.
 Render the value inside an anchor carrying the same hidden result ID:
 `href="#provenance-<result_id>"`, `data-result-id="<result_id>"`, and
-`data-provenance-trigger="<result_id>"`. Pending, missing, or invalidated cells
+`data-provenance-trigger="<result_id>"`. Also attach a compact escaped
+`data-provenance-summary` and identical native `title` containing goal, metric,
+source, calculation, and verification; local results additionally include raw
+artifact/locator and the actual command, while reported reuse includes its
+source/locator and not-rerun notice. Hover and keyboard focus show this compact
+summary without navigation; click still opens the complete generation-process
+card and preserves Back navigation. Pending, missing, or invalidated cells
 are plain status text and are never clickable. Keep the paper-shaped row ×
 column geometry; do not add a visible provenance column or one ledger row per
 result.
@@ -456,12 +502,24 @@ NOT a scientific result` banner and `SYNTHETIC` watermark.
 
 ## Fixed HTML structures
 
-Render exactly two user-facing experiment artifacts.
+Render exactly two user-facing experiment artifacts. In both files, each `<section data-report-section>` and visible `<h2>` must agree.
 
-- `04_RUN_PLAN.html`: header totals (Goals, GPUs, time) → ordered Parts and Goals → status and figure/table destination for every Goal → exactly one current Goal with copyable `/goal`, outputs, resources, and completion check → compact coverage checklist for all approved figures/tables.
-- `05_EXP_RESULT.html`: header and artifact completion → approved paper tables/figures in paper order with unchanged geometry and pending states → filled numbers as page-local provenance links → one collapsible `生成过程` index containing raw path, actual command, code/config, calculation, and verification.
+`04_RUN_PLAN.html` has exactly these ordered top-level sections:
 
-Never expose `RESULTS_LEDGER.csv` as a user-facing tab, table, preview, or download in Research Studio or the Live Demo. It remains an internal store used to generate and validate `05_EXP_RESULT.html`. Never add a third experiment-stage tab or a visible ledger-shaped table. The Live Demo must reproduce these two structures with illustrative content and a working numeric provenance jump.
+1. `1. Execution Estimate` (`execution-estimate`): Goals, GPUs, approximate time, and assumptions;
+2. `2. Implementation Sources` (`implementation-sources`): the inherited per-method implementation contract;
+3. `3. Figure/Table Coverage` (`artifact-coverage`): the complete approved artifact checklist;
+4. `4. Parts and Goals` (`parts-and-goals`): ordered `Pn` parts with nested `Gn.m` goals, status, and destination. The exactly one copyable Current Goal panel is nested inside the matching goal card and moves with `proposed_goal_id` / `active_goal`.
+
+`05_EXP_RESULT.html` has exactly these ordered top-level sections:
+
+1. `1. Artifact Completion` (`artifact-completion`);
+2. `2. Paper Tables and Figures` (`paper-artifacts`): approved artifacts in paper order with unchanged geometry and pending states;
+3. `3. 生成过程` (`generation-process`): one collapsible provenance index containing raw path, actual command, code/config, calculation, and verification.
+
+Every title in both files must own substantive project-specific content; an empty section, title-only slot, or placeholder-only body is invalid. Do not add, rename, reorder, or omit these sections. Before presenting either file, run `python3 tools/validate_report_structure.py --kind runplan --html reports/04_RUN_PLAN.html` and `python3 tools/validate_report_structure.py --kind results --html reports/05_EXP_RESULT.html` in addition to the ledger/result validators.
+
+Never expose `RESULTS_LEDGER.csv` as a user-facing tab, table, preview, or download in Research Studio or the Live Demo. It remains an internal store used to generate and validate `05_EXP_RESULT.html`. Never add a third experiment-stage tab or a visible ledger-shaped table. The Live Demo must reproduce these two structures with illustrative content and working numeric hover/focus provenance plus the full click-through jump.
 
 ## Output
 

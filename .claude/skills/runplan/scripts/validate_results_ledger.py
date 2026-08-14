@@ -227,6 +227,8 @@ def validate_clickable_provenance(
     interaction_markers = {
         "scrollIntoView": "provenance interaction does not scroll to the selected record",
         "focus(": "provenance interaction does not focus the selected record",
+        ".result-value:hover": "provenance interaction lacks a mouse-hover summary",
+        ".result-value:focus-visible": "provenance interaction lacks a keyboard-focus summary",
         "provenance-": "provenance interaction does not resolve result jump targets",
         "createElement": "provenance interaction does not build jump-target cards",
         "textContent": "provenance cards are not rendered with safe textContent",
@@ -252,11 +254,15 @@ def validate_clickable_provenance(
         anchor = re.search(
             rf'<a\b(?=[^>]*\bdata-result-id="{re.escape(rid)}")'
             rf'(?=[^>]*\bdata-provenance-trigger="{re.escape(rid)}")'
-            rf'(?=[^>]*\bhref="#provenance-{re.escape(rid)}")[^>]*>',
+            rf'(?=[^>]*\bhref="#provenance-{re.escape(rid)}")'
+            rf'(?=[^>]*\bdata-provenance-summary="[^"]+")'
+            rf'(?=[^>]*\btitle="[^"]+")[^>]*>',
             report,
         )
         if not anchor:
-            errors.append(f"{label}: filled value lacks a clickable provenance jump")
+            errors.append(
+                f"{label}: filled value lacks a clickable provenance jump and hover/focus summary"
+            )
         record = payload.get(rid)
         if not isinstance(record, dict):
             errors.append(f"{label}: provenance payload entry is missing")
@@ -289,6 +295,94 @@ def validate_clickable_provenance(
                     errors.append(f"{label}: provenance field {field} differs from ledger")
             if record.get("reuse_notice") != "not rerun locally":
                 errors.append(f"{label}: reported reuse lacks the not-rerun notice")
+        if anchor:
+            summary_match = re.search(
+                r'\bdata-provenance-summary="([^"]+)"', anchor.group(0)
+            )
+            title_match = re.search(r'\btitle="([^"]+)"', anchor.group(0))
+            summary = html.unescape(summary_match.group(1)) if summary_match else ""
+            title = html.unescape(title_match.group(1)) if title_match else ""
+            if summary != title:
+                errors.append(f"{label}: hover summary and native title differ")
+            required_hover_values = [
+                row.get("goal_id", ""), row.get("metric", ""), row.get("value", ""),
+                row.get("verification_status", ""),
+            ]
+            if row.get("source_type") == "RUN_LOCAL":
+                required_hover_values.extend([
+                    row.get("raw_artifact", ""), row.get("raw_locator", ""),
+                    row.get("command", ""),
+                ])
+            else:
+                required_hover_values.extend([
+                    row.get("source_reference", ""), row.get("source_locator", ""),
+                    "not rerun locally",
+                ])
+            for value in required_hover_values:
+                if value and value not in summary:
+                    errors.append(f"{label}: hover summary lacks {value!r}")
+    return errors
+
+
+def validate_completed_goal_evidence(
+    plan: str,
+    state: dict[str, object],
+    acquisitions: dict[str, dict[str, object]],
+) -> list[str]:
+    """Require completed paper-facing goals to display their traceable artifact."""
+    errors: list[str] = []
+    completed = {
+        str(goal.get("id", ""))
+        for goal in state.get("goals", [])
+        if isinstance(goal, dict) and goal.get("status") == "completed"
+    }
+    scoped: dict[str, list[dict[str, object]]] = {}
+    for contract in acquisitions.values():
+        goal_id = str(contract.get("producing_goal", ""))
+        if goal_id in completed and contract.get("artifact_id") and contract.get("target_id"):
+            scoped.setdefault(goal_id, []).append(contract)
+    for goal_id, contracts in scoped.items():
+        card = re.search(
+            rf'<article\b(?=[^>]*\bdata-goal-id="{re.escape(goal_id)}")[^>]*>.*?</article>',
+            plan,
+            re.S,
+        )
+        if not card or 'class="goal-results"' not in card.group(0):
+            errors.append(f"completed goal {goal_id} lacks its Completed Goal Evidence block")
+            continue
+        block = card.group(0)
+        if ".result-value:hover" not in block or ".result-value:focus-visible" not in block:
+            errors.append(f"completed goal {goal_id} lacks hover/focus provenance styling")
+        for contract in contracts:
+            artifact_id = str(contract.get("artifact_id"))
+            target_id = str(contract.get("target_id"))
+            if f'data-artifact-id="{artifact_id}"' not in block:
+                errors.append(f"completed goal {goal_id} lacks artifact snapshot {artifact_id}")
+                continue
+            target = re.search(
+                rf'<(?P<tag>[a-zA-Z0-9]+)\b(?=[^>]*\bdata-target-id="{re.escape(target_id)}")'
+                rf'(?P<open>[^>]*)>(?P<body>.*?)</(?P=tag)>',
+                block,
+                re.S,
+            )
+            if not target:
+                errors.append(f"completed goal {goal_id} lacks target {target_id} in its snapshot")
+                continue
+            result = re.search(r'\bdata-result-id="([^"]+)"', target.group("open"))
+            if not result or (
+                f'href="05_EXP_RESULT.html#provenance-{result.group(1)}"'
+                not in target.group("body")
+            ):
+                errors.append(
+                    f"completed goal {goal_id} target {target_id} lacks clickable provenance"
+                )
+            elif (
+                'data-provenance-summary="' not in target.group("body")
+                or 'title="' not in target.group("body")
+            ):
+                errors.append(
+                    f"completed goal {goal_id} target {target_id} lacks hover provenance"
+                )
     return errors
 
 
@@ -399,7 +493,8 @@ def validate(args: argparse.Namespace) -> list[str]:
             runplan_text = args.plan.read_text(encoding="utf-8")
             runplan_visible = re.sub(r'<script\b.*?</script>', '', runplan_text, flags=re.S)
             for item in approved_implementation:
-                for token in (item.get("method"), item.get("mode"), item.get("plan")):
+                for field in ("method", "implementation_summary"):
+                    token = item.get(field)
                     if token and html.unescape(str(token)) not in html.unescape(re.sub(r'<[^>]+>', ' ', runplan_visible)):
                         errors.append(f"visible run plan lacks approved implementation detail: {token}")
                 url = item.get("source_url")
@@ -578,6 +673,12 @@ def validate(args: argparse.Namespace) -> list[str]:
     if args.strict_report and report_text:
         errors.extend(validate_figure_sources(report_text, acquisitions))
         errors.extend(validate_clickable_provenance(report_text, rows, acquisitions))
+    if args.plan:
+        errors.extend(
+            validate_completed_goal_evidence(
+                args.plan.read_text(encoding="utf-8"), state, acquisitions
+            )
+        )
     return errors
 
 
@@ -657,6 +758,65 @@ def self_test() -> int:
         )
         if validate(args):
             return 1
+        provenance_payload = {
+            row["result_id"]: {
+                "result_id": row["result_id"], "goal_id": row["goal_id"],
+                "metric": row["metric"], "value": row["value"], "unit": row["unit"],
+                "dimensions": {}, "source_type": row["source_type"],
+                "acquisition_kind": "atomic", "calculation": {"kind": "atomic"},
+                "obtained_at": row["obtained_at"], "verified_at": row["verified_at"],
+                "verification_status": row["verification_status"],
+                "raw_artifact": row["raw_artifact"], "raw_locator": row["raw_locator"],
+                "command": row["command"], "code_files": row["code_files"],
+                "config_files": row["config_files"],
+                "environment_files": row["environment_files"],
+                "code_revision": row["code_revision"],
+            }
+        }
+        hover_summary = html.escape(
+            "\n".join([
+                f"Goal: {row['goal_id']}",
+                f"Metric: {row['metric']} = {row['value']}",
+                f"Raw: {row['raw_artifact']} · {row['raw_locator']}",
+                f"Command: {row['command']}",
+                f"Verified: {row['verification_status']}",
+            ]),
+            quote=True,
+        )
+        report_path = root / "05_EXP_RESULT.html"
+        report_path.write_text(
+            '<table><tr><td data-target-id="score.fixture">'
+            '<a href="#provenance-R-G00-001" data-result-id="R-G00-001" '
+            'data-provenance-trigger="R-G00-001" '
+            f'data-provenance-summary="{hover_summary}" title="{hover_summary}">'
+            '0.75</a></td></tr></table>'
+            '<section id="result-provenance-index"></section>'
+            '<script type="application/json" id="result-provenance">'
+            + json.dumps(provenance_payload).replace("<", "\\u003c")
+            + '</script><script>const card=document.createElement("details");'
+            'card.id="provenance-R-G00-001";card.textContent="generation evidence";'
+            'document.getElementById("result-provenance-index").appendChild(card);'
+            'addEventListener("hashchange",()=>{const target='
+            'document.getElementById("provenance-"+location.hash.slice(12));'
+            'target.open=true;target.focus();target.scrollIntoView();});</script>'
+            '<style>.result-value:hover::after{display:block}'
+            '.result-value:focus-visible::after{display:block}</style>',
+            encoding="utf-8",
+        )
+        args.report = report_path
+        args.strict_report = True
+        if validate(args):
+            return 1
+        report_path.write_text(
+            report_path.read_text(encoding="utf-8").replace(
+                'href="#provenance-R-G00-001"', 'href="#broken"'
+            ),
+            encoding="utf-8",
+        )
+        if not any("clickable provenance jump" in error for error in validate(args)):
+            return 1
+        args.report = None
+        args.strict_report = False
         row["artifact_id"] = row["target_id"] = ""
         write_row()
         args.plan = None

@@ -277,6 +277,11 @@ class MengyaoRegressionTests(unittest.TestCase):
             self.assertEqual(PROVENANCE_RENDERER.update_report(report, ledger, plan), 1)
             rendered = report.read_text(encoding="utf-8")
             self.assertIn('href="#provenance-R1"', rendered)
+            self.assertIn('data-provenance-summary="生成过程', rendered)
+            self.assertIn(f"Raw: {raw} · /score", rendered)
+            self.assertIn("Command: python run.py", rendered)
+            self.assertIn(".result-value:hover::after", rendered)
+            self.assertIn(".result-value:focus-visible::after", rendered)
             self.assertIn('id="result-provenance-index"', rendered)
             self.assertIn("Command actually run", rendered)
             args = SimpleNamespace(
