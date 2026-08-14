@@ -1,7 +1,9 @@
+const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+
 const commandStrip = (title, command, detail = "在终端中的 Coding Agent 执行；网页读取生成后的项目文件。") => `
   <div class="command-card">
-    <div><span>CODING AGENT · TERMINAL</span><strong>${title}</strong><small>${detail}</small></div>
-    <code>${command}</code><button type="button" data-copy="${command}">复制命令</button>
+    <div><span>CODING AGENT · TERMINAL</span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></div>
+    <code>${escapeHtml(command)}</code><button type="button" data-copy="${escapeHtml(command)}">复制命令</button>
   </div>`;
 
 const pendingRows = (xs, series) => xs.map(x => `<tr><th>${x}</th>${series.map(() => `<td class="demo-pending">PENDING</td>`).join("")}</tr>`).join("");
@@ -101,24 +103,25 @@ const experimentPlanDemo = () => {
     </article>`;
 };
 
-const runParts = [
-  ["P1", "Instrumentation", [["✅", "G1.1", "最小可复现轨迹通路", "共享 trace / evaluator 基础设施"]]],
-  ["P2", "Problem-Existence Validation", [["✅", "G2.1", "AdvBench 首次偏离探针", "F2A · exit depth"],["→", "G2.2", "HarmBench 成功/失败退出集中度", "F2B · concentration"]]],
-  ["P3", "Method Feasibility", [["○", "G3.1", "单模型单点修复可行性", "无直接图表"]]],
-  ["P4", "Development Tuning", [["○", "G4.1", "冻结 safety-tube threshold", "无直接图表"],["○", "G4.2", "冻结最小有效 repair strength", "无直接图表"]]],
-  ["P5", "Primary Evidence", [["○", "G5.1", "三模型、五基线统一协议主比较", "T1"]]],
-  ["P6", "Causal Controls and Ablation", [["○", "G6.1", "修复层偏移因果曲线", "F3A"],["○", "G6.2", "下游轨迹恢复检验", "F3B"],["○", "G6.3", "唯一性消融矩阵", "T2"]]],
-  ["P7", "Robustness and Sensitivity", [["○", "G7.1", "修复强度鲁棒性", "F4"]]],
-  ["P8", "Cost and Failure Analysis", [["○", "G8.1", "延迟、显存与未恢复案例", "T3"]]]
-];
+let runPlanDemoState = null;
 
-const goalDetail = gid => ({
-  "G1.1": "已完成：一个模型与极小输入切片的 layer×token trace、judge、重复运行和 provenance 路径均通过验证。",
-  "G2.1": "已完成：F2A 的 16 个 Demo 数字已由同一源表生成下方曲线；数字悬停可检查取得过程。",
-  "G2.2": "当前唯一解锁项：完成后命令与箭头继续向下移动，G2.1 的结果仍保留可追溯。"
-}[gid] || "前置 Gate 完成后才解锁；每个原子结果先落盘并写 ledger，再计算聚合值。");
+const runStatusMark = status => ({completed:"✅",running:"▶",proposed:"→",locked:"○",pending:"○",blocked:"⚠",invalidated:"⚠"}[status] || "○");
 
-const goalHierarchy = () => `<section class="goal-hierarchy"><p class="artifact-kicker">8 PARTS · 12 GOALS · 2 COMPLETE · ONE UNLOCKED</p>${runParts.map(([pid,title,goals]) => `<div class="part-row"><h4><span>${pid}</span>${title}</h4>${goals.map(([mark,gid,name,dest]) => `<div class="expanded-goal"><b>${mark}</b><strong>${gid} · ${name}</strong><span>对应图表：${dest}</span><p>${goalDetail(gid)}</p></div>`).join("")}</div>`).join("")}</section>`;
+const currentGoalPanel = goal => `<div class="demo-current-goal" data-demo-current-goal="${escapeHtml(goal.id)}">
+  <p class="artifact-kicker">CURRENT GOAL · ${escapeHtml(goal.id)}</p>
+  <h5>${escapeHtml(goal.title)}</h5>
+  <pre>${escapeHtml(goal.goal_command)}</pre>
+  <button type="button" data-copy="${escapeHtml(goal.goal_command)}">复制 /goal</button>
+  <dl><dt>Outputs</dt><dd>${(goal.outputs || []).map(escapeHtml).join(" · ")}</dd><dt>Resources</dt><dd>${escapeHtml(goal.budget)}</dd><dt>Completion</dt><dd>${escapeHtml(goal.completion_check)}</dd></dl>
+</div>`;
+
+const goalHierarchy = () => {
+  if (!runPlanDemoState) return `<section class="goal-hierarchy"><p>Run Plan snapshot unavailable.</p></section>`;
+  const goals = Object.fromEntries(runPlanDemoState.goals.map(goal => [goal.id, goal]));
+  const currentId = runPlanDemoState.active_goal || runPlanDemoState.proposed_goal_id;
+  const completed = runPlanDemoState.goals.filter(goal => goal.status === "completed").length;
+  return `<section class="goal-hierarchy"><p class="artifact-kicker">SYNCED FROM ${escapeHtml(runPlanDemoState.source)} · ${runPlanDemoState.parts.length} PARTS · ${runPlanDemoState.goals.length} GOALS · ${completed} COMPLETE · ONE CURRENT</p>${runPlanDemoState.parts.map(part => `<div class="part-row"><h4><span>${escapeHtml(part.id)}</span>${escapeHtml(part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p>${part.goals.map(goalId => { const goal = goals[goalId]; const destination = goal.artifact_ids?.length ? goal.artifact_ids.join("、") : "无直接图表"; return `<div class="expanded-goal"><b>${runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}</strong><span>对应图表：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成检查：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? currentGoalPanel(goal) : ""}</div>`;}).join("")}</div>`).join("")}</section>`;
+};
 
 const completedF2Rows = [
   ["0.00", 0.04, 0.06], ["0.14", 0.05, 0.11], ["0.29", 0.08, 0.26], ["0.43", 0.13, 0.47],
@@ -133,11 +136,23 @@ const completedF2Chart = () => {
 };
 
 const resultProvenanceDemo = () => `
-  <section class="evidence-artifact completed-result"><p class="artifact-kicker">05_EXP_RESULT · FIRST ARTIFACT COMPLETE · DEMO DATA</p><h4>F2A · Safety-tube exit rate by normalized depth</h4>
-    <p>这里演示完成第一个结果 Goal 后的状态。数字是 UI 示例，不是本项目的科学结果；表和图使用同一组值。</p>
+  <section class="evidence-artifact completed-result future-result-example"><p class="artifact-kicker">完成后的交互示例 · 与当前 RUN PLAN 状态分开 · DEMO DATA</p><h4>F2A · Safety-tube exit rate by normalized depth</h4>
+    <p>真实 Run Plan 当前尚未产生论文数字。这里只演示未来完成首个结果 Goal 后，数据表、图和 provenance 如何出现；这些数字不是当前结果，也不是科学结论。</p>
     <div class="provenance-flow"><span>raw JSONL</span><i>→</i><span>已验证结果记录</span><i>→</i><span>验证公式</span><i>→</i><span>填入源数据表</span><i>→</i><span>生成图</span></div>
     <div class="completed-result-grid"><div class="table-scroll"><table class="result-shell source-table completed-source"><thead><tr><th>Normalized depth</th><th>Direct harmful</th><th>Style-transformed harmful</th></tr></thead><tbody>${completedF2Rows.map(([depth,direct,styled]) => `<tr><th>${depth}</th><td>${provenanceNumber(direct,depth,"direct harmful")}</td><td>${provenanceNumber(styled,depth,"style-transformed harmful")}</td></tr>`).join("")}</tbody></table><p class="hover-instruction">鼠标停在任一数字上，或用键盘聚焦，即可查看 raw path、筛选、公式、命令与验证过程。</p></div>${completedF2Chart()}</div>
   </section>`;
+
+let paperDemoView = "writing";
+
+const paperPdfPreview = (caption = "每次确认后，右侧 PDF 自动刷新") => `<div class="paper-demo-pdf"><div class="paper-demo-pdfbar"><strong>LaTeX PDF</strong><span>第 2 / 8 页</span></div><div class="paper-demo-page"><h6>First-Divergence Repair</h6><p></p><p></p><p class="short"></p><div class="paper-demo-figure"><i></i><i></i><i></i></div><small>${escapeHtml(caption)}</small><p></p><p></p><p class="short"></p></div></div>`;
+
+const paperDemoScenes = {
+  writing: () => `<div class="paper-demo-workspace"><section class="paper-demo-editor"><div class="paper-demo-toolbar"><span>Introduction</span><span class="active">P2 · Motivation gap</span><span>P3 · Contributions</span></div><div class="paper-demo-form"><label>Matched reference context</label><div class="paper-demo-context">参考论文只约束这一段的写作风格与论证节奏；证据来自已验证结果。</div><label>当前段落 candidate</label><textarea rows="9">Existing defenses observe jailbreak trajectories after the model has already departed from its safety-consistent path. We instead identify the earliest reproducible departure and test whether a single intervention at that layer is sufficient to recover downstream behavior.</textarea><label>给 GPT 的修改意见</label><textarea rows="3" placeholder="例如：压缩第一句，并更明确地引出 Figure 2。"></textarea><div class="paper-demo-actions"><button>GPT 生成 / 修改 candidate</button><button class="accept">Accept → LaTeX</button></div></div></section>${paperPdfPreview()}</div>`,
+  figures: () => `<div class="paper-demo-workspace"><section class="paper-demo-editor"><div class="paper-demo-toolbar"><span>F1 · Mechanism</span><span class="active">F2 · First exit</span><span>F3 · Recovery</span></div><div class="paper-demo-form"><label>本地 Agent 绘图 Prompt</label><textarea rows="4">Use the verified F2 source-data table. Plot matched direct and style-transformed trajectories across normalized depth; preserve uncertainty intervals and do not infer missing values.</textarea><div class="paper-demo-flow"><b>源数据已验证</b><i>→</i><b>矢量 PDF candidate</b><i>→</i><b>可编辑 PPTX</b></div><div class="paper-demo-chart"><i></i><i></i><i></i><i></i><i></i><i></i></div><label>图片 Caption</label><textarea rows="3">Style transformations induce an earlier and more concentrated departure from the safety-consistent trajectory.</textarea><div class="paper-demo-placement"><span>插入位置：Observation P2 后</span><span>布局：双栏</span></div><button class="paper-demo-wide-action">确认并插入正文</button></div></section>${paperPdfPreview("图确认后替换正文占位符，并保留 Caption 与 label")}</div>`,
+  tables: () => `<div class="paper-demo-workspace"><section class="paper-demo-editor"><div class="paper-demo-toolbar"><span class="active">T1 · Main comparison</span><span>T2 · Ablation</span><span>T3 · Cost</span></div><div class="paper-demo-form"><label>可编辑 Table LaTeX</label><textarea rows="8">\\begin{table*}[t]\n\\centering\n\\caption{Safety--utility comparison under the shared evaluation protocol.}\n\\begin{tabular}{lcccc}\nMethod & AdvBench & HarmBench & XSTest & Just-Eval \\\\n... verified ledger values only ...\n\\end{tabular}\n\\end{table*}</textarea><div class="paper-demo-table"><b>Method</b><b>DSR ↑</b><b>False refusal ↓</b><span>ABD</span><span>—</span><span>—</span><span>Our method</span><span>—</span><span>—</span></div><div class="paper-demo-placement"><span>插入位置：Experiments E2 后</span><span>布局：双栏 table*</span></div><div class="paper-demo-actions"><button>调用本地 Agent</button><button class="accept">保存表格 → PDF</button></div></div></section>${paperPdfPreview("表格只从 validated ledger 填值；确认后重新编译")}</div>`
+};
+
+const paperStudioDemo = () => `<section class="paper-studio-demo"><div class="paper-demo-appbar"><div><strong>Paper Studio</strong><span>逐段对话、确认后写入 LaTeX</span></div><div><button class="active">正文</button><button>图片</button><button>表格</button><button>编译 PDF</button></div></div><nav class="paper-demo-scenes" aria-label="Paper Studio feature screens">${[["writing","正文写作"],["figures","图片工作台"],["tables","表格工作台"]].map(([id,label]) => `<button type="button" data-paper-demo-view="${id}" class="${paperDemoView === id ? "active" : ""}">${label}</button>`).join("")}</nav><div id="paper-demo-scene">${paperDemoScenes[paperDemoView]()}</div></section>`;
 
 let reportStructures = {};
 
@@ -189,22 +204,26 @@ const stages = [
   {
     id: "runplan", short: "实验执行", path: "run-plan", title: "一次执行一个 Goal，完成即填表并整理",
     compare: ["强调连续自主探索与整体吞吐", "适合可自动判分的大规模搜索", "每个 Goal 落盘、验证、填表、打勾，再解锁下一项"],
-    render: () => `
-      <div class="stage-head"><div><p class="eyebrow">STEP 05 · RUNPLAN + /GOAL</p><h3>完成一项，状态与命令就向下移动</h3><p>Demo 展示首个结果图 F2A 已完成：G1.1 与 G2.1 保留 ✅，当前唯一解锁项移动到 G2.2；16 个示例数字都能悬停查看 provenance。</p></div><span class="status-pill">G2.2 UNLOCKED</span></div>
-      ${commandStrip("执行当前唯一 Goal G2.2", "/goal Complete G2.2: acquire and verify the HarmBench first-exit concentration panel")}
+    render: () => {
+      const currentId = runPlanDemoState?.active_goal || runPlanDemoState?.proposed_goal_id || "NONE";
+      const current = runPlanDemoState?.goals.find(goal => goal.id === currentId);
+      return `
+      <div class="stage-head"><div><p class="eyebrow">STEP 05 · RUNPLAN + /GOAL</p><h3>与真实 04 Run Plan 使用同一份状态</h3><p>以下层级、状态和 Current Goal 由 reports/04_RUN_PLAN.html 的 embedded state 导出。当前没有完成的实验结果时，Demo 也不会把示例数字冒充成真实进度。</p></div><span class="status-pill">${escapeHtml(currentId)} ${runPlanDemoState?.active_goal ? "RUNNING" : "UNLOCKED"}</span></div>
+      ${current ? commandStrip(`执行当前唯一 Goal ${current.id}`, current.goal_command, "命令与真实 Run Plan 的 Current Goal 完全一致。") : ""}
       ${reportDocument("runplan")}
       ${goalHierarchy()}
-      ${reportDocument("results", "EXPERIMENT RESULTS · FIRST ARTIFACT COMPLETE · DEMO")}
-      ${resultProvenanceDemo()}`
+      ${reportDocument("results", "EXPERIMENT RESULTS · CURRENT REAL STATUS")}
+      ${resultProvenanceDemo()}`;
+    }
   },
   {
     id: "paper", short: "论文写作", path: "paper-writing", title: "逐段写作、实时编译、图表可编辑",
     compare: ["倾向批量生成 Markdown 或 LaTeX 草稿", "适合快速获得整体版本", "逐段确认，接受后才写入 LaTeX 并实时编译"],
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">STOP BOUNDARY · PAPERWRITE NEXT</p><h3>本次真实流水线在写论文前停止</h3><p>03 已批准，04/05 已生成；只有执行完 Goals、144 个数字通过 provenance 校验后，才能进入 paperwrite。</p></div><span class="status-pill">NOT STARTED</span></div>
-      ${commandStrip("结果完成后才启动", "$paperwrite", "本 Demo 不伪造论文正文、LaTeX 或已完成 PDF。")}
-      ${reportDocument("paper-studio", "PAPER STUDIO · WRITING INTERFACE")}
-      <section class="plain-section"><p class="artifact-kicker">ENTRY CONTRACT</p><h4>Paperwrite 将消费什么</h4><ul><li>批准且保持空白的 03 Projected Paper</li><li>04 中全部完成并打勾的 Goal 状态</li><li>05 中由 validated ledger 填入的同构图表</li><li>每个数字可回到 raw artifact、实际命令、代码、配置与计算公式</li></ul></section>`
+      <div class="stage-head"><div><p class="eyebrow">PAPERWRITE → PAPER STUDIO</p><h3>真实写作界面：正文、图片、表格分别处理</h3><p>下面复现 Paper Studio 的实际工作台和真实控件名称。切换三个界面即可查看逐段候选与 Accept → LaTeX、图片生成与 Caption、可编辑 Table LaTeX 与 PDF 更新。</p></div><span class="status-pill">INTERACTIVE UI</span></div>
+      ${commandStrip("结果完成后启动论文写作", "$paperwrite", "Paperwrite 准备项目数据并打开固定 Paper Studio；LLM API 负责流畅正文，本地 Agent 负责可复现图表与排版。")}
+      ${paperStudioDemo()}
+      <section class="plain-section"><p class="artifact-kicker">真实工作方式</p><h4>候选不会自动写入论文</h4><ul><li>正文：GPT 生成可编辑 candidate，研究者点击 Accept → LaTeX 后才编译。</li><li>图片：实验结果驱动矢量图；机制图同时保留 GPT 构图参考和可编辑 PPT/PDF。</li><li>表格：只允许 verified ledger 数字进入可编辑 LaTeX，确认后刷新右侧 PDF。</li></ul></section>`
   }
 ];
 
@@ -263,6 +282,14 @@ window.addEventListener("popstate", syncStageFromLocation);
 window.addEventListener("hashchange", syncStageFromLocation);
 
 document.addEventListener("click", async event => {
+  const paperView = event.target.closest("[data-paper-demo-view]");
+  if (paperView) {
+    paperDemoView = paperView.dataset.paperDemoView;
+    document.querySelectorAll("[data-paper-demo-view]").forEach(button => button.classList.toggle("active", button === paperView));
+    const scene = document.querySelector("#paper-demo-scene");
+    if (scene) scene.innerHTML = paperDemoScenes[paperDemoView]();
+    return;
+  }
   const button = event.target.closest("[data-copy]");
   if (!button) return;
   const original = button.textContent;
@@ -273,9 +300,14 @@ document.addEventListener("click", async event => {
 
 async function initializeDemo() {
   try {
-    const response = await fetch("report-structures.json?v=20260814-real-provenance");
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    reportStructures = await response.json();
+    const [structureResponse, runPlanResponse] = await Promise.all([
+      fetch("report-structures.json?v=20260814-runplan-paperstudio"),
+      fetch("runplan-state.json?v=20260814-runplan-paperstudio")
+    ]);
+    if (!structureResponse.ok) throw new Error(`report structures HTTP ${structureResponse.status}`);
+    if (!runPlanResponse.ok) throw new Error(`run plan snapshot HTTP ${runPlanResponse.status}`);
+    reportStructures = await structureResponse.json();
+    runPlanDemoState = await runPlanResponse.json();
     state.stage = stageIndexFromLocation();
     renderStage();
   } catch (error) {
