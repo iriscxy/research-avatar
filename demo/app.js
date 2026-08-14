@@ -236,8 +236,8 @@ const stages = [
       ${reportDocument("ideas")}`
   },
   {
-    id: "expplan", short: "实验设计", path: "experiment-plan", title: "先明确证据需求，再设计实验",
-    compare: null,
+    id: "expplan", short: "实验设计", path: "experiment-plan", title: "先明确论文主张，再反推所需实验",
+    compare: ["先列实验清单，再根据结果补充论证", "容易出现实验很多、论文主张却没有被直接验证", "先确定论文要证明什么，再为每个主张安排图表、指标和失败条件"],
     render: () => `
       <div class="stage-head"><div><p class="eyebrow">第四步 · 实验设计</p><h3>从论文主张反推实验和证据</h3><p>先明确论文需要回答的问题，再为每个主张安排数据、基线、指标、图表和失败条件。</p></div><span class="status-pill">方案已确认</span></div>
       ${commandStrip("生成实验设计与待填图表", "$expplan")}
