@@ -226,7 +226,7 @@ const stages = [
   },
   {
     id: "paper", short: "论文写作", path: "paper-writing", title: "逐段写作、实时编译、图表可编辑",
-    compare: ["倾向批量生成 Markdown 或 LaTeX 草稿", "适合快速获得整体版本", "逐段确认，接受后才写入 LaTeX 并实时编译"],
+    compare: ["倾向批量生成 Markdown 或 LaTeX 草稿", "适合快速获得整体版本", "正文调用 LLM API（不是 Code Agent）逐段生成；确认接受后才写入 LaTeX 并实时编译"],
     render: () => `
       <div class="stage-head"><div><p class="eyebrow">PAPERWRITE → PAPER STUDIO</p><h3>直接展示真实 Paper Studio 截图</h3><p>不在 Demo 中自创写作界面或 Tab。下面的正文、图片和表格三张截图全部来自仓库中实际运行的 Paper Studio。</p></div><span class="status-pill">REAL SCREENSHOTS</span></div>
       ${commandStrip("结果完成后启动论文写作", "$paperwrite", "Paperwrite 准备项目数据并打开固定 Paper Studio；LLM API 负责流畅正文，本地 Agent 负责可复现图表与排版。")}

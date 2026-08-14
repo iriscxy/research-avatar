@@ -27,6 +27,7 @@ class DemoSyncTests(unittest.TestCase):
         self.assertIn("右侧真实 Live PDF", source)
         self.assertIn("正文由 LLM API 写作", source)
         self.assertIn("不是 Code Agent 生成正文", source)
+        self.assertIn("正文调用 LLM API（不是 Code Agent）逐段生成", source)
         self.assertIn("真实 GPT Image 已生成并显示", source)
         self.assertIn("真实 DEMO DATA 已通过 LaTeX 编译", source)
         self.assertIn("?v=20260814-real-artifacts", source)
