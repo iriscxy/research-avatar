@@ -648,7 +648,10 @@ def runplan_stage(root: Path) -> dict[str, Any]:
             {"label": "Acquisitions", "value": str(len(plan.get("acquisition_contracts", [])))},
             {"label": "State", "value": str(plan.get("state", "Pending"))},
         ],
-        "artifacts": [artifact, results_artifact],
+        # Run Plan is the single execution-facing page. Completed goal cards
+        # embed their verified tables/plots and link into 05 for full provenance.
+        "artifacts": [artifact],
+        "results_backend": results_artifact,
         "message": proposed.get("instructions", plan.get("exact_next_authorized_action", "等待实验计划批准。")),
         "goals": [
             {

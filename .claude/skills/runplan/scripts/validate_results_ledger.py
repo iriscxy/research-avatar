@@ -153,15 +153,17 @@ def listed_paths(value: str) -> list[Path]:
 
 
 def validate_figure_sources(report: str, acquisitions: dict[str, dict[str, object]]) -> list[str]:
-    """Ensure each filled plot is generated from its adjacent displayed table."""
+    """Ensure each completed panel plot comes from its adjacent displayed table."""
     errors: list[str] = []
-    expected: dict[str, set[str]] = {}
+    expected: dict[str, dict[str, set[str]]] = {}
     for contract in acquisitions.values():
         if contract.get("figure_source_cell") is True:
-            expected.setdefault(str(contract.get("artifact_id", "")), set()).add(
-                str(contract.get("target_id", ""))
-            )
-    for artifact_id, target_ids in expected.items():
+            dimensions = contract.get("dimensions", {})
+            panel_id = str(dimensions.get("panel", "")) if isinstance(dimensions, dict) else ""
+            expected.setdefault(str(contract.get("artifact_id", "")), {}).setdefault(
+                panel_id or "__artifact__", set()
+            ).add(str(contract.get("target_id", "")))
+    for artifact_id, panels in expected.items():
         match = re.search(
             rf'<section\b(?=[^>]*class="figure-result")(?=[^>]*data-artifact-id="{re.escape(artifact_id)}")[^>]*>(.*?)</section>',
             report,
@@ -171,29 +173,62 @@ def validate_figure_sources(report: str, acquisitions: dict[str, dict[str, objec
             errors.append(f"report lacks figure-result section for {artifact_id}")
             continue
         block = match.group(0)
+        target_ids = set().union(*panels.values())
         declared = re.search(r'data-source-target-ids="([^"]*)"', block)
         declared_ids = set(declared.group(1).split()) if declared else set()
         displayed_ids = set(re.findall(r'<td\b[^>]*data-target-id="([^"]+)"[^>]*>', block))
         if declared_ids != target_ids or displayed_ids != target_ids:
             errors.append(f"{artifact_id}: figure source IDs do not exactly match acquisition contracts")
-        cells = re.findall(r'<td\b[^>]*data-target-id="([^"]+)"[^>]*>(.*?)</td>', block, re.S)
-        filled = len(cells) == len(target_ids) and all(
-            'data-result-id="' in cell_tag and "[PENDING]" not in content
-            and "MISSING" not in content and "INVALIDATED" not in content
-            for target_id, content in cells
-            for cell_tag in [re.search(rf'<td\b[^>]*data-target-id="{re.escape(target_id)}"[^>]*>', block).group(0)]
-        )
-        plot = re.search(r'<(?:img|figure)\b[^>]*class="[^"]*result-plot[^"]*"[^>]*>', block)
-        if not filled and plot:
-            errors.append(f"{artifact_id}: result plot exists while its source table is not fully filled")
-        if filled:
-            if not plot:
-                errors.append(f"{artifact_id}: fully filled source table lacks generated result plot")
-            else:
-                generated = re.search(r'data-generated-from-target-ids="([^"]*)"', plot.group(0))
-                generated_ids = set(generated.group(1).split()) if generated else set()
-                if generated_ids != target_ids:
-                    errors.append(f"{artifact_id}: generated plot source IDs differ from displayed table")
+        panel_starts = list(re.finditer(
+            r'<div\b[^>]*class="[^"]*\bresult-panel\b[^"]*"[^>]*>\s*<h4>(.*?)</h4>',
+            block,
+            re.S,
+        ))
+        panel_blocks = {
+            " ".join(html.unescape(re.sub(r"<[^>]+>", " ", panel.group(1))).split()): block[
+                panel.start():panel_starts[index + 1].start() if index + 1 < len(panel_starts) else len(block)
+            ]
+            for index, panel in enumerate(panel_starts)
+        }
+        for panel_id, panel_target_ids in panels.items():
+            panel_block = block if panel_id == "__artifact__" else panel_blocks.get(panel_id, "")
+            label = artifact_id if panel_id == "__artifact__" else f"{artifact_id}/{panel_id}"
+            if not panel_block:
+                errors.append(f"{label}: figure panel is missing")
+                continue
+            panel_displayed = set(re.findall(
+                r'<td\b[^>]*data-target-id="([^"]+)"[^>]*>', panel_block
+            ))
+            if panel_displayed != panel_target_ids:
+                errors.append(f"{label}: panel source IDs do not match acquisition contracts")
+            filled = True
+            for target_id in panel_target_ids:
+                cell = re.search(
+                    rf'(?P<open><td\b[^>]*data-target-id="{re.escape(target_id)}"[^>]*>)'
+                    r'(?P<body>.*?)</td>',
+                    panel_block,
+                    re.S,
+                )
+                if not cell or 'data-result-id="' not in cell.group("open") or any(
+                    status in cell.group("body")
+                    for status in ("[PENDING]", "MISSING", "INVALIDATED")
+                ):
+                    filled = False
+                    break
+            plot = re.search(
+                r'<(?:img|figure)\b[^>]*class="[^"]*result-plot[^"]*"[^>]*>',
+                panel_block,
+            )
+            if not filled and plot:
+                errors.append(f"{label}: result plot exists while its source table is not fully filled")
+            if filled:
+                if not plot:
+                    errors.append(f"{label}: fully filled source table lacks generated result plot")
+                else:
+                    generated = re.search(r'data-generated-from-target-ids="([^"]*)"', plot.group(0))
+                    generated_ids = set(generated.group(1).split()) if generated else set()
+                    if generated_ids != panel_target_ids:
+                        errors.append(f"{label}: generated plot source IDs differ from displayed table")
     return errors
 
 
@@ -714,6 +749,23 @@ def self_test() -> int:
                      '<img class="result-plot" data-generated-from-target-ids="F2.a.p1.x F2.a.p1.y">'
                      '</section>')
     if validate_figure_sources(filled_report, figure_acquisitions):
+        return 1
+    split_panel_acquisitions = {
+        "A1": {"artifact_id": "F2", "target_id": "F2.a.x", "figure_source_cell": True,
+               "dimensions": {"panel": "panel-a"}},
+        "A2": {"artifact_id": "F2", "target_id": "F2.b.x", "figure_source_cell": True,
+               "dimensions": {"panel": "panel-b"}},
+    }
+    split_panel_report = (
+        '<section class="figure-result" data-artifact-id="F2" '
+        'data-source-target-ids="F2.a.x F2.b.x">'
+        '<div class="result-panel"><h4>panel-a</h4><table><tr>'
+        '<td data-target-id="F2.a.x" data-result-id="R1">1</td></tr></table>'
+        '<img class="result-plot" data-generated-from-target-ids="F2.a.x"></div>'
+        '<div class="result-panel"><h4>panel-b</h4><table><tr>'
+        '<td data-target-id="F2.b.x">[PENDING]</td></tr></table></div></section>'
+    )
+    if validate_figure_sources(split_panel_report, split_panel_acquisitions):
         return 1
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)

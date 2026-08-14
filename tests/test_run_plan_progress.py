@@ -122,9 +122,53 @@ class RunPlanProgressTests(unittest.TestCase):
         self.assertIn('class="goal-results"', g1.group(0))
         self.assertIn('data-artifact-id="T1"', g1.group(0))
         self.assertIn('href="05_EXP_RESULT.html#provenance-R1"', g1.group(0))
+        self.assertIn('class="result-value"', g1.group(0))
         self.assertIn('data-provenance-summary="Goal: G1.1', g1.group(0))
         self.assertIn('title="Goal: G1.1', g1.group(0))
         self.assertIn('.goal-results .result-value:hover::after', g1.group(0))
+
+    def test_completed_goal_embeds_a_real_figure_with_its_source_table(self):
+        state = fixture_state(proposed="G2.1")
+        state["goals"][0]["artifact_ids"] = ["F2"]
+        state["acquisition_contracts"] = [{
+            "id": "A-F2-1",
+            "artifact_id": "F2",
+            "target_id": "f2-panel-a-00",
+            "source_type": "RUN_LOCAL",
+            "producing_goal": "G1.1",
+            "figure_source_cell": True,
+        }]
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = root / "04_RUN_PLAN.html"
+            report = root / "05_EXP_RESULT.html"
+            plan.write_text(
+                '<html><body><section data-report-section="parts-and-goals">'
+                '<h2>4. Parts and Goals</h2><p>old</p></section>'
+                '<script type="application/json" id="run-plan-state">'
+                + json.dumps(state)
+                + '</script></body></html>',
+                encoding="utf-8",
+            )
+            report.write_text(
+                '<section class="figure-result" data-artifact-id="F2" '
+                'data-source-target-ids="f2-panel-a-00"><h3>F2</h3>'
+                '<div class="result-panel"><h4>panel-a</h4><table><tr>'
+                '<td data-target-id="f2-panel-a-00" data-result-id="R-F2-1">'
+                '<a href="#provenance-R-F2-1" data-result-id="R-F2-1" '
+                'data-provenance-summary="Goal: G1.1&#10;Command: python run.py" '
+                'title="Goal: G1.1&#10;Command: python run.py">0.82</a></td>'
+                '</tr></table><img class="result-plot" src="f2.svg" '
+                'data-generated-from-target-ids="f2-panel-a-00"></div></section>',
+                encoding="utf-8",
+            )
+            result = refresh(plan)
+            source = plan.read_text(encoding="utf-8")
+        self.assertEqual(result["completed_artifact_snapshots"], 1)
+        self.assertIn('class="result-plot"', source)
+        self.assertIn('data-target-id="f2-panel-a-00"', source)
+        self.assertIn('href="05_EXP_RESULT.html#provenance-R-F2-1"', source)
+        self.assertIn('class="result-value"', source)
 
     def test_completed_goal_rejects_unlinked_target(self):
         state = fixture_state(proposed="G2.1")

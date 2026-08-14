@@ -173,8 +173,8 @@ def render_parts_and_goals(state: dict, completed_artifacts: dict[str, list[str]
             snapshots = completed_artifacts.get(str(goal_id), [])
             if item.get("status") == "completed" and snapshots:
                 chunks.append(
-                    '<div class="goal-results"><h4>Completed Goal Evidence</h4>'
-                    '<p>以下图表直接来自 05 实验结果；悬停或聚焦已填数字可预览生成过程，点击可在 05 查看完整记录。</p>'
+                    '<div class="goal-results"><h4>已完成 Goal 的图表</h4>'
+                    '<p>本 Goal 已验证的真实表格或“源数据表＋图”显示如下；悬停或聚焦数字可预览生成过程，点击可在 05 查看完整 provenance。</p>'
                     + GOAL_RESULT_PROVENANCE_STYLE
                     + "".join(snapshots)
                     + '</div>'
@@ -202,12 +202,28 @@ def _artifact_snapshot(report: str, artifact_id: str) -> str:
     match = pattern.search(report)
     if not match:
         raise ValueError(f"05_EXP_RESULT.html lacks artifact {artifact_id}")
-    snapshot = match.group(0)
-    return re.sub(
+    snapshot = re.sub(
         r'href=(["\'])#provenance-',
         lambda found: f'href={found.group(1)}05_EXP_RESULT.html#provenance-',
+        match.group(0),
+    )
+    return re.sub(
+        r'<a\b(?=[^>]*\bdata-result-id=["\'])[^>]*>',
+        _mark_result_link,
         snapshot,
     )
+
+
+def _mark_result_link(match: re.Match[str]) -> str:
+    tag = match.group(0)
+    class_match = re.search(r'\bclass=(["\'])(.*?)\1', tag)
+    if class_match:
+        classes = class_match.group(2).split()
+        if "result-value" in classes:
+            return tag
+        replacement = f'class={class_match.group(1)}{class_match.group(2)} result-value{class_match.group(1)}'
+        return tag[:class_match.start()] + replacement + tag[class_match.end():]
+    return tag[:-1] + ' class="result-value">'
 
 
 def _verified_target(snapshot: str, target_id: str) -> bool:

@@ -184,6 +184,15 @@ keyboard focus previews its raw source, calculation, actual command, and
 verification, while click opens the complete record in `05`. Regeneration must fail if a scoped
 target is missing, pending, lacks a result ID, or lacks its provenance link.
 
+Treat `04_RUN_PLAN.html` as the single user-facing experiment-execution page in
+Research Studio. Do not expose `05_EXP_RESULT.html` as a second artifact button
+there: `05` remains the cumulative result/provenance backend reached by clicking
+a value in an embedded Goal snapshot. When different goals own different panels
+of one figure, validate and render each panel independently. As soon as one goal
+has filled and verified all source cells for its panel, generate that panel's
+plot and show its source table plus plot under the completed goal; do not wait
+for unrelated panels owned by later goals.
+
 ## 3. Write one durable webpage with embedded state
 
 Create or resume:
@@ -454,7 +463,9 @@ synthetic projected fixture from `03`. Regenerate the table and plot together
 after every ledger update. Record the exact source target IDs on the figure
 container (`data-source-target-ids`) and on the generated plot
 (`data-generated-from-target-ids`); the two sets must match exactly. A filled
-plot while its source table is not fully filled is a hard validation failure.
+panel plot while that panel's source table is not fully filled is a hard
+validation failure. A completed panel must have a generated plot even if other
+panels in the same figure remain pending.
 
 Make every `FILLED` paper-facing number in a result table—and every filled
 number in a figure's adjacent source-data table—a page-local provenance link.

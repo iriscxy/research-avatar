@@ -291,8 +291,9 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertEqual(state["stages"][4]["goals"][0]["status"], "completed")
         self.assertEqual(
             [item["key"] for item in state["stages"][4]["artifacts"]],
-            ["runplan", "results"],
+            ["runplan"],
         )
+        self.assertEqual(state["stages"][4]["results_backend"]["key"], "results")
 
 
 if __name__ == "__main__":
