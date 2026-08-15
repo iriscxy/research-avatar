@@ -62,6 +62,315 @@ from paper_studio.server import (
 
 
 class PaperStudioTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        """Run project-level regressions against an isolated legacy fixture."""
+        cls.fixture_directory = TemporaryDirectory(dir=studio.ROOT / "tests")
+        root = Path(cls.fixture_directory.name)
+        paper = root / "paper"
+        paper.mkdir()
+        (paper / "sections").mkdir()
+        reference = paper / "reference_stylization_jailbreak.txt"
+        reference_lines = [f"Reference line {index}" for index in range(1, 241)]
+        reference_lines[146] = "DeepSeek GPT-4o Style Jailbreak 96.0 52.8"
+        reference_lines[69] = "Conclusion and Future Work reference paragraph."
+        reference.write_text("\n".join(reference_lines), encoding="utf-8")
+        metrics = {
+            "fixture": {
+                "synthetic": True,
+                "notice": "Synthetic fixture; not measured.",
+            },
+            "representation_analysis": {
+                "local_probe": {"layers": [1, 2], "accuracy": [0.6, 0.7]},
+            },
+            "main_results": {
+                "benchmarks": {
+                    "AdvBench": {"rows": [{"method": "Style Jailbreak", "mean_asr": 96.0, "mean_sr": 52.8}]},
+                    "TrustLLM": {"rows": [{"method": "Style Jailbreak", "mean_asr": 92.0, "mean_sr": 48.0}]},
+                }
+            },
+            "defenses": {
+                "rows": [{"defense": "Guard", "residual_asr": 12.0, "benign_utility": 90.0}]
+            },
+            "robustness": {
+                "layerwise_values": {
+                    "synthetic": True,
+                    "notice": "Synthetic fixture; not measured.",
+                    "series": [
+                        {"model": "A", "values": [0.1, 0.2]},
+                        {"model": "B", "values": [0.2, 0.3]},
+                        {"model": "C", "values": [0.3, 0.4]},
+                    ],
+                }
+            },
+        }
+        metrics_file = paper / "metrics.json"
+        metrics_file.write_text(json.dumps(metrics), encoding="utf-8")
+        section_specs = [
+            {"id": "abstract", "title": "Abstract", "file": "abstract.tex", "render": "abstract", "result_keys": []},
+            {"id": "introduction", "title": "Introduction", "latex_title": "Introduction", "file": "introduction.tex", "result_keys": []},
+            {"id": "related_work", "title": "Related Work", "latex_title": "Related Work", "file": "related_work.tex", "result_keys": []},
+            {"id": "method", "title": "Style Jailbreak", "latex_title": "Style Jailbreak", "file": "method.tex", "result_keys": []},
+            {"id": "representation_analysis", "title": "Representation Analysis", "latex_title": "Representation Analysis", "file": "representation_analysis.tex", "result_keys": ["representation_analysis.local_probe"]},
+            {"id": "experiments", "title": "Experiments", "latex_title": "Experiments", "file": "experiments.tex", "result_keys": ["main_results.benchmarks"]},
+            {"id": "analysis_discussion", "title": "Analysis and Discussion", "latex_title": "Analysis and Discussion", "file": "analysis_discussion.tex", "result_keys": ["defenses.rows"]},
+            {"id": "conclusion", "title": "Conclusion and Future Work", "latex_title": "Conclusion and Future Work", "end_label": "paper:endconclusion", "file": "conclusion.tex", "result_keys": []},
+            {"id": "appendix", "title": "Appendix", "latex_title": "Appendix", "file": "appendix.tex", "result_keys": ["robustness.layerwise_values"]},
+        ]
+        figures = {
+            "F1": {
+                "title": "Motivation overview", "label": "fig:overview", "kind": "mechanism",
+                "width": "single-column", "source_sections": ["introduction"],
+                "description": "Motivation overview.", "caption": "Overview.", "phase": 1,
+                "result_keys": [], "panels": [], "deliverable_stem": "overview_gpt",
+                "depends_on_paragraphs": {"introduction": ["I1", "I2", "I3", "I4"]},
+                "generation_requires_paragraphs": {"introduction": ["I1"]},
+            },
+            "F2": {
+                "title": "Representation analysis", "label": "fig:representation", "kind": "data",
+                "width": "two-column", "source_sections": ["representation_analysis"],
+                "description": "Representation analysis.", "caption": "Representation analysis.", "phase": 2,
+                "result_keys": ["representation_analysis.ok"],
+                "depends_on_figures": ["F1", "F3"],
+                "depends_on_paragraphs": {"representation_analysis": ["RA1", "RA2", "RA3", "RA4"]},
+                "panels": [
+                    {"id": "a", "title": "Probe", "goal": "Show the local probe.", "result_keys": ["representation_analysis.local_probe"]},
+                    {"id": "b", "title": "Trajectory", "goal": "Show the trajectory.", "result_keys": ["representation_analysis.local_probe"]},
+                ],
+            },
+            "F3": {
+                "title": "Method", "label": "fig:method", "kind": "mechanism",
+                "width": "two-column", "source_sections": ["method"],
+                "description": "Method mechanism.", "caption": "Method overview.", "phase": 1,
+                "result_keys": [], "panels": [], "deliverable_stem": "method_gpt",
+                "depends_on_paragraphs": {"method": ["M1", "M2", "M3", "M4"]},
+                "generation_requires_paragraphs": {"method": ["M1", "M2", "M3", "M4"]},
+            },
+            "F4": {
+                "title": "Ablation and style analysis", "label": "fig:main_results", "kind": "data",
+                "width": "two-column", "source_sections": ["experiments"],
+                "description": "Main comparison.", "caption": "Main results.", "phase": 2,
+                "result_keys": ["main_results.benchmarks"],
+                "depends_on_paragraphs": {"experiments": ["E1", "E2", "E3"]},
+                "panels": [
+                    {"id": "a", "title": "Safety", "goal": "Show safety.", "result_keys": ["main_results.benchmarks"]},
+                    {"id": "b", "title": "Utility", "goal": "Show utility.", "result_keys": ["main_results.benchmarks"]},
+                ],
+            },
+            "F5": {
+                "title": "Defense analysis", "label": "fig:defense", "kind": "data",
+                "width": "single-column", "source_sections": ["analysis_discussion"],
+                "description": "Defense analysis.", "caption": "Defense analysis.", "phase": 3,
+                "result_keys": ["defenses.rows"],
+                "depends_on_paragraphs": {"analysis_discussion": ["D1"]},
+                "panels": [{"id": "a", "title": "Defense", "goal": "Show defense results.", "result_keys": ["defenses.rows"]}],
+            },
+            "F6": {
+                "title": "Layer-wise robustness", "label": "fig:layerwise", "kind": "data",
+                "width": "single-column", "source_sections": ["appendix"],
+                "description": "Layer-wise robustness.", "caption": "[SYNTHETIC] Layer-wise robustness.", "phase": 3,
+                "result_keys": ["robustness.layerwise_values"],
+                "depends_on_figures": ["F1", "F3"],
+                "depends_on_paragraphs": {"appendix": ["AP2"]},
+                "panels": [{"id": "a", "title": "Layers", "goal": "Show layer values.", "result_keys": ["robustness.layerwise_values"]}],
+            },
+        }
+        tables = {
+            "T1": {
+                "title": "Main comparison", "label": "tab:main", "kind": "table",
+                "width": "two-column", "source_sections": ["experiments"],
+                "description": "Main benchmark comparison.", "caption": "Main comparison.",
+                "related_paragraphs": {"experiments": ["E2"]},
+                "data_grid": {
+                    "type": "benchmark_rows", "path": "main_results.benchmarks", "row_key": "method",
+                    "benchmarks": ["AdvBench", "TrustLLM"],
+                    "metrics": [{"key": "mean_asr", "label": "ASR"}, {"key": "mean_sr", "label": "StrongREJECT"}],
+                },
+                "prompt": {"columns": "Method | AdvBench ASR | AdvBench StrongREJECT | TrustLLM ASR | TrustLLM StrongREJECT", "rows": "source", "font_size": "small", "best_values": "none"},
+            },
+            "T2": {
+                "title": "Defense comparison", "label": "tab:defense", "kind": "table",
+                "width": "single-column", "source_sections": ["analysis_discussion"],
+                "description": "Defense comparison.", "caption": "Defense comparison.",
+                "related_paragraphs": {"analysis_discussion": ["D1"]},
+                "data_grid": {
+                    "type": "records", "path": "defenses.rows",
+                    "columns": [{"key": "defense", "label": "Defense"}, {"key": "residual_asr", "label": "Residual ASR"}, {"key": "benign_utility", "label": "Benign utility"}],
+                },
+                "prompt": {"columns": "Defense | Residual ASR | Benign utility", "rows": "source", "font_size": "small", "best_values": "none"},
+            },
+        }
+        config = {
+            "schema_version": "1.0",
+            "project": {"id": "style-jailbreak-test", "name": "Style Jailbreak", "initial_title": "Style Jailbreak", "venue": "ICLR"},
+            "sections": section_specs,
+            "figure_order": ["F1", "F3", "F2", "F4", "F5", "F6"], "figures": figures,
+            "table_order": ["T1", "T2"], "tables": tables,
+            "paths": {"metrics": str(metrics_file), "main": str(paper / "main.tex"), "reference": str(reference)},
+        }
+        plan_sections = {
+            "abstract": [{"id": "A1", "purpose": "Abstract.", "reference_lines": [1, 3], "artifacts": []}],
+            "introduction": [{"id": f"I{i}", "purpose": f"Introduction {i}.", "reference_lines": [i + 3, i + 4], "artifacts": ["F1"] if i == 1 else []} for i in range(1, 7)],
+            "related_work": [
+                {"id": "R1", "heading": "Safety alignment and refusal behavior.", "heading_style": "textbf", "purpose": "Related work one.", "reference_lines": [20, 24], "artifacts": []},
+                {"id": "R2", "heading": "Jailbreak attacks.", "heading_style": "textbf", "purpose": "Related work two.", "reference_lines": [25, 29], "artifacts": []},
+            ],
+            "method": [{"id": f"M{i}", "heading": ["Overview", "Style Representation", "Intervention", "Two-Turn Execution"][i-1], "heading_style": "subsection", "purpose": f"Method {i}.", "reference_lines": [30 + i, 31 + i], "artifacts": ["F3"] if i == 4 else []} for i in range(1, 5)],
+            "representation_analysis": [{"id": f"RA{i}", "purpose": f"Representation {i}.", "reference_lines": [40 + i, 41 + i], "artifacts": ["F2"] if i == 4 else []} for i in range(1, 5)],
+            "experiments": [
+                {"id": "E1", "heading": "Experimental Setup", "heading_style": "subsection", "purpose": "Setup.", "reference_lines": [50, 52], "artifacts": []},
+                {"id": "E2", "heading": "Main Results", "heading_style": "subsection", "purpose": "Main results.", "reference_lines": [53, 55], "artifacts": ["T1"]},
+                {"id": "E3", "purpose": "Further analysis.", "reference_lines": [56, 58], "artifacts": ["F4"]},
+            ],
+            "analysis_discussion": [{"id": "D1", "purpose": "Defense analysis.", "reference_lines": [60, 64], "artifacts": ["F5", "T2"]}],
+            "conclusion": [{"id": "C1", "purpose": "Conclusion.", "reference_lines": [70, 72], "artifacts": []}],
+            "appendix": [{"id": "AP1", "purpose": "Appendix setup.", "reference_lines": [80, 82], "artifacts": []}, {"id": "AP2", "purpose": "Layerwise appendix.", "reference_lines": [83, 86], "artifacts": ["F6"]}],
+        }
+        plan = {"reference_file": str(reference), "sections": plan_sections}
+        config_file = paper / "paper_studio.json"
+        plan_file = paper / "paragraph_plan.json"
+        config_file.write_text(json.dumps(config), encoding="utf-8")
+        plan_file.write_text(json.dumps(plan), encoding="utf-8")
+        inputs = []
+        for section in section_specs:
+            path = paper / "sections" / section["file"]
+            path.write_text("% fixture\n", encoding="utf-8")
+            if section["id"] == "abstract":
+                inputs.append(f"\\begin{{abstract}}\\input{{sections/{Path(section['file']).stem}}}\\end{{abstract}}")
+            else:
+                inputs.append(f"\\input{{sections/{Path(section['file']).stem}}}")
+        (paper / "main.tex").write_text(
+            "\\documentclass{article}\n\\title{Style Jailbreak}\n\\begin{document}\n"
+            + "\n".join(inputs) + "\n\\end{document}\n",
+            encoding="utf-8",
+        )
+        cls.originals = {
+            "PAPER": studio.PAPER, "STATE_DIR": studio.STATE_DIR, "STATE_FILE": studio.STATE_FILE,
+            "PARAGRAPH_PLAN_FILE": studio.PARAGRAPH_PLAN_FILE, "PROJECT_CONFIG_FILE": studio.PROJECT_CONFIG_FILE,
+            "FIGURE_DIR": studio.FIGURE_DIR, "FIGURE_SOURCE_DIR": studio.FIGURE_SOURCE_DIR,
+            "DATA_FIGURE_AGENT_DIR": studio.DATA_FIGURE_AGENT_DIR, "TABLE_PREVIEW_DIR": studio.TABLE_PREVIEW_DIR,
+            "PAPER_PAGE_DIR": studio.PAPER_PAGE_DIR, "METRICS_FILE": studio.METRICS_FILE,
+            "PROJECT_ID": studio.PROJECT_ID, "EMPTY_PROJECT_MODE": studio.EMPTY_PROJECT_MODE,
+        }
+        studio.PAPER = paper
+        studio.STATE_DIR = paper / ".paper_studio"
+        studio.STATE_FILE = studio.STATE_DIR / "state.json"
+        studio.PARAGRAPH_PLAN_FILE = plan_file
+        studio.PROJECT_CONFIG_FILE = config_file
+        studio.FIGURE_DIR = paper / "fig"
+        studio.FIGURE_SOURCE_DIR = paper / "figsrc"
+        studio.DATA_FIGURE_AGENT_DIR = studio.FIGURE_SOURCE_DIR / "data_agents"
+        studio.TABLE_PREVIEW_DIR = studio.STATE_DIR / "table_previews"
+        studio.PAPER_PAGE_DIR = studio.STATE_DIR / "paper_pages"
+        studio.METRICS_FILE = metrics_file
+        studio.PROJECT_ID = config["project"]["id"]
+        studio.EMPTY_PROJECT_MODE = False
+        studio.PROJECT_CONFIG.clear(); studio.PROJECT_CONFIG.update(config)
+        studio.PROJECT_METADATA.clear(); studio.PROJECT_METADATA.update(config["project"])
+        studio.SECTION_SPECS[:] = section_specs
+        studio.SECTIONS[:] = [(item["id"], item["title"], item["file"]) for item in section_specs]
+        studio.SECTION_MAP.clear(); studio.SECTION_MAP.update({item["id"]: {"title": item["title"], "file": item["file"], "render": item.get("render", "section"), "latex_title": item.get("latex_title", ""), "end_label": item.get("end_label", "")} for item in section_specs})
+        studio.SECTION_LATEX_TITLES.clear(); studio.SECTION_LATEX_TITLES.update({item["id"]: item["latex_title"] for item in section_specs if item.get("latex_title")})
+        studio.RESULT_KEYS.clear(); studio.RESULT_KEYS.update({item["id"]: item["result_keys"] for item in section_specs})
+        studio.FIGURES.clear(); studio.FIGURES.update(figures)
+        studio.FIGURE_ORDER[:] = config["figure_order"]
+        studio.TABLES.clear(); studio.TABLES.update(tables)
+        studio.TABLE_ORDER[:] = config["table_order"]
+
+    @classmethod
+    def tearDownClass(cls):
+        for name, value in cls.originals.items():
+            setattr(studio, name, value)
+        cls.fixture_directory.cleanup()
+
+    def test_api_key_setup_is_actionable_without_exposing_secret(self):
+        with patch.dict(studio.os.environ, {}, clear=True):
+            missing = public_state(_default_state())
+            with self.assertRaisesRegex(StudioError, "启动 Paper Studio 的本机终端"):
+                studio.post_openai({"model": "gpt-5-nano", "input": "test"})
+        self.assertFalse(missing["api_key_configured"])
+        self.assertEqual(
+            missing["api_key_setup"]["environment_variable"], "OPENAI_API_KEY"
+        )
+        self.assertIn("export OPENAI_API_KEY", missing["api_key_setup"]["setup_command"])
+        self.assertIn("python3 -m paper_studio.server", missing["api_key_setup"]["restart_command"])
+
+        secret = "must-never-reach-public-state"
+        with patch.dict(studio.os.environ, {"OPENAI_API_KEY": secret}):
+            configured = public_state(_default_state())
+        self.assertTrue(configured["api_key_configured"])
+        self.assertNotIn(secret, json.dumps(configured, ensure_ascii=False))
+
+        html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
+        self.assertIn('id="llm-runtime-config" hidden', html)
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn('id="api-key-setup"', html)
+        self.assertIn("写论文需要 LLM API", html)
+        self.assertNotIn('value="compatible"', html)
+        self.assertEqual(
+            [item["id"] for item in configured["llm_provider_options"]],
+            ["openai", "deepseek"],
+        )
+        self.assertIn('$("api-key-setup").hidden = apiKeyReady', source)
+
+    def test_deepseek_text_provider_uses_chat_completions_without_exposing_key(self):
+        secret = "deepseek-secret-must-stay-server-side"
+        response = MagicMock()
+        response.read.return_value = json.dumps(
+            {
+                "id": "chatcmpl-test",
+                "choices": [{"message": {"content": "Draft paragraph."}}],
+            }
+        ).encode("utf-8")
+        response.__enter__.return_value = response
+        response.__exit__.return_value = False
+        with (
+            patch.dict(studio.os.environ, {"DEEPSEEK_API_KEY": secret}, clear=True),
+            patch.object(studio.urllib.request, "urlopen", return_value=response) as urlopen,
+        ):
+            body = studio.post_openai(
+                {
+                    "model": "deepseek-v4-flash",
+                    "instructions": "Return prose only.",
+                    "input": "Write one paragraph.",
+                },
+                provider="deepseek",
+            )
+            state = _default_state()
+            state["llm_provider"] = "deepseek"
+            visible = public_state(state)
+        request = urlopen.call_args.args[0]
+        sent = json.loads(request.data.decode("utf-8"))
+        self.assertTrue(request.full_url.endswith("/chat/completions"))
+        self.assertEqual(sent["messages"][0]["role"], "system")
+        self.assertEqual(extract_output_text(body), "Draft paragraph.")
+        self.assertEqual(visible["api_key_setup"]["environment_variable"], "DEEPSEEK_API_KEY")
+        self.assertNotIn(secret, json.dumps(visible, ensure_ascii=False))
+
+    def test_provider_selection_is_limited_to_openai_and_deepseek(self):
+        state = _default_state()
+        state["title_editor"]["previous_response_id"] = "title-old"
+        first_section = next(iter(state["sections"].values()))
+        first_section["previous_response_id"] = "section-old"
+        self.assertTrue(studio.select_llm_provider(state, "deepseek"))
+        self.assertEqual(state["llm_provider"], "deepseek")
+        self.assertEqual(state["model"], studio.PROVIDER_DEFAULT_MODELS["deepseek"])
+        self.assertIsNone(state["title_editor"]["previous_response_id"])
+        self.assertIsNone(first_section["previous_response_id"])
+        with self.assertRaisesRegex(StudioError, "不支持的 LLM API"):
+            studio.select_llm_provider(state, "compatible")
+
+    def test_human_figure_label_produces_safe_paths_without_colon(self):
+        original = FIGURES["F2"]["label"]
+        try:
+            FIGURES["F2"]["label"] = "Representation Analysis"
+            paths = studio.figure_paths("F2")
+            panel_paths = studio.data_panel_paths("F2", "a")
+            self.assertEqual(paths["spec"].name, "Representation_Analysis_spec.json")
+            self.assertIn("Representation_Analysis", panel_paths["source"].name)
+        finally:
+            FIGURES["F2"]["label"] = original
+
     def test_cancelled_preview_response_does_not_emit_handler_traceback(self):
         class ClosedSocket:
             def write(self, _data):
@@ -92,7 +401,7 @@ class PaperStudioTests(unittest.TestCase):
         parser = InteractionParser()
         parser.feed(html)
         expected_controls = {
-            "model", "reset", "reset-generated", "writing-view", "figures-view",
+            "llm-provider", "model", "reset", "reset-generated", "writing-view", "figures-view",
             "tables-view", "compile", "paper-title", "title-gpt-prompt",
             "title-generate", "title-save", "candidate", "comment", "generate",
             "accept", "pdf-navigation-toggle", "table-agent-prompt", "table-agent-edit",
@@ -106,7 +415,7 @@ class PaperStudioTests(unittest.TestCase):
             "reset-project-id", "reset-project-copy", "reset-project-confirm",
             "reset-generated-cancel", "reset-generated-confirm", "agent-chat-launcher",
             "agent-chat-close", "figure-agent-chat-input", "figure-agent-chat-send",
-            "agent-chat-cancel",
+            "agent-chat-cancel", "full-draft-start", "full-draft-cancel",
         }
         self.assertEqual(set(parser.control_ids), expected_controls)
         self.assertEqual(len(parser.control_ids), len(expected_controls))
@@ -134,10 +443,12 @@ class PaperStudioTests(unittest.TestCase):
             {
                 "/api/accept", "/api/agent-chat", "/api/agent-chat/cancel",
                 "/api/compile", "/api/figure/approve", "/api/figure/build",
+                "/api/full-draft/start", "/api/full-draft/cancel",
                 "/api/figure/cancel", "/api/figure/caption",
                 "/api/figure/caption/generate", "/api/figure/compose",
                 "/api/figure/draw", "/api/figure/panel/generate",
                 "/api/figure/placement", "/api/figure/prompt", "/api/generate",
+                "/api/llm-provider",
                 "/api/pdf/locate", "/api/reset-conversation",
                 "/api/reset-generated-paper", "/api/select-paragraph", "/api/state",
                 "/api/table/agent-edit", "/api/table/approve", "/api/table/generate",
@@ -755,7 +1066,10 @@ class PaperStudioTests(unittest.TestCase):
         self.assertEqual(studio.FIGURE_ORDER, config["figure_order"])
         self.assertEqual(studio.TABLE_ORDER, config["table_order"])
         public = public_state(_default_state())
-        self.assertEqual(public["project"]["config_file"], "paper/paper_studio.json")
+        self.assertEqual(
+            public["project"]["config_file"],
+            studio.PROJECT_CONFIG_FILE.relative_to(studio.ROOT).as_posix(),
+        )
         studio.validate_project_workspace()
 
     def test_project_workspace_rejects_an_artifact_without_any_paragraph_binding(self):
@@ -821,8 +1135,10 @@ class PaperStudioTests(unittest.TestCase):
         )
         config["paths"].pop("main")
         config["paths"].pop("reference")
+        config["paths"]["metrics"] = "metrics.json"
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
+            (root / "metrics.json").write_text('{"ready": true}', encoding="utf-8")
             path = root / "paper_studio.json"
             path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(studio.ProjectConfigError, "paths.main is required"):
@@ -918,7 +1234,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('/static/app.js?v=20260805.88', html)
+        self.assertIn('/static/app.js?v=20260815.2', html)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
         self.assertIn('id="figures-view" disabled', html)
         self.assertIn('id="compile" class="secondary" disabled', html)
@@ -1053,7 +1369,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('/static/app.js?v=20260805.88', html)
+        self.assertIn('/static/app.js?v=20260815.2', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1063,7 +1379,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('roundLabel.textContent = `第 ${round} 轮`', source)
         self.assertIn('message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`', source)
         self.assertIn("agent-chat-round", source)
-        self.assertIn('/static/style.css?v=20260805.25', html)
+        self.assertIn('/static/style.css?v=20260815.3', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)
@@ -2829,7 +3145,7 @@ args = parser.parse_args()
 
     def test_reference_context_contains_the_full_case_table(self):
         path, source = table_reference_context()
-        self.assertEqual(path, "paper/reference_stylization_jailbreak.txt")
+        self.assertEqual(path, studio.PROJECT_CONFIG["paths"]["reference"])
         self.assertIn("DeepSeek GPT-4o", source)
         self.assertIn("Style Jailbreak 96.0 52.8", source)
 
@@ -2932,10 +3248,14 @@ args = parser.parse_args()
         model = studio.mechanism_source("F3", state)
         self.assertIn('"placement": "single-column figure"', intro)
         self.assertIn('"image_size": "1024x1024"', intro)
-        self.assertIn("at most two groups", intro)
+        self.assertIn("compact ACL-style introduction/motivation schematic", intro)
+        self.assertIn("2–3 aligned regions", intro)
+        self.assertIn("pure white background", intro)
         self.assertIn('"placement": "two-column figure*"', model)
         self.assertIn('"image_size": "1536x1024"', model)
-        self.assertIn("page-width horizontal model/method diagram", model)
+        self.assertIn("page-width ACL-style method schematic", model)
+        self.assertIn("2–4 aligned regions", model)
+        self.assertIn("flat modules", model)
 
     def test_mechanism_build_reconstructs_every_part_as_native_shapes(self):
         with TemporaryDirectory() as temporary:
@@ -3207,7 +3527,7 @@ args = parser.parse_args()
         self.assertEqual(payload["notice"], metrics["fixture"]["notice"])
         self.assertEqual(
             payload["source_metrics"],
-            "results/style_jailbreak_fixture_20260729/metrics.json",
+            studio.PROJECT_CONFIG["paths"]["metrics"],
         )
 
     def test_data_panel_program_receives_only_its_traceable_result_mapping(self):
@@ -3363,6 +3683,110 @@ args = parser.parse_args()
             self.assertNotIn("Approved outline:", captured["input"])
             self.assertEqual(response_id, "resp-f1-next")
             self.assertEqual(prompt, "A simpler single-column BioRender prompt.")
+
+    def test_full_draft_worker_fills_only_pending_paragraph_and_finishes(self):
+        with TemporaryDirectory() as directory:
+            state_dir = Path(directory)
+            state_file = state_dir / "state.json"
+            state = _default_state()
+            for section in state["sections"].values():
+                for paragraph in section["paragraphs"]:
+                    paragraph["accepted_text"] = "Already accepted."
+            target_section = studio.batch_writing_order()[0]
+            target = state["sections"][target_section]["paragraphs"][0]
+            target["accepted_text"] = ""
+            token = "full-draft-test"
+            state["full_draft_job"] = {
+                "token": token,
+                "status": "running",
+                "server_instance": studio.SERVER_INSTANCE_TOKEN,
+                "total": 1,
+                "completed": 0,
+                "progress": 0,
+            }
+
+            def fake_accept(current_state, section, paragraph, text):
+                paragraph["accepted_text"] = text
+                paragraph["candidate"] = None
+                current_state["sections"][section]["accepted_text"] = text
+                current_state["compile"] = {"status": "ok", "message": "compiled"}
+                return studio.CompileResult(True, "compiled")
+
+            with (
+                patch.object(studio, "STATE_DIR", state_dir),
+                patch.object(studio, "STATE_FILE", state_file),
+                patch.object(
+                    studio,
+                    "call_openai",
+                    return_value=("resp-batch", "Batch draft.", []),
+                ) as generate,
+                patch.object(
+                    studio,
+                    "accept_full_draft_paragraph",
+                    side_effect=fake_accept,
+                ),
+            ):
+                studio.save_state(state)
+                studio.full_draft_worker(token, "gpt-5-nano")
+                finished = studio.load_state()
+
+            self.assertEqual(finished["full_draft_job"]["status"], "completed")
+            self.assertEqual(finished["full_draft_job"]["completed"], 1)
+            accepted, _ = studio.paragraph_by_id(
+                finished, target_section, target["id"]
+            )
+            self.assertEqual(accepted["accepted_text"], "Batch draft.")
+            self.assertEqual(generate.call_count, 1)
+
+    def test_direct_full_draft_uses_same_job_without_opening_browser(self):
+        with TemporaryDirectory() as directory:
+            paper = Path(directory) / "paper"
+            state_dir = paper / ".paper_studio"
+            state_file = state_dir / "state.json"
+            paper.mkdir()
+            (paper / ".outline-approved").write_text("approved\n", encoding="utf-8")
+            (paper / "main.tex").write_text("paper\n", encoding="utf-8")
+            state = _default_state()
+            for section in state["sections"].values():
+                for paragraph in section["paragraphs"]:
+                    paragraph["accepted_text"] = "Already accepted."
+            section = studio.batch_writing_order()[0]
+            state["sections"][section]["paragraphs"][0]["accepted_text"] = ""
+
+            def fake_worker(token, _model):
+                current = studio.load_state()
+                current["full_draft_job"].update(
+                    status="completed",
+                    token=None,
+                    completed=1,
+                    progress=100,
+                    progress_message="done",
+                )
+                studio.save_state(current)
+
+            with (
+                patch.object(studio, "PAPER", paper),
+                patch.object(studio, "STATE_DIR", state_dir),
+                patch.object(studio, "STATE_FILE", state_file),
+                patch.object(studio, "full_draft_worker", side_effect=fake_worker) as worker,
+                patch.object(studio.webbrowser, "open") as browser_open,
+                patch.dict(studio.os.environ, {studio.API_KEY_ENVIRONMENT_VARIABLE: "secret"}),
+                patch("builtins.print"),
+            ):
+                studio.save_state(state)
+                studio.run_direct_full_draft("gpt-5-nano")
+
+            worker.assert_called_once()
+            browser_open.assert_not_called()
+
+    def test_project_config_rejects_incomplete_batch_writing_order(self):
+        config = json.loads(studio.PROJECT_CONFIG_FILE.read_text(encoding="utf-8"))
+        config["batch_writing_order"] = [config["sections"][0]["id"]]
+        with TemporaryDirectory(dir=studio.ROOT / "tests") as directory:
+            path = Path(directory) / "paper_studio.json"
+            path.write_text(json.dumps(config), encoding="utf-8")
+            with self.assertRaisesRegex(studio.ProjectConfigError, "batch_writing_order"):
+                studio.load_project_config(path, root=studio.ROOT)
 
 
 if __name__ == "__main__":

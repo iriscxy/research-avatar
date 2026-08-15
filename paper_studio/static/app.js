@@ -8,6 +8,13 @@ const FIGURE_EDITOR_DRAFTS_KEY_PREFIX = "paper-studio.figure-editor-drafts.";
 const PROSE_DRAFTS_KEY_PREFIX = "paper-studio.prose-drafts.";
 const TITLE_DRAFTS_KEY_PREFIX = "paper-studio.title-drafts.";
 const COMMENT_DRAFTS_KEY_PREFIX = "paper-studio.comment-drafts.";
+const LEGACY_DRAFT_KEY_PREFIXES = [
+  "paperstudio.caption-drafts.",
+  "paperstudio.figure-editor-drafts.",
+  "paperstudio.prose-drafts.",
+  "paperstudio.title-drafts.",
+  "paperstudio.comment-drafts.",
+];
 let state = null;
 let pdfNavigationVisible = (() => {
   try {
@@ -46,6 +53,7 @@ const autoFigurePromptAttempted = new Set();
 const autoDataPanelAttempted = new Set();
 let figurePollTimer = null;
 let agentChatPollTimer = null;
+let fullDraftPollTimer = null;
 let titleBusy = false;
 let acceptRequestBusy = false;
 let proseRequestBusy = false;
@@ -55,6 +63,7 @@ let conversationResetBusy = false;
 let agentChatRequestBusy = false;
 let figureRequestBusy = false;
 let generatedResetBusy = false;
+let fullDraftRequestBusy = false;
 let pdfLocateRequestId = 0;
 let proseBaselineKey = "";
 let proseBaselineText = "";
@@ -344,6 +353,7 @@ function clearBrowserDraftsForProject(projectId) {
     PROSE_DRAFTS_KEY_PREFIX,
     TITLE_DRAFTS_KEY_PREFIX,
     COMMENT_DRAFTS_KEY_PREFIX,
+    ...LEGACY_DRAFT_KEY_PREFIXES,
   ].forEach((prefix) => {
     try {
       localStorage.removeItem(prefix + projectId);
@@ -405,6 +415,7 @@ function setBusy(busy, label = "") {
   $("reset").disabled = busy;
   $("candidate").disabled = busy;
   $("comment").disabled = busy;
+  $("llm-provider").disabled = busy;
   $("model").disabled = busy;
   if (busy) {
     $("accept").disabled = true;
@@ -1577,6 +1588,24 @@ function render() {
   syncCommentDraftProject();
   $("load-error").hidden = true;
   const project = state.project || {};
+  const apiKeySetup = state.api_key_setup || {};
+  const apiKeyReady = Boolean(state.api_key_configured);
+  const providerSelect = $("llm-provider");
+  const providerOptions = state.llm_provider_options || [];
+  if (providerOptions.length) {
+    providerSelect.replaceChildren(...providerOptions.map((option) => {
+      const element = document.createElement("option");
+      element.value = option.id;
+      element.textContent = `${option.label}${option.configured ? " · 已配置" : ""}`;
+      return element;
+    }));
+  }
+  providerSelect.value = state.llm_provider || "openai";
+  $("api-key-setup").hidden = apiKeyReady;
+  $("api-key-setup-command").textContent = apiKeySetup.setup_command || 'export OPENAI_API_KEY="粘贴你的 API key"';
+  $("api-key-setup-description").textContent = `${apiKeySetup.provider_label || "当前"} API 尚未配置。请在启动 Paper Studio 的本机终端设置；密钥不会进入网页。GPT Image 仍单独使用 OpenAI。`;
+  $("api-key-restart-command").textContent = apiKeySetup.restart_command || "python3 -m paper_studio.server";
+  document.querySelector(".workspace").classList.toggle("api-key-missing", !apiKeyReady);
   $("project-eyebrow").textContent = project.eyebrow || project.name || "PAPER PROJECT";
   $("studio-title").textContent = project.studio_title || "Paper Studio";
   $("project-subtitle").textContent = project.subtitle || "逐段对话、确认后写入 LaTeX";
@@ -1589,17 +1618,17 @@ function render() {
     $("figures-workspace").hidden = true;
     $("section-kicker").textContent = "EMPTY STUDIO";
     $("section-title").textContent = "尚未载入论文";
-    $("api-status").textContent = "Shell ready";
-    $("api-status").className = "status ok";
+    $("api-status").textContent = apiKeyReady ? "Shell ready · API key ready" : "Shell ready · API key missing";
+    $("api-status").className = "status " + (apiKeyReady ? "ok" : "warn");
     $("conversation-status").style.display = "none";
-    ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "model"].forEach((id) => {
+    ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model"].forEach((id) => {
       $(id).disabled = true;
     });
     $("agent-chat-launcher").hidden = true;
     return;
   }
   $("agent-chat-launcher").hidden = false;
-  ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "model"].forEach((id) => {
+  ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model"].forEach((id) => {
     $(id).disabled = false;
   });
   renderAgentChat();
@@ -1620,7 +1649,7 @@ function render() {
   const section = state.sections[activeSection];
   $("section-title").textContent = section.title;
   renderTitleDraftInput($("model"), "model", state.model || "gpt-5-nano");
-  $("api-status").textContent = state.api_key_configured ? "API key ready" : "API key missing";
+  $("api-status").textContent = `${apiKeySetup.provider_label || "LLM"} · ${state.api_key_configured ? "API ready" : "API missing"}`;
   $("api-status").className = "status " + (state.api_key_configured ? "ok" : "warn");
   $("conversation-status").textContent = section.conversation_active ? "Conversation active" : "New conversation";
   $("conversation-status").className = "status " + (section.conversation_active ? "ok" : "");
@@ -1675,13 +1704,86 @@ function render() {
     ? ""
     : "Outline 尚未确认。可以浏览界面，但在确认并建立 LaTeX scaffold 前不能 Accept → LaTeX。";
   gate.classList.toggle("show", !state.outline_confirmed);
+  renderFullDraft();
   renderPdf();
-  if (activeView === "writing" && paragraph && !candidate && !paragraph.accepted_text) {
+  const fullDraftRunning = Boolean(
+    state.full_draft && state.full_draft.job && state.full_draft.job.status === "running"
+  );
+  if (activeView === "writing" && !fullDraftRunning && paragraph && !candidate && !paragraph.accepted_text) {
     const key = `${activeSection}:${paragraph.id}`;
     if (!autoAttempted.has(key)) {
       autoAttempted.add(key);
       setTimeout(() => generateCurrent(true), 50);
     }
+  }
+}
+
+function renderFullDraft() {
+  const card = $("full-draft-card");
+  const draft = state.full_draft || {};
+  const job = draft.job || null;
+  const running = Boolean(job && job.status === "running");
+  const pending = Number(draft.pending_paragraphs || 0);
+  const total = Number(draft.total_paragraphs || 0);
+  card.classList.toggle("is-running", running);
+  card.classList.toggle("is-failed", Boolean(job && job.status === "failed"));
+  card.classList.toggle("is-completed", Boolean(job && job.status === "completed"));
+
+  const summary = $("full-draft-summary");
+  if (job && job.progress_message) {
+    summary.textContent = job.progress_message;
+  } else if (!state.outline_confirmed) {
+    summary.textContent = "请先确认 outline；批量模式不会绕过论文结构确认。";
+  } else if (!state.api_key_configured) {
+    summary.textContent = "请先按页面顶部说明配置 LLM API Key。";
+  } else if (!pending) {
+    summary.textContent = `全部 ${total} 个段落已经写入 LaTeX，可继续逐段修改。`;
+  } else {
+    summary.textContent = `将按项目写作顺序补齐 ${pending} / ${total} 个未完成段落；已接受内容不会被覆盖。`;
+  }
+
+  const start = $("full-draft-start");
+  const cancel = $("full-draft-cancel");
+  start.disabled = fullDraftRequestBusy || running || !draft.available || pending === 0;
+  start.textContent = job && ["failed", "cancelled"].includes(job.status)
+    ? "继续补齐未完成正文"
+    : pending === 0
+      ? "全文初稿已生成"
+      : "直接生成全文初稿";
+  cancel.hidden = !running;
+  cancel.disabled = fullDraftRequestBusy;
+
+  const progressRow = $("full-draft-progress-row");
+  progressRow.hidden = !job;
+  $("full-draft-progress").value = Number((job && job.progress) || 0);
+  $("full-draft-progress-text").textContent = job
+    ? `${Number(job.completed || 0)} / ${Number(job.total || pending)} · ${job.progress_message || job.status}`
+    : "";
+
+  ["candidate", "comment", "generate", "accept", "paper-title", "title-gpt-prompt", "title-generate", "title-save", "llm-provider", "model", "reset", "reset-generated"].forEach((id) => {
+    const element = $(id);
+    if (element && running) element.disabled = true;
+  });
+  document.querySelectorAll("#paragraph-nav button").forEach((button) => {
+    button.disabled = running;
+  });
+
+  if (fullDraftPollTimer) {
+    clearTimeout(fullDraftPollTimer);
+    fullDraftPollTimer = null;
+  }
+  if (running) {
+    fullDraftPollTimer = setTimeout(pollFullDraft, 900);
+  }
+}
+
+async function pollFullDraft() {
+  fullDraftPollTimer = null;
+  try {
+    state = await request("/api/state");
+    render();
+  } catch (error) {
+    showMessage(error.message, true);
   }
 }
 
@@ -1768,6 +1870,30 @@ $("comment").addEventListener("input", (event) => {
 
 $("model").addEventListener("input", (event) => {
   rememberTitleDraft("model", event.currentTarget.value, state.model || "gpt-5-nano");
+});
+
+$("llm-provider").addEventListener("change", async (event) => {
+  if (proseRequestBusy || fullDraftRequestBusy || titleBusy) {
+    event.currentTarget.value = state.llm_provider || "openai";
+    return;
+  }
+  const provider = event.currentTarget.value;
+  try {
+    setBusy(true, "正在切换正文写作 API 并重置旧对话链…");
+    const payload = await request("/api/llm-provider", {
+      method: "POST",
+      body: JSON.stringify({provider}),
+    });
+    state = payload.state;
+    forgetTitleDraft("model");
+    render();
+    showMessage(`正文写作 API 已切换为 ${state.api_key_setup.provider_label}；模型为 ${state.model || "请填写模型名称"}。`);
+  } catch (error) {
+    event.currentTarget.value = state.llm_provider || "openai";
+    showMessage(error.message, true);
+  } finally {
+    setBusy(false);
+  }
 });
 
 $("paper-title").addEventListener("input", (event) => {
@@ -2168,6 +2294,44 @@ function switchView(view) {
 }
 
 $("writing-view").onclick = () => switchView("writing");
+$("full-draft-start").onclick = async () => {
+  if (fullDraftRequestBusy) return;
+  fullDraftRequestBusy = true;
+  $("full-draft-start").disabled = true;
+  try {
+    const payload = await request("/api/full-draft/start", {
+      method: "POST",
+      body: JSON.stringify({model: $("model").value.trim()}),
+    });
+    state = payload.state;
+    render();
+    showMessage("全文初稿任务已启动；可以切换页面查看进度，完成后仍可逐段修改。");
+  } catch (error) {
+    showMessage(error.message, true);
+  } finally {
+    fullDraftRequestBusy = false;
+    renderFullDraft();
+  }
+};
+$("full-draft-cancel").onclick = async () => {
+  if (fullDraftRequestBusy) return;
+  fullDraftRequestBusy = true;
+  $("full-draft-cancel").disabled = true;
+  try {
+    const payload = await request("/api/full-draft/cancel", {
+      method: "POST",
+      body: "{}",
+    });
+    state = payload.state;
+    render();
+    showMessage("已请求停止；已完成段落保留，之后可继续补齐未完成正文。");
+  } catch (error) {
+    showMessage(error.message, true);
+  } finally {
+    fullDraftRequestBusy = false;
+    renderFullDraft();
+  }
+};
 $("figures-view").onclick = () => switchView("figures");
 $("tables-view").onclick = () => switchView("tables");
 

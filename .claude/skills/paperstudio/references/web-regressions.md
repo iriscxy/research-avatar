@@ -1,5 +1,22 @@
 # Paper Studio product and regression contract
 
+## LLM API setup
+
+- The terminal writing workflow selects only OpenAI or DeepSeek before launching
+  Paper Studio; the webpage shows runtime status but no persistent API/model settings panel.
+  Read their secrets only from `OPENAI_API_KEY` or `DEEPSEEK_API_KEY`.
+- When the selected provider is not configured, show one prominent page-level banner that says the key is
+  entered in the local terminal that starts Paper Studio, gives the export and
+  restart commands, and warns against pasting the secret into chat, repository
+  files, or browser storage.
+- Public state and the DOM may expose configuration status and instructions,
+  never the key value. GPT endpoint errors must repeat the actionable setup
+  location instead of returning a generic English missing-key error.
+- Persist the selected provider and editable model. Switching providers resets
+  section, title, and figure-Prompt conversation IDs and applies the provider's
+  default model. Never send a response ID from one provider to another.
+- GPT Image remains OpenAI-only and continues to require `OPENAI_API_KEY`.
+
 ## Data figures
 
 - Generate and show every requested plot as a PDF candidate. Do not expose generated Python source or a plotting-code block in the browser.

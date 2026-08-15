@@ -49,7 +49,7 @@ Paper Studio is a permanent, paper-independent shell. It must start even when `p
 5. Keep local-Agent and GPT roles explicit:
    - Use the local Codex Agent for reproducible plot authoring, safe layout interpretation, table editing, and the always-available help chat.
    - Use the section GPT conversation for prose, passing every bound artifact's title, purpose, caption, panels, label, and exact required LaTeX reference.
-   - Budget GPT inputs explicitly. Bootstrap outline, working abstract, style, bibliography, and section evidence once per persistent Responses chain; later turns use `previous_response_id` and send only mutable context. Title and mechanism-prompt revisions must not resend the full paper. Resend developer instructions because Responses API instructions are not inherited. Estimate text/reasoning tokens, citation web searches, GPT Image size/quality, and redraws separately; image redraws usually dominate the bill.
+   - Budget LLM inputs explicitly. Bootstrap outline, working abstract, style, bibliography, and section evidence once per provider conversation; later turns send only mutable context while that conversation is available. Re-bootstrap Chat Completions providers after a server restart instead of trusting a stale local conversation ID. Title and mechanism-prompt revisions must not resend the full paper unnecessarily. Resend developer instructions every turn. Estimate text/reasoning tokens, OpenAI citation web searches, GPT Image size/quality, and redraws separately; image redraws usually dominate the bill.
    - Let the local Codex Agent semantically classify each ordinary chat turn from the current message and recent history as `read_only`, `execute`, or `confirmation_required`; never select read versus write mode from a hard-coded action-verb list. Keep a deterministic server-side confirmation gate only for deletion, clearing, broad overwrite, and similarly hard-to-recover operations. Detect success across both editable source files and researcher-visible PNG/PDF/PPTX/SVG artifacts. Run Codex in its own process group and terminate the whole group on timeout so a reported failure cannot continue mutating files in the background.
    - Show a local-Agent stop button only while a chat job is running. Stopping must persist a `cancelled` job and an `已停止` assistant turn, terminate the whole Codex process group, and make the worker ignore every late result.
    - Give every accepted local-Agent chat turn exactly one terminal assistant bubble. On completion, failure, cancellation, timeout, or server-restart recovery, persist a nonempty assistant reply with the corresponding execution badge. Never leave a user bubble unanswered merely because the job state became terminal; mark recovered replies so repeated reloads cannot duplicate them.
@@ -64,6 +64,23 @@ Paper Studio is a permanent, paper-independent shell. It must start even when `p
 11. Table validation must enforce the configured float width: two-column tables use a matched `table*` environment and single-column tables use `table`. Keep this invariant alongside fixed label/caption and traceable numeric-cell validation across initial generation, Agent edits, saves, and approval.
    - Drive table Agent/edit/save/approve controls from the visible LaTeX textarea. Enable save only for a nonempty dirty value; keep clean approved `已插入正文` disabled, and expose a dirty approved table as `更新表格 → PDF` so the visible revision can be compiled transactionally.
 12. Use `gpt-5-nano` as the default text GPT API model for a new or empty Paper Studio state. Keep the model field editable and preserve `PAPER_STUDIO_MODEL` as an explicit deployment override; a persisted project selection still takes precedence over the default.
+13. Keep text-LLM API selection and key setup explicit without moving secrets into
+    browser state. Ask for OpenAI or DeepSeek in the terminal workflow and pass the choice at server startup; do not show a persistent provider/model settings panel in the webpage. Persist only the provider and model; public state
+    exposes only whether that provider's environment configuration is ready plus
+    safe setup commands. Switching providers resets incompatible response chains
+    and selects that provider's default model. Never render, accept, persist, log,
+    or return a key. Remove `OPENAI_API_KEY` and `DEEPSEEK_API_KEY`
+    from local-Agent subprocesses. Keep GPT Image explicitly OpenAI-only.
+14. Terminal one-shot full-draft generation and the webpage are one live workflow.
+    `$paperwrite` keeps a same-project Paper Studio server/page open while
+    `python3 -m paper_studio.server --direct-full-draft --provider <openai|deepseek>` runs as a separate process.
+    Require the terminal workflow to ask the researcher which API to use and
+    reject direct mode when `--provider` is omitted.
+    Persist every paragraph's successful Accept-and-compile revision before moving
+    on; make public-state reads detect external CLI revisions instead of serving a
+    stale in-memory snapshot. Within one polling cycle and without reload, update
+    the page's current paragraph, completed/total progress, accepted prose and
+    navigation state, and compiled PDF revision. Never synchronize only at the end.
 
 ## Workspace data map
 

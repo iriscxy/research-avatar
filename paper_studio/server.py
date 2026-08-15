@@ -4,8 +4,8 @@ Run from the repository root:
 
     python3 -m paper_studio.server
 
-The browser never receives the OpenAI API key. Each manuscript section owns an
-independent Responses API chain through its stored ``previous_response_id``.
+The browser never receives an API key. Each manuscript section owns an
+independent selected-provider conversation.
 """
 
 from __future__ import annotations
@@ -50,9 +50,22 @@ PAPER_PAGE_DIR = STATE_DIR / "paper_pages"
 FIGURE_TOOL = ROOT / "tools" / "figure_ppt.py"
 PROJECT_CONFIG_FILE = PAPER / "paper_studio.json"
 DEFAULT_MODEL = os.environ.get("PAPER_STUDIO_MODEL", "gpt-5-nano")
+DEFAULT_PROVIDER = os.environ.get("PAPER_STUDIO_PROVIDER", "openai").strip().lower()
+if DEFAULT_PROVIDER not in {"openai", "deepseek"}:
+    DEFAULT_PROVIDER = "openai"
+PROVIDER_DEFAULT_MODELS = {
+    "openai": DEFAULT_MODEL,
+    "deepseek": os.environ.get("DEEPSEEK_PAPER_MODEL", "deepseek-v4-flash"),
+}
 MECHANISM_AGENT_TIMEOUT_SECONDS = 120
 API_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 API_URL += "/responses"
+API_KEY_ENVIRONMENT_VARIABLE = "OPENAI_API_KEY"
+API_KEY_SETUP_LOCATION = "启动 Paper Studio 的本机终端"
+API_KEY_SETUP_COMMAND = 'export OPENAI_API_KEY="粘贴你的 API key"'
+API_KEY_RESTART_COMMAND = "python3 -m paper_studio.server"
+CHAT_HISTORY_LOCK = threading.RLock()
+CHAT_RESPONSE_HISTORIES: dict[str, list[dict[str, str]]] = {}
 STATE_LOCK = threading.RLock()
 FIGURE_PROCESS_LOCK = threading.RLock()
 RUNNING_FIGURE_PROCESSES: dict[str, subprocess.Popen[str]] = {}
@@ -60,6 +73,8 @@ CANCELLED_FIGURE_JOBS: set[str] = set()
 AGENT_CHAT_PROCESS_LOCK = threading.RLock()
 RUNNING_AGENT_CHAT_PROCESSES: dict[str, subprocess.Popen[str]] = {}
 CANCELLED_AGENT_CHAT_JOBS: set[str] = set()
+FULL_DRAFT_JOB_LOCK = threading.RLock()
+CANCELLED_FULL_DRAFT_JOBS: set[str] = set()
 SERVER_INSTANCE_TOKEN = uuid.uuid4().hex
 
 
@@ -115,6 +130,15 @@ def load_project_config(
         if not isinstance(section["result_keys"], list):
             raise ProjectConfigError(f"Section result_keys must be a list: {section_id}")
         section_ids.append(section_id)
+    batch_order = config.get("batch_writing_order", section_ids)
+    if (
+        not isinstance(batch_order, list)
+        or len(batch_order) != len(set(batch_order))
+        or set(map(str, batch_order)) != set(section_ids)
+    ):
+        raise ProjectConfigError(
+            "batch_writing_order must list every configured section exactly once"
+        )
     for kind, order_key in (("figures", "figure_order"), ("tables", "table_order")):
         definitions = config.get(kind)
         order = config.get(order_key)
@@ -256,6 +280,7 @@ def empty_project_config() -> dict[str, Any]:
             "subtitle": "等待 paperwrite 填入论文项目数据",
         },
         "sections": [],
+        "batch_writing_order": [],
         "figure_order": [],
         "figures": {},
         "table_order": [],
@@ -296,6 +321,14 @@ FIGURE_ORDER = [str(item) for item in PROJECT_CONFIG["figure_order"]]
 TABLES: dict[str, dict[str, Any]] = PROJECT_CONFIG["tables"]
 TABLE_ORDER = [str(item) for item in PROJECT_CONFIG["table_order"]]
 METRICS_FILE = _project_path(ROOT, PROJECT_CONFIG["paths"]["metrics"], "paths.metrics")
+
+
+def batch_writing_order() -> list[str]:
+    """Return project-owned whole-draft order without inferring paper structure."""
+    configured = PROJECT_CONFIG.get("batch_writing_order")
+    if isinstance(configured, list) and set(map(str, configured)) == set(SECTION_MAP):
+        return [str(item) for item in configured]
+    return [str(item["id"]) for item in SECTION_SPECS]
 
 
 def default_table_prompt(table_id: str) -> str:
@@ -437,9 +470,11 @@ def artifact_reference_error(
         + "。每个绑定图表在该段必须且只能引用一次；需要在其他段落再次引用时，先在 "
         "paper/paragraph_plan.json 中显式绑定。"
     )
-FIGURE_PROMPT_INSTRUCTIONS = """You are a professional and experienced scientific-figure designer. Carefully read the following paper content, deeply understand its core mechanism, key method, and deep-model experimental pipeline, and then generate a BioRender-style prompt for the mechanism figure.
+FIGURE_PROMPT_INSTRUCTIONS = """You are an expert designer of figures for ACL-family NLP papers. Carefully read the supplied manuscript evidence and return one complete, production-ready GPT Image prompt for a restrained academic diagram.
 
-You are operating one persistent conversation dedicated to exactly one paper figure. Keep the figure faithful to its bound manuscript section and approved figure role. The supplied <paper_figure_format> is mandatory: explicitly restate its single-column or two-column target, physical aspect ratio, central safe composition band, and density limit in the returned image-generation prompt. On revision turns, preserve sound prior design decisions but follow the researcher's latest instruction about scope, layout, density, hierarchy, and column width. Return only the complete revised image-generation prompt, with no commentary or Markdown fence."""
+First identify the figure's single scientific message and the minimum visual structure needed to communicate it. Follow common ACL figure conventions: pure white background, flat vector geometry, thin consistent strokes, compact alignment, generous whitespace, precise typography, two to four clearly related regions, and a muted colorblind-safe palette of three to five colors. Use tokens, small semantic glyphs, arrows, brackets, paths, matrices, or modules only when they encode the mechanism. Prefer an Illustrator/TikZ-like schematic over a decorative BioRender poster. Do not add people, scenery, mascots, photorealistic objects, gradients, glow, glass, 3D depth, glossy buttons, heavy shadows, or marketing-style visual drama unless the manuscript explicitly requires them. Do not default to oversized text cards or a generic box-and-arrow flowchart; small boxes and panels are acceptable when they precisely encode tokens, states, or modules. Keep labels short and print-readable. Never invent evidence or put result charts in a method figure.
+
+You are operating one persistent conversation dedicated to exactly one paper figure. Keep the figure faithful to its bound manuscript section and approved figure role. The supplied <paper_figure_format> is mandatory: explicitly restate its single-column or two-column target, physical aspect ratio, central safe composition band, and density guidance in the returned image-generation prompt. On revision turns, preserve sound prior design decisions but follow the researcher's latest instruction about scope, layout, density, hierarchy, and column width. Return only the complete revised image-generation prompt, with no commentary or Markdown fence."""
 
 
 class StudioError(Exception):
@@ -910,7 +945,8 @@ def _default_state() -> dict[str, Any]:
     return {
         "schema_version": "1.2",
         "project_id": PROJECT_ID,
-        "model": DEFAULT_MODEL,
+        "llm_provider": DEFAULT_PROVIDER,
+        "model": PROVIDER_DEFAULT_MODELS.get(DEFAULT_PROVIDER) or DEFAULT_MODEL,
         "title_editor": {
             "prompt": "",
             "candidate": "",
@@ -919,6 +955,7 @@ def _default_state() -> dict[str, Any]:
         },
         "agent_chat_history": [],
         "agent_chat_job": None,
+        "full_draft_job": None,
         "updated_at": None,
         "sections": {
             key: {
@@ -1083,7 +1120,12 @@ def load_state() -> dict[str, Any]:
             )
             current.pop("candidate", None)
             current.pop("history", None)
-        state.setdefault("model", DEFAULT_MODEL)
+        if state.get("llm_provider") not in PROVIDER_DEFAULT_MODELS:
+            state["llm_provider"] = "openai"
+            if state.get("model") == "model-name":
+                state["model"] = PROVIDER_DEFAULT_MODELS["openai"]
+        state.setdefault("llm_provider", DEFAULT_PROVIDER)
+        state.setdefault("model", PROVIDER_DEFAULT_MODELS.get(state["llm_provider"]) or DEFAULT_MODEL)
         title_editor = state.setdefault("title_editor", default["title_editor"])
         for field, value in default["title_editor"].items():
             title_editor.setdefault(field, value)
@@ -1123,6 +1165,19 @@ def load_state() -> dict[str, Any]:
                 )
                 state["agent_chat_history"] = history[-40:]
                 job["reply_recorded"] = True
+        draft_job = state.setdefault("full_draft_job", None)
+        if (
+            isinstance(draft_job, dict)
+            and draft_job.get("status") == "running"
+            and draft_job.get("server_instance") != SERVER_INSTANCE_TOKEN
+        ):
+            state["full_draft_job"] = {
+                **draft_job,
+                "status": "failed",
+                "token": None,
+                "progress_message": "服务已重启；全文生成任务已停止，可从未完成段落继续。",
+                "finished_at": int(time.time()),
+            }
         state.setdefault("compile", default["compile"])
         stored_figures = state.get("figures", {})
         state["figures"] = {
@@ -1233,7 +1288,7 @@ def read_text(path: Path, limit: int = 24000) -> str:
 
 
 def writing_style_context() -> str:
-    profile = read_text(ROOT / "researcher-profile/PROFILE.md", 50000)
+    profile = read_text(ROOT / "researcher-profile/PROFILE.html", 50000)
     match = re.search(
         r"## Writing Style\s*(.*?)(?=\n## Experiment Templates)",
         profile,
@@ -1257,7 +1312,7 @@ def metrics_bundle() -> dict[str, Any]:
 
 
 def figure_paths(figure_id: str) -> dict[str, Path]:
-    slug = FIGURES[figure_id]["label"].split(":", 1)[1].replace("-", "_")
+    slug = artifact_label_slug(FIGURES[figure_id]["label"], fallback=figure_id)
     deliverable_slug = str(FIGURES[figure_id].get("deliverable_stem") or slug)
     return {
         "spec": FIGURE_SOURCE_DIR / f"{slug}_spec.json",
@@ -1277,7 +1332,7 @@ def data_panel_paths(figure_id: str, panel_id: str) -> dict[str, Path]:
     """Return the independently generated artifacts for one atomic data panel."""
     if panel_id not in {item["id"] for item in FIGURES[figure_id].get("panels", [])}:
         raise StudioError(f"Unknown panel {figure_id}{panel_id}.")
-    slug = FIGURES[figure_id]["label"].split(":", 1)[1].replace("-", "_")
+    slug = artifact_label_slug(FIGURES[figure_id]["label"], fallback=figure_id)
     stem = f"{figure_id.lower()}_{panel_id}_{slug}"
     return {
         "source": DATA_FIGURE_AGENT_DIR / f"{stem}.py",
@@ -2083,7 +2138,8 @@ def edit_table_with_local_agent(
 </current_table_latex>
 """
     environment = dict(os.environ)
-    environment.pop("OPENAI_API_KEY", None)
+    for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
+        environment.pop(secret_name, None)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=f"agent-table-{table_id.lower()}-", dir=STATE_DIR
@@ -2467,13 +2523,146 @@ def extract_output_text(response: dict[str, Any]) -> str:
     return "\n".join(piece for piece in pieces if piece).strip()
 
 
-def post_openai(payload: dict[str, Any]) -> dict[str, Any]:
-    api_key = os.environ.get("OPENAI_API_KEY")
+def artifact_label_slug(label: object, *, fallback: str) -> str:
+    """Return a safe filename stem for both LaTeX labels and human labels."""
+    raw = str(label or "").strip()
+    candidate = raw.split(":", 1)[1] if ":" in raw else raw
+    candidate = re.sub(r"[^A-Za-z0-9._-]+", "_", candidate).strip("._-")
+    if not candidate:
+        candidate = re.sub(r"[^A-Za-z0-9._-]+", "_", fallback).strip("._-")
+    return (candidate or "artifact").replace("-", "_")
+
+
+def provider_configuration(provider: str) -> dict[str, str]:
+    provider = provider.strip().lower()
+    configurations = {
+        "openai": {
+            "id": "openai",
+            "label": "OpenAI",
+            "environment_variable": "OPENAI_API_KEY",
+            "base_url": os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
+            "protocol": "responses",
+        },
+        "deepseek": {
+            "id": "deepseek",
+            "label": "DeepSeek",
+            "environment_variable": "DEEPSEEK_API_KEY",
+            "base_url": os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/"),
+            "protocol": "chat_completions",
+        },
+    }
+    if provider not in configurations:
+        raise StudioError(f"不支持的 LLM API：{provider}")
+    return configurations[provider]
+
+
+def active_llm_provider() -> str:
+    try:
+        provider = str(load_state().get("llm_provider") or DEFAULT_PROVIDER).strip().lower()
+    except Exception:
+        provider = DEFAULT_PROVIDER
+    return provider if provider in PROVIDER_DEFAULT_MODELS else "openai"
+
+
+def api_setup_for_provider(provider: str) -> dict[str, Any]:
+    config = provider_configuration(provider)
+    env_name = config["environment_variable"]
+    configured = bool(os.environ.get(env_name))
+    commands = [f'export {env_name}="粘贴你的 API key"']
+    return {
+        "provider": provider,
+        "provider_label": config["label"],
+        "required": True,
+        "configured": configured,
+        "location": API_KEY_SETUP_LOCATION,
+        "environment_variable": env_name,
+        "setup_command": "\n".join(commands),
+        "restart_command": API_KEY_RESTART_COMMAND,
+        "security_note": "不要把真实 API key 输入聊天、提交到仓库或保存到浏览器。",
+    }
+
+
+def select_llm_provider(state: dict[str, Any], provider: str) -> bool:
+    """Apply one supported provider and clear conversation IDs when it changes."""
+    provider = provider.strip().lower()
+    provider_configuration(provider)
+    if provider == state.get("llm_provider"):
+        return False
+    state["llm_provider"] = provider
+    state["model"] = PROVIDER_DEFAULT_MODELS[provider]
+    state.setdefault("title_editor", {})["previous_response_id"] = None
+    for section_state in state.get("sections", {}).values():
+        section_state["previous_response_id"] = None
+        section_state["bibliography_fingerprint"] = None
+    for figure_state in state.get("figures", {}).values():
+        figure_state["previous_response_id"] = None
+    return True
+
+
+def _chat_completion_payload(payload: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    previous_id = str(payload.get("previous_response_id") or "")
+    with CHAT_HISTORY_LOCK:
+        messages = list(CHAT_RESPONSE_HISTORIES.get(previous_id, []))
+    instructions = str(payload.get("instructions") or "").strip()
+    if instructions:
+        messages.append({"role": "system", "content": instructions})
+    user_input = payload.get("input", "")
+    if not isinstance(user_input, str):
+        user_input = json.dumps(user_input, ensure_ascii=False)
+    messages.append({"role": "user", "content": user_input})
+    request_payload: dict[str, Any] = {
+        "model": payload.get("model"),
+        "messages": messages,
+    }
+    text_config = payload.get("text") or {}
+    format_config = text_config.get("format") if isinstance(text_config, dict) else None
+    if isinstance(format_config, dict) and format_config.get("type") == "json_schema":
+        request_payload["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": format_config.get("name", "paper_studio_response"),
+                "strict": bool(format_config.get("strict", True)),
+                "schema": format_config.get("schema", {}),
+            },
+        }
+    return request_payload, messages
+
+
+def reusable_response_id(response_id: str | None) -> str | None:
+    """Drop an in-memory chat ID after restart; OpenAI IDs remain server-hosted."""
+    if not response_id or active_llm_provider() == "openai":
+        return response_id
+    with CHAT_HISTORY_LOCK:
+        return response_id if response_id in CHAT_RESPONSE_HISTORIES else None
+
+
+def post_openai(payload: dict[str, Any], *, provider: str | None = None) -> dict[str, Any]:
+    """Call the selected text LLM and normalize it to a Responses-style record."""
+    provider = (provider or active_llm_provider()).strip().lower()
+    config = provider_configuration(provider)
+    api_key = os.environ.get(config["environment_variable"])
     if not api_key:
-        raise StudioError("OPENAI_API_KEY is not configured in the server environment.")
+        setup = api_setup_for_provider(provider)
+        raise StudioError(
+            f"尚未配置 {config['label']} LLM API。请在启动 Paper Studio 的本机终端输入 "
+            f"`{setup['setup_command']}`，停止当前服务后重新运行 "
+            f"`{API_KEY_RESTART_COMMAND}`。不要把真实 API key 输入聊天、"
+            "提交到仓库或保存到浏览器。"
+        )
+    if provider != "openai" and payload.get("tools"):
+        raise StudioError(
+            f"{config['label']} 当前可用于正文、标题、Caption 和设计 Prompt；"
+            "自动联网核验 citation 需要切换到 OpenAI 后重试。"
+        )
+    request_payload = payload
+    history: list[dict[str, str]] | None = None
+    api_url = config["base_url"] + "/responses"
+    if config["protocol"] == "chat_completions":
+        request_payload, history = _chat_completion_payload(payload)
+        api_url = config["base_url"] + "/chat/completions"
     request = urllib.request.Request(
-        API_URL,
-        data=json.dumps(payload).encode("utf-8"),
+        api_url,
+        data=json.dumps(request_payload).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -2482,12 +2671,28 @@ def post_openai(payload: dict[str, Any]) -> dict[str, Any]:
     )
     try:
         with urllib.request.urlopen(request, timeout=240) as response:
-            return json.loads(response.read().decode("utf-8"))
+            body = json.loads(response.read().decode("utf-8"))
+            if config["protocol"] == "responses":
+                return body
+            choices = body.get("choices") or []
+            content = ""
+            if choices:
+                content = str((choices[0].get("message") or {}).get("content") or "")
+            response_id = str(body.get("id") or f"chat-{uuid.uuid4().hex}")
+            if history is not None:
+                with CHAT_HISTORY_LOCK:
+                    CHAT_RESPONSE_HISTORIES[response_id] = history + [
+                        {"role": "assistant", "content": content}
+                    ]
+            return {
+                "id": response_id,
+                "output": [{"type": "message", "content": [{"type": "output_text", "text": content}]}],
+            }
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise StudioError(f"OpenAI API returned HTTP {exc.code}: {detail[:1200]}") from exc
+        raise StudioError(f"{config['label']} API returned HTTP {exc.code}: {detail[:1200]}") from exc
     except urllib.error.URLError as exc:
-        raise StudioError(f"OpenAI API request failed: {exc.reason}") from exc
+        raise StudioError(f"{config['label']} API request failed: {exc.reason}") from exc
 
 
 def needs_citation_resolution(text: str) -> bool:
@@ -2731,6 +2936,7 @@ def call_openai(
     figure_states: dict[str, dict[str, Any]] | None = None,
     required_heading_style: str | None = None,
 ) -> tuple[str, str, list[str]]:
+    previous_response_id = reusable_response_id(previous_response_id)
     section_meta = SECTION_MAP[section]
     section_path = PAPER / "sections" / section_meta["file"]
     current_section = read_text(section_path, 24000)
@@ -3051,6 +3257,7 @@ def replace_manuscript_title_source(source: str, title: str) -> str:
 def call_openai_for_title(
     *, model: str, prompt: str, current_title: str, previous_response_id: str | None
 ) -> tuple[str, str]:
+    previous_response_id = reusable_response_id(previous_response_id)
     instructions = """You are an expert academic paper-title editor. Return exactly one
 plain-text title: no quotation marks, Markdown, commentary, alternatives, or LaTeX commands.
 Keep the title concise and venue-appropriate. Preserve the approved paper framing and claim
@@ -3170,7 +3377,8 @@ def compile_paper() -> CompileResult:
         command,
         cwd=PAPER,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=240,
         env=compile_environment,
     )
@@ -3179,6 +3387,324 @@ def compile_paper() -> CompileResult:
     if process.returncode:
         return CompileResult(False, tail or "LaTeX compilation failed.")
     return CompileResult(True, tail or "Compilation succeeded.")
+
+
+def full_draft_targets(state: dict[str, Any]) -> list[tuple[str, str]]:
+    """Return pending paragraphs in the project-owned batch writing order."""
+    targets: list[tuple[str, str]] = []
+    for section in batch_writing_order():
+        section_state = state.get("sections", {}).get(section, {})
+        for paragraph in section_state.get("paragraphs", []):
+            if not str(paragraph.get("accepted_text", "")).strip():
+                targets.append((section, str(paragraph.get("id", ""))))
+    return targets
+
+
+def full_draft_running(state: dict[str, Any]) -> bool:
+    return (state.get("full_draft_job") or {}).get("status") == "running"
+
+
+def paragraph_by_id(
+    state: dict[str, Any], section: str, paragraph_id: str
+) -> tuple[dict[str, Any], int]:
+    section_state = state.get("sections", {}).get(section)
+    if not isinstance(section_state, dict):
+        raise StudioError(f"全文生成找不到 section：{section}")
+    for index, paragraph in enumerate(section_state.get("paragraphs", [])):
+        if paragraph.get("id") == paragraph_id:
+            return paragraph, index
+    raise StudioError(f"全文生成找不到段落：{section}/{paragraph_id}")
+
+
+def accept_full_draft_paragraph(
+    state: dict[str, Any], section: str, paragraph: dict[str, Any], text: str
+) -> CompileResult:
+    """Transactionally accept one batch-generated paragraph into canonical LaTeX."""
+    section_state = state["sections"][section]
+    text = enforce_required_heading(
+        text, paragraph.get("heading"), paragraph.get("heading_style")
+    )
+    bound_artifacts = artifact_writing_context(
+        paragraph.get("artifacts", []), state.get("figures", {})
+    )
+    reference_error = artifact_reference_error(text, bound_artifacts)
+    if reference_error:
+        raise StudioError(reference_error)
+    if "[CITATION NEEDED]" in text:
+        raise StudioError("全文生成仍包含未解决的 [CITATION NEEDED]。")
+    unknown = sorted(citation_keys(text) - bibliography_keys())
+    if unknown:
+        raise StudioError("全文生成使用了未验证 citation keys：" + ", ".join(unknown))
+    prose_issues = latex_prose_issues(text)
+    if prose_issues:
+        raise StudioError("全文生成包含 LaTeX 风险字符：" + "; ".join(prose_issues))
+
+    target = PAPER / "sections" / SECTION_MAP[section]["file"]
+    target.parent.mkdir(parents=True, exist_ok=True)
+    existed = target.exists()
+    previous = target.read_text(encoding="utf-8") if existed else ""
+    bibliography_path = target.parent / "bibliography.tex"
+    previous_bibliography = read_text(bibliography_path, 10000)
+    paragraph["accepted_text"] = text
+    paragraph["candidate"] = None
+    section_source, accepted_section = render_section_source(
+        section, section_state, state["figures"], state["tables"]
+    )
+    temporary = target.with_suffix(".tex.tmp")
+    temporary.write_text(section_source, encoding="utf-8")
+    os.replace(temporary, target)
+    bibliography_text = (
+        "\\bibliography{references}\n"
+        if manuscript_citation_keys()
+        else "% Paper Studio enables the bibliography after the first accepted citation.\n"
+    )
+    bibliography_temporary = bibliography_path.with_suffix(".tex.tmp")
+    bibliography_temporary.write_text(bibliography_text, encoding="utf-8")
+    os.replace(bibliography_temporary, bibliography_path)
+    compile_result = compile_paper()
+    if not compile_result.ok:
+        paragraph["accepted_text"] = ""
+        if existed:
+            rollback = target.with_suffix(".tex.rollback")
+            rollback.write_text(previous, encoding="utf-8")
+            os.replace(rollback, target)
+        elif target.exists():
+            target.unlink()
+        bibliography_rollback = bibliography_path.with_suffix(".tex.rollback")
+        bibliography_rollback.write_text(previous_bibliography, encoding="utf-8")
+        os.replace(bibliography_rollback, bibliography_path)
+        compile_paper()
+        raise StudioError("LaTeX failed; batch paragraph rolled back.\n" + compile_result.message)
+
+    section_state["revision"] = int(section_state.get("revision", 0)) + 1
+    section_state["accepted_text"] = accepted_section
+    next_index = next_unaccepted_index(section_state["paragraphs"])
+    section_state["current_index"] = (
+        len(section_state["paragraphs"]) - 1
+        if next_index >= len(section_state["paragraphs"])
+        else next_index
+    )
+    state["compile"] = {
+        "status": "ok",
+        "message": compile_result.message,
+        "updated_at": int(time.time()),
+    }
+    return compile_result
+
+
+def update_full_draft_job(token: str, **updates: Any) -> dict[str, Any] | None:
+    with FULL_DRAFT_JOB_LOCK:
+        state = load_state()
+        job = state.get("full_draft_job") or {}
+        if job.get("token") != token or job.get("status") != "running":
+            return None
+        job.update(updates)
+        state["full_draft_job"] = job
+        save_state(state)
+        return job
+
+
+def full_draft_worker(token: str, model: str) -> None:
+    """Fill every pending paragraph through the normal GPT and LaTeX contracts."""
+    try:
+        initial = load_state()
+        targets = full_draft_targets(initial)
+        for ordinal, (section, paragraph_id) in enumerate(targets, start=1):
+            with FULL_DRAFT_JOB_LOCK:
+                state = load_state()
+                job = state.get("full_draft_job") or {}
+                if (
+                    token in CANCELLED_FULL_DRAFT_JOBS
+                    or job.get("token") != token
+                    or job.get("status") != "running"
+                ):
+                    return
+                paragraph, paragraph_index = paragraph_by_id(state, section, paragraph_id)
+                if str(paragraph.get("accepted_text", "")).strip():
+                    job.update(completed=ordinal, progress=int(ordinal * 100 / max(1, len(targets))))
+                    state["full_draft_job"] = job
+                    save_state(state)
+                    continue
+                section_state = state["sections"][section]
+                previous_response_id = section_state.get("previous_response_id")
+                current_bib_fingerprint = bibliography_fingerprint()
+                bibliography_update = ""
+                if (
+                    previous_response_id
+                    and section_state.get("bibliography_fingerprint")
+                    != current_bib_fingerprint
+                ):
+                    bibliography_update = bibliography_catalog()
+                figure_states = json.loads(json.dumps(state.get("figures", {})))
+                job.update(
+                    current_section=section,
+                    current_paragraph=paragraph_id,
+                    progress_message=f"正在生成 {SECTION_MAP[section]['title']} · {paragraph_id}",
+                )
+                state["full_draft_job"] = job
+                save_state(state)
+
+            response_id, text, citations_added = call_openai(
+                section=section,
+                model=model,
+                previous_response_id=previous_response_id,
+                purpose=paragraph["purpose"],
+                required_heading=paragraph.get("heading"),
+                required_heading_style=paragraph.get("heading_style"),
+                reference_paragraph=reference_excerpt(paragraph["reference_lines"]),
+                comment="",
+                current_text="",
+                bibliography_update=bibliography_update,
+                artifacts=[str(item) for item in paragraph.get("artifacts", [])],
+                figure_states=figure_states,
+            )
+
+            with FULL_DRAFT_JOB_LOCK:
+                state = load_state()
+                job = state.get("full_draft_job") or {}
+                if (
+                    token in CANCELLED_FULL_DRAFT_JOBS
+                    or job.get("token") != token
+                    or job.get("status") != "running"
+                ):
+                    return
+                paragraph, paragraph_index = paragraph_by_id(state, section, paragraph_id)
+                if str(paragraph.get("accepted_text", "")).strip():
+                    continue
+                section_state = state["sections"][section]
+                candidate_id = uuid.uuid4().hex
+                paragraph["candidate"] = {
+                    "id": candidate_id,
+                    "text": text,
+                    "purpose": paragraph["purpose"],
+                    "citations_added": citations_added,
+                    "created_at": int(time.time()),
+                }
+                paragraph.setdefault("history", []).append(
+                    {
+                        "candidate_id": candidate_id,
+                        "comment": "[DIRECT FULL DRAFT]",
+                        "text": text,
+                        "citations_added": citations_added,
+                        "created_at": int(time.time()),
+                    }
+                )
+                paragraph["history"] = paragraph["history"][-40:]
+                section_state["previous_response_id"] = response_id
+                section_state["bibliography_fingerprint"] = bibliography_fingerprint()
+                section_state["current_index"] = paragraph_index
+
+            # Compilation can take minutes. Do not hold the job lock: cancellation
+            # remains responsive and takes effect after this transactional paragraph.
+            accept_full_draft_paragraph(state, section, paragraph, text)
+
+            with FULL_DRAFT_JOB_LOCK:
+                latest = load_state()
+                latest["sections"][section] = state["sections"][section]
+                latest["compile"] = state["compile"]
+                latest["model"] = model
+                job = latest.get("full_draft_job") or {}
+                if job.get("status") == "running" and job.get("token") == token:
+                    job.update(
+                        completed=ordinal,
+                        progress=int(ordinal * 100 / max(1, len(targets))),
+                        progress_message=f"已写入并编译 {SECTION_MAP[section]['title']} · {paragraph_id}",
+                    )
+                latest["full_draft_job"] = job
+                save_state(latest)
+                if job.get("status") != "running" or job.get("token") != token:
+                    return
+
+        with FULL_DRAFT_JOB_LOCK:
+            state = load_state()
+            job = state.get("full_draft_job") or {}
+            if job.get("token") == token and job.get("status") == "running":
+                job.update(
+                    status="completed",
+                    token=None,
+                    progress=100,
+                    completed=job.get("total", len(targets)),
+                    progress_message="全文初稿已写入 LaTeX 并完成 PDF 编译，可继续逐段修改。",
+                    finished_at=int(time.time()),
+                )
+                state["full_draft_job"] = job
+                save_state(state)
+    except Exception as exc:
+        with FULL_DRAFT_JOB_LOCK:
+            state = load_state()
+            job = state.get("full_draft_job") or {}
+            if job.get("token") == token and job.get("status") == "running":
+                job.update(
+                    status="failed",
+                    token=None,
+                    progress_message=f"全文生成停在当前段落：{exc}",
+                    finished_at=int(time.time()),
+                )
+                state["full_draft_job"] = job
+                save_state(state)
+    finally:
+        with FULL_DRAFT_JOB_LOCK:
+            CANCELLED_FULL_DRAFT_JOBS.discard(token)
+
+
+def start_full_draft_job(model: str) -> tuple[str, dict[str, Any]]:
+    """Create the canonical batch-writing job for either HTTP or CLI execution."""
+    provider = active_llm_provider()
+    setup = api_setup_for_provider(provider)
+    if not setup["configured"]:
+        raise StudioError(
+            f"{setup['provider_label']} API 未配置。请在{API_KEY_SETUP_LOCATION}运行 "
+            f"{setup['setup_command']}，然后重新运行 {API_KEY_RESTART_COMMAND}。"
+        )
+    if not (PAPER / ".outline-approved").exists():
+        raise StudioError("Outline 尚未确认，不能直接生成全文。")
+    if not (PAPER / "main.tex").exists():
+        raise StudioError("paper/main.tex 不存在；请先由 paperwrite 建立论文 scaffold。")
+    model = model.strip()
+    if not model:
+        raise StudioError("模型名称不能为空。")
+    with FULL_DRAFT_JOB_LOCK:
+        state = load_state()
+        if full_draft_running(state):
+            raise StudioError("全文初稿任务已经在运行。")
+        targets = full_draft_targets(state)
+        if not targets:
+            raise StudioError("全部段落已经写入 LaTeX，无需再次批量生成。")
+        token = uuid.uuid4().hex
+        state["model"] = model
+        state["full_draft_job"] = {
+            "token": token,
+            "status": "running",
+            "server_instance": SERVER_INSTANCE_TOKEN,
+            "started_at": int(time.time()),
+            "finished_at": None,
+            "total": len(targets),
+            "completed": 0,
+            "progress": 0,
+            "current_section": "",
+            "current_paragraph": "",
+            "progress_message": "正在准备全文初稿…",
+        }
+        save_state(state)
+    return token, state
+
+
+def run_direct_full_draft(model: str) -> None:
+    """Generate all pending prose synchronously without opening the web UI."""
+    token, state = start_full_draft_job(model)
+    job = state["full_draft_job"]
+    print(f"Direct full draft: 0 / {job['total']} paragraphs")
+    full_draft_worker(token, model)
+    finished = load_state().get("full_draft_job") or {}
+    status = finished.get("status")
+    message = str(finished.get("progress_message") or status or "unknown status")
+    if status != "completed":
+        raise StudioError(message)
+    print(
+        f"PASS: direct full draft completed "
+        f"({finished.get('completed', 0)} / {finished.get('total', 0)} paragraphs)"
+    )
+    print(f"PDF: {PAPER / 'main.pdf'}")
 
 
 def shutil_which(command: str) -> str | None:
@@ -3201,7 +3727,7 @@ def paper_pdf_metadata() -> dict[str, Any]:
     if not pdf.exists() or not pdfinfo:
         return metadata
     process = subprocess.run(
-        [pdfinfo, str(pdf)], capture_output=True, text=True, timeout=30
+        [pdfinfo, str(pdf)], capture_output=True, encoding="utf-8", errors="replace", timeout=30
     )
     if process.returncode:
         return metadata
@@ -3414,7 +3940,8 @@ def run_checked(
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
+        encoding="utf-8",
+        errors="replace",
         start_new_session=True,
     )
     with FIGURE_PROCESS_LOCK:
@@ -3462,16 +3989,19 @@ def mechanism_source(
         "canvas_in": spec["canvas_in"],
         "image_size": spec["image_size"],
         "composition": (
-            "page-width horizontal model/method diagram; 2–4 visually distinct stages; "
+            "page-width ACL-style method schematic with 2–4 aligned regions; use flat modules, "
+            "tokens, paths, matrices, or small semantic glyphs only when they encode the method; "
             "keep all critical content in the central horizontal safe band because the "
             "landscape GPT Image draft will be cover-cropped to the paper aspect ratio"
             if wide
-            else "compact introduction/motivation illustration; one visual story with at "
-            "most two groups; readable at one-column width; avoid dense method detail"
+            else "compact ACL-style introduction/motivation schematic with 2–3 aligned regions; "
+            "use flat tokens, a small transformation cue, and at most one restrained semantic "
+            "glyph; pure white background and readable at one-column width"
         ),
         "final_output": (
-            "The exact GPT Image visual will be retained in the final paper PDF and used "
-            "as the PowerPoint background; do not design a placeholder flowchart."
+            "Design a restrained final-quality ACL paper figure whose modules, tokens, paths, "
+            "glyphs, and labels can be faithfully reconstructed as editable PowerPoint elements; "
+            "avoid both sparse placeholder flowcharts and decorative poster illustration."
         ),
     }
     pieces = [
@@ -3728,7 +4258,8 @@ GPT Image 草图绝对路径：{paths['draft']}
 6. 不得加入 raster/background/image 元素；最终每个对象都必须能在 PowerPoint 中单独编辑。
 """
     environment = dict(os.environ)
-    environment.pop("OPENAI_API_KEY", None)
+    for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
+        environment.pop(secret_name, None)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=f"agent-mechanism-{figure_id.lower()}-", dir=STATE_DIR
@@ -3789,8 +4320,9 @@ def generate_mechanism_prompt(
     prompt_instruction: str = "",
     current_prompt: str = "",
 ) -> tuple[str, str]:
-    if not os.environ.get("OPENAI_API_KEY"):
-        raise StudioError("OPENAI_API_KEY 未配置，无法生成机制图设计 Prompt。")
+    setup = api_setup_for_provider(str(state.get("llm_provider") or DEFAULT_PROVIDER))
+    if not setup["configured"]:
+        raise StudioError(f"{setup['provider_label']} API 未配置，无法生成机制图设计 Prompt。")
     paths = figure_paths(figure_id)
     FIGURE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     source = mechanism_source(
@@ -3801,7 +4333,7 @@ def generate_mechanism_prompt(
     )
     paths["source"].write_text(source, encoding="utf-8")
     figure_state = state["figures"][figure_id]
-    previous_response_id = figure_state.get("previous_response_id")
+    previous_response_id = reusable_response_id(figure_state.get("previous_response_id"))
     api_input = source
     if previous_response_id:
         format_match = re.search(
@@ -4426,7 +4958,8 @@ def create_data_figure_code_with_local_agent(
 {revision_block}
 """
     environment = dict(os.environ)
-    environment.pop("OPENAI_API_KEY", None)
+    for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
+        environment.pop(secret_name, None)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=f"agent-figure-{figure_id.lower()}-", dir=STATE_DIR
@@ -4739,7 +5272,8 @@ def ask_studio_local_agent(
 """
     before = chat_source_snapshot() if not confirmation_required else {}
     environment = dict(os.environ)
-    environment.pop("OPENAI_API_KEY", None)
+    for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
+        environment.pop(secret_name, None)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix="agent-chat-", dir=STATE_DIR
@@ -5201,7 +5735,8 @@ def create_data_figure_layout_with_local_agent(
 5. 无法表达的装饰性要求应忽略，不得增加 schema 外字段。
 """
     environment = dict(os.environ)
-    environment.pop("OPENAI_API_KEY", None)
+    for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
+        environment.pop(secret_name, None)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=f"agent-layout-{figure_id.lower()}-", dir=STATE_DIR
@@ -5472,6 +6007,20 @@ def compose_data_figure(
 
 
 def public_state(state: dict[str, Any]) -> dict[str, Any]:
+    provider = str(state.get("llm_provider") or DEFAULT_PROVIDER).strip().lower()
+    if provider not in PROVIDER_DEFAULT_MODELS:
+        provider = "openai"
+    api_key_setup = api_setup_for_provider(provider)
+    api_key_configured = bool(api_key_setup["configured"])
+    provider_options = [
+        {
+            "id": candidate,
+            "label": provider_configuration(candidate)["label"],
+            "configured": bool(api_setup_for_provider(candidate)["configured"]),
+            "default_model": PROVIDER_DEFAULT_MODELS[candidate],
+        }
+        for candidate in ("openai", "deepseek")
+    ]
     if EMPTY_PROJECT_MODE:
         return {
             "schema_version": state.get("schema_version", "1.2"),
@@ -5486,6 +6035,8 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
                 "loaded": False,
             },
             "model": state.get("model", DEFAULT_MODEL),
+            "llm_provider": provider,
+            "llm_provider_options": provider_options,
             "sections": {},
             "figures": [],
             "tables": [],
@@ -5498,9 +6049,17 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
                 "page_height_pt": 792.0,
             },
             "outline_confirmed": False,
-            "api_key_configured": bool(os.environ.get("OPENAI_API_KEY")),
+            "api_key_configured": api_key_configured,
+            "api_key_setup": api_key_setup,
             "agent_chat_history": [],
             "agent_chat_job": None,
+            "full_draft": {
+                "available": False,
+                "pending_paragraphs": 0,
+                "total_paragraphs": 0,
+                "writing_order": [],
+                "job": None,
+            },
         }
     result = json.loads(json.dumps(state))
     result["project"] = {
@@ -5511,6 +6070,19 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         "subtitle": str(PROJECT_METADATA.get("subtitle", "")),
         "config_file": PROJECT_CONFIG_FILE.relative_to(ROOT).as_posix(),
         "loaded": True,
+    }
+    total_paragraphs = sum(
+        len(section.get("paragraphs", []))
+        for section in state.get("sections", {}).values()
+    )
+    pending_paragraphs = len(full_draft_targets(state))
+    outline_confirmed = (PAPER / ".outline-approved").exists()
+    result["full_draft"] = {
+        "available": outline_confirmed and api_key_configured,
+        "pending_paragraphs": pending_paragraphs,
+        "total_paragraphs": total_paragraphs,
+        "writing_order": batch_writing_order(),
+        "job": result.pop("full_draft_job", None),
     }
     title_editor = result.setdefault("title_editor", {})
     title_editor["current_title"] = manuscript_title_display()
@@ -5574,8 +6146,11 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         "url": "/paper.pdf",
         **pdf_metadata,
     }
-    result["outline_confirmed"] = (PAPER / ".outline-approved").exists()
-    result["api_key_configured"] = bool(os.environ.get("OPENAI_API_KEY"))
+    result["outline_confirmed"] = outline_confirmed
+    result["llm_provider"] = provider
+    result["llm_provider_options"] = provider_options
+    result["api_key_configured"] = api_key_configured
+    result["api_key_setup"] = api_key_setup
     result["figures"] = figure_public_state(state)
     result["tables"] = table_public_state(state)
     return result
@@ -5655,7 +6230,9 @@ def reset_generated_paper(model: str) -> dict[str, Any]:
         if RUNNING_FIGURE_PROCESSES:
             raise StudioError("仍有绘图调用运行；请先用进度条右侧的停止按钮结束调用。")
 
+    current_provider = active_llm_provider()
     fresh = _default_state()
+    fresh["llm_provider"] = current_provider
     fresh["model"] = model
     sections_dir = PAPER / "sections"
     sections_dir.mkdir(parents=True, exist_ok=True)
@@ -5797,6 +6374,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.handle_accept(body)
             elif self.path == "/api/compile":
                 self.handle_compile()
+            elif self.path == "/api/full-draft/start":
+                self.handle_full_draft_start(body)
+            elif self.path == "/api/full-draft/cancel":
+                self.handle_full_draft_cancel()
+            elif self.path == "/api/llm-provider":
+                self.handle_llm_provider(body)
             elif self.path == "/api/reset-conversation":
                 self.handle_reset(body)
             elif self.path == "/api/reset-generated-paper":
@@ -5856,8 +6439,19 @@ class Handler(BaseHTTPRequestHandler):
             raise StudioError("Unknown manuscript section.")
         return section
 
+    def handle_llm_provider(self, body: dict[str, Any]) -> None:
+        state = load_state()
+        if full_draft_running(state):
+            raise StudioError("全文初稿正在生成；请先停止任务再切换 LLM API。")
+        provider = str(body.get("provider") or "").strip().lower()
+        if select_llm_provider(state, provider):
+            save_state(state)
+        self.send_json({"ok": True, "state": public_state(state)})
+
     def handle_title_generate(self, body: dict[str, Any]) -> None:
         state = load_state()
+        if full_draft_running(state):
+            raise StudioError("全文初稿正在生成；请等待完成或先停止任务。")
         editor = state["title_editor"]
         prompt = str(body.get("prompt", "")).strip()
         if not prompt:
@@ -5885,6 +6479,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"ok": True, "state": public_state(state)})
 
     def handle_title_save(self, body: dict[str, Any]) -> None:
+        if full_draft_running(load_state()):
+            raise StudioError("全文初稿正在生成；请等待完成或先停止任务。")
         title = normalize_plain_title(str(body.get("title", "")))
         result = save_manuscript_title(title)
         state = load_state()
@@ -5981,6 +6577,8 @@ class Handler(BaseHTTPRequestHandler):
     def handle_generate(self, body: dict[str, Any]) -> None:
         section = self.require_section(body)
         state = load_state()
+        if full_draft_running(state):
+            raise StudioError("全文初稿正在生成；请等待完成或先停止任务。")
         model = str(body.get("model") or state.get("model") or DEFAULT_MODEL).strip()
         section_state = state["sections"][section]
         paragraph = current_paragraph(section_state)
@@ -6053,6 +6651,8 @@ class Handler(BaseHTTPRequestHandler):
         submitted_text = str(body.get("candidate_text", "")).strip()
         base_text = str(body.get("base_text", ""))
         state = load_state()
+        if full_draft_running(state):
+            raise StudioError("全文初稿正在生成；请等待完成或先停止任务。")
         section_state = state["sections"][section]
         paragraph = current_paragraph(section_state)
         if paragraph is None:
@@ -6197,9 +6797,40 @@ class Handler(BaseHTTPRequestHandler):
         status = 200 if result.ok else 400
         self.send_json({"ok": result.ok, "message": result.message, "state": public_state(state)}, status=status)
 
+    def handle_full_draft_start(self, body: dict[str, Any]) -> None:
+        model = str(body.get("model") or DEFAULT_MODEL).strip()
+        token, state = start_full_draft_job(model)
+        threading.Thread(
+            target=full_draft_worker,
+            args=(token, model),
+            daemon=True,
+            name=f"full-draft-{token[:8]}",
+        ).start()
+        self.send_json({"ok": True, "state": public_state(state)}, status=202)
+
+    def handle_full_draft_cancel(self) -> None:
+        with FULL_DRAFT_JOB_LOCK:
+            state = load_state()
+            job = state.get("full_draft_job") or {}
+            token = str(job.get("token") or "")
+            if job.get("status") != "running" or not token:
+                raise StudioError("当前没有正在运行的全文生成任务。")
+            CANCELLED_FULL_DRAFT_JOBS.add(token)
+            job.update(
+                status="cancelled",
+                token=None,
+                progress_message="已请求停止；当前正在事务处理的段落完成后停止，之后可继续补齐未完成段落。",
+                finished_at=int(time.time()),
+            )
+            state["full_draft_job"] = job
+            save_state(state)
+        self.send_json({"ok": True, "state": public_state(state)})
+
     def handle_reset(self, body: dict[str, Any]) -> None:
         section = self.require_section(body)
         state = load_state()
+        if full_draft_running(state):
+            raise StudioError("全文初稿正在生成；不能同时重置 section 对话。")
         model = str(body.get("model") or state.get("model") or DEFAULT_MODEL).strip()
         if not model:
             raise StudioError("模型名称不能为空。")
@@ -6210,6 +6841,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"ok": True, "state": public_state(state)})
 
     def handle_reset_generated_paper(self, body: dict[str, Any]) -> None:
+        if full_draft_running(load_state()):
+            raise StudioError("请先停止全文初稿任务，再清空生成内容。")
         confirmation = str(body.get("project_id", "")).strip()
         if confirmation != PROJECT_ID:
             raise StudioError("项目 ID 不匹配；未删除任何生成内容。")
@@ -7149,6 +7782,22 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument(
+        "--direct-full-draft",
+        action="store_true",
+        help="Generate every pending paragraph and compile without opening Paper Studio.",
+    )
+    parser.add_argument(
+        "--model",
+        default="",
+        help="Model for --direct-full-draft (defaults to persisted state or PAPER_STUDIO_MODEL).",
+    )
+    parser.add_argument(
+        "--provider",
+        choices=("openai", "deepseek"),
+        default="",
+        help="Text API selected in the terminal before Paper Studio starts.",
+    )
+    parser.add_argument(
         "--validate-project",
         action="store_true",
         help="Validate project config, paragraph plan, and artifact bindings, then exit.",
@@ -7164,6 +7813,29 @@ def main() -> None:
     if args.validate_project:
         print("PASS: Paper Studio project preflight")
         return
+    if args.direct_full_draft:
+        try:
+            if not args.provider:
+                raise StudioError(
+                    "终端全文写作必须先询问使用哪个 API，然后显式传入 "
+                    "--provider openai 或 --provider deepseek。"
+                )
+            state = load_state()
+            if select_llm_provider(state, args.provider):
+                save_state(state)
+            model = str(args.model or state.get("model") or DEFAULT_MODEL).strip()
+            run_direct_full_draft(model)
+        except StudioError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            raise SystemExit(1) from None
+        return
+    if args.provider or args.model:
+        state = load_state()
+        if args.provider:
+            select_llm_provider(state, args.provider)
+        if args.model:
+            state["model"] = args.model.strip()
+        save_state(state)
     recover_interrupted_agent_chat_job()
     if not EMPTY_PROJECT_MODE:
         recover_interrupted_figure_jobs()

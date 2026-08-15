@@ -49,7 +49,7 @@ Paper Studio is a permanent, paper-independent shell. It must start even when `p
 5. Keep local-Agent and GPT roles explicit:
    - Use the local Codex Agent for reproducible plot authoring, safe layout interpretation, table editing, and the always-available help chat.
    - Use the section GPT conversation for prose, passing every bound artifact's title, purpose, caption, panels, label, and exact required LaTeX reference.
-   - Budget GPT inputs explicitly. Bootstrap outline, working abstract, style, bibliography, and section evidence once per persistent Responses chain; later turns use `previous_response_id` and send only mutable context. Title and mechanism-prompt revisions must not resend the full paper. Resend developer instructions because Responses API instructions are not inherited. Estimate text/reasoning tokens, citation web searches, GPT Image size/quality, and redraws separately; image redraws usually dominate the bill.
+   - Budget LLM inputs explicitly. Bootstrap outline, working abstract, style, bibliography, and section evidence once per provider conversation; later turns send only mutable context while that conversation is available. Re-bootstrap Chat Completions providers after a server restart instead of trusting a stale local conversation ID. Title and mechanism-prompt revisions must not resend the full paper unnecessarily. Resend developer instructions every turn. Estimate text/reasoning tokens, OpenAI citation web searches, GPT Image size/quality, and redraws separately; image redraws usually dominate the bill.
    - Let the local Codex Agent semantically classify each ordinary chat turn from the current message and recent history as `read_only`, `execute`, or `confirmation_required`; never select read versus write mode from a hard-coded action-verb list. Keep a deterministic server-side confirmation gate only for deletion, clearing, broad overwrite, and similarly hard-to-recover operations. Detect success across both editable source files and researcher-visible PNG/PDF/PPTX/SVG artifacts. Run Codex in its own process group and terminate the whole group on timeout so a reported failure cannot continue mutating files in the background.
    - Show a local-Agent stop button only while a chat job is running. Stopping must persist a `cancelled` job and an `已停止` assistant turn, terminate the whole Codex process group, and make the worker ignore every late result.
    - Give every accepted local-Agent chat turn exactly one terminal assistant bubble. On completion, failure, cancellation, timeout, or server-restart recovery, persist a nonempty assistant reply with the corresponding execution badge. Never leave a user bubble unanswered merely because the job state became terminal; mark recovered replies so repeated reloads cannot duplicate them.
@@ -64,11 +64,44 @@ Paper Studio is a permanent, paper-independent shell. It must start even when `p
 11. Table validation must enforce the configured float width: two-column tables use a matched `table*` environment and single-column tables use `table`. Keep this invariant alongside fixed label/caption and traceable numeric-cell validation across initial generation, Agent edits, saves, and approval.
    - Drive table Agent/edit/save/approve controls from the visible LaTeX textarea. Enable save only for a nonempty dirty value; keep clean approved `已插入正文` disabled, and expose a dirty approved table as `更新表格 → PDF` so the visible revision can be compiled transactionally.
 12. Use `gpt-5-nano` as the default text GPT API model for a new or empty Paper Studio state. Keep the model field editable and preserve `PAPER_STUDIO_MODEL` as an explicit deployment override; a persisted project selection still takes precedence over the default.
+13. Keep text-LLM API selection and key setup explicit without moving secrets into
+    browser state. Ask for OpenAI or DeepSeek in the terminal workflow and pass the choice at server startup; do not show a persistent provider/model settings panel in the webpage. Persist only the provider and model; public state
+    exposes only whether that provider's environment configuration is ready plus
+    safe setup commands. Switching providers resets incompatible response chains
+    and selects that provider's default model. Never render, accept, persist, log,
+    or return a key. Remove `OPENAI_API_KEY` and `DEEPSEEK_API_KEY`
+    from local-Agent subprocesses. Keep GPT Image explicitly OpenAI-only.
+14. Offer one optional `直接生成全文初稿` action inside the existing `正文`
+    workspace; do not add a fourth primary tab or a second manuscript state. The
+    action runs as a persisted background job, follows the project-configured
+    `batch_writing_order`, and sends every still-pending paragraph through the
+    same GPT, citation, LaTeX-safety, artifact-reference, Accept, and compile
+    contracts as interactive writing. It never overwrites accepted prose. A
+    failure or cancellation preserves completed paragraphs and can resume from
+    the remaining set. Disable conflicting prose/title/reset mutations while it
+    runs, keep reading/navigation available, and expose progress plus a stop
+    action. The engine must not infer a scientific writing order from section
+    names; `$paperwrite` owns and writes that order into project data.
+    The same job must also be available as
+    `python3 -m paper_studio.server --direct-full-draft --provider <openai|deepseek>`, which runs synchronously
+    and exits without starting the HTTP server or opening a browser. CLI and UI
+    must share the exact state and worker; do not maintain a second batch writer.
+    Require the terminal workflow to ask the researcher which of the two APIs to
+    use; reject direct mode when `--provider` is omitted.
+    When `$paperwrite` uses this terminal entry point, a same-project Paper Studio
+    server and browser page remain live in parallel. Atomically persist the job
+    revision after every paragraph's successful Accept-and-compile transaction,
+    before starting the next paragraph. The server's public-state read path must
+    notice revisions written by the external CLI process instead of serving a stale
+    in-memory snapshot. Within one normal polling cycle, the open page must update
+    current section/paragraph, completed/total counts, accepted prose/navigation,
+    and the compiled vector-PDF revision without a reload. Never defer web-state or
+    PDF synchronization until the whole draft finishes.
 
 ## Workspace data map
 
 - `paper_studio/` is the fixed reusable web engine: server, frontend assets, empty-project shell, and PDF/PPTX composition implementation. It exists and starts independently of any paper. Do not regenerate or fork it for each paper, and do not put project-specific section, figure, table, branding, or result definitions there.
-- `paper/paper_studio.json` is the single project configuration: stable project ID, identity/venue, ordered sections and LaTeX filenames, result bindings, Figure/Table definitions and order, typed data-grid mappings, mechanism shape-spec paths, and explicit `paths.main`, `paths.reference`, and `paths.metrics`. Starting another paper means supplying a new config and project data—not rewriting the web application. Change `project.id` for a genuinely different paper so persisted runtime state cannot leak across projects; preserve it for ordinary config revisions within the same paper.
+- `paper/paper_studio.json` is the single project configuration: stable project ID, identity/venue, ordered sections and LaTeX filenames, project-owned `batch_writing_order`, result bindings, Figure/Table definitions and order, typed data-grid mappings, mechanism shape-spec paths, and explicit `paths.main`, `paths.reference`, and `paths.metrics`. Starting another paper means supplying a new config and project data—not rewriting the web application. Change `project.id` for a genuinely different paper so persisted runtime state cannot leak across projects; preserve it for ordinary config revisions within the same paper.
 - The fixed `paper_studio/` product must contain no paper title, method name, benchmark name, metric path, or project-specific mechanism fallback. Generic placeholders and config-driven fallback shapes are allowed; every paper-specific label, plotting program, or shape specification belongs under `paper/` or `results/`.
 - `paper/paragraph_plan.json` is the canonical paragraph/subsection and artifact-binding plan. `paper/working_abstract.txt`, `paper/reference_stylization_jailbreak.txt`, and `paper/references.bib` are writing/reference inputs.
 - `paper/sections/*.tex` contains accepted rendered manuscript text; `paper/main.tex` and `paper/main.pdf` are the manuscript entry point and compiled output.

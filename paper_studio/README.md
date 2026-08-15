@@ -2,14 +2,27 @@
 
 Local, section-aware drafting UI for `$paperwrite`.
 
+Choose OpenAI or DeepSeek in the terminal, then configure the matching environment
+before starting the server. The browser shows runtime status but no persistent API
+settings panel:
+
 ```bash
-export OPENAI_API_KEY=...
-python3 -m paper_studio.server
+# OpenAI
+export OPENAI_API_KEY="粘贴你的 API key"
+
+# DeepSeek
+export DEEPSEEK_API_KEY="粘贴你的 API key"
+
+python3 -m paper_studio.server --provider openai
+# or: --provider deepseek
 ```
 
 The system browser opens <http://127.0.0.1:8765> automatically unless startup
-explicitly includes `--no-browser`. The API key remains in the server process
-and is never sent to the browser.
+explicitly includes `--no-browser`. API keys remain in the server process
+and is never sent to the browser. Enter it in the local terminal that launches
+Paper Studio, not in chat, a repository file, or a browser field. If the server
+was already running without the selected key, stop it and restart it after the export.
+Changing the provider at startup resets incompatible conversation IDs. GPT Image remains OpenAI-only.
 
 The application under `paper_studio/` is a reusable engine. Project-specific
 identity, section order and LaTeX filenames, result bindings, Figure/Table
@@ -30,16 +43,41 @@ pending or candidate paragraphs may be edited in any order, accepted paragraphs
 remain selectable revision bases, and accepted prose is always assembled into
 LaTeX in the approved plan order.
 
-Each manuscript section stores its own `previous_response_id` in
+After the outline is approved, **直接生成全文初稿** provides an optional batch
+path inside the existing **正文** workspace. It uses the same LLM API, paragraph
+plan, citation verification, result bindings, transactional LaTeX writes, and
+compile checks as interactive drafting. It processes only unaccepted paragraphs,
+in the `batch_writing_order` declared by `paper/paper_studio.json`; accepted prose
+is never overwritten. Progress is persisted, the job can be stopped after the
+current paragraph transaction, and a later click resumes from the remaining
+paragraphs. This is a writing mode, not a separate paper state or a fourth tab.
+
+To skip the web interface entirely, run the same batch path from the terminal:
+
+```bash
+python3 -m paper_studio.server --direct-full-draft --provider openai
+# or: --provider deepseek
+```
+
+An explicit model override is optional: `--model gpt-5-nano`. The command exits
+only after every pending paragraph has passed the normal write-and-compile
+transaction, or reports the paragraph where the job failed. Opening Paper Studio
+later shows the same accepted paragraphs and PDF because CLI and UI share one
+canonical state.
+
+Each manuscript section stores its own provider-specific conversation ID in
 `paper/.paper_studio/state.json`. The first request in a section bootstraps the
-approved outline, the Writing Style section of `researcher-profile/PROFILE.md`, and complete BibTeX catalog. Later requests rely
-on that conversation state and send only changing paragraph context. Developer
-instructions are still sent on every request because Responses API instructions
-are not inherited through `previous_response_id`.
+approved outline, the Writing Style section of `researcher-profile/PROFILE.html`,
+and the complete BibTeX catalog. OpenAI uses server-hosted Responses chains;
+Chat Completions providers keep the equivalent history in the running Studio
+process and safely re-bootstrap after a restart. Developer instructions are sent
+on every request.
 
 If a generated paragraph contains `[CITATION NEEDED]` or an unknown citation key,
-the server continues the same section conversation with the Responses API
-`web_search` tool. It accepts only structured citation records whose scholarly
+the OpenAI provider can continue the same section conversation with the Responses
+API `web_search` tool. DeepSeek reports that this
+OpenAI-only citation-verification step requires switching providers. The resolver
+accepts only structured citation records whose scholarly
 source URL appears in the search response, appends their BibTeX entries to
 `paper/references.bib`, and returns the revised paragraph. Unverified citations
 remain explicit placeholders.
@@ -77,7 +115,7 @@ text boxes with Agent-selected font sizes. The final vector PDF is compiled from
 same validated geometry, so composition never triggers a macOS PowerPoint permission
 dialog. Only that composed PDF/PPTX pair can be approved for insertion. A
 missing result dimension stays visibly locked instead of being fabricated, and
-`OPENAI_API_KEY` is removed from the Agent subprocess.
+All supported LLM API keys are removed from the Agent subprocess.
 
 The **Tables** workspace has a separate editable local-Agent Prompt. Initial
 generation and later result-related revisions are handled by the installed local
@@ -88,22 +126,21 @@ generated LaTeX remains directly editable before approval.
 For free-form revisions, the table workspace also exposes **给本地 Agent 的修改
 Prompt**. That action launches the installed `codex exec` CLI in an ephemeral,
 read-only sandbox, with the current LaTeX and traceable result matrix. Paper Studio
-removes `OPENAI_API_KEY` from that subprocess and does not call the Responses API.
+removes all supported LLM API keys from that subprocess and does not call a text LLM API.
 The returned table must retain its fixed label and caption and compile successfully
 before it replaces the draft.
 
-Install local rendering dependencies before using figure actions:
+Install the repository's frozen dependencies before using figure actions or tests:
 
 ```bash
-python3 -m pip install -r paper_studio/requirements.txt
+make setup
 ```
 
-Install the separate regression-test dependencies and Chromium once before
-running the real-browser matrix:
+Run the complete unit suite through the same root entry point, then run the
+real-browser matrix when changing web behavior:
 
 ```bash
-python3 -m pip install -r paper_studio/requirements-dev.txt
-python3 -m playwright install chromium
+make test
 python3 .agents/skills/paperstudio/scripts/browser_matrix.py --url http://127.0.0.1:8765
 ```
 
