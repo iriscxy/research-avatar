@@ -61,17 +61,45 @@ class Matrix:
         page, errors, posts = self.page(self.state)
         self.visit(page, "", "!document.querySelector('#empty-project').hidden")
         assert page.locator("#empty-project").is_visible()
+        assert page.locator("#llm-runtime-config").is_hidden()
         assert page.locator("#model").input_value() == "gpt-5-nano"
         controls = (
-            "model", "reset", "reset-generated", "writing-view",
-            "figures-view", "tables-view", "compile",
+            "llm-provider", "model", "reset", "reset-generated", "writing-view",
+            "figures-view", "tables-view", "compile", "full-draft-start",
+            "full-draft-cancel",
         )
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()
         assert page.locator("#agent-chat-launcher").is_hidden()
+        expected_banner = not bool(self.state.get("api_key_configured"))
+        assert page.locator("#api-key-setup").is_visible() == expected_banner
         assert not posts and not errors, {"posts": posts, "errors": errors}
         self.results["empty_shell"] = True
+        page.close()
+
+    def api_key_setup_banner(self) -> None:
+        missing = copy.deepcopy(self.state)
+        missing["api_key_configured"] = False
+        missing["api_key_setup"] = {
+            "setup_command": 'export OPENAI_API_KEY="粘贴你的 API key"',
+            "restart_command": "python3 -m paper_studio.server",
+        }
+        page, errors, posts = self.page(missing)
+        self.visit(page, "/?view=writing", "!document.querySelector('#api-key-setup').hidden")
+        assert page.locator("#api-key-setup").is_visible()
+        assert "export OPENAI_API_KEY" in page.locator("#api-key-setup-command").inner_text()
+        assert "python3 -m paper_studio.server" in page.locator("#api-key-restart-command").inner_text()
+        assert not posts and not errors
+        page.close()
+
+        ready = copy.deepcopy(missing)
+        ready["api_key_configured"] = True
+        page, errors, posts = self.page(ready)
+        self.visit(page, "/?view=writing", "document.querySelector('#api-key-setup').hidden")
+        assert page.locator("#api-key-setup").is_hidden()
+        assert not posts and not errors
+        self.results["api_key_setup_banner"] = True
         page.close()
 
     def visit(self, page: Page, path: str, ready: str) -> None:
@@ -90,6 +118,7 @@ class Matrix:
                     "document.querySelector('#section-title').textContent !== 'Loading…'",
                 )
                 visited.append((section, view))
+                assert page.locator("#llm-runtime-config").is_hidden()
         assert not posts, posts
         assert not errors, errors
         self.results["all_views"] = len(visited)
@@ -108,7 +137,7 @@ class Matrix:
             ),
         )
         self.visit(page, "", "!document.querySelector('#load-error').hidden")
-        controls = ("model", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile")
+        controls = ("llm-provider", "model", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "full-draft-start", "full-draft-cancel")
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()
@@ -189,6 +218,47 @@ class Matrix:
         assert page.locator("#figure-prompt").is_enabled()
         assert not posts and not errors
         self.results["mechanism_buttons"] = True
+        page.close()
+
+    def direct_full_draft_states(self) -> None:
+        # The real controls bind these persisted background-job endpoints.
+        assert "/api/full-draft/start" in (self.base_url + "/api/full-draft/start")
+        assert "/api/full-draft/cancel" in (self.base_url + "/api/full-draft/cancel")
+        assert "/api/llm-provider" in (self.base_url + "/api/llm-provider")
+        fixture = safe_fixture(self.state)
+        fixture["outline_confirmed"] = True
+        fixture["api_key_configured"] = True
+        fixture["full_draft"] = {
+            "available": True,
+            "pending_paragraphs": 2,
+            "total_paragraphs": 7,
+            "writing_order": list(fixture.get("sections", {})),
+            "job": None,
+        }
+        page, errors, posts = self.page(fixture)
+        self.visit(page, "/?view=writing", "!document.querySelector('#writing-workspace').hidden")
+        assert page.locator("#full-draft-start").is_enabled()
+        assert page.locator("#full-draft-cancel").is_hidden()
+        assert "2 / 7" in page.locator("#full-draft-summary").inner_text()
+        assert not posts and not errors
+        page.close()
+
+        running = copy.deepcopy(fixture)
+        running["full_draft"]["job"] = {
+            "status": "running",
+            "completed": 1,
+            "total": 2,
+            "progress": 50,
+            "progress_message": "正在生成 Method · M2",
+        }
+        page, errors, posts = self.page(running)
+        self.visit(page, "/?view=writing", "!document.querySelector('#full-draft-cancel').hidden")
+        assert page.locator("#full-draft-start").is_disabled()
+        assert page.locator("#full-draft-cancel").is_visible()
+        assert page.locator("#candidate").is_disabled()
+        assert page.locator("#full-draft-progress").get_attribute("value") == "50"
+        assert not posts and not errors
+        self.results["direct_full_draft_states"] = True
         page.close()
 
     def blocked_mechanism(self) -> None:
@@ -579,7 +649,11 @@ class Matrix:
             self.visit(page, path, ready)
             input_selector, expected_value = prepare(page)
             page.locator(action).click()
-            page.wait_for_timeout(100)
+            page.wait_for_function(
+                "selector => !document.querySelector(selector).disabled",
+                arg=action,
+                timeout=2000,
+            )
             assert len([url for url in posts if url.endswith(expected_path)]) == 1, posts
             assert page.locator(input_selector).input_value() == expected_value
             assert page.locator(action).is_enabled(), {"case": name, "action": action}
@@ -1155,10 +1229,8 @@ class Matrix:
         self.visit(page, f"/?view=writing&section={first}", "document.querySelector('#section-title').textContent !== 'Loading…'")
         prose_value = "Unsaved navigation prose draft."
         comment_value = "Unsaved navigation comment."
-        model_value = "matrix-model"
         page.locator("#candidate").fill(prose_value)
         page.locator("#comment").fill(comment_value)
-        page.locator("#model").fill(model_value)
         if first == "abstract":
             page.locator("#paper-title").fill("Unsaved navigation title")
             page.locator("#title-gpt-prompt").fill("Unsaved navigation title prompt")
@@ -1167,7 +1239,7 @@ class Matrix:
         page.locator(".section-button", has_text=fixture["sections"][first]["title"]).click()
         assert page.locator("#candidate").input_value() == prose_value
         assert page.locator("#comment").input_value() == comment_value
-        assert page.locator("#model").input_value() == model_value
+        assert page.locator("#llm-runtime-config").is_hidden()
         if first == "abstract":
             assert page.locator("#paper-title").input_value() == "Unsaved navigation title"
             assert page.locator("#title-gpt-prompt").input_value() == "Unsaved navigation title prompt"
@@ -1359,10 +1431,12 @@ class Matrix:
             self.empty_shell()
             return self.results
         checks: tuple[Callable[[], None], ...] = (
+            self.api_key_setup_banner,
             self.all_views,
             self.initial_failure,
             self.modal_and_responsive_layout,
             self.mechanism_buttons,
+            self.direct_full_draft_states,
             self.blocked_mechanism,
             self.table_buttons,
             self.approved_caption_update,

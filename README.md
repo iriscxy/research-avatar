@@ -1,14 +1,12 @@
-# Research Buddy：个性化科研助手
+# Research Avatar：个性化科研助手
 
-Research Buddy 是一套面向**有经验研究者**的轻量级、个性化科研助手。它不是全自动的 AutoResearch 系统，也不会替你做研究判断——
+Research Avatar 是一套面向**有经验研究者**的轻量级、个性化科研助手。它不是全自动的 AutoResearch 系统，也不会替你做研究判断——
 
 > **机械性工作交给助手加速，关键研究决策由你完成；而"怎么加速"，全部围绕你自己的研究品味、写作风格和实验习惯来定制。**
 
 ---
 
-## Live Demo
-
-**[打开 Live Demo →](https://research-buddy-demo.pages.dev/)**
+[Live Demo →](https://research-avatar-demo.pages.dev/)
 
 ---
 
@@ -27,10 +25,11 @@ Research Buddy 是一套面向**有经验研究者**的轻量级、个性化科�
 
 ### ✍️ 论文写作
 1. **可交互论文工作台**——按 section 分对话逐段写作、改图、编译，随时看到 PDF 效果；
-2. **写作风格个性化**——套用你在目标会议发表过的论文作结构参考，语气和篇章组织都贴你自己的风格；
-3. **自动化可编辑图表**——intro/motivation 图和 model/method 图支持 GPT Image 构图、重绘及可编辑 PPT/PDF 导出；实验分析图由代码读取真实结果生成，不造假数据。
+2. **LLM API 自然语言写作**——Paper Studio 调用 LLM API 起草和修改正文，写作比直接走 Coding Agent 的代码生成路径更连贯、自然；Coding Agent 继续负责检索、实验、代码、文件整理和编译；
+3. **写作风格个性化**——套用你在目标会议发表过的论文作结构参考，语气和篇章组织都贴你自己的风格；
+4. **自动化可编辑图表**——intro/motivation 图和 model/method 图支持 GPT Image 构图、重绘及可编辑 PPT/PDF 导出；实验分析图由代码读取真实结果生成，不造假数据。
 
-| 对比维度 | 开源 AutoResearch 常见侧重 | Research Buddy 的侧重 |
+| 对比维度 | 开源 AutoResearch 常见侧重 | Research Avatar 的侧重 |
 |---|---|---|
 | 🧭 人机分工 | 强调端到端自动探索 | **关键节点停下，由研究者拍板** |
 | 🎭 个性化依据 | 以任务上下文和通用配置为主 | **Scholar + 工作习惯生成个人研究画像** |
@@ -51,6 +50,35 @@ $profileconstruct 使用 ~/Downloads/scholar_profile.html
 
 你可以下载自己的 Scholar 主页，也可以下载希望模仿其研究品味和论文结构的研究者主页。
 
+论文写作，以及用户明确要求把 Literature Survey 翻译成其他语言时，需要
+LLM API。终端流程会先询问本次使用 OpenAI 还是 DeepSeek；只需在运行命令
+和启动 Paper Studio 的同一个本机终端中配置所选服务的 Key：
+
+```bash
+# 使用 OpenAI 时需要
+export OPENAI_API_KEY="粘贴你的 API key"
+
+# 使用 DeepSeek 时需要
+export DEEPSEEK_API_KEY="粘贴你的 API key"
+```
+
+启动写作流程时先在终端选择 OpenAI 或 DeepSeek；Paper Studio 不再显示常驻 API 设置窗口。正文、标题、
+Caption 和机制图设计 Prompt 使用启动时选定的文本 API；GPT Image 绘图仍使用
+OpenAI，因此需要绘图时仍需配置 `OPENAI_API_KEY`。
+
+用户明确要求翻译 Survey 时，终端同样会先询问使用 OpenAI 还是 DeepSeek；
+未要求翻译时不会调用翻译 API。
+
+```bash
+# 选择 OpenAI
+export OPENAI_API_KEY="粘贴你的 API key"
+
+# 选择 DeepSeek
+export DEEPSEEK_API_KEY="粘贴你的 API key"
+```
+
+API Key 只保存在本机终端环境变量中，不要输入聊天、写入仓库或保存在浏览器里。未明确请求翻译时，`$researchlit` 不会调用任何翻译 API，也不会因为对话语言自动翻译。
+
 ---
 
 ## 推荐使用方式
@@ -70,7 +98,7 @@ $profileconstruct 使用 ~/Downloads/scholar_profile.html
 个性化的入口是一份权威画像：
 
 ```text
-researcher-profile/PROFILE.md
+researcher-profile/PROFILE.html
 ```
 
 **数据来源**：`$profileconstruct` 会读取你的 Google Scholar 论文列表，并结合可用的 coding-agent 历史提取实验环境和工作习惯。
@@ -94,7 +122,8 @@ researcher-profile/PROFILE.md
 
 ### 论文写作：
 
-**1. 可交互论文工作台**——`$paperwrite` 写作前先把大纲写进 `paper/outline.txt` 供你确认，承接 `$expplan` 中已批准的论文骨架。确认后会自动打开本地网页写作界面：左侧是可编辑的论文正文，右侧实时预览。写作的模型可自由配置 GPT、Claude 等 LLM API，走的是自然语言撰写而非 Codex 这类编程工具的代码生成路径。每个 section 有独立对话，可选参考段落、写 comment 修改，接受后自动同步 LaTeX、编译 PDF，全程不用离开这个界面手动改 `.tex`。
+**1. 可交互论文工作台**——`$paperwrite` 写作前先把大纲写进 `paper/outline.txt` 供你确认，承接 `$expplan` 中已批准的论文骨架。确认后会自动打开本地网页写作界面：左侧是可编辑的论文正文，右侧实时预览。
+每个 section 有独立对话，可选参考段落、写 comment 修改，接受后自动同步 LaTeX、编译 PDF，全程不用离开这个界面手动改 `.tex`。
 
 **2. 论文写作风格个性化**——以你在目标会议发表过的一篇论文作结构参考（章节/长度/图表布局），套用画像中的 Writing Style，自引 ≤3 篇，并比对你过往摘要防止无意自我重复。完整稿会自动检查理论是否统一、引用是否可靠、claim 是否能追溯到实验结果，以及全文逻辑是否闭环。
 

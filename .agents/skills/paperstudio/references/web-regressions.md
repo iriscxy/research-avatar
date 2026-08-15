@@ -1,5 +1,52 @@
 # Paper Studio product and regression contract
 
+## LLM API setup
+
+- The terminal writing workflow selects only OpenAI or DeepSeek before launching
+  Paper Studio; the webpage shows runtime status but no persistent API/model settings panel.
+  Read their secrets only from `OPENAI_API_KEY` or `DEEPSEEK_API_KEY`.
+- When the selected provider is not configured, show one prominent page-level banner that says the key is
+  entered in the local terminal that starts Paper Studio, gives the export and
+  restart commands, and warns against pasting the secret into chat, repository
+  files, or browser storage.
+- Public state and the DOM may expose configuration status and instructions,
+  never the key value. GPT endpoint errors must repeat the actionable setup
+  location instead of returning a generic English missing-key error.
+- Persist the selected provider and editable model. Switching providers resets
+  section, title, and figure-Prompt conversation IDs and applies the provider's
+  default model. Never send a response ID from one provider to another.
+- GPT Image remains OpenAI-only and continues to require `OPENAI_API_KEY`.
+
+## Direct full-draft mode
+
+- Keep `直接生成全文初稿` inside the existing `正文` workspace; it is an
+  alternate execution mode, not a fourth tab and not a second paper project.
+- Require the confirmed outline, project scaffold, and configured LLM API key.
+  Follow `paper_studio.json.batch_writing_order`; never infer writing policy from
+  reusable section-name heuristics.
+- Fill only pending paragraphs. Preserve every accepted paragraph exactly and
+  reuse the ordinary GPT, citation verification, LaTeX-safety, artifact binding,
+  transactional write, and compile path for each new paragraph.
+- Persist running/completed/failed/cancelled progress. Stop requests take effect
+  after the paragraph currently in a transactional API/compile step; completed
+  paragraphs stay accepted and retry resumes from the remaining set.
+- While running, disable conflicting prose, title, conversation-reset, and
+  generated-content reset mutations in both DOM and server endpoints. Keep the
+  paper readable and show the exact current section/paragraph plus completed and
+  total counts.
+- `python3 -m paper_studio.server --direct-full-draft --provider <openai|deepseek>` is the no-interface entry
+  point to the same canonical worker. It must not bind a port or open a browser;
+  success means all pending paragraphs were transactionally compiled, while
+  failure exits with the persisted paragraph-level error and preserves progress.
+- Direct mode must reject an omitted provider so the terminal workflow asks the
+  researcher instead of inferring a choice from available environment keys.
+- Exercise that CLI while a same-project Paper Studio page is already open. After
+  every completed paragraph, the server must detect the externally persisted state
+  revision (never return a stale process-local cache), and the browser must show the
+  new current paragraph, completed count, accepted text/navigation state, and PDF
+  revision within one polling cycle without a manual reload. Assert an intermediate
+  update before CLI completion so an end-only refresh cannot pass this regression.
+
 ## Data figures
 
 - Generate and show every requested plot as a PDF candidate. Do not expose generated Python source or a plotting-code block in the browser.

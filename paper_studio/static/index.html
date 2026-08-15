@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Paper Studio</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/static/style.css?v=20260805.25">
+  <link rel="stylesheet" href="/static/style.css?v=20260815.3">
 </head>
 <body>
   <div class="app">
@@ -17,8 +17,15 @@
       </div>
       <div id="sections" class="sections"></div>
       <div class="sidebar-foot">
-        <label for="model">OpenAI model</label>
-        <input id="model" value="gpt-5-nano" disabled>
+        <div id="llm-runtime-config" hidden aria-hidden="true">
+          <label for="llm-provider">正文写作 API</label>
+          <select id="llm-provider" disabled tabindex="-1">
+            <option value="openai">OpenAI</option>
+            <option value="deepseek">DeepSeek</option>
+          </select>
+          <label for="model">模型</label>
+          <input id="model" value="gpt-5-nano" disabled tabindex="-1">
+        </div>
         <button id="reset" class="ghost" disabled>重置当前 section 对话</button>
         <button id="reset-generated" class="ghost danger" disabled>清空生成内容</button>
       </div>
@@ -42,6 +49,18 @@
         </div>
       </header>
 
+      <section id="api-key-setup" class="api-key-setup" role="alert" hidden>
+        <div>
+          <strong>写论文需要 LLM API</strong>
+          <span id="api-key-setup-description">请为当前选择的正文写作 API 在启动 Paper Studio 的本机终端配置；不要把真实 key 输入聊天、提交到仓库或保存在浏览器中。GPT Image 仍单独使用 OpenAI。</span>
+        </div>
+        <div class="api-key-commands">
+          <code id="api-key-setup-command">export OPENAI_API_KEY="粘贴你的 API key"</code>
+          <span>然后停止当前服务并重新运行</span>
+          <code id="api-key-restart-command">python3 -m paper_studio.server</code>
+        </div>
+      </section>
+
       <section id="empty-project" class="empty-project" hidden>
         <div>
           <span class="eyebrow dark">EMPTY STUDIO</span>
@@ -61,6 +80,20 @@
 
       <div id="writing-workspace" class="editor-grid" hidden>
         <section class="editor">
+          <section id="full-draft-card" class="full-draft-card" aria-labelledby="full-draft-title">
+            <div class="full-draft-copy">
+              <strong id="full-draft-title">直接生成全文初稿</strong>
+              <span id="full-draft-summary">复用当前计划、结果、reference 与逐段校验，只补齐尚未写入的段落。</span>
+            </div>
+            <div class="full-draft-actions">
+              <button id="full-draft-start" class="primary" type="button" disabled>直接生成全文初稿</button>
+              <button id="full-draft-cancel" class="danger" type="button" hidden disabled>⏸ 停止</button>
+            </div>
+            <div id="full-draft-progress-row" class="full-draft-progress" hidden>
+              <progress id="full-draft-progress" max="100" value="0"></progress>
+              <span id="full-draft-progress-text" aria-live="polite"></span>
+            </div>
+          </section>
           <details id="title-editor" class="title-editor" open hidden>
             <summary>
               <span>论文标题</span>
@@ -356,6 +389,6 @@
       </div>
     </section>
   </div>
-  <script src="/static/app.js?v=20260805.88"></script>
+  <script src="/static/app.js?v=20260815.2"></script>
 </body>
 </html>
