@@ -172,13 +172,24 @@ Goal panel moves downward to the newly proposed/unlocked goal. There must be
 exactly one nested Current Goal whenever `active_goal` or `proposed_goal_id` is
 set, and its `data-current-goal-id` must equal that state ID.
 
-For every completed goal that owns paper-facing acquisition targets, render a
-`Completed Goal Evidence` block inside that same goal card. Copy the matching
-approved artifact/table snapshot from `05_EXP_RESULT.html`; never hand-author a
-second numeric source. Figure snapshots include their adjacent source-data
-table, and table snapshots include the result table. Every filled number keeps
+For each paper-facing artifact, render exactly one `Completed Goal Evidence`
+block under the earliest goal in run-plan order whose `artifact_ids` names that
+artifact. If later goals fill additional cells or panels of the same table or
+figure, regenerate and update that original block; never repeat the artifact
+under the later goals. Copy the matching approved artifact/table snapshot from
+`05_EXP_RESULT.html`; never hand-author a second numeric source. Figure
+snapshots include their adjacent source-data table, and table snapshots include
+the result table. Every filled number keeps
 its `data-result-id` and links to
-`05_EXP_RESULT.html#provenance-<result_id>`. The copied value also retains a
+`/artifact/results#provenance-<result_id>` when embedded in the Research Studio
+Run Plan (the result page itself uses the same-page `#provenance-<result_id>`
+anchor). Never use `05_EXP_RESULT.html#...` from `/artifact/runplan`, because
+the browser resolves that to the nonexistent `/artifact/05_EXP_RESULT.html`.
+Also attach `data-local-result-href="05_EXP_RESULT.html#provenance-<result_id>"`
+and activate it only under `file:` so a researcher who opens
+`reports/04_RUN_PLAN.html` directly reaches the sibling results file instead of
+the invalid filesystem-root `/artifact/results` path.
+The copied value also retains a
 compact `data-provenance-summary` plus matching native `title`: mouse hover or
 keyboard focus previews its raw source, calculation, actual command, and
 verification, while click opens the complete record in `05`. Regeneration must fail if a scoped
@@ -187,11 +198,11 @@ target is missing, pending, lacks a result ID, or lacks its provenance link.
 Treat `04_RUN_PLAN.html` as the single user-facing experiment-execution page in
 Research Studio. Do not expose `05_EXP_RESULT.html` as a second artifact button
 there: `05` remains the cumulative result/provenance backend reached by clicking
-a value in an embedded Goal snapshot. When different goals own different panels
-of one figure, validate and render each panel independently. As soon as one goal
-has filled and verified all source cells for its panel, generate that panel's
-plot and show its source table plus plot under the completed goal; do not wait
-for unrelated panels owned by later goals.
+a value in an embedded Goal snapshot. When different goals fill different
+panels of one figure, validate and generate each completed panel independently,
+but keep the evolving source tables and plots together in the figure's one block
+under its earliest owning goal. Do not repeat the same figure under each
+producing goal or wait for unrelated panels before updating that one block.
 
 ## 3. Write one durable webpage with embedded state
 
@@ -329,7 +340,7 @@ Store it as embedded `run-plan-state.proposed_goal_id`, then print one self-cont
 command in this form:
 
 ```text
-/goal Complete Gn.m: <plain-language description of the exact data slice, methods/comparisons, engineering work, checks, metrics, and stopping condition>; follow reports/04_RUN_PLAN.html and its embedded run-plan state; save each result immediately; before completing the goal, organize its code and files, remove only disposable temporary artifacts, and verify every recorded path; append and validate every result in code/RESULTS_LEDGER.csv; update the embedded state, regenerate reports/04_RUN_PLAN.html so the goal shows ✅ and, for paper-facing targets, embeds the matching 05 figure source-data table or result table with every filled number linked to provenance; update the matching shells in reports/05_EXP_RESULT.html from the ledger; stop after Gn.m, do not start the successor goal, and only propose the next unlocked /goal.
+/goal Complete Gn.m: <plain-language description of the exact data slice, methods/comparisons, engineering work, checks, metrics, and stopping condition>; follow reports/04_RUN_PLAN.html and its embedded run-plan state; save each result immediately; before completing the goal, organize its code and files, remove only disposable temporary artifacts, and verify every recorded path; append and validate every result in code/RESULTS_LEDGER.csv; update the embedded state, regenerate reports/04_RUN_PLAN.html so the goal shows ✅ and, for paper-facing targets, updates the single matching 05 figure/table snapshot under that artifact's earliest owning goal with every filled number linked to provenance; update the matching shells in reports/05_EXP_RESULT.html from the ledger; stop after Gn.m, do not start the successor goal, and only propose the next unlocked /goal.
 ```
 
 Replace every placeholder with actual work. The command must make sense without
@@ -384,9 +395,10 @@ and `04_RUN_PLAN.html` must require it to:
    completed item visibly changes to `✅` before reporting completion. Run
    `python3 tools/run_plan_progress.py reports/04_RUN_PLAN.html`; this also moves
    the one nested Current Goal panel to the next `proposed_goal_id` and embeds
-   each completed goal's exact paper-facing artifact snapshot from
-   `05_EXP_RESULT.html`. Validate that the panel is a child of that goal's card,
-   not a detached top-level section.
+   each paper-facing artifact exactly once under its earliest owning goal,
+   updating that snapshot from `05_EXP_RESULT.html` as later goals fill it.
+   Validate that the evidence block is a child of that earliest owner's card,
+   not a detached top-level section or a duplicate under a later goal.
 7. Complete the goal only when its declared files, scoped evidence, and
    mechanical checks exist. If the goal owns paper-facing acquisition targets,
    it cannot be completed until every target scoped to that goal is filled from
@@ -394,8 +406,10 @@ and `04_RUN_PLAN.html` must require it to:
    every numeric value exposes the same provenance summary on mouse hover and
    keyboard focus,
    and the corresponding figure source-data table or result table is visibly
-   embedded beneath the completed goal card. A data-driven figure must show its
-   actual source-data table; a table target must show the result table itself.
+   updated in the artifact's single evidence block beneath its earliest owning
+   goal card. A later producer goal must not receive a duplicate block. A
+   data-driven figure must show its actual source-data table; a table target
+   must show the result table itself.
    Partially owned artifacts may keep other goals' cells pending, but the
    completed goal's own cells may not be pending. Infrastructure-only goals
    marked `无直接图表` are exempt from the snapshot requirement.

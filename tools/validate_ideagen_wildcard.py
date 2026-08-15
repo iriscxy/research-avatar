@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a standard Research Buddy idea report with one optional wildcard."""
+"""Validate a standard Research Avatar idea report with one optional wildcard."""
 
 from __future__ import annotations
 

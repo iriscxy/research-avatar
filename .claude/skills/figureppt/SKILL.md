@@ -14,15 +14,24 @@ A fixed meta-prompt is applied to the paper's method/mechanism text via GPT (cha
 produce a BioRender-style image prompt. The meta-prompt (verbatim, in the tool as
 `META_PROMPT`) is:
 
-> You are a professional and experienced scientific-figure designer. Carefully read the following
-> paper content, deeply understand its core mechanism, key method, and deep-model experimental
-> pipeline, and then generate a BioRender-style prompt for the mechanism figure.
+> You are an expert designer of figures for ACL-family NLP papers. Read the supplied manuscript
+> and return one production-ready GPT Image prompt for a restrained academic diagram. Use a pure
+> white background, flat vector geometry, thin strokes, compact alignment, precise typography,
+> two to four related regions, and a muted colorblind-safe palette. Use tokens, small glyphs,
+> arrows, paths, matrices, or modules only when they encode the mechanism. Prefer an
+> Illustrator/TikZ-like schematic over a decorative BioRender poster. Avoid people, scenery,
+> photorealism, gradients, glow, 3D depth, glossy buttons, heavy shadows, marketing drama,
+> oversized text cards, and generic flowcharts. Specify exact composition, minimal labels,
+> aspect ratio, safe crop, and print readability; stay evidence-faithful and return only the prompt.
 
 ```bash
 python3 tools/figure_ppt.py genprompt --paper <method.tex-or-txt> --spec spec.json [--model gpt-4o]
 ```
 It reads the paper (feed the Method/Understanding sections, or the whole `main.tex`), calls
 GPT as that expert designer, and writes the returned BioRender prompt into `spec.draw_prompt`.
+The first automatic Prompt must already be a concrete ACL-style visual specification, not a
+content summary. Reject it before drawing if it describes either a sparse repeated-box flowchart
+or a decorative poster with characters, scenery, glow, gradients, or 3D effects.
 Do NOT hand-author the draw prompt — it comes from the paper through this meta-prompt so the
 figure is faithful to the mechanism. (Read it back; re-run if it misreads the method.)
 
@@ -100,7 +109,7 @@ genprompt → draw → (refine → draw)×N → build → pdf.
 ## Workflow when called by /paperwrite
 1. `emit-example` → a spec; set `canvas_in: [W,H]` to the Fig 1 slot's aspect ratio + `image_size`.
 2. **genprompt** from the paper's Method section → `spec.draw_prompt` (BioRender prompt).
-3. **In interactive Paper Studio, stop at a human prompt gate:** give every mechanism figure its own persistent Responses API conversation (`figure:F1`, `figure:F3`, etc.) with a separately stored `previous_response_id`; never share the manuscript section's prose-writing conversation. When a ready figure is first opened, generate and show its Prompt automatically, let the researcher edit it, and call the image model only after she explicitly confirms it. Pass a mandatory format contract: Intro/motivation figures default to compact single-column square compositions with at most two groups; Model/Method figures default to landscape page-width two-column compositions with 2–4 horizontal stages. The returned image prompt must explicitly state the placement, aspect ratio, density, and safe crop band. Prompt regeneration must continue that figure's conversation and include a researcher-instruction field. Bind each figure to the section that first introduces it; entering Figures from a section shows only that section's planned figures. Run prompt/image calls as background jobs and surface persisted queued/running/completed/failed progress in the webpage.
+3. **In interactive Paper Studio, stop at a human prompt gate:** give every mechanism figure its own persistent Responses API conversation (`figure:F1`, `figure:F3`, etc.) with a separately stored `previous_response_id`; never share the manuscript section's prose-writing conversation. When a ready figure is first opened, generate and show its Prompt automatically, let the researcher edit it, and call the image model only after she explicitly confirms it. Pass a mandatory format contract: Intro/motivation figures default to compact single-column ACL-style schematics with 2–3 aligned regions; Model/Method figures default to landscape page-width schematics with 2–4 aligned regions. Require white background, flat vectors, thin strokes, muted limited color, exact typography, and only mechanism-bearing tokens/modules/glyphs. The returned image prompt must explicitly state placement, aspect ratio, visual encoding, spatial composition, density, and safe crop band. Prompt regeneration must continue that figure's conversation and include a researcher-instruction field. Bind each figure to the section that first introduces it; entering Figures from a section shows only that section's planned figures. Run prompt/image calls as background jobs and surface persisted queued/running/completed/failed progress in the webpage.
 4. **draw** → `.bg.png`; **read the image yourself**.
    Before drawing, compare the Prompt with the latest successful archived `round_NN.prompt.txt`.
    If unchanged, reuse the current image and do not call the image API or create a new round.
@@ -113,6 +122,13 @@ genprompt → draw → (refine → draw)×N → build → pdf.
 8. Copy the PDF to `paper/fig/model.pdf` and `\includegraphics{fig/model.pdf}` into the Fig 1 slot.
 
 ## Rules
+- **Print-readability gate:** body labels are at least 7 pt at final paper size and panel
+  labels at least 8 pt; no information may be encoded by color alone. Every data series
+  also needs a marker, line style, hatch, or direct label. Use a color-vision-safe palette,
+  render once in grayscale, and reject any pair of series/modules that becomes
+  indistinguishable. Keep text/background contrast at least 4.5:1 and remove labels that
+  force crowding instead of shrinking them. Record the final-size font floor,
+  non-color encoding, grayscale result, and density decision in the figure source spec.
 - **Keep `paper/fig/` clean — deliverables ONLY.** After building, `paper/fig/` should contain only the
   figures the paper includes plus their editable/source-of-truth artifacts: the final figure PDFs
   (`model.pdf`, `motiv.pdf`, data plots), the editable `*.pptx`, and each gpt-generated image saved AS A
@@ -127,6 +143,9 @@ genprompt → draw → (refine → draw)×N → build → pdf.
   `spec.draw_prompt` from what is actually rendered; no fixed refine instruction (first-draft
   failures can't be enumerated in advance). The image is throwaway between rounds.
 - **BioRender-style schematic, not a text flowchart** — the picture carries the mechanism.
+- **The first generated Prompt is an ACL-style visual specification, not a summary** — require
+  exact layout and encodings, but reject both repeated-box placeholders and decorative poster art
+  before spending an image call.
 - **Method figure shows the METHOD, never results** — no accuracy/ASR/metric numbers or bar charts.
 - **Image models garble baked text** — regenerate/refine to reduce it; if a label must be crisp,
   set `no_text` and overlay it as an editable PPT box instead.

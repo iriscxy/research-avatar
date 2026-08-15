@@ -116,7 +116,7 @@ def read_tex_tree(main_path, *, root=None):
 
         # TeX accepts both ``\input{file}`` and the primitive ``\input file`` form.
         return re.sub(
-            r"\\(?:input|include)\s*(?:\{([^}]+)\}|([^\s%]+))",
+            r"\\(?:input|include)(?![A-Za-z@])\s*(?:\{([^}]+)\}|([^\s%]+))",
             replace,
             source,
         )
@@ -175,6 +175,9 @@ def prose_text(body):
                 "equation\\*?"):
         t = re.sub(r"\\begin\{" + env + r"\}.*?\\end\{" + env.replace("\\*?", "") + r"\*?\}",
                    " ", t, flags=re.S)
+    # Parentheses inside inline mathematics are notation, not parenthetical prose.
+    t = re.sub(r"\\\(.*?\\\)", " ", t, flags=re.S)
+    t = re.sub(r"(?<!\\)\$.*?(?<!\\)\$", " ", t, flags=re.S)
     # remove the argument text of headings / captions (bold there is fine)
     t = re.sub(r"\\(paragraph|section|subsection|caption|title)\*?\{[^}]*\}", " ", t)
     return t
@@ -322,7 +325,9 @@ def check_style(args):
     for t, x in sections(body):
         if any(w in t.lower() for w in NARRATIVE):
             continue
-        if wordcount(x) > PARAGRAPH_SECTION_WORDS and r"\paragraph{" not in strip_comments(x):
+        if wordcount(x) > PARAGRAPH_SECTION_WORDS and not re.search(
+            r"\\(?:subsection|paragraph)\*?\{", strip_comments(x)
+        ):
             viol.append({"metric": "no_subheading", "section": t, "words": wordcount(x)})
 
     return {"check": "style", "ok": not viol, "body_words": words,
@@ -349,6 +354,33 @@ def check_scholarship(args):
     obligations = contract.get("citation_obligations", [])
     if not obligations:
         violations.append({"issue": "citation_obligations must be non-empty"})
+    coverage = contract.get("nearest_neighbor_coverage")
+    if contract.get("schema_version") == "1.1" and not isinstance(coverage, list):
+        violations.append({"issue": "nearest_neighbor_coverage is required by schema 1.1"})
+    for index, contribution in enumerate(coverage or []):
+        required = ("contribution_id", "claim", "nearest_neighbors")
+        missing = [field for field in required if not contribution.get(field)]
+        if missing:
+            violations.append({"issue": "nearest_neighbor_coverage_incomplete",
+                               "index": index, "missing": missing})
+            continue
+        neighbors = contribution["nearest_neighbors"]
+        if not isinstance(neighbors, list) or len(neighbors) < 2:
+            violations.append({"issue": "too_few_nearest_neighbors",
+                               "contribution_id": contribution["contribution_id"], "minimum": 2})
+            continue
+        keys = []
+        for neighbor_index, neighbor in enumerate(neighbors):
+            fields = ("citation_key", "overlap", "independent_difference", "source_url")
+            missing_neighbor = [field for field in fields if not str(neighbor.get(field, "")).strip()]
+            if missing_neighbor:
+                violations.append({"issue": "nearest_neighbor_incomplete",
+                                   "contribution_id": contribution["contribution_id"],
+                                   "index": neighbor_index, "missing": missing_neighbor})
+            keys.append(str(neighbor.get("citation_key", "")))
+        if len(keys) != len(set(keys)):
+            violations.append({"issue": "duplicate_nearest_neighbor",
+                               "contribution_id": contribution["contribution_id"]})
     for index, item in enumerate(obligations):
         required = ("name", "kind", "section", "citation_key", "supported_clause",
                     "source_evidence_path", "source_evidence_excerpt")
@@ -404,6 +436,14 @@ def check_scholarship(args):
         }
         for item in obligations if isinstance(item, dict)
     ]
+    obligation_key_set = {item["key"] for item in normalized_obligations}
+    for contribution in coverage or []:
+        for neighbor in contribution.get("nearest_neighbors", []):
+            key = str(neighbor.get("citation_key", ""))
+            if key and key not in obligation_key_set:
+                violations.append({"issue": "nearest_neighbor_missing_citation_obligation",
+                                   "contribution_id": contribution.get("contribution_id"),
+                                   "citation_key": key})
     for title, section in section_map.items():
         for sentence in re.split(r"(?<=[.!?])\s+", re.sub(r"\s+", " ", section)):
             sentence_lower = sentence.lower()
@@ -468,6 +508,19 @@ def _json_pointer(value, pointer):
     return node
 
 
+def _decision_holds(value, operator, threshold):
+    operators = {
+        ">=": lambda left, right: left >= right,
+        ">": lambda left, right: left > right,
+        "<=": lambda left, right: left <= right,
+        "<": lambda left, right: left < right,
+        "==": lambda left, right: left == right,
+    }
+    if operator not in operators:
+        raise ValueError(f"unsupported decision operator: {operator}")
+    return operators[operator](value, threshold)
+
+
 def check_consistency(args):
     """Bind canonical names, source values, and checked formulas across the paper."""
     paper_dir = Path(args.paper_dir).resolve()
@@ -487,6 +540,9 @@ def check_consistency(args):
     terms = contract.get("canonical_terms", [])
     values = contract.get("source_values", [])
     formal_links = contract.get("formal_links", [])
+    empirical_claims = contract.get("empirical_claims")
+    if contract.get("schema_version") == "1.1" and not isinstance(empirical_claims, list):
+        violations.append({"issue": "empirical_claims is required by schema 1.1"})
     source_plan_value = str(contract.get("source_plan", "")).strip()
     try:
         source_plan = (project_root / source_plan_value).resolve()
@@ -554,6 +610,31 @@ def check_consistency(args):
             violations.append({"issue": "source_value_manuscript_evidence_missing",
                                "id": item["id"]})
 
+    for index, item in enumerate(empirical_claims or []):
+        required = ("id", "source_path", "source_locator", "operator", "threshold",
+                    "supported_text", "not_supported_text")
+        missing = [field for field in required if field not in item or item[field] == ""]
+        if missing:
+            violations.append({"issue": "empirical_claim_incomplete", "index": index,
+                               "missing": missing})
+            continue
+        source = (project_root / str(item["source_path"])).resolve()
+        try:
+            source.relative_to(project_root)
+            value = _json_pointer(json.loads(source.read_text(encoding="utf-8")),
+                                  item["source_locator"])
+            holds = _decision_holds(value, item["operator"], item["threshold"])
+        except (ValueError, OSError, KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
+            violations.append({"issue": "empirical_claim_unreadable", "id": item.get("id"),
+                               "error": str(exc)})
+            continue
+        expected = str(item["supported_text"] if holds else item["not_supported_text"])
+        contradicted = str(item["not_supported_text"] if holds else item["supported_text"])
+        if expected not in tex or contradicted in tex:
+            violations.append({"issue": "empirical_claim_rendering_stale", "id": item["id"],
+                               "observed": value, "operator": item["operator"],
+                               "threshold": item["threshold"], "expected_text": expected})
+
     verifier = paper_dir / "theory" / "verify.py"
     for index, item in enumerate(formal_links):
         required = ("id", "manuscript_evidence", "verifier_evidence")
@@ -594,7 +675,8 @@ def _references_page(paper_dir, main_base):
     if not os.path.exists(pdf):
         return None
     try:
-        out = subprocess.run(["pdftotext", pdf, "-"], capture_output=True, text=True).stdout
+        out = subprocess.run(["pdftotext", pdf, "-"], capture_output=True,
+                             encoding="utf-8", errors="replace").stdout
     except Exception:
         return None
     for i, pg in enumerate(out.split("\f"), 1):
@@ -620,7 +702,7 @@ def _page_bottom_slack(paper_dir, main_base, page, heading_regex):
         return None
     try:
         out = subprocess.run(["pdftotext", "-layout", "-f", str(page), "-l", str(page), pdf, "-"],
-                             capture_output=True, text=True).stdout
+                             capture_output=True, encoding="utf-8", errors="replace").stdout
     except Exception:
         return None
     # strip a leading review-mode line number (e.g. "592   Limitations ...") before matching
@@ -652,11 +734,23 @@ def check_length(args):
     conc = label_page(args.paper_dir, args.main_base, "endconclusion")
     lim = label_page(args.paper_dir, args.main_base, "limstart")  # start of Limitations
     tgt = args.body_target
-    # Some venues (e.g. AAAI) have NO Limitations section — the body ends at Conclusion -> References.
-    # There, `endconclusion == target` is the fill signal; the limstart check does not apply.
     tex = manuscript_tex(args)
-    has_limitations = bool(re.search(r"\\section\*?\s*\{\s*Limitations\s*\}", tex))
-    refs_pg = None if has_limitations else _references_page(args.paper_dir, args.main_base)
+    conclusion_match = re.search(
+        r"\\section\*?\s*\{\s*Conclusion(?:[^}]*)\}", tex, re.I
+    )
+    limitations_match = re.search(
+        r"\\section\*?\s*\{\s*Limitations\s*\}", tex, re.I
+    )
+    limitations_after_conclusion = bool(
+        limitations_match
+        and conclusion_match
+        and limitations_match.start() > conclusion_match.start()
+    )
+    refs_pg = (
+        None
+        if limitations_after_conclusion
+        else _references_page(args.paper_dir, args.main_base)
+    )
     viol = []
     if total is None:
         return {"check": "length", "ok": False, "issue": "no compile log — build first"}
@@ -673,10 +767,10 @@ def check_length(args):
         elif conc > tgt:
             viol.append({"issue": "conclusion_past_limit", "conclusion_end_page": conc,
                          "target_page": tgt, "note": "content overflows the page limit — trim."})
-        elif has_limitations and lim is None:
+        elif limitations_after_conclusion and lim is None:
             viol.append({"issue": "no_limstart_label",
                          "fix": r"add \label{paper:limstart} right after \section*{Limitations}"})
-        elif has_limitations and lim <= tgt:
+        elif limitations_after_conclusion and lim <= tgt:
             # Limitations starts ON the target page rather than target+1. That is acceptable IF the
             # Conclusion still ended within LENGTH_LINE_TOL lines of the page bottom (the ±5-line
             # tolerance) — measured by how few lines sit below the Limitations heading on the page.
@@ -689,8 +783,8 @@ def check_length(args):
                                      "(Limitations starts on page %d). Add counted content so the Conclusion "
                                      "fills page %d to within %d lines of the bottom." %
                                      (tgt, LENGTH_LINE_TOL, lim, tgt, LENGTH_LINE_TOL)})
-        elif not has_limitations and refs_pg is not None and refs_pg <= tgt:
-            # No Limitations section (AAAI): References follow the Conclusion. Accept if they start
+        elif not limitations_after_conclusion and refs_pg is not None and refs_pg <= tgt:
+            # References follow the approved body, including when Limitations precedes Conclusion.
             # within LENGTH_LINE_TOL lines of the target-page bottom (±5-line tolerance).
             slack = _page_bottom_slack(args.paper_dir, args.main_base, tgt, r"^\s*References\b")
             if slack is None or slack > LENGTH_LINE_TOL:
@@ -701,9 +795,11 @@ def check_length(args):
                                      "%d lines above the bottom. Add BODY content so References start on page %d "
                                      "(or within %d lines of the bottom)." % (tgt, LENGTH_LINE_TOL, tgt + 1, LENGTH_LINE_TOL)})
         # else: References start on target+1 (or no page data) — the Conclusion fills the target page.
+    boundary = "limitations" if limitations_after_conclusion else "references"
     return {"check": "length", "ok": not viol, "conclusion_end_page": conc,
             "limitations_start_page": lim, "references_start_page": refs_pg, "total_pages": total, "target_page": tgt,
-            "note": "pass = Conclusion ends on the target page AND Limitations starts on target+1 (page full)",
+            "post_body_boundary": boundary,
+            "note": f"pass = Conclusion ends on the target page and the approved following boundary ({boundary}) starts on target+1 or within the bottom-line tolerance",
             "violations": viol}
 
 
@@ -724,7 +820,8 @@ def check_formal(args):
     elif os.path.exists(theory):
         try:
             process = subprocess.run(
-                [sys.executable, str(Path(theory).resolve())], cwd=args.paper_dir, text=True,
+                [sys.executable, str(Path(theory).resolve())], cwd=args.paper_dir,
+                encoding="utf-8", errors="replace",
                 capture_output=True, timeout=30, check=False,
             )
             if process.returncode != 0:

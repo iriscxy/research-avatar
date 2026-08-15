@@ -1,2 +1,1 @@
-matplotlib>=3.9
-python-pptx>=1.0
+-r ../requirements.lock

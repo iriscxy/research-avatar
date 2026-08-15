@@ -151,7 +151,7 @@ def _make_keys(papers: list[dict]) -> None:
 def _s2_search(fetcher: str, title: str) -> list[dict]:
     proc = subprocess.run(
         ["python3", fetcher, "search", title, "--max", "3"],
-        capture_output=True, text=True, timeout=40,
+        capture_output=True, encoding="utf-8", errors="replace", timeout=40,
     )
     if proc.returncode != 0:
         raise RuntimeError(proc.stderr.strip() or "s2 search failed")

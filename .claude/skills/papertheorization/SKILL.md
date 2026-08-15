@@ -11,7 +11,7 @@ whose results earn their place. The failure mode this skill exists to prevent is
 rigorous. Better no theory than loose theory.
 
 This is a review sub-skill of `/paperwrite`. It reads the same inputs
-(`researcher-profile/PROFILE.md` at the project-local `researcher-profile/` path, `reports/03_EXPERIMENT_PLAN.html`,
+(`researcher-profile/PROFILE.html` at the project-local `researcher-profile/` path, `reports/03_EXPERIMENT_PLAN.html`,
 `results/`) and writes into `paper/`.
 
 ## Ground it in the researcher's own theory lineage first

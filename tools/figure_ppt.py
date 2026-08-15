@@ -45,9 +45,22 @@ import urllib.request
 
 # ---------- the fixed prompt-generation meta-prompt (verbatim, per the researcher) ----------
 META_PROMPT = (
-    "You are a professional and experienced scientific-figure designer. Carefully read the "
-    "following paper content, deeply understand its core mechanism, key method, and deep-model "
-    "experimental pipeline, and then generate a BioRender-style prompt for the mechanism figure."
+    "You are an expert designer of figures for ACL-family NLP papers. Read the supplied manuscript "
+    "content and return only one complete, production-ready GPT Image prompt for a restrained academic "
+    "diagram. First identify the figure's single scientific message and the minimum visual structure "
+    "needed to communicate it. Follow common ACL figure conventions: pure white background, flat vector "
+    "geometry, thin consistent strokes, compact alignment, generous whitespace, precise typography, "
+    "two to four clearly related regions, and a muted colorblind-safe palette of three to five colors. "
+    "Use tokens, small semantic glyphs, arrows, brackets, paths, matrices, or modules only when they "
+    "encode the mechanism. Prefer an Illustrator/TikZ-like schematic over a decorative BioRender poster. "
+    "Do not add people, scenery, mascots, photorealistic objects, gradients, glow, glass, 3D depth, glossy "
+    "buttons, heavy shadows, or marketing-style visual drama unless the manuscript explicitly requires "
+    "them. Do not default to oversized text cards or a generic box-and-arrow flowchart; small boxes and "
+    "panels are acceptable when they precisely encode tokens, states, or modules. Keep labels short and "
+    "print-readable. Specify exact spatial composition, visual encoding, minimal verbatim labels, aspect "
+    "ratio, safe crop band, and column-size readability. Stay faithful to the evidence, do not invent "
+    "results, and never put result charts in a method figure. Return the image-generation prompt only, "
+    "without commentary or Markdown fences."
 )
 def _openai_chat_raw(model, messages):
     key = os.environ.get("OPENAI_API_KEY") or sys.exit("OPENAI_API_KEY not set")

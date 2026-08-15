@@ -1,3 +1,1 @@
--r requirements.txt
-playwright>=1.50
-PyYAML>=6.0
+-r ../requirements.lock

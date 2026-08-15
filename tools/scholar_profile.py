@@ -294,7 +294,7 @@ _SAFARI_READ_TAB = (
 def _run_osa(script: str) -> str:
     proc = subprocess.run(
         ["osascript", "-"], input=script,
-        capture_output=True, text=True, timeout=60,
+        capture_output=True, encoding="utf-8", errors="replace", timeout=60,
     )
     if proc.returncode != 0:
         raise RuntimeError((proc.stderr or "osascript failed").strip())

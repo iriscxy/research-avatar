@@ -3,31 +3,28 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Research Buddy project control plane">
+  <meta name="description" content="Research Avatar project control plane">
   <title>Research Studio</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/demo/style.css?v=20260809-4">
-  <link rel="stylesheet" href="/style.css?v=20260809-4">
+  <link rel="stylesheet" href="/demo/style.css?v=20260809-fixed-structures">
+  <link rel="stylesheet" href="/style.css?v=20260810-typography">
 </head>
 <body class="research-app">
   <main class="studio-main">
     <nav id="pipeline" class="pipeline" aria-label="Research stages"></nav>
 
-    <section class="project-toolbar">
-      <div class="project-meta"><span>ACTIVE PROJECT</span><strong id="project-name">Loading…</strong></div>
-      <button id="refresh" class="button primary" type="button">↻ 刷新状态</button>
-    </section>
-
     <section class="project-workspace">
       <section class="stage-surface">
-        <div id="stage-body"></div>
         <div class="artifact-preview">
           <div class="preview-toolbar">
             <div><span>CANONICAL ARTIFACT</span><strong id="preview-title">等待生成</strong></div>
             <a id="preview-open" class="preview-open" target="_blank" hidden>新窗口打开 ↗</a>
           </div>
           <div id="preview-empty" class="preview-empty">
-            <span>⌁</span><strong>该步骤尚未生成</strong><small>复制终端命令执行后，点击“刷新状态”即可直接读取结果。</small>
+            <span>⌁</span>
+            <strong>该步骤尚未生成</strong>
+            <small>请在终端运行以下命令</small>
+            <code id="preview-command">等待读取命令</code>
           </div>
           <iframe id="preview-frame" title="Artifact preview" sandbox="allow-scripts allow-forms allow-popups allow-downloads" hidden></iframe>
         </div>
@@ -35,7 +32,6 @@
     </section>
   </main>
 
-  <div id="toast" class="toast" role="status" hidden></div>
   <script src="/app.js?v=20260814-copy-goal-bridge"></script>
 </body>
 </html>

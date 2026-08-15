@@ -10,7 +10,7 @@ This idempotent project bootstrap starts or reuses Research Studio at
 both browser pages. Run it once per session, never launch duplicate servers, and
 surface any startup error instead of claiming that either page is available.
 
-Read `researcher-profile/PROFILE.md` first for the synthesized researcher profile and `researcher-profile/publications.json` for per-paper records. If either is absent, tell the user to run `/profileconstruct`. Never expect or reconstruct a full Publications Index inside `PROFILE.md`.
+Read `researcher-profile/PROFILE.html` first for the synthesized researcher profile and `researcher-profile/publications.json` for per-paper records. If either is absent, tell the user to run `/profileconstruct`. Never expect or reconstruct a full Publications Index inside `PROFILE.html`.
 
 **Arguments:** `<direction>` (free text) · `— lens: engineering|theory|benchmark` (= **mode**) · `— disruptive-wildcard: on|off` (**default `off`** — the wildcard runs ONLY when the user explicitly asks for it, e.g. `— disruptive-wildcard: on` or a plain-language request for a disruptive/paradigm-breaking idea; never infer it on) · `— ref paper: <arXiv URL | PDF | URL>` (*optional*, triggers A0).
 
@@ -44,9 +44,57 @@ For each flagged candidate, assign exactly one level: `LOW`, `MEDIUM`, `HIGH`, o
 Each flagged card must include an **Ethics assessment** covering: affected parties and context; concrete harm pathways; data, consent, retention, and de-identification; misuse and dual use; safeguards; and residual risk/uncertainty. Do not invent laws, consent status, incidents, or empirical harms. Ethics is an annotation and human decision gate, never an automatic rejection.
 
 ## Output conventions
-- **One folder `reports/` (create it), two-digit step prefixes.** The survey `reports/01_LIT_SURVEY.html` is written by `/researchlit` (the grounding this skill reads). This skill writes the single canonical `reports/02_IDEA_REPORT.html` (a **short** landscape pointer to the survey + the ranked ideas — NOT a duplicated paper appendix); when `— ref paper:` is given, the reference-paper reading is folded in as a short "Reference Paper Notes" box at the top of `02` (A0), NOT a separate file. Downstream continues the numbering (`03_EXPERIMENT_PLAN` … `04_EXP_RESULT`).
+- **One folder `reports/` (create it), two-digit step prefixes.** The survey `reports/01_LIT_SURVEY.html` is written by `/researchlit` (the grounding this skill reads). This skill writes the single canonical `reports/02_IDEA_REPORT.html` (a **short** landscape pointer to the survey + the ranked ideas — NOT a duplicated paper appendix); when `— ref paper:` is given, the reference-paper reading is folded in as a short "Reference Paper Notes" box at the top of `02` (A0), NOT a separate file. Downstream continues as `03_EXPERIMENT_PLAN.html` → `04_RUN_PLAN.html` → `05_EXP_RESULT.html`.
 - **Every deliverable is self-contained HTML, never Markdown** — inline `<style>`, no external assets, real structure (`<h1>/<h2>`, `<table>`, `<ul>`). **Every paper reference is a direct `<a href>`** to its arXiv/DOI; unverifiable → visible `pending`, never a fabricated URL.
 - The single file `reports/02_IDEA_REPORT.html` is the **primary** — it is what `/expplan` reads, and the `SELECTED` stamp lives in it. Address the researcher directly, never in the third person.
+
+### Mandatory GPT API readability rewrite — every visible explanatory sentence
+
+The first complete HTML draft is **not** the deliverable. After A5 has fixed the
+scientific content, novelty verdicts, links, attributes, machine audit, and pick
+state, pass every eligible visible explanatory text node through the OpenAI GPT
+API by running:
+
+```bash
+/Users/xiuying.chen/miniconda3/bin/python tools/rewrite_ideagen_html.py \
+  reports/02_IDEA_REPORT.html --model "${IDEAGEN_REWRITE_MODEL:-gpt-4o-mini}"
+```
+
+This is a hard generation stage, not an optional polish pass and not a request
+to the current agent to paraphrase from memory. The script must receive a real
+`OPENAI_API_KEY`, make successful API calls, rewrite the prose in place for an
+adjacent-area researcher, and embed one hidden `ideagen-readable-rewrite` JSON
+receipt containing the provider, model, API response IDs, eligible/rewritten
+node counts, and output digests. **No API key, API error, malformed response,
+partial node coverage, or missing receipt is a hard stop. Never silently keep
+the pre-rewrite draft and call it readable.**
+
+Rewrite all natural-language statements in `<p>`, `<li>`, `<dd>`, and prose
+table cells, including landscape summaries, ranked-idea explanations, card
+arguments, novelty comparisons, objections, falsifiers, feasibility notes, and
+pick instructions. The rewrite must make the actor, action, comparison, and
+observable consequence explicit; split overloaded sentences; explain a
+necessary technical term at first use; remove noun piles and opaque shorthand;
+and preserve uncertainty rather than making the claim sound stronger.
+
+Do **not** rewrite fixed section headings, idea IDs, paper/method/model/dataset
+names, direct-link anchor text, numeric values, novelty labels, machine JSON,
+CSS/JavaScript, `<code>/<pre>` content, or HTML attributes. The API may improve
+wording only: it may not add evidence, remove a falsifier, change a novelty or
+scope verdict, alter a citation, or convert a conditional claim into a result.
+The pre-rewrite draft remains internal; only the API-rewritten HTML is shown to
+the researcher.
+
+After the rewrite, run all ordinary validators **and**:
+
+```bash
+/Users/xiuying.chen/miniconda3/bin/python tools/validate_ideagen_readability.py reports/02_IDEA_REPORT.html
+```
+
+If any subsequent edit changes visible prose, rerun the GPT API rewrite so the
+receipt covers the final delivered wording. Selection stamping is exempt only
+for the fixed `Selected: I<k> — <title>` banner and row tag; changing any idea
+explanation requires a fresh API pass.
 
 ## A0 — Reference paper (only if `— ref paper:` given)
 Summarize BEFORE surveying so generation targets its gaps. Fetch (`tools/fetch_fulltext.py` / `pdftotext` / web open/fetch) and read the paper for **what they did · key results · limitations & open questions · improvement directions**. Numbers/claims trace to the paper's text; if you couldn't fetch it, say so and ask for the PDF. **Do NOT write a separate summary file** — this reading is internal grounding for idea generation. When `— ref paper:` was given, surface it as a **short "Reference Paper Notes" box at the very top of `02_IDEA_REPORT.html`** (those four bullets, condensed), so the reader sees the gap the ideas are built to attack; without `— ref paper:` there is no such box (grounding is the survey landscape only). This box is a conditional block, separate from and above the regular Literature Landscape section.
@@ -69,7 +117,7 @@ When the wildcard is on, run **D0–D3** from `references/disruptive-branch.md` 
 ## A3 — Idea generation (ONE lens, branch-aware, method-first)
 Generate 6 candidates through the chosen mode, seeded by the profile AND the survey's structural gaps (from A1 / `01_LIT_SURVEY.html`):
 - **engineering** — iterate habitual methods from *Dominant Methods*; prefer reuse-existing-code. No arbitrary time cap ("2-week pilot"); let the problem set the scope.
-- **theory** — read the records in `publications.json` in time order together with *Research Lineage* in `PROFILE.md`; find the method-evolution fault line; propose hypotheses adjacent to, not repeating, the lineage.
+- **theory** — read the records in `publications.json` in time order together with *Research Lineage* in `PROFILE.html`; find the method-evolution fault line; propose hypotheses adjacent to, not repeating, the lineage.
 - **benchmark** — from *Active Venues* + *Niche Subfields*: follow-up **survey** / **custom benchmark-dataset** filling an eval gap / **reproduce-and-beat** a recent competitor.
 
 **“Plain-language summary” is mandatory and comes first.** Before the technical pitch, write exactly one plain-language sentence for every idea that an adjacent-area researcher can understand on the first read. It must state all three: **the concrete problem, what will be changed/built/tested, and the observable result that would matter**. Do not use an unexplained method name, acronym, metaphor, or abstract label as the idea. If the reader must first understand terms such as “interchange intervention”, “behavioral iso-effect”, or a newly coined framework name, rewrite the sentence. Put this same plain-language sentence in the ranked table, at the top of the idea card under a visible `Plain-language summary` label, and in the human pick options. The technical one-sentence pitch and method details may follow it; they must not replace it.
@@ -138,7 +186,7 @@ Never create a second report for the disruptive pass. Set `data-idea-branch="sta
 - Keep the standard ranking table unchanged. Do not insert D1 as rank 8 and do not compare its Disruptive score to standard Novelty / qualitative ranks.
 - When the wildcard is on, run `python3 tools/validate_ideagen_wildcard.py reports/02_IDEA_REPORT.html` and fix all errors before presenting it. Ask the researcher to pick / kill / redirect by id (`I*` or `D1`). Never auto-proceed.
 
-Present a **4–6 idea decision slate when evidence supports it**; fewer is valid after the second generation pass. Use `ID | Tier | Idea | Novelty status | Scope necessity | Closest work | Concrete difference | Strongest objection | Confidence` (plus conditional ethics risk). Each selectable card carries `data-idea-id`, `data-novelty-status`, `data-idea-tier`, `data-default-pick`, and the scope attributes from 2b. Only Tier A may be default; Tier B says `needs framing`; at most one card is default. Before the gate, give a fresh-context reviewer only the cards and retrieved sources; embed its per-ID verdict, absorbability result, closest-work overlap/difference, ISO latest-search date, fresh-context run ID, and ≥2 non-placeholder direct URLs as `idea-novelty-audit` JSON. The card and audit must agree. Non-selectable survivors have no pick ID. Run `tools/validate_ideagen_report.py`, then stop for pick/kill/redirect.
+Present a **4–6 idea decision slate when evidence supports it**; fewer is valid after the second generation pass. Use `ID | Tier | Idea | Novelty status | Scope necessity | Closest work | Concrete difference | Strongest objection | Confidence` (plus conditional ethics risk). Each selectable card carries `data-idea-id`, `data-novelty-status`, `data-idea-tier`, `data-default-pick`, and the scope attributes from 2b. Only Tier A may be default; Tier B says `needs framing`; at most one card is default. Before the gate, give a fresh-context reviewer only the cards and retrieved sources; embed its per-ID verdict, absorbability result, closest-work overlap/difference, ISO latest-search date, fresh-context run ID, and ≥2 non-placeholder direct URLs as `idea-novelty-audit` JSON. The card and audit must agree. Non-selectable survivors have no pick ID. Run the mandatory GPT API readability rewrite, then `tools/validate_ideagen_report.py`, `tools/validate_ideagen_readability.py`, and the fixed-structure validator; only the API-rewritten final HTML may be presented. Then stop for pick/kill/redirect.
 
 
 If any ethics risk is `HIGH` or `CRITICAL`, the gate must state that the candidate requires explicit human ethics review before implementation, data collection, deployment, or release, as applicable. Ask only the concrete review question needed for the flagged pathway; do not show an ethics prompt for unflagged work. For `LOW` or `MEDIUM`, show the risk and safeguards in the report and let the normal idea-selection gate handle the decision.
@@ -149,4 +197,11 @@ If any ethics risk is `HIGH` or `CRITICAL`, the gate must state that the candida
 
 ## Fixed HTML structure
 
-Render `02_IDEA_REPORT.html` only as: optional Reference Paper Notes → literature landscape → ranked decision slate → candidate cards in rank order → human selection gate/selected banner. Each candidate card owns its novelty evidence, mechanism, falsifier, feasibility, strongest objection, and conditional ethics assessment. Keep audits as hidden JSON, not visible sections. Do not add workflow logs, dashboards, or tool comparisons. Research Studio adds selection controls around this report; the Live Demo must show these same slots with illustrative candidates.
+Render `02_IDEA_REPORT.html` with an unnumbered selected-status banner when applicable, an optional unnumbered `Reference Paper Notes` box, and exactly these ordered top-level sections (`<section data-report-section>` and visible `<h2>` text must agree):
+
+1. `1. Literature Landscape` (`literature-landscape`);
+2. `2. Ranked Decision Slate` (`ranked-slate`);
+3. `3. Candidate Cards` (`candidate-cards`);
+4. `4. Human Selection` (`human-selection`).
+
+Place any opt-in `Disruptive Wildcard` inside `Candidate Cards`; it is not a fifth top-level section. Each candidate card owns its plain-language summary, novelty evidence, one mechanism, falsifier, scope necessity, feasibility, strongest objection, and conditional ethics assessment. Every top-level title must own substantive topic-specific content; an empty section, title-only slot, or placeholder-only body is invalid. Keep audits as hidden JSON, not visible sections. Do not add, rename, reorder, or omit a top-level section; workflow logs, dashboards, and tool comparisons are forbidden. Before the pick gate, run `python3 tools/validate_report_structure.py --kind ideas --html reports/02_IDEA_REPORT.html` in addition to the idea-specific validators. Research Studio adds selection controls around this report; the Live Demo must display this exact section list with filled illustrative candidates.

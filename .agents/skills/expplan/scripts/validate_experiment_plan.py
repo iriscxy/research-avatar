@@ -16,7 +16,10 @@ from pathlib import Path
 CONTRACT_RE = re.compile(
     r'<script type="application/json" id="experiment-plan-contract">(.*?)</script>', re.S
 )
-APPROVAL_FIELDS = {"approval_status", "approved_at", "approval_channel", "approval_contract_sha256"}
+APPROVAL_FIELDS = {
+    "approval_status", "approved_at", "approval_channel", "approval_contract_sha256",
+    "approval_contract_version",
+}
 
 
 def contract_digest(contract: dict) -> str:
@@ -93,13 +96,42 @@ def validate(plan: Path) -> list[str]:
         contract = json.loads(match.group(1))
     except json.JSONDecodeError as exc:
         return [f"invalid experiment-plan-contract JSON: {exc}"]
+    schema_version = str(contract.get("schema_version", "1.0"))
+    if schema_version not in {"1.0", "1.1"}:
+        errors.append("schema_version must be 1.0 or 1.1")
+    if schema_version == "1.1":
+        contract_version = contract.get("contract_version")
+        if not isinstance(contract_version, int) or contract_version < 1:
+            errors.append("schema 1.1 requires a positive integer contract_version")
+        history = contract.get("revision_history")
+        if not isinstance(history, list) or not history:
+            errors.append("schema 1.1 requires a non-empty revision_history")
+        else:
+            versions = [item.get("version") for item in history if isinstance(item, dict)]
+            if versions != list(range(1, len(history) + 1)) or versions[-1] != contract_version:
+                errors.append("revision_history versions must be contiguous and end at contract_version")
+            for index, revision in enumerate(history):
+                if not isinstance(revision, dict) or any(
+                    not revision.get(field)
+                    for field in ("version", "changed_at", "reason", "compatibility")
+                ) or not isinstance(revision.get("changed_fields"), list):
+                    errors.append(
+                        f"revision_history[{index}] lacks reason/compatibility/changed_fields metadata"
+                    )
+            if contract_version and contract_version > 1 and not str(
+                contract.get("parent_approval_sha256", "")
+            ).strip():
+                errors.append("an amended contract requires parent_approval_sha256")
     if contract.get("approval_status") not in {"pending", "approved"}:
         errors.append("approval_status must be pending or approved")
-    if contract.get("approval_status") == "approved" and contract.get("approval_contract_sha256") != contract_digest(contract):
-        errors.append("approved experiment contract digest is missing or does not match")
+    if contract.get("approval_status") == "approved":
+        if contract.get("approval_contract_sha256") != contract_digest(contract):
+            errors.append("approved experiment contract digest is missing or does not match")
+        if schema_version == "1.1" and contract.get("approval_contract_version") != contract.get("contract_version"):
+            errors.append("approved schema 1.1 contract requires approval_contract_version to match contract_version")
     profile = contract.get("profile_contract", {})
-    if profile.get("profile_path") != "researcher-profile/PROFILE.md":
-        errors.append("profile_contract.profile_path must point to researcher-profile/PROFILE.md")
+    if profile.get("profile_path") != "researcher-profile/PROFILE.html":
+        errors.append("profile_contract.profile_path must point to researcher-profile/PROFILE.html")
     if profile.get("publications_path") != "researcher-profile/publications.json":
         errors.append("profile_contract.publications_path must point to researcher-profile/publications.json")
     if profile.get("authorship_verified") is not True or not str(profile.get("researcher_identity", "")).strip():
@@ -108,7 +140,7 @@ def validate(plan: Path) -> list[str]:
     if not structure_key:
         errors.append("profile_contract.structure_reference_key is required")
     project_root = plan.parent.parent if plan.parent.name == "reports" else plan.parent
-    profile_path = project_root / "researcher-profile/PROFILE.md"
+    profile_path = project_root / "researcher-profile/PROFILE.html"
     publications_path = project_root / "researcher-profile/publications.json"
     publication_keys: set[str] = set()
     structure_publication: dict = {}
@@ -118,7 +150,7 @@ def validate(plan: Path) -> list[str]:
         if str(profile.get("researcher_identity", "")).lower() not in profile_path.read_text(
             encoding="utf-8", errors="replace"
         ).lower():
-            errors.append("profile_contract researcher identity is not present in PROFILE.md")
+            errors.append("profile_contract researcher identity is not present in PROFILE.html")
         try:
             publication_payload = json.loads(publications_path.read_text(encoding="utf-8"))
             publications = (publication_payload.get("publications", [])
@@ -551,6 +583,22 @@ def validate(plan: Path) -> list[str]:
         implementation_contract = contract.get("implementation_contract", [])
         if not implementation_contract:
             errors.append("contract lacks the per-method implementation plan")
+        implementation_table = re.search(
+            r'<table class="implementation-table">(.*)$', setup, re.S
+        )
+        implementation_html = implementation_table.group(1) if implementation_table else ""
+        if not implementation_table:
+            errors.append("Setup lacks the two-column implementation table")
+        else:
+            headers = re.findall(r'<th>(.*?)</th>', re.search(r'<thead>(.*?)</thead>', implementation_html, re.S).group(1), re.S)
+            if [visible_text(header) for header in headers] != ["Method", "How it is implemented"]:
+                errors.append("implementation table must contain only Method and How it is implemented")
+            for forbidden in (
+                "Reuse / write boundary", "Shared boundary / fallback",
+                "Source type:", "PAPER_GUIDED_REIMPLEMENT", "PAPER_SPEC",
+            ):
+                if forbidden in implementation_html:
+                    errors.append(f"implementation table exposes internal contract field: {forbidden}")
         proposed_method = contract.get("grounding", {}).get("proposed_method")
         expected_methods = {
             item.get("name")
@@ -566,13 +614,42 @@ def validate(plan: Path) -> list[str]:
                 f"expected={sorted(expected_methods)}, actual={sorted(actual_methods)}"
             )
         setup_text = visible_text(setup)
+        allowed_source_kinds = {"OFFICIAL_GITHUB", "LOCAL"}
         for item in implementation_contract:
-            for token in (item.get("method"), item.get("mode"), item.get("plan")):
+            for token in (
+                item.get("method"), item.get("implementation_summary"),
+            ):
                 if token and token not in setup_text:
                     errors.append(f"Setup implementation plan lacks: {token}")
             url = item.get("source_url")
-            if url and f'href="{url}"' not in setup:
-                errors.append(f"Setup implementation source lacks direct link: {item.get('method')}")
+            row = re.search(
+                rf'<tr><th>{re.escape(str(item.get("display_name") or item.get("method")))}</th>(.*?)</tr>',
+                implementation_html,
+                re.S,
+            )
+            row_html = row.group(0) if row else ""
+            if not row:
+                errors.append(f"Setup implementation table lacks row: {item.get('display_name') or item.get('method')}")
+            elif item.get("implementation_summary") not in visible_text(row_html):
+                errors.append(f"Setup implementation row lacks direct decision: {item.get('method')}")
+            if url and f'href="{url}"' not in row_html:
+                errors.append(f"Setup implementation source lacks direct official link: {item.get('method')}")
+            if not url and "<a " in row_html:
+                errors.append(f"local implementation row must not contain a link: {item.get('method')}")
+            source_kind = item.get("source_kind")
+            if source_kind not in allowed_source_kinds:
+                errors.append(f"implementation source_kind is invalid for {item.get('method')}: {source_kind}")
+            mode = item.get("mode")
+            if mode in {"REUSE_OFFICIAL_MODULE", "SOURCE_GUIDED_REIMPLEMENT"}:
+                if source_kind != "OFFICIAL_GITHUB" or not str(url).startswith("https://github.com/"):
+                    errors.append(f"source-guided implementation lacks official GitHub source: {item.get('method')}")
+            if mode == "SELF_IMPLEMENT":
+                if source_kind != "LOCAL" or url or not item.get("local_implementation"):
+                    errors.append(f"self-implemented method lacks explicit local ownership: {item.get('method')}")
+            if mode == "PAPER_GUIDED_REIMPLEMENT" or source_kind == "PAPER_SPEC":
+                errors.append(
+                    f"non-official code must be declared SELF_IMPLEMENT/LOCAL without an implementation link: {item.get('method')}"
+                )
         metric_contract = contract.get("metric_contract", [])
         if not metric_contract:
             errors.append("contract lacks metric_contract")

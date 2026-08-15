@@ -1,9 +1,9 @@
 ---
 name: "profileconstruct"
-description: "Build / refresh the personalized researcher profile (PROFILE.md, the single source of truth) from Google Scholar + available coding-agent habits. Use when the user wants to (re)build or refresh their research profile, re-import publications, sync Experiment Templates / Workflow Preferences, or whenever PROFILE.md is missing or stale. Invoke explicitly as `/profileconstruct`."
+description: "Build / refresh the personalized researcher profile (PROFILE.html, the single source of truth) from Google Scholar + available coding-agent habits. Use when the user wants to (re)build or refresh their research profile, re-import publications, sync Experiment Templates / Workflow Preferences, or whenever PROFILE.html is missing or stale. Invoke explicitly as `/profileconstruct`."
 ---
 
-# Profile Construct — Personalize the research buddy from Google Scholar
+# Profile Construct — Personalize Research Avatar from Google Scholar
 
 At the first Skill action in this Codex project session, run
 `python3 -m research_studio.server --ensure-studios` before substantive work.
@@ -12,12 +12,12 @@ This idempotent project bootstrap starts or reuses Research Studio at
 both browser pages. Run it once per session, never launch duplicate servers, and
 surface any startup error instead of claiming that either page is available.
 
-> Restored 2026-07-03 by adapting the origin skill (`Auto-claude-code-research-in-sleep/skills/profile-builder`) to this project after the project skill tree was rebuilt. Kept research-buddy specifics: in-repo `researcher-profile/`, the `tools/` helpers, the six-skill pipeline, and W1–Wn workflow preferences.
+> Restored 2026-07-03 by adapting the origin skill (`Auto-claude-code-research-in-sleep/skills/profile-builder`) to this project after the project skill tree was rebuilt. Kept Research Avatar specifics: in-repo `researcher-profile/`, the `tools/` helpers, the six-skill pipeline, and W1–Wn workflow preferences.
 
 ## Overview
 
 Reads the researcher's **Google Scholar homepage** and distills it into
-**`researcher-profile/PROFILE.md`** at the project-local `researcher-profile/` path (NOT `~/researcher-profile`) — the **single source of truth**. Every
+**`researcher-profile/PROFILE.html`** at the project-local `researcher-profile/` path (NOT `~/researcher-profile`) — the self-contained **single source of truth**. Every
 downstream skill is a consumer:
 
 | Consumer | Reads |
@@ -27,9 +27,9 @@ downstream skill is a consumer:
 | `/ideagen — lens: benchmark` | *Active Venues* + *Niche Subfields* |
 | `/expplan` | *Experiment Templates* + closest-work grounding |
 | `/runplan` | *Experiment Templates* (stack / OOM memory) |
-| `/paperwrite` | the detailed *Writing Style* section in `PROFILE.md` + per-paper `task_type` + BibTeX (from `publications.json`) |
+| `/paperwrite` | the detailed *Writing Style* section in `PROFILE.html` + per-paper `task_type` + BibTeX (from `publications.json`) |
 
-`PROFILE.md` is the only synthesized profile document and canonical profile source. Its rendered HTML is the one human-facing profile. `publications.json` is only the canonical per-publication record; never create a second profile or writing-style companion file.
+`PROFILE.html` is both the only synthesized profile document and the human-facing canonical profile. `publications.json` is only the canonical per-publication record; never create a Markdown profile, second profile, or writing-style companion file.
 
 > **Data source is fixed: Google Scholar.** Semantic Scholar only enriches abstracts/DOIs of
 > papers already on Scholar — it never adds or removes a paper.
@@ -42,13 +42,13 @@ and tell the user to expand fully and re-export** — never profile on a partial
 
 ### Research Studio terminal entry
 
-Run `/profileconstruct` in the terminal with the fully expanded `.html`/`.htm` path. Research Studio only provides copy/open-terminal controls and renders the resulting `PROFILE.md` and `publications.json`; it must not upload Scholar HTML, run this Skill in a web-server background process, duplicate its logic, or maintain a second profile state. `PROFILE.md`, `publications.json`, and `fulltext/` are the only canonical outputs.
+Run `/profileconstruct` in the terminal with the fully expanded `.html`/`.htm` path. Research Studio only provides copy/open-terminal controls and serves the resulting `PROFILE.html` plus `publications.json`; it must not upload Scholar HTML, run this Skill in a web-server background process, duplicate its logic, or maintain a second profile state. `PROFILE.html`, `publications.json`, and `fulltext/` are the only canonical outputs.
 
 ## Pipeline (cheap/deterministic first — W1; cache & never clobber — W2/W3)
 
 All artifacts are built under the in-repo `researcher-profile/` path. The **final directory has a strict whitelist**:
 
-- `PROFILE.md`
+- `PROFILE.html`
 - `publications.json`
 - `fulltext/` (both `pdf/` and extracted `txt/`)
 
@@ -105,7 +105,7 @@ Honesty rule: when a paper straddles two, pick the dominant contribution and not
 - **Abstract-level** (from the abstracts in `publications.json`): argument arc (gap-first vs landscape-first), two-/N-challenge framing, method-naming habit, mechanism-intro phrasing, closing/evaluation cadence, contribution-bullet phrasing.
 - **Whole-paper-level** (from `fulltext/txt/`): read **exactly 15 unique representative full papers**, not just their abstracts. Select them to cover the researcher's major subfields, engineering/theory/benchmark contribution types, earlier/recent periods, and signature/recent work; do not simply take the first 15 downloads. Analyze **section organization** (which sections, in what order, typical lengths) · **Introduction structure** (the role each paragraph plays — hook → gap → approach → contributions list) · **Related Work organization** (thematic vs chronological; how many subsections) · **Method presentation** (subsection-per-module naming, notation conventions, how a module is introduced then formalized) · **paragraph rhetoric** (topic-sentence habits, transition words, how claims are hedged/qualified) · **table/figure conventions** (caption style, what Fig 1 usually is, table density) · **Limitations / Conclusion patterns**. Record these as concrete, reusable observations tied to example papers, so `/paperwrite` can match structure and cadence at the section level, not only the abstract. Head the section by stating it was mined from BOTH abstracts and exactly 15 full papers, listing all 15 unique publication keys. If fewer than 15 verified full texts are available, continue the acquisition ladder; never silently lower the sample count or substitute abstract-only evidence.
 
-Write the detailed, operational style analysis directly inside the **`PROFILE.md` Writing Style section**. It must record its evidence base and include: quantitative abstract tendencies; core voice; abstract blueprint; paragraph-by-paragraph Introduction architecture; Related Work organization; Method/notation/naming conventions; experiment narrative and result-paragraph pattern; figure/table/caption conventions; paragraph/sentence mechanics; limitations/ethics/conclusion patterns; engineering/theory/benchmark variants; anti-imitation safeguards; and a drafting checklist. Tie observations to representative local full texts, distinguish measured tendencies from hard rules, and match structure/cadence without copying prior sentences. Do not generate any second profile or style-guide file.
+Write the detailed, operational style analysis directly inside the **`PROFILE.html` Writing Style section**. It must record its evidence base and include: quantitative abstract tendencies; core voice; abstract blueprint; paragraph-by-paragraph Introduction architecture; Related Work organization; Method/notation/naming conventions; experiment narrative and result-paragraph pattern; figure/table/caption conventions; paragraph/sentence mechanics; limitations/ethics/conclusion patterns; engineering/theory/benchmark variants; anti-imitation safeguards; and a drafting checklist. Tie observations to representative local full texts, distinguish measured tendencies from hard rules, and match structure/cadence without copying prior sentences. Do not generate any Markdown profile, second profile, or style-guide file.
 
 **Phase 5 — Tacit knowledge (optional, non-blocking)**: reviewer-pushback themes / experiments they refuse to redo / recurring pitfalls seed *Known Dead-Ends*. You MAY ask the researcher for these if she is present, but this does NOT gate profile generation — if she doesn't supply them, seed *Known Dead-Ends* from the mined history + publications and move on. Never block the profile on an interview or a confirmation.
 
@@ -116,23 +116,33 @@ python3 tools/experiment_history.py --events .aris/meta/events.jsonl --output "r
 python3 tools/workflow_prefs.py --transcripts "<compatible-transcript-dir-or-jsonl>" --output "researcher-profile/prefs_bundle.json"
 ```
 - **Fold `habits.json` → *Experiment Templates*** (deterministic): habitual launcher · framework/deps · base-model backbone · GPUs · failure memory (OOM hits, top error types). **Do NOT write hyperparameter values** (lr/batch/epochs/seed) — those are task-determined, decided by `/expplan`.
-- **Fold `prefs_bundle.json` → *Workflow Preferences* W1–Wn** (LLM-distill, written directly — NO confirmation gate): cluster recurring candidates into 1-line preference statements, each with an evidence quote + why/how-to-apply; discard project-specific one-offs. **Write them straight from the mining** — Workflow Preferences are descriptive mined data, not a research decision, so this step does NOT stop to confirm them; if one is off, the researcher edits `PROFILE.md` directly. **The count is emergent — write as many W's as the mining yields, NOT a fixed 7.**
+- **Fold `prefs_bundle.json` → *Workflow Preferences* W1–Wn** (LLM-distill, written directly — NO confirmation gate): cluster recurring candidates into 1-line preference statements, each with an evidence quote + why/how-to-apply; discard project-specific one-offs. **Write them straight from the mining** — Workflow Preferences are descriptive mined data, not a research decision, so this step does NOT stop to confirm them; if one is off, the researcher edits `PROFILE.html` directly. **The count is emergent — write as many W's as the mining yields, NOT a fixed 7.**
 
-**Phase 7 — Write the single profile**: write `PROFILE.md` with sections: header (source/affiliation/stats/generated/publications + ⚠ if truncated) · Research Identity · Research Lineage · the complete Writing Style analysis specified in Phase 4 · Experiment Templates · Workflow Preferences (W1–Wn table — as many as mined) · one short **Publication Records** pointer to `publications.json`. Never copy a per-paper Publications Index or BibTeX bank into `PROFILE.md`; `publications.json` is the sole detailed publication source and Research Studio renders it for people. Do not generate `PROFILE.<lang>.md` or another profile companion.
+**Phase 7 — Write the single profile**: write one self-contained `PROFILE.html` with inline CSS and the fixed sections below: source/coverage header · Research Identity · Research Lineage · the complete Writing Style analysis specified in Phase 4 · Experiment Templates · Workflow Preferences (W1–Wn table — as many as mined) · one short **Publication Records** pointer to `publications.json`. Never copy a per-paper Publications Index or BibTeX bank into `PROFILE.html`; `publications.json` is the sole detailed publication source. Do not generate `PROFILE.md`, `PROFILE.<lang>.html`, or another profile companion.
 
-**Phase 8 — Refresh and cleanup**: refresh `PROFILE.md` in place while preserving/merging Experiment Templates and Tacit Knowledge (W2/W3 — a stop mid-crawl must not destroy the existing profile). Mechanically verify that its Writing Style evidence list contains exactly 15 unique full-paper keys. Before declaring success, delete everything in `researcher-profile/` except `PROFILE.md`, `publications.json`, and `fulltext/`, mechanically verify that whitelist, and remove any obsolete profile companion so two profile sources cannot drift.
+**Phase 8 — Refresh and cleanup**: refresh `PROFILE.html` transactionally while preserving/merging Experiment Templates and Tacit Knowledge (W2/W3 — a stop mid-crawl must not destroy the existing profile). Mechanically verify that its Writing Style evidence list contains exactly 15 unique full-paper keys. Before declaring success, delete everything in `researcher-profile/` except `PROFILE.html`, `publications.json`, and `fulltext/`, mechanically verify that whitelist, and remove any obsolete Markdown or profile companion so two profile sources cannot drift. Run `python3 tools/validate_report_structure.py --kind profile --html researcher-profile/PROFILE.html` before completion.
 
 ## Key rules
 - **Google Scholar decides the paper list.** S2 only enriches; never adds/drops.
 - **Stop on truncation.** A partial record poisons every downstream skill.
 - **Label honestly.** Every `task_type` traces to title/venue/abstract; never invent publications or habits.
 - **All PDFs are a mandatory outcome.** Exhaust the source ladder for every Scholar row; browser-assisted discovery/download is allowed and expected when shell networking is throttled. A representative-only corpus or any unresolved row is not completion.
-- **Strict final directory.** `researcher-profile/` contains only `PROFILE.md`, `publications.json`, and `fulltext/`.
-- **Detailed style stays inside the single profile.** Refresh the complete `PROFILE.md` Writing Style section from abstracts plus exactly 15 unique representative full papers on every successful profile construction; never split it into another file.
-- **No duplicated publication index.** Keep counts, coverage, signature works, and research-line summaries in `PROFILE.md`; keep every per-paper row, abstract, citation count, `task_type`, BibTeX entry, and full-text status only in `publications.json`.
-- **Descriptive, not a claim; NO confirmation gate** — a profile (incl. Workflow Preferences) is mined data, not a research verdict, so this step writes it straight through and does NOT stop to confirm anything. The researcher reviews by editing `PROFILE.md`. This is deliberately distinct from the research gates in `/ideagen`…`/paperwrite`, which DO stop for the human — profile-building is data prep, not a judgment.
+- **Strict final directory.** `researcher-profile/` contains only `PROFILE.html`, `publications.json`, and `fulltext/`.
+- **Detailed style stays inside the single profile.** Refresh the complete `PROFILE.html` Writing Style section from abstracts plus exactly 15 unique representative full papers on every successful profile construction; never split it into another file.
+- **No duplicated publication index.** Keep counts, coverage, signature works, and research-line summaries in `PROFILE.html`; keep every per-paper row, abstract, citation count, `task_type`, BibTeX entry, and full-text status only in `publications.json`.
+- **Descriptive, not a claim; NO confirmation gate** — a profile (incl. Workflow Preferences) is mined data, not a research verdict, so this step writes it straight through and does NOT stop to confirm anything. The researcher reviews by editing `PROFILE.html`. This is deliberately distinct from the research gates in `/ideagen`…`/paperwrite`, which DO stop for the human — profile-building is data prep, not a judgment.
 - **Network throttle ≠ no network.** When S2/arXiv-API return 429 in sandbox Bash, fall back to direct `arxiv.org/abs|pdf/<id>` plus the local browser or `web open/fetch`/`web search`. Mark abstract and PDF coverage honestly and note unresolved failures in `publications.json`; never fabricate.
 
 ## Fixed profile page structure
 
-Research Studio renders the single `PROFILE.md` as one fixed page: source/coverage header → Research Identity → Research Lineage → complete Writing Style → Experiment Templates → Workflow Preferences → short Publication Records pointer. Vary only the profile content inside these headings. Do not create extra profile tabs, upload controls, publication-index sections, or companion profile pages. The Live Demo must show these same slots with illustrative content.
+Write the canonical profile directly as one fixed HTML page. Preserve this exact visible order, exact section names, and exact `data-report-section` IDs:
+
+1. `Source and Coverage` (`source-coverage`);
+2. `Research Identity` (`research-identity`);
+3. `Research Lineage` (`research-lineage`);
+4. `Writing Style` (`writing-style`);
+5. `Experiment Templates` (`experiment-templates`);
+6. `Workflow Preferences` (`workflow-preferences`);
+7. `Publication Records` (`publication-records`).
+
+Use one `<section data-report-section="…">` and one matching visible `<h2>` for every slot. Vary only their content and task-specific nested headings. Do not add, rename, reorder, or omit a top-level section. Do not create extra profile tabs, upload controls, publication-index sections, or companion profile pages. Every top-level title must contain substantive, researcher-specific content; an empty heading, placeholder-only body, or title-only structure list fails the contract. The Live Demo must show all seven slots with filled illustrative content.

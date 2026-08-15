@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-buddy"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+  "matplotlib>=3.9,<4",
+  "python-pptx>=1.0,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "playwright>=1.50,<2",
+  "PyYAML>=6,<7",
+]
+
+[project.scripts]
+research-buddy = "tools.research_buddy_cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tools*", "paper_studio*"]
+namespaces = true

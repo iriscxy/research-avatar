@@ -10,7 +10,7 @@ This idempotent project bootstrap starts or reuses Research Studio at
 both browser pages. Run it once per session, never launch duplicate servers, and
 surface any startup error instead of claiming that either page is available.
 
-Read `researcher-profile/PROFILE.md` first for the synthesized profile and `researcher-profile/publications.json` for per-paper metadata, BibTeX, and full-text paths. If either is absent, tell the user to run `$profileconstruct`. Never expect a duplicated Publications Index inside `PROFILE.md`.
+Read `researcher-profile/PROFILE.html` first for the synthesized profile and `researcher-profile/publications.json` for per-paper metadata, BibTeX, and full-text paths. If either is absent, tell the user to run `$profileconstruct`. Never expect a duplicated Publications Index inside `PROFILE.html`.
 
 Do not replace a missing researcher profile or owned structure paper with a synthetic profile or an external author. Record the verified researcher identity and selected publication key in `profile_contract`; the structure reference must match that key. If no owned full text is available, stop for `$profileconstruct` rather than weakening personalization.
 
@@ -316,16 +316,29 @@ full resolved decision in the hidden contract. In the visible Projected Paper:
   and why it supplies a distinct control or comparison role. Describe an
   individual baseline separately only when its role is unique. Do not emit an
   unexplained list of names or invent one paragraph per method mechanically;
-- immediately after the Setup prose, show one concise implementation-source
-  entry for every selected baseline and the proposed method. Each entry names
-  exactly one resolved mode (`REUSE_OFFICIAL_MODULE`,
-  `SOURCE_GUIDED_REIMPLEMENT`, `PAPER_GUIDED_REIMPLEMENT`, or
-  `SELF_IMPLEMENT`), links the approved GitHub/paper source when one exists,
-  states which module is reused versus written locally, and names the shared
-  framework boundary. Do not hide this only in repository metadata and do not
-  use ambiguous language such as “reuse or reimplement.” Store the identical
-  ordered list as `implementation_contract` in the embedded contract so
-  `$runplan` can inherit it without reinterpretation;
+- immediately after the Setup prose, show a two-column implementation table:
+  `Method` and `How it is implemented`. Each row directly commits to one
+  implementation. If verified official code will actually be used, name the
+  reused modules, the local adapter work, and link the direct official GitHub.
+  Otherwise say `Local implementation` and name the components implemented;
+  show no implementation-source link. Never expose separate mode, source-type,
+  reuse/write-boundary, shared-boundary, or fallback columns to the reader.
+  Make the common execution architecture explicit inside each row: baselines
+  are implemented in the same local model/data/trace/generation/evaluator
+  framework as the proposed method, while official modules are integrated into
+  that framework through an adapter. Label the proposed row visibly as
+  `Our method — <name>` so it cannot be mistaken for another baseline.
+  Paper links remain scientific citations in Setup and never appear as code
+  sources. Store the identical row order plus the full engineering details as
+  `implementation_contract` in the embedded contract so `$runplan` can inherit
+  it without reinterpretation. Each record requires `implementation_summary`.
+  Official-code records use `OFFICIAL_GITHUB` plus
+  `SOURCE_GUIDED_REIMPLEMENT` or `REUSE_OFFICIAL_MODULE` and a verified direct
+  GitHub URL. Every other record uses `SELF_IMPLEMENT`, `LOCAL`, and an empty
+  `source_url`; `PAPER_SPEC` and `PAPER_GUIDED_REIMPLEMENT` are not valid
+  implementation-source decisions. Keep `paper_url`, `repository_status`,
+  `upstream_reuse`, `local_implementation`, `shared_boundary`, and `fallback`
+  only in the hidden contract for grounding and execution checks;
 - approved metrics/datasets/settings appear directly as columns, axes, or
   panels;
 - in Setup, give every metric its provenance class (`DIRECT`, `ADAPTED`, or
@@ -660,7 +673,7 @@ returning to the final gate.
   the same series names and point order in the table and preview. Predefined
   Give every pending numeric source-table cell a stable non-visible
   `data-target-id` and include those cell IDs—not only a coarse panel ID—in the
-  artifact's `result_requirements`. `$runplan` and `04_EXP_RESULT.html` must
+  artifact's `result_requirements`. `$runplan` and `05_EXP_RESULT.html` must
   later fill these exact cells from validated ledger rows and generate the
   final plot from the displayed values; they must not create a second plot-only
   data source.
@@ -724,8 +737,8 @@ and artifact shells. Do not turn them into extra visible web sections:
 7. **Paper consistency coverage** — `consistency_requirements` lists exactly every selected baseline/metric ID, decision ID, and claim marked `requires_formal_check`; `$paperwrite` must bind each to manuscript evidence instead of choosing a convenient subset.
 8. **Budget** — rough GPU-hours per experiment block; flag runs longer than one day for sign-off.
 
-**Embedded contract schema (required):** use top-level keys
-`schema_version`, `source_plan`, `approval_status`, `profile_contract`,
+**Embedded contract schema (required):** new plans use `schema_version: "1.1"` and top-level keys
+`schema_version`, `contract_version`, `revision_history`, `source_plan`, `approval_status`, `profile_contract`,
 `target`, `references`, `dataset_confirmation`, `grounding`, `claims`, `variables`,
 `baseline_contract`, `repository_contract`, `experiment_contracts`,
 `metric_contract`, `decision_space_contract`, `consistency_requirements`,
@@ -741,6 +754,11 @@ figures additionally record their required-data table, plotting source, fixture,
 and generated PDF/PNG paths and set `data_driven: true`. Conceptual method or
 overview figures set `data_driven: false` and are exempt from numeric fixtures
 and Python plotting.
+`revision_history` starts at version 1 and records `changed_at`, a concrete `reason`,
+`changed_fields`, and compatibility impact. Any approved-contract amendment increments
+`contract_version`, stores the prior approval digest as `parent_approval_sha256`, resets
+approval to pending, and requires a new approval whose `approval_contract_version`
+equals the current version.
 Add `dimensions` when a result is broken down by
 dataset/game/model/seed/condition. `paper_outline` records the ordered sections
 and paragraph rows described above. Every paragraph record contains `id`,
@@ -780,4 +798,19 @@ without changing table/figure semantics is a presentation refresh and preserves 
 
 ## Fixed HTML structure
 
-Render `03_EXPERIMENT_PLAN.html` only as: (1) target conference and exactly two reference papers, (2) Projected Paper title/abstract/one-line float budget/complete paragraph blueprint, (3) paper-shaped table and figure shells inline at their planned paragraphs, (4) compact claim → falsifier → evidence mapping, (5) compact implementation plan for the proposed method and selected baselines, and (6) budget plus stop/refine/pivot criteria and approval gate. Keep machine contracts in hidden JSON. Do not add visible registries, acquisition audits, grounding appendices, workflow logs, or generic dashboards. Research Studio adds only the approval control; the Live Demo must show these same slots with illustrative pending cells.
+Render `03_EXPERIMENT_PLAN.html` with exactly three ordered top-level sections (`<section data-report-section>` and visible `<h2>` text must agree):
+
+1. `1. Target Conference and Reference Papers` (`target-and-references`);
+2. `2. Projected Paper` (`projected-paper`);
+3. `3. Approval` (`approval`).
+
+Inside `Projected Paper`, use exactly these ordered visible subsections:
+
+1. `2.1 Projected Title and Abstract` (`projected-title-abstract`);
+2. `2.2 Figure/Table Count` (`figure-table-count`), containing only the required one-line whole-paper count;
+3. `2.3 Paragraph Blueprint and Evidence Shells` (`paragraph-blueprint`), including every paper section and each paper-shaped table/figure shell at its first planned paragraph;
+4. `2.4 Claim–Falsifier–Evidence` (`claim-falsifier-evidence`);
+5. `2.5 Implementation Plan` (`implementation-plan`), covering the proposed method and every selected baseline;
+6. `2.6 Budget and Decision Criteria` (`budget-decision-criteria`), covering budget plus stop/refine/pivot criteria.
+
+Keep the machine contract in hidden JSON and keep the approval control inside the third top-level section. Every top-level title and Projected Paper subtitle must own substantive plan-specific content; an empty section, title-only slot, or placeholder-only body is invalid (pending numeric cells remain valid evidence shells when their acquisition requirements are filled). Do not add, rename, reorder, or omit these top-level sections or Projected Paper subsections. Do not add visible registries, acquisition audits, grounding appendices, workflow logs, or generic dashboards. Before the approval gate, run `python3 tools/validate_report_structure.py --kind expplan --html reports/03_EXPERIMENT_PLAN.html` before the experiment-plan validator. Research Studio adds only the approval control; the Live Demo must display this exact hierarchy with filled illustrative content and pending result cells.

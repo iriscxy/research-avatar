@@ -10,7 +10,7 @@ This idempotent project bootstrap starts or reuses Research Studio at
 both browser pages. Run it once per session, never launch duplicate servers, and
 surface any startup error instead of claiming that either page is available.
 
-Read `researcher-profile/PROFILE.md` first for the synthesized profile and `researcher-profile/publications.json` for per-paper metadata, BibTeX, and full-text paths. If either is absent, tell the user to run `/profileconstruct`. Never expect a duplicated Publications Index inside `PROFILE.md`.
+Read `researcher-profile/PROFILE.html` first for the synthesized profile and `researcher-profile/publications.json` for per-paper metadata, BibTeX, and full-text paths. If either is absent, tell the user to run `/profileconstruct`. Never expect a duplicated Publications Index inside `PROFILE.html`.
 
 Do not replace a missing researcher profile or owned structure paper with a synthetic profile or an external author. Record the verified researcher identity and selected publication key in `profile_contract`; the structure reference must match that key. If no owned full text is available, stop for `/profileconstruct` rather than weakening personalization.
 
@@ -32,7 +32,7 @@ Do not replace a missing researcher profile or owned structure paper with a synt
 - **Minimal reader-facing section order:** render only `1. Target Conference and Reference Papers` (exactly three entries: target conference, external mechanism reference, researcher-owned structure reference) → `2. Projected Paper` (title, PROJECTED abstract, one concrete planning sentence for every paragraph in every section, inline fillable empirical result shells, compact artifact ledger, page-fill check) → `3. Approval`. Do not put the research question, implementation architecture, datasets, metrics, baselines, or any other contract material in Section 1. Do not render separate visible sections for claims, method/data/variables, experiment matrices, baseline registries, repository audits, run order, configs, budgets, risks, or grounding appendices. Those remain necessary internal design/decision inputs and machine-readable contract fields; Projected Paper must embody their paper-facing consequences.
 - **Keep the research contract and decision meetings unchanged.** Preserve the existing venue, two-reference, baseline/reuse, repository, and final approval gates and their order. This revision changes what `2. Projected Paper` renders and what its signed artifact/result contract contains; it does not bypass or merge any human decision.
 - **Skill-test / fabricate-data run:** if this plan is part of an explicit skill-test (the downstream `results/` will be fabricated to exercise the pipeline), `03` must carry the same loud banner as the rest of the artifact set — `SKILL-TEST — fabricated data, NOT a scientific result` — at the top, so the whole `03`/`05` + paper set is consistently marked and none can pass as real (AGENTS.md discipline #1). The plan's own numbers stay `[X%]` placeholders marked PROJECTED regardless.
-- **Self-contained HTML, never Markdown** — inline `<style>`, no external assets, real structure (`<h1>/<h2>`, `<table>`, `<ul>`); use **continuous tables as the primary layout** for structured content, never card/grid layouts. Embed projected PNG previews as `data:` URLs. Keep the table-first figure contract in `paper/figsrc/<project>/figure_schema.json`, reusable plotting code in `paper/fig/make_figs.py`, schema-conforming synthetic inputs in `paper/figsrc/<project>/projected_fixture.json`, and projected PDF/PNG outputs in `paper/fig/<project>/projected/`, so `$paperwrite` reuses the same schema/code and swaps only the metrics input. **Every paper reference a direct `<a href>`** to arXiv/DOI, unverifiable → visible `pending`, never fabricated.
+- **Self-contained HTML, never Markdown** — inline `<style>`, no external assets, real structure (`<h1>/<h2>`, `<table>`, `<ul>`); use **continuous tables as the primary layout** for structured content, never card/grid layouts. Embed projected PNG previews as `data:` URLs. Keep the table-first figure contract in `paper/figsrc/<project>/figure_schema.json`, reusable plotting code in `paper/fig/make_figs.py`, schema-conforming synthetic inputs in `paper/figsrc/<project>/projected_fixture.json`, and projected PDF/PNG outputs in `paper/fig/<project>/projected/`, so `/paperwrite` reuses the same schema/code and swaps only the metrics input. **Every paper reference a direct `<a href>`** to arXiv/DOI, unverifiable → visible `pending`, never fabricated.
 - **Math variables must render as proper notation, not raw ASCII in a `<code>` span.** A subscripted or Greek variable like `b_dir` / `s_si` / `Δ_cross` / `θ*` / `Pz` reads as a defect when shown as `<code>s_si</code>`. Render it natively with italic `<var>` + `<sub>` + Unicode Greek — `<var>b<sub>dir</sub></var>`, `<var>s<sub>si</sub></var>`, `<var>&Delta;<sub>cross</sub></var>`, `<var>&theta;*</var>`, `<var>P<sub>z</sub></var>` — with a one-line style rule (`var{font-family:Georgia,serif;font-style:italic} var sub{font-style:normal;font-size:.72em}`). No external MathJax/KaTeX (breaks self-containment); these are simple subscripted vars, so `<var>/<sub>` suffices and renders with zero JS. Keep raw `results/` JSON field keys (e.g. `sim_runs.json:Pz`) as `<code>` — those are literal identifiers, not math.
 - `reports/03_EXPERIMENT_PLAN.html` is the single canonical plan that `/runplan` reads. Address the researcher directly, never in the third person.
 
@@ -316,16 +316,29 @@ full resolved decision in the hidden contract. In the visible Projected Paper:
   and why it supplies a distinct control or comparison role. Describe an
   individual baseline separately only when its role is unique. Do not emit an
   unexplained list of names or invent one paragraph per method mechanically;
-- immediately after the Setup prose, show one concise implementation-source
-  entry for every selected baseline and the proposed method. Each entry names
-  exactly one resolved mode (`REUSE_OFFICIAL_MODULE`,
-  `SOURCE_GUIDED_REIMPLEMENT`, `PAPER_GUIDED_REIMPLEMENT`, or
-  `SELF_IMPLEMENT`), links the approved GitHub/paper source when one exists,
-  states which module is reused versus written locally, and names the shared
-  framework boundary. Do not hide this only in repository metadata and do not
-  use ambiguous language such as “reuse or reimplement.” Store the identical
-  ordered list as `implementation_contract` in the embedded contract so
-  `/runplan` can inherit it without reinterpretation;
+- immediately after the Setup prose, show a two-column implementation table:
+  `Method` and `How it is implemented`. Each row directly commits to one
+  implementation. If verified official code will actually be used, name the
+  reused modules, the local adapter work, and link the direct official GitHub.
+  Otherwise say `Local implementation` and name the components implemented;
+  show no implementation-source link. Never expose separate mode, source-type,
+  reuse/write-boundary, shared-boundary, or fallback columns to the reader.
+  Make the common execution architecture explicit inside each row: baselines
+  are implemented in the same local model/data/trace/generation/evaluator
+  framework as the proposed method, while official modules are integrated into
+  that framework through an adapter. Label the proposed row visibly as
+  `Our method — <name>` so it cannot be mistaken for another baseline.
+  Paper links remain scientific citations in Setup and never appear as code
+  sources. Store the identical row order plus the full engineering details as
+  `implementation_contract` in the embedded contract so `/runplan` can inherit
+  it without reinterpretation. Each record requires `implementation_summary`.
+  Official-code records use `OFFICIAL_GITHUB` plus
+  `SOURCE_GUIDED_REIMPLEMENT` or `REUSE_OFFICIAL_MODULE` and a verified direct
+  GitHub URL. Every other record uses `SELF_IMPLEMENT`, `LOCAL`, and an empty
+  `source_url`; `PAPER_SPEC` and `PAPER_GUIDED_REIMPLEMENT` are not valid
+  implementation-source decisions. Keep `paper_url`, `repository_status`,
+  `upstream_reuse`, `local_implementation`, `shared_boundary`, and `fallback`
+  only in the hidden contract for grounding and execution checks;
 - approved metrics/datasets/settings appear directly as columns, axes, or
   panels;
 - in Setup, give every metric its provenance class (`DIRECT`, `ADAPTED`, or
@@ -647,7 +660,7 @@ returning to the final gate.
   Structure multi-panel code as `draw_panel_*()` functions. With
   `synthetic: true`, draw `PROJECTED SHAPE — NOT RESULTS` prominently. Missing
   input must fail rather than default, interpolate, or invent. Embed the PNG in
-  `03` as a data URL and retain script/PDF/PNG for `$paperwrite`; the paper run
+  `03` as a data URL and retain script/PDF/PNG for `/paperwrite`; the paper run
   reuses the code and replaces only `--metrics` with validated results.
   Render each panel as its own preview beside exactly one corresponding data
   requirement table; never place several panels beside one combined table.
@@ -660,7 +673,7 @@ returning to the final gate.
   the same series names and point order in the table and preview. Predefined
   Give every pending numeric source-table cell a stable non-visible
   `data-target-id` and include those cell IDs—not only a coarse panel ID—in the
-  artifact's `result_requirements`. `/runplan` and `04_EXP_RESULT.html` must
+  artifact's `result_requirements`. `/runplan` and `05_EXP_RESULT.html` must
   later fill these exact cells from validated ledger rows and generate the
   final plot from the displayed values; they must not create a second plot-only
   data source.
@@ -716,7 +729,7 @@ contract and let their paper-facing consequences appear in the paragraph plan
 and artifact shells. Do not turn them into extra visible web sections:
 
 1. **Claims → evidence → variables** — map each claim through experiment, observable, raw field, and computation to its metrics. Its `measurement_contract` records construct, direct/proxy role, limits/alternatives/companions, uncertainty, and support/weaken/falsify patterns. No measurable chain or only an unsupported proxy means narrow the claim or add direct evidence.
-2. **Systems, datasets, metrics, and baselines** — freeze the method, selected baselines, and source actions in hidden `grounding`. Determine datasets and metrics directly in each projected main result table and caption/note; do not create dataset or metric registries. The visible table must make both unambiguous without hidden JSON. Do not discuss, decide, require, render, store, or validate train/dev/test splits in `$expplan`; they are entirely outside this skill's contract. Resolve conflicts in dataset or metric meaning at the existing decision meeting.
+2. **Systems, datasets, metrics, and baselines** — freeze the method, selected baselines, and source actions in hidden `grounding`. Determine datasets and metrics directly in each projected main result table and caption/note; do not create dataset or metric registries. The visible table must make both unambiguous without hidden JSON. Do not discuss, decide, require, render, store, or validate train/dev/test splits in `/expplan`; they are entirely outside this skill's contract. Resolve conflicts in dataset or metric meaning at the existing decision meeting.
 3. **Variable feasibility and provenance** — for every variable record `used_in`, `purpose`, `source`, `required_observable`, `available_now`, `fallback_or_proxy`, `raw_field`, and evidence grade. Do not mention a variable in the blueprint or an artifact unless it exists in this hidden record.
 4. **Ablation contract** — one record per ablated component; each changes exactly one variable versus the full method and maps to approved artifact targets.
 5. **Execution dependency sketch** — instrumentation sanity → generation smoke → baseline → diagnosis/main pilot → ablation → polish. This is not the final run schedule: `/runplan` later converts it into goals. Instrumentation sanity must verify raw fields and computation paths for every planned variable.
@@ -724,8 +737,8 @@ and artifact shells. Do not turn them into extra visible web sections:
 7. **Paper consistency coverage** — `consistency_requirements` lists exactly every selected baseline/metric ID, decision ID, and claim marked `requires_formal_check`; `/paperwrite` must bind each to manuscript evidence instead of choosing a convenient subset.
 8. **Budget** — rough GPU-hours per experiment block; flag runs longer than one day for sign-off.
 
-**Embedded contract schema (required):** use top-level keys
-`schema_version`, `source_plan`, `approval_status`, `profile_contract`,
+**Embedded contract schema (required):** new plans use `schema_version: "1.1"` and top-level keys
+`schema_version`, `contract_version`, `revision_history`, `source_plan`, `approval_status`, `profile_contract`,
 `target`, `references`, `dataset_confirmation`, `grounding`, `claims`, `variables`,
 `baseline_contract`, `repository_contract`, `experiment_contracts`,
 `metric_contract`, `decision_space_contract`, `consistency_requirements`,
@@ -741,6 +754,11 @@ figures additionally record their required-data table, plotting source, fixture,
 and generated PDF/PNG paths and set `data_driven: true`. Conceptual method or
 overview figures set `data_driven: false` and are exempt from numeric fixtures
 and Python plotting.
+`revision_history` starts at version 1 and records `changed_at`, a concrete `reason`,
+`changed_fields`, and compatibility impact. Any approved-contract amendment increments
+`contract_version`, stores the prior approval digest as `parent_approval_sha256`, resets
+approval to pending, and requires a new approval whose `approval_contract_version`
+equals the current version.
 Add `dimensions` when a result is broken down by
 dataset/game/model/seed/condition. `paper_outline` records the ordered sections
 and paragraph rows described above. Every paragraph record contains `id`,
@@ -761,14 +779,14 @@ row/column locator. For local work, `experiment_id` must resolve to an
 `experiment_contracts` entry that references the table-defined dataset/metric
 semantics and fixes only experiment-specific variables/raw fields, computation,
 seed/uncertainty exceptions, authorized decision-space IDs, and repository
-authority. Split selection is absent here and added by `$runplan`. This is the scientific source
+authority. Split selection is absent here and added by `/runplan`. This is the scientific source
 contract that `/runplan` later turns into an executable acquisition contract;
 it is not yet a goal schedule. Use `[]` for a required non-empty list. Before approval, set
 `approval_status` to `pending`.
 
 **GATE (human is judge — enforce it, don't just present):** in the approval conversation, summarize claims, selected baseline coverage/actions, exact reuse sources, omitted-Required risks, repository authority/fallbacks, the reference-aligned one-sentence-per-paragraph blueprint, every inline figure/table shell and its unfilled targets, variable feasibility, ablations, first three dependency-sketch experiments, budget, and artifact placement. Do not add these as extra visible HTML sections. Baseline and repository contracts must be resolved before the final HTML is written, so the GATE asks only for approval or revision of the complete plan. Reject the plan before this gate if any claim lacks a valid measurement contract, a proxy is asked to establish a stronger construct without a companion direct measure/control, any researcher-controlled decision is outside the authorized decision-space contract, any section/subsection omits its planned paragraphs, any paragraph lacks exactly one concrete planning sentence, any promised artifact lacks a visible shell, any numeric shell cell lacks exactly one result requirement, any result requirement lacks a single authorized source action and experiment/source locator, or any required target cannot be deterministically acquired. **Then STOP and call `ask the user directly`** for the researcher to `approve` / `revise` the plan (offer those options; `revise` collects what to change) — exactly as the intermediate baseline/reuse/repository gates already do. **Do NOT auto-proceed to `/runplan`; wait for the researcher's approval token.** This holds even in a skill-test run (fabricated data does not skip the gate).
 
-Before presenting the gate, run `python .agents/skills/expplan/scripts/validate_experiment_plan.py --plan reports/03_EXPERIMENT_PLAN.html`. Fix every failure. This validator enforces table-owned dataset/metric semantics, no expplan split, Python-generated projected figures, fixture isolation, target coverage, and non-visible internal result IDs.
+Before presenting the gate, run `python .claude/skills/expplan/scripts/validate_experiment_plan.py --plan reports/03_EXPERIMENT_PLAN.html`. Fix every failure. This validator enforces table-owned dataset/metric semantics, no expplan split, Python-generated projected figures, fixture isolation, target coverage, and non-visible internal result IDs.
 
 On `approve`, set the embedded contract's `approval_status` to `approved` and
 validate that every artifact in the visible HTML ledger appears once in that
@@ -780,4 +798,19 @@ without changing table/figure semantics is a presentation refresh and preserves 
 
 ## Fixed HTML structure
 
-Render `03_EXPERIMENT_PLAN.html` only as: (1) target conference and exactly two reference papers, (2) Projected Paper title/abstract/one-line float budget/complete paragraph blueprint, (3) paper-shaped table and figure shells inline at their planned paragraphs, (4) compact claim → falsifier → evidence mapping, (5) compact implementation plan for the proposed method and selected baselines, and (6) budget plus stop/refine/pivot criteria and approval gate. Keep machine contracts in hidden JSON. Do not add visible registries, acquisition audits, grounding appendices, workflow logs, or generic dashboards. Research Studio adds only the approval control; the Live Demo must show these same slots with illustrative pending cells.
+Render `03_EXPERIMENT_PLAN.html` with exactly three ordered top-level sections (`<section data-report-section>` and visible `<h2>` text must agree):
+
+1. `1. Target Conference and Reference Papers` (`target-and-references`);
+2. `2. Projected Paper` (`projected-paper`);
+3. `3. Approval` (`approval`).
+
+Inside `Projected Paper`, use exactly these ordered visible subsections:
+
+1. `2.1 Projected Title and Abstract` (`projected-title-abstract`);
+2. `2.2 Figure/Table Count` (`figure-table-count`), containing only the required one-line whole-paper count;
+3. `2.3 Paragraph Blueprint and Evidence Shells` (`paragraph-blueprint`), including every paper section and each paper-shaped table/figure shell at its first planned paragraph;
+4. `2.4 Claim–Falsifier–Evidence` (`claim-falsifier-evidence`);
+5. `2.5 Implementation Plan` (`implementation-plan`), covering the proposed method and every selected baseline;
+6. `2.6 Budget and Decision Criteria` (`budget-decision-criteria`), covering budget plus stop/refine/pivot criteria.
+
+Keep the machine contract in hidden JSON and keep the approval control inside the third top-level section. Every top-level title and Projected Paper subtitle must own substantive plan-specific content; an empty section, title-only slot, or placeholder-only body is invalid (pending numeric cells remain valid evidence shells when their acquisition requirements are filled). Do not add, rename, reorder, or omit these top-level sections or Projected Paper subsections. Do not add visible registries, acquisition audits, grounding appendices, workflow logs, or generic dashboards. Before the approval gate, run `python3 tools/validate_report_structure.py --kind expplan --html reports/03_EXPERIMENT_PLAN.html` before the experiment-plan validator. Research Studio adds only the approval control; the Live Demo must display this exact hierarchy with filled illustrative content and pending result cells.

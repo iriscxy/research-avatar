@@ -9,7 +9,7 @@ ones that carry a *preference signal* (mandates, prohibitions, trade-offs,
 corrections, process/order cues, rigor cues). It does NOT decide the final
 preferences — that is an LLM judgement made by the consuming skill, which reads
 this bundle and distills 1-line preference statements for the user to confirm
-before they land in ``PROFILE.md`` (*Workflow Preferences* / *Tacit
+before they land in ``PROFILE.html`` (*Workflow Preferences* / *Tacit
 Knowledge*).
 
 Why a bundle, not an answer: "I always smoke-test on 1 epoch first" is a behaviour

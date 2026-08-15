@@ -1,2 +1,1 @@
-"""Unified local control plane for the Research Buddy workflow."""
-
+"""Unified local control plane for the Research Avatar workflow."""

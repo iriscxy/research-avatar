@@ -30,7 +30,13 @@ CONTRACT_RE = re.compile(
     r"(.*?)</script>",
     re.DOTALL | re.IGNORECASE,
 )
-APPROVAL_FIELDS = {"approval_status", "approved_at", "approval_channel", "approval_contract_sha256"}
+APPROVAL_FIELDS = {
+    "approval_status",
+    "approved_at",
+    "approval_channel",
+    "approval_contract_sha256",
+    "approval_contract_version",
+}
 
 
 def contract_digest(contract: dict[str, Any]) -> str:
@@ -73,13 +79,20 @@ def expand_tex(path: Path, seen: set[Path] | None = None) -> str:
 
 
 def get_path(value: Any, dotted: str) -> tuple[bool, Any]:
-    """Resolve a dotted path; ``[]`` means any list element."""
+    """Resolve a dotted path; ``[]``/``*`` expand list or mapping members."""
     nodes = [value]
     for raw_part in dotted.split("."):
+        expand_members = raw_part == "*"
         any_item = raw_part.endswith("[]")
         part = raw_part[:-2] if any_item else raw_part
         next_nodes: list[Any] = []
         for node in nodes:
+            if expand_members:
+                if isinstance(node, list):
+                    next_nodes.extend(node)
+                elif isinstance(node, dict):
+                    next_nodes.extend(node.values())
+                continue
             if not isinstance(node, dict) or part not in node:
                 continue
             selected = node[part]
@@ -92,6 +105,95 @@ def get_path(value: Any, dotted: str) -> tuple[bool, Any]:
             return False, None
         nodes = next_nodes
     return True, nodes
+
+
+def nonempty_result(value: Any) -> bool:
+    """Treat JSON null and empty containers/strings as missing evidence."""
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict)):
+        return bool(value) and all(nonempty_result(item) for item in (
+            value.values() if isinstance(value, dict) else value
+        ))
+    return True
+
+
+def json_type_matches(value: Any, expected: str) -> bool:
+    expected = expected.lower()
+    if expected in {"array", "list"}:
+        return isinstance(value, list)
+    if expected in {"object", "dict"}:
+        return isinstance(value, dict)
+    if expected in {"number", "numeric"}:
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if expected in {"integer", "int"}:
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected in {"string", "str"}:
+        return isinstance(value, str)
+    if expected in {"boolean", "bool"}:
+        return isinstance(value, bool)
+    return False
+
+
+def parse_result_selector(selector: str) -> tuple[str | None, str]:
+    """Split ``results/file.json:path`` while preserving legacy dotted paths."""
+    file_name, separator, dotted = selector.partition(":")
+    if separator and file_name.lower().endswith(".json"):
+        return file_name, dotted
+    return None, selector
+
+
+def resolve_result_file(results_dir: Path, file_name: str) -> Path | None:
+    """Resolve an explicit result file and keep it inside the results directory."""
+    candidate = Path(file_name)
+    if not candidate.is_absolute():
+        parts = candidate.parts
+        if parts and parts[0] == results_dir.name:
+            candidate = results_dir.parent / candidate
+        else:
+            candidate = results_dir / candidate
+    candidate = candidate.resolve()
+    root = results_dir.resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    return candidate
+
+
+def validate_result_values(values: Any, requirement: dict[str, Any]) -> list[str]:
+    """Apply optional type/cardinality/schema checks to one resolved result path."""
+    errors: list[str] = []
+    if not nonempty_result(values):
+        errors.append("empty_value")
+        return errors
+    resolved = values if isinstance(values, list) else [values]
+    expected_type = str(requirement.get("expected_type", "")).strip()
+    if expected_type and any(not json_type_matches(item, expected_type) for item in resolved):
+        errors.append(f"wrong_type:{expected_type}")
+    count = len(resolved)
+    if requirement.get("exact_items") is not None and count != int(requirement["exact_items"]):
+        errors.append(f"wrong_item_count:{count}")
+    if requirement.get("min_items") is not None and count < int(requirement["min_items"]):
+        errors.append(f"too_few_items:{count}")
+    required_fields = requirement.get("required_fields", [])
+    if required_fields:
+        for item in resolved:
+            if not isinstance(item, dict):
+                errors.append("required_fields_on_non_object")
+                break
+            missing = [field for field in required_fields if not nonempty_result(item.get(field))]
+            if missing:
+                errors.append("missing_fields:" + ",".join(map(str, missing)))
+                break
+    expected_unit = requirement.get("unit")
+    if expected_unit is not None and any(
+        not isinstance(item, dict) or item.get("unit") != expected_unit for item in resolved
+    ):
+        errors.append(f"wrong_unit:{expected_unit}")
+    return errors
 
 
 def load_json_files(results_dir: Path) -> list[tuple[Path, Any]]:
@@ -371,14 +473,36 @@ def main() -> int:
                 violations.append({"issue": "missing_required_label", "label": label})
 
     json_files = load_json_files(args.results_dir)
+    loaded_by_path = {path.resolve(): payload for path, payload in json_files}
     result_checks = []
     for requirement in contract.get("result_requirements", []):
         paths = requirement.get("any_of", [])
         matches = []
-        for json_path, payload in json_files:
-            for dotted in paths:
+        rejected = []
+        for selector in paths:
+            file_name, dotted = parse_result_selector(selector)
+            if file_name:
+                target = resolve_result_file(args.results_dir, file_name)
+                candidates = [] if target is None else [(target, loaded_by_path.get(target))]
+            else:
+                candidates = json_files
+            for json_path, payload in candidates:
+                if payload is None:
+                    rejected.append({"file": str(json_path), "path": dotted, "errors": ["missing_or_invalid_file"]})
+                    continue
                 exists, values = get_path(payload, dotted)
-                if exists:
+                if not exists:
+                    rejected.append({"file": str(json_path), "path": dotted, "errors": ["missing_path"]})
+                    continue
+                errors = validate_result_values(values, requirement)
+                expected_hash = str(requirement.get("sha256", "")).strip().lower()
+                if expected_hash and json_path.is_file():
+                    actual_hash = hashlib.sha256(json_path.read_bytes()).hexdigest()
+                    if actual_hash != expected_hash:
+                        errors.append("sha256_mismatch")
+                if errors:
+                    rejected.append({"file": str(json_path), "path": dotted, "errors": errors})
+                else:
                     matches.append({"file": str(json_path), "path": dotted})
         ok = bool(matches)
         result_checks.append(
@@ -386,6 +510,7 @@ def main() -> int:
                 "id": requirement.get("id"),
                 "any_of": paths,
                 "matches": matches,
+                "rejected": rejected,
                 "ok": ok,
             }
         )

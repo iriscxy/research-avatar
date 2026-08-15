@@ -79,6 +79,17 @@ them; verify only newly added ones.)
   `python3 tools/bib_manager.py check paper/references.bib` (duplicate / non-standard
   keys / missing fields) and recompile after.
 
+## Mechanical nearest-neighbor coverage
+
+For every claimed contribution, record at least two closest primary works in
+`paper/scholarship_contract.json` under schema `1.1` → `nearest_neighbor_coverage`.
+Each entry contains `contribution_id`, the exact `claim`, and neighbors with
+`citation_key`, `source_url`, concrete `overlap`, and one independently testable
+`independent_difference`. Every neighbor must also have an in-context
+`citation_obligations` entry. “Broadly related” is not a distinction; if the paper
+cannot state how it differs from its nearest work, narrow the contribution before writing.
+The `paper_checks.py scholarship` gate rejects missing, duplicate, or uncited neighbors.
+
 ## Output
 Updated `paper/references.bib` (verified entries) + an expanded, subheading-organized
 related-work section + a whole-manuscript citation-obligation audit with in-context

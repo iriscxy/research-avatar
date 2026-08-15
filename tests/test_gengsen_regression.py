@@ -45,7 +45,7 @@ def scientific_contract() -> dict:
     return {
         "approval_status": "pending",
         "profile_contract": {
-            "profile_path": "researcher-profile/PROFILE.md",
+            "profile_path": "researcher-profile/PROFILE.html",
             "publications_path": "researcher-profile/publications.json",
             "researcher_identity": "Fixture Researcher",
             "authorship_verified": True,

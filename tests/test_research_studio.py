@@ -2,10 +2,11 @@ import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from research_studio.server import (
     build_state,
+    ensure_project_studios,
     ensure_research_studio,
     extract_script_json,
     idea_report_state,
@@ -14,7 +15,6 @@ from research_studio.server import (
     record_expplan_approval,
     render_ledger_html,
     render_publications_html,
-    render_profile_html,
 )
 
 
@@ -59,7 +59,47 @@ class ResearchStudioTests(unittest.TestCase):
             ensure_research_studio()
         popen.assert_not_called()
 
-    def test_six_stage_shell_uses_direct_preview_and_terminal_missing_state(self):
+    @patch("research_studio.server.webbrowser.open")
+    @patch("research_studio.server.start_paper_studio")
+    @patch("research_studio.server.ensure_research_studio")
+    def test_ensure_project_studios_reuses_both_and_opens_pages(
+        self, ensure_research, start_paper, open_browser
+    ):
+        ensure_research.return_value = {
+            "url": "http://127.0.0.1:8780",
+            "started": False,
+        }
+        start_paper.return_value = {
+            "ok": True,
+            "url": "http://127.0.0.1:8765",
+            "already_running": True,
+        }
+
+        result = ensure_project_studios()
+
+        self.assertEqual(
+            result["urls"],
+            ["http://127.0.0.1:8780", "http://127.0.0.1:8765"],
+        )
+        self.assertEqual(
+            open_browser.call_args_list,
+            [call("http://127.0.0.1:8780"), call("http://127.0.0.1:8765")],
+        )
+
+    @patch("research_studio.server.webbrowser.open")
+    @patch("research_studio.server.start_paper_studio")
+    @patch("research_studio.server.ensure_research_studio")
+    def test_ensure_project_studios_can_skip_browser(
+        self, ensure_research, start_paper, open_browser
+    ):
+        ensure_research.return_value = {"url": "http://127.0.0.1:8780"}
+        start_paper.return_value = {"ok": True, "url": "http://127.0.0.1:8765"}
+
+        ensure_project_studios(open_browser=False)
+
+        open_browser.assert_not_called()
+
+    def test_six_stage_shell_is_a_minimal_direct_preview(self):
         root = Path(__file__).resolve().parents[1]
         app_source = (root / "research_studio" / "static" / "app.js").read_text(
             encoding="utf-8"
@@ -74,16 +114,35 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertNotIn('id="stage-header"', index_source)
         self.assertNotIn('class="studio-header"', index_source)
         self.assertNotIn('class="pipeline-head"', index_source)
-        self.assertIn('class="project-toolbar"', index_source)
+        self.assertNotIn('class="project-toolbar"', index_source)
+        self.assertNotIn('id="refresh"', index_source)
+        self.assertNotIn('id="stage-body"', index_source)
         self.assertIn('class="stage-surface"', index_source)
-        self.assertIn("missingStageMarkup", app_source)
-        self.assertIn('document.querySelector(".artifact-preview").hidden = !primaryArtifact', app_source)
+        self.assertNotIn("missingStageMarkup", app_source)
+        self.assertNotIn("goalMarkup", app_source)
+        self.assertNotIn("ideaMarkup", app_source)
+        self.assertNotIn("expplanApprovalMarkup", app_source)
         self.assertNotIn("artifactMarkup", app_source)
         self.assertNotIn("该阶段尚未开始", app_source)
         self.assertNotIn("profileTerminalMarkup", app_source)
-        self.assertIn("artifactSelectorMarkup", app_source)
-        self.assertIn('data-artifact-key', app_source)
-        self.assertIn("selectArtifact(artifact.dataset.artifactKey)", app_source)
+        self.assertNotIn("artifactSelectorMarkup", app_source)
+        self.assertIn("selectArtifact(primaryArtifact.key)", app_source)
+        self.assertIn('id="preview-open"', index_source)
+        self.assertIn('id="preview-command"', index_source)
+        self.assertIn("请在终端运行以下命令", index_source)
+        self.assertIn('previewCommand.textContent = stage.command', app_source)
+
+    def test_pipeline_tabs_use_readable_typography_and_bumped_cache(self):
+        root = Path(__file__).resolve().parents[1]
+        style_source = (
+            root / "research_studio" / "static" / "style.css"
+        ).read_text(encoding="utf-8")
+        index_source = (
+            root / "research_studio" / "static" / "index.html"
+        ).read_text(encoding="utf-8")
+        self.assertIn(".pipeline-button strong{font-size:14px", style_source)
+        self.assertIn("font:750 10px var(--serif)", style_source)
+        self.assertIn("/style.css?v=20260810-typography", index_source)
 
     def test_live_demo_matches_the_local_six_stage_navigation(self):
         root = Path(__file__).resolve().parents[1]
@@ -101,17 +160,43 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertNotIn("解析研究画像", demo_source)
         self.assertNotIn("upload-zone", demo_source)
         self.assertNotIn("paper/WRITING_STYLE.md", demo_source)
-        self.assertIn("PROFILE.md · Writing Style", demo_source)
+        self.assertNotIn("PROFILE.md", demo_source)
+        self.assertNotIn('data-action="profile-section"', demo_source)
+        self.assertIn('reportDocument("profile"', demo_source)
+        self.assertNotIn("profileDocument", demo_source)
+        self.assertNotIn('class="profile-output"', demo_source)
         self.assertIn("$profileconstruct 使用 ~/Downloads/scholar_profile.html", demo_source)
-        self.assertIn('data-action="select-idea"', demo_source)
-        self.assertIn('data-action="approve-expplan"', demo_source)
-        self.assertIn("04_RUN_PLAN.html", demo_source)
-        self.assertIn("05_EXP_RESULT.html", demo_source)
+        for report_key in (
+            "profile",
+            "literature",
+            "ideas",
+            "runplan",
+        ):
+            self.assertIn(f'reportDocument("{report_key}"', demo_source)
+        self.assertNotIn('reportDocument("results"', demo_source)
+        self.assertNotIn('reportDocument("paper-studio"', demo_source)
+        self.assertIn("experimentPlanDemo()", demo_source)
+        self.assertIn("研究目标与参考依据", demo_source)
+        self.assertIn("代表性图表 · 轨迹首次偏离", demo_source)
+        self.assertIn("代表性结果表", demo_source)
+        self.assertNotIn("F3A · Only the first-exit layer", demo_source)
+        self.assertNotIn("F4 · Safety–utility sensitivity", demo_source)
+        self.assertIn("provenance-number", demo_source)
+        self.assertIn("provenance-tooltip", demo_source)
+        self.assertIn('? "执行中" : "可开始"', demo_source)
+        self.assertNotIn('data-action="select-idea"', demo_source)
+        self.assertNotIn('data-action="approve-expplan"', demo_source)
+        self.assertNotIn('data-action="run-view"', demo_source)
+        self.assertNotIn('data-action="paper-view"', demo_source)
         self.assertNotIn("RESULTS_LEDGER.csv", demo_source)
-        self.assertIn("data-provenance-trigger", demo_source)
-        self.assertIn("scrollIntoView", demo_source)
-        self.assertIn('data-action="paper-view"', demo_source)
+        self.assertNotIn("data-provenance-trigger", demo_source)
+        self.assertNotIn("scrollIntoView", demo_source)
+        self.assertIn("Research Avatar", demo_source)
+        self.assertNotIn("RESEARCH BUDDY", demo_source)
         self.assertIn("overflow-y:auto", demo_style)
+        self.assertIn(".report-document>section", demo_style)
+        self.assertNotIn(".profile-document>section", demo_style)
+        self.assertNotIn(".profile-detail-grid", demo_style)
 
     def test_extract_script_json_reads_named_contract(self):
         with TemporaryDirectory() as directory:
@@ -136,18 +221,6 @@ class ResearchStudioTests(unittest.TestCase):
             self.assertEqual(
                 ledger_summary(path), {"rows": 3, "verified": 2, "invalid": 1}
             )
-
-    def test_profile_renderer_formats_markdown_and_escapes_html(self):
-        rendered = render_profile_html(
-            "# Researcher Profile — Ada\n\n"
-            "| Field | Value |\n|---|---|\n| Name | **Ada** |\n\n"
-            "## Identity\n\n- Safe `<script>`\n"
-        )
-        self.assertIn("<table>", rendered)
-        self.assertIn("<h2>Identity</h2>", rendered)
-        self.assertIn("<strong>Ada</strong>", rendered)
-        self.assertNotIn("<script>", rendered)
-        self.assertIn("&lt;script&gt;", rendered)
 
     def test_idea_selection_is_recorded_inside_canonical_report(self):
         with TemporaryDirectory() as directory:
@@ -219,8 +292,8 @@ class ResearchStudioTests(unittest.TestCase):
             (root / "researcher-profile").mkdir()
             (root / "paper" / ".paper_studio").mkdir(parents=True)
             (root / "code").mkdir()
-            (root / "researcher-profile" / "PROFILE.md").write_text(
-                "# Researcher Profile — Ada Lovelace\n", encoding="utf-8"
+            (root / "researcher-profile" / "PROFILE.html").write_text(
+                "<title>Researcher Profile — Ada Lovelace</title>\n", encoding="utf-8"
             )
             (root / "researcher-profile" / "publications.json").write_text(
                 json.dumps({"publications": [{"title": "A"}, {"title": "B"}]}),

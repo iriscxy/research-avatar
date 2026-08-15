@@ -37,7 +37,7 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-UA = "research-buddy/1.0 (mailto:zzs144118@gmail.com)"
+UA = "research-avatar/1.0 (mailto:zzs144118@gmail.com)"
 MAILTO = "zzs144118@gmail.com"
 
 

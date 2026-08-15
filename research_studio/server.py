@@ -40,7 +40,7 @@ PAPER_STUDIO_PROCESS: subprocess.Popen[bytes] | None = None
 LOCAL_URL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 ARTIFACTS = {
-    "profile": ("researcher-profile/PROFILE.md", "text/plain; charset=utf-8"),
+    "profile": ("researcher-profile/PROFILE.html", "text/html; charset=utf-8"),
     "publications": ("researcher-profile/publications.json", "application/json; charset=utf-8"),
     "literature": ("reports/01_LIT_SURVEY.html", "text/html; charset=utf-8"),
     "ideas": ("reports/02_IDEA_REPORT.html", "text/html; charset=utf-8"),
@@ -395,115 +395,6 @@ def record_expplan_approval(path: Path) -> dict[str, Any]:
     return {"approval_status": "approved", "approved_at": approved_at}
 
 
-def markdown_inline(value: str) -> str:
-    """Render the small inline subset needed by PROFILE.md after escaping HTML."""
-    escaped = html.escape(value.strip())
-    escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
-    escaped = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", escaped)
-    escaped = re.sub(
-        r"\[([^]]+)]\((https?://[^)]+)\)",
-        r'<a href="\2" target="_blank" rel="noreferrer">\1</a>',
-        escaped,
-    )
-    return escaped
-
-
-def render_profile_html(source: str) -> str:
-    """Render a safe, standalone academic-profile view from canonical Markdown."""
-    lines = source.splitlines()
-    output: list[str] = []
-    index = 0
-    in_list: str | None = None
-
-    def close_list() -> None:
-        nonlocal in_list
-        if in_list:
-            output.append(f"</{in_list}>")
-            in_list = None
-
-    while index < len(lines):
-        raw = lines[index]
-        stripped = raw.strip()
-        if not stripped:
-            close_list()
-            index += 1
-            continue
-        if stripped.startswith("|") and index + 1 < len(lines):
-            separator = lines[index + 1].strip()
-            if separator.startswith("|") and re.fullmatch(r"[|:\- ]+", separator):
-                close_list()
-                headers = [cell.strip() for cell in stripped.strip("|").split("|")]
-                index += 2
-                rows = []
-                while index < len(lines) and lines[index].strip().startswith("|"):
-                    rows.append([cell.strip() for cell in lines[index].strip().strip("|").split("|")])
-                    index += 1
-                output.append("<div class='table-wrap'><table><thead><tr>")
-                output.extend(f"<th>{markdown_inline(cell)}</th>" for cell in headers)
-                output.append("</tr></thead><tbody>")
-                for row in rows:
-                    output.append("<tr>")
-                    output.extend(f"<td>{markdown_inline(cell)}</td>" for cell in row)
-                    output.append("</tr>")
-                output.append("</tbody></table></div>")
-                continue
-        heading = re.match(r"^(#{1,4})\s+(.+)$", stripped)
-        if heading:
-            close_list()
-            level = len(heading.group(1))
-            output.append(f"<h{level}>{markdown_inline(heading.group(2))}</h{level}>")
-            index += 1
-            continue
-        if stripped.startswith(">"):
-            close_list()
-            quote_lines = []
-            while index < len(lines) and lines[index].strip().startswith(">"):
-                quote_lines.append(lines[index].strip()[1:].strip())
-                index += 1
-            output.append(f"<blockquote>{markdown_inline(' '.join(quote_lines))}</blockquote>")
-            continue
-        bullet = re.match(r"^[-*]\s+(.+)$", stripped)
-        ordered = re.match(r"^\d+\.\s+(.+)$", stripped)
-        if bullet or ordered:
-            wanted = "ul" if bullet else "ol"
-            if in_list != wanted:
-                close_list()
-                in_list = wanted
-                output.append(f"<{wanted}>")
-            output.append(f"<li>{markdown_inline((bullet or ordered).group(1))}</li>")
-            index += 1
-            continue
-        close_list()
-        paragraph = [stripped]
-        index += 1
-        while index < len(lines):
-            candidate = lines[index].strip()
-            if not candidate or candidate.startswith(("#", ">", "|", "- ", "* ")) or re.match(r"^\d+\.\s", candidate):
-                break
-            paragraph.append(candidate)
-            index += 1
-        output.append(f"<p>{markdown_inline(' '.join(paragraph))}</p>")
-    close_list()
-    title_match = re.search(r"^#\s+(.+)$", source, re.MULTILINE)
-    title = title_match.group(1) if title_match else "Researcher Profile"
-    return f"""<!doctype html><html lang='en'><head><meta charset='utf-8'>
-<meta name='viewport' content='width=device-width,initial-scale=1'>
-<title>{html.escape(title)}</title><style>
-:root{{--ink:#172a35;--muted:#6c7d84;--line:#dbe4e2;--navy:#11374b;--teal:#087d70;--wash:#eef4f2}}
-*{{box-sizing:border-box}}body{{margin:0;background:var(--wash);color:var(--ink);font:14px/1.68 Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}}
-main{{max-width:980px;margin:0 auto;padding:42px 44px 80px;background:#fff;box-shadow:0 12px 48px #16374614}}
-.profile-top{{margin:-42px -44px 38px;padding:34px 44px;background:linear-gradient(135deg,#102f41,#18586a);color:#fff}}
-.profile-top span{{color:#6fd2c3;font-size:10px;font-weight:900;letter-spacing:.16em}}.profile-top strong{{display:block;margin-top:7px;font:700 30px/1.15 Georgia,serif}}
-h1{{display:none}}h2{{margin:42px 0 14px;padding-bottom:8px;border-bottom:2px solid #b8d9d3;color:var(--navy);font:700 25px/1.2 Georgia,serif}}
-h3{{margin:27px 0 9px;color:#285568;font:700 18px/1.3 Georgia,serif}}h4{{margin:22px 0 7px;color:var(--teal);font-size:14px}}
-p{{margin:10px 0;color:#435860}}strong{{color:#183a49}}code{{padding:2px 5px;border-radius:4px;background:#edf4f2;color:#17675e;font:12px ui-monospace,SFMono-Regular,Menlo,monospace}}
-blockquote{{margin:16px 0;padding:13px 16px;border-left:4px solid #d7ad55;background:#fff8e7;color:#665127}}
-ul,ol{{padding-left:23px}}li{{margin:7px 0;color:#40565f}}.table-wrap{{margin:18px 0;overflow:auto;border:1px solid var(--line);border-radius:10px}}
-table{{width:100%;border-collapse:collapse;background:#fff;font-size:12px}}th,td{{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}}th{{background:#eaf3f1;color:#244c5a;font-weight:850}}tr:last-child td{{border-bottom:0}}td:first-child{{color:#587079;font-weight:750;white-space:nowrap}}
-a{{color:var(--teal)}}@media(max-width:650px){{main{{padding:28px 18px 55px}}.profile-top{{margin:-28px -18px 28px;padding:28px 18px}}.profile-top strong{{font-size:24px}}h2{{font-size:21px}}}}
-</style></head><body><main><header class='profile-top'><span>RESEARCHER-PROFILE / CANONICAL SOURCE</span><strong>{html.escape(title.replace('Researcher Profile — ', ''))}</strong></header>{''.join(output)}</main></body></html>"""
-
-
 def load_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
@@ -533,6 +424,7 @@ def file_record(root: Path, key: str) -> dict[str, Any]:
         "path": relative,
         "exists": path.exists(),
         "size": path.stat().st_size if path.exists() else 0,
+        "modified_ns": path.stat().st_mtime_ns if path.exists() else 0,
         "url": f"/artifact/{key}" if path.exists() else "",
         "title": html_title(path) if path.suffix == ".html" else path.name,
     }
@@ -553,8 +445,10 @@ def profile_stage(root: Path) -> dict[str, Any]:
     count = len(publication_rows) if isinstance(publication_rows, list) else 0
     name = ""
     if profile.exists():
-        first = next((line for line in read_text(profile).splitlines() if line.startswith("# ")), "")
-        name = first.replace("# Researcher Profile", "").strip(" —-")
+        title = html_title(profile)
+        name = re.sub(r"^Researcher Profile\s*[—–-]?\s*", "", title).strip()
+    artifact = file_record(root, "profile")
+    artifact["title"] = "研究画像"
     return {
         "id": "profile",
         "title": "研究画像",
@@ -564,7 +458,7 @@ def profile_stage(root: Path) -> dict[str, Any]:
             {"label": "Researcher", "value": name or "Pending"},
             {"label": "Publications", "value": str(count) if count else "—"},
         ],
-        "artifacts": [file_record(root, "profile")],
+        "artifacts": [artifact],
         "message": "画像是后续选题、实验习惯和写作风格的唯一通用来源。",
     }
 
@@ -904,7 +798,7 @@ def profile_progress_state(job: dict[str, Any], root: Path = ROOT) -> dict[str, 
         (4, "研究身份与写作风格", f"阅读全文 {style_read}/{style_target or '—'}"),
         (5, "失败经验与隐性知识", "可用证据归纳"),
         (6, "实验与工作流偏好", "读取可用历史"),
-        (7, "生成完整研究画像", "PROFILE.md"),
+        (7, "生成完整研究画像", "PROFILE.html"),
         (8, "清理与最终校验", "检查 canonical artifacts"),
     )
     phases = []
@@ -1023,13 +917,13 @@ def run_profileconstruct_job(upload_path: Path, publication_count: int, input_na
         if return_code == 0 and profile_ready and publications_ready:
             update_profile_job(
                 status="complete",
-                message="研究画像已生成；身份、研究脉络、写作风格与实验习惯均在同一个 PROFILE.md 中查看。",
+                message="研究画像已生成；身份、研究脉络、写作风格与实验习惯均在同一个 PROFILE.html 中查看。",
                 completed_at=int(time.time()),
             )
         else:
             missing = []
             if not profile_ready:
-                missing.append("PROFILE.md")
+                missing.append("PROFILE.html")
             if not publications_ready:
                 missing.append("publications.json")
             missing_text = ", ".join(missing)
@@ -1083,10 +977,7 @@ class Handler(BaseHTTPRequestHandler):
             if not target.exists() or not target.is_file():
                 self.send_json({"error": "artifact not found"}, HTTPStatus.NOT_FOUND)
                 return
-            if key == "profile":
-                rendered = render_profile_html(read_text(target)).encode()
-                self.send_bytes(rendered, "text/html; charset=utf-8")
-            elif key == "publications":
+            if key == "publications":
                 rendered = render_publications_html(target).encode()
                 self.send_bytes(rendered, "text/html; charset=utf-8")
             else:
@@ -1119,7 +1010,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         mime = {
             ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
-            ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml",
+            ".js": "text/javascript; charset=utf-8", ".json": "application/json; charset=utf-8",
+            ".svg": "image/svg+xml",
         }.get(target.suffix, "application/octet-stream")
         self.send_bytes(target.read_bytes(), mime)
 

@@ -3,7 +3,7 @@
 
 Used by the `/bib-manager` skill (Module 3 of ARIS personalization). Backed by the
 BibTeX Bank that `/profileconstruct` produced (in `researcher-profile/publications.json` or
-inline in `PROFILE.md`). Pure stdlib.
+inline in `PROFILE.html`). Pure stdlib.
 
 Subcommands
 -----------

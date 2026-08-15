@@ -364,35 +364,47 @@ def validate_completed_goal_evidence(
     state: dict[str, object],
     acquisitions: dict[str, dict[str, object]],
 ) -> list[str]:
-    """Require completed paper-facing goals to display their traceable artifact."""
+    """Require one traceable snapshot per artifact under its earliest owning goal."""
     errors: list[str] = []
+    goals = [goal for goal in state.get("goals", []) if isinstance(goal, dict)]
     completed = {
         str(goal.get("id", ""))
-        for goal in state.get("goals", [])
-        if isinstance(goal, dict) and goal.get("status") == "completed"
+        for goal in goals if goal.get("status") == "completed"
     }
+    artifact_owner: dict[str, str] = {}
+    for goal in goals:
+        for artifact_id in goal.get("artifact_ids", []):
+            artifact_owner.setdefault(str(artifact_id), str(goal.get("id", "")))
     scoped: dict[str, list[dict[str, object]]] = {}
     for contract in acquisitions.values():
-        goal_id = str(contract.get("producing_goal", ""))
-        if goal_id in completed and contract.get("artifact_id") and contract.get("target_id"):
-            scoped.setdefault(goal_id, []).append(contract)
-    for goal_id, contracts in scoped.items():
+        producing_goal = str(contract.get("producing_goal", ""))
+        artifact_id = str(contract.get("artifact_id", ""))
+        if producing_goal in completed and artifact_id and contract.get("target_id"):
+            scoped.setdefault(artifact_id, []).append(contract)
+    for artifact_id, contracts in scoped.items():
+        goal_id = artifact_owner.get(artifact_id, str(contracts[0].get("producing_goal", "")))
+        if goal_id not in completed:
+            errors.append(
+                f"artifact {artifact_id} has completed producer data before its earliest owner {goal_id} completed"
+            )
+            continue
         card = re.search(
             rf'<article\b(?=[^>]*\bdata-goal-id="{re.escape(goal_id)}")[^>]*>.*?</article>',
             plan,
             re.S,
         )
         if not card or 'class="goal-results"' not in card.group(0):
-            errors.append(f"completed goal {goal_id} lacks its Completed Goal Evidence block")
+            errors.append(f"artifact owner {goal_id} lacks the Completed Goal Evidence block for {artifact_id}")
             continue
         block = card.group(0)
+        if plan.count(f'data-artifact-id="{artifact_id}"') != 1:
+            errors.append(f"artifact {artifact_id} must appear exactly once under earliest owner {goal_id}")
         if ".result-value:hover" not in block or ".result-value:focus-visible" not in block:
-            errors.append(f"completed goal {goal_id} lacks hover/focus provenance styling")
+            errors.append(f"artifact owner {goal_id} lacks hover/focus provenance styling")
         for contract in contracts:
-            artifact_id = str(contract.get("artifact_id"))
             target_id = str(contract.get("target_id"))
             if f'data-artifact-id="{artifact_id}"' not in block:
-                errors.append(f"completed goal {goal_id} lacks artifact snapshot {artifact_id}")
+                errors.append(f"artifact owner {goal_id} lacks artifact snapshot {artifact_id}")
                 continue
             target = re.search(
                 rf'<(?P<tag>[a-zA-Z0-9]+)\b(?=[^>]*\bdata-target-id="{re.escape(target_id)}")'
@@ -401,22 +413,29 @@ def validate_completed_goal_evidence(
                 re.S,
             )
             if not target:
-                errors.append(f"completed goal {goal_id} lacks target {target_id} in its snapshot")
+                errors.append(f"artifact owner {goal_id} lacks target {target_id} in its snapshot")
                 continue
             result = re.search(r'\bdata-result-id="([^"]+)"', target.group("open"))
             if not result or (
-                f'href="05_EXP_RESULT.html#provenance-{result.group(1)}"'
+                f'href="/artifact/results#provenance-{result.group(1)}"'
                 not in target.group("body")
             ):
                 errors.append(
-                    f"completed goal {goal_id} target {target_id} lacks clickable provenance"
+                    f"artifact owner {goal_id} target {target_id} lacks clickable provenance"
+                )
+            elif (
+                f'data-local-result-href="05_EXP_RESULT.html#provenance-{result.group(1)}"'
+                not in target.group("body")
+            ):
+                errors.append(
+                    f"artifact owner {goal_id} target {target_id} lacks standalone-file provenance fallback"
                 )
             elif (
                 'data-provenance-summary="' not in target.group("body")
                 or 'title="' not in target.group("body")
             ):
                 errors.append(
-                    f"completed goal {goal_id} target {target_id} lacks hover provenance"
+                    f"artifact owner {goal_id} target {target_id} lacks hover provenance"
                 )
     return errors
 

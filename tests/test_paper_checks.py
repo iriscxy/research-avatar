@@ -3,11 +3,61 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from tools import paper_checks
 
 
 class TexTreeTests(unittest.TestCase):
+    def test_empirical_decision_recomputes_when_threshold_changes(self):
+        self.assertTrue(paper_checks._decision_holds(0.81, ">=", 0.8))
+        self.assertFalse(paper_checks._decision_holds(0.81, ">=", 0.9))
+        with self.assertRaises(ValueError):
+            paper_checks._decision_holds(0.81, "approximately", 0.8)
+
+    def test_length_respects_limitations_before_conclusion(self):
+        args = SimpleNamespace(
+            paper_dir="paper", main="main.tex", main_base="main", body_target=8
+        )
+        source = (
+            r"\section{Limitations}\label{paper:limstart}Limits."
+            r"\section{Conclusion}Done.\label{paper:endconclusion}"
+        )
+        with (
+            patch.object(paper_checks, "log_pages", return_value=10),
+            patch.object(
+                paper_checks,
+                "label_page",
+                side_effect=lambda _directory, _base, label: 8 if label == "endconclusion" else 7,
+            ),
+            patch.object(paper_checks, "manuscript_tex", return_value=source),
+            patch.object(paper_checks, "_references_page", return_value=9),
+        ):
+            result = paper_checks.check_length(args)
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["post_body_boundary"], "references")
+
+    def test_length_uses_limitations_boundary_when_it_follows_conclusion(self):
+        args = SimpleNamespace(
+            paper_dir="paper", main="main.tex", main_base="main", body_target=8
+        )
+        source = (
+            r"\section{Conclusion}Done.\label{paper:endconclusion}"
+            r"\section*{Limitations}\label{paper:limstart}Limits."
+        )
+        with (
+            patch.object(paper_checks, "log_pages", return_value=10),
+            patch.object(
+                paper_checks,
+                "label_page",
+                side_effect=lambda _directory, _base, label: 8 if label == "endconclusion" else 9,
+            ),
+            patch.object(paper_checks, "manuscript_tex", return_value=source),
+        ):
+            result = paper_checks.check_length(args)
+        self.assertTrue(result["ok"], result)
+        self.assertEqual(result["post_body_boundary"], "limitations")
+
     def test_recursively_expands_input_and_include(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -29,6 +79,22 @@ class TexTreeTests(unittest.TestCase):
             self.assertIn(r"\section{Introduction}", expanded)
             self.assertIn("Nested method evidence.", expanded)
             self.assertNotIn(r"\input{", expanded)
+
+    def test_includegraphics_is_not_parsed_as_tex_include(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "main.tex").write_text(
+                r"\begin{document}\includegraphics[width=\columnwidth]{fig/result.pdf}\end{document}",
+                encoding="utf-8",
+            )
+            expanded = paper_checks.read_tex_tree(root / "main.tex", root=root)
+            self.assertIn(r"\includegraphics", expanded)
+
+    def test_prose_text_excludes_inline_math_parentheses(self):
+        prose = paper_checks.prose_text(
+            r"A real parenthetical (aside) and notation \(A(r)=B(r)\) plus $C(r)$ remain."
+        )
+        self.assertEqual(prose.count("("), 1)
 
     def test_ignores_commented_include(self):
         with tempfile.TemporaryDirectory() as directory:

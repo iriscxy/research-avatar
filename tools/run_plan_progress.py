@@ -14,14 +14,37 @@ STATE_RE = re.compile(
     r'<script\s+type="application/json"\s+id="run-plan-state">(.*?)</script>',
     re.DOTALL,
 )
-PARTS_RE = re.compile(
-    r'<section\s+data-report-section="parts-and-goals">.*?</section>',
-    re.DOTALL,
-)
 LEGACY_CURRENT_RE = re.compile(
     r'\s*<section\s+data-report-section="current-goal">.*?</section>',
     re.DOTALL,
 )
+
+
+def report_section_span(source: str, section_name: str) -> tuple[int, int]:
+    """Return the balanced byte span of one named report section."""
+    opening = re.search(
+        rf'<section\b[^>]*\bdata-report-section=["\']{re.escape(section_name)}["\'][^>]*>',
+        source,
+        re.IGNORECASE,
+    )
+    if not opening:
+        raise ValueError(f"report lacks {section_name!r} section")
+    depth = 0
+    for token in re.finditer(r'</?section\b[^>]*>', source[opening.start():], re.IGNORECASE):
+        tag = token.group(0)
+        if tag.startswith("</"):
+            depth -= 1
+            if depth == 0:
+                return opening.start(), opening.start() + token.end()
+        else:
+            depth += 1
+    raise ValueError(f"report section {section_name!r} is not balanced")
+
+
+def replace_report_section(source: str, section_name: str, replacement: str) -> str:
+    """Replace one report section while respecting nested ``section`` elements."""
+    start, end = report_section_span(source, section_name)
+    return source[:start] + replacement + source[end:]
 STATUS_MARK = {
     "completed": "✅",
     "running": "▶",
@@ -40,6 +63,10 @@ GOAL_RESULT_PROVENANCE_STYLE = (
     'box-shadow:0 12px 28px #102e3b3d;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;'
     'transform:translateX(-50%)}.goal-results .result-value:hover::after,'
     '.goal-results .result-value:focus-visible::after{display:block}</style>'
+    '<script>(()=>{const rewrite=()=>{if(location.protocol!=="file:")return;document.querySelectorAll('
+    '".goal-results a[data-local-result-href]").forEach(link=>link.setAttribute("href",'
+    'link.dataset.localResultHref))};if(document.readyState==="loading")addEventListener('
+    '"DOMContentLoaded",rewrite,{once:true});else rewrite()})();</script>'
 )
 GOAL_COPY_ASSETS = (
     '<style>.goal-command-copy{position:relative}.goal-copy-actions{display:flex;align-items:center;'
@@ -95,8 +122,8 @@ def goal_command(goal: dict) -> str:
         "and verify every recorded path; append and validate every result in "
         "code/RESULTS_LEDGER.csv; update the embedded state, regenerate "
         "reports/04_RUN_PLAN.html so the goal shows ✅ and, for paper-facing targets, "
-        "embeds the matching 05 figure source-data table or result table with every filled "
-        "number linked to provenance; update the matching shells in "
+        "updates the single matching 05 figure/table snapshot under that artifact's earliest "
+        "owning goal with every filled number linked to provenance; update the matching shells in "
         f"reports/05_EXP_RESULT.html from the ledger; stop after {goal_id}, do not start the "
         "successor goal, and only propose the next unlocked /goal."
     )
@@ -203,8 +230,12 @@ def _artifact_snapshot(report: str, artifact_id: str) -> str:
     if not match:
         raise ValueError(f"05_EXP_RESULT.html lacks artifact {artifact_id}")
     snapshot = re.sub(
-        r'href=(["\'])#provenance-',
-        lambda found: f'href={found.group(1)}05_EXP_RESULT.html#provenance-',
+        r'href=(?P<quote>["\'])#provenance-(?P<result_id>[^"\']+)(?P=quote)',
+        lambda found: (
+            f'href={found.group("quote")}/artifact/results#provenance-{found.group("result_id")}{found.group("quote")} '
+            f'data-local-result-href={found.group("quote")}05_EXP_RESULT.html#provenance-'
+            f'{found.group("result_id")}{found.group("quote")}'
+        ),
         match.group(0),
     )
     return re.sub(
@@ -240,7 +271,8 @@ def _verified_target(snapshot: str, target_id: str) -> bool:
         return False
     result_id = re.escape(result.group(1))
     return bool(re.search(
-        rf'<a\b(?=[^>]*href=["\'](?:05_EXP_RESULT\.html)?#provenance-{result_id}["\'])'
+        rf'<a\b(?=[^>]*href=["\'](?:05_EXP_RESULT\.html|/artifact/results)?#provenance-{result_id}["\'])'
+        rf'(?=[^>]*data-local-result-href=["\']05_EXP_RESULT\.html#provenance-{result_id}["\'])'
         rf'(?=[^>]*data-provenance-summary=["\'][^"\']+["\'])'
         rf'(?=[^>]*title=["\'][^"\']+["\'])[^>]*>',
         element.group("body"),
@@ -248,14 +280,21 @@ def _verified_target(snapshot: str, target_id: str) -> bool:
 
 
 def completed_artifact_snapshots(state: dict, results_path: Path) -> dict[str, list[str]]:
-    completed = {str(goal.get("id")) for goal in state.get("goals", []) if goal.get("status") == "completed"}
+    goals = state.get("goals", [])
+    completed = {str(goal.get("id")) for goal in goals if goal.get("status") == "completed"}
+    artifact_owner: dict[str, str] = {}
+    for goal in goals:
+        goal_id = str(goal.get("id") or "")
+        for artifact_id in goal.get("artifact_ids", []):
+            artifact_owner.setdefault(str(artifact_id), goal_id)
     scoped: dict[str, dict[str, list[str]]] = {}
     for contract in state.get("acquisition_contracts", []):
-        goal_id = str(contract.get("producing_goal") or "")
+        producing_goal = str(contract.get("producing_goal") or "")
         artifact_id = str(contract.get("artifact_id") or "")
         target_id = str(contract.get("target_id") or "")
-        if goal_id in completed and artifact_id and target_id:
-            scoped.setdefault(goal_id, {}).setdefault(artifact_id, []).append(target_id)
+        owner_goal = artifact_owner.get(artifact_id, producing_goal)
+        if producing_goal in completed and owner_goal in completed and artifact_id and target_id:
+            scoped.setdefault(owner_goal, {}).setdefault(artifact_id, []).append(target_id)
     if not scoped:
         return {}
     if not results_path.exists():
@@ -268,7 +307,7 @@ def completed_artifact_snapshots(state: dict, results_path: Path) -> dict[str, l
             missing = [target for target in target_ids if not _verified_target(snapshot, target)]
             if missing:
                 raise ValueError(
-                    f"completed goal {goal_id} has unlinked/unverified targets in {artifact_id}: {missing[:5]}"
+                    f"completed artifact owner {goal_id} has unlinked/unverified targets in {artifact_id}: {missing[:5]}"
                 )
             snapshots.setdefault(goal_id, []).append(snapshot)
     return snapshots
@@ -282,10 +321,17 @@ def refresh(path: Path) -> dict:
     state = json.loads(match.group(1))
     snapshots = completed_artifact_snapshots(state, path.parent / "05_EXP_RESULT.html")
     rendered = render_parts_and_goals(state, snapshots)
-    if not PARTS_RE.search(source):
-        raise ValueError("04_RUN_PLAN.html lacks Parts and Goals section")
-    updated = PARTS_RE.sub(rendered, source, count=1)
+    updated = replace_report_section(source, "parts-and-goals", rendered)
     updated = LEGACY_CURRENT_RE.sub("", updated, count=1)
+    # Parts and Goals is the last visible fixed section. Older regex-based
+    # refreshes could leave a stale duplicated tail here when snapshots nested
+    # their own <section>; discard that non-canonical gap before embedded state.
+    _parts_start, parts_end = report_section_span(updated, "parts-and-goals")
+    state_match = STATE_RE.search(updated, parts_end)
+    if not state_match:
+        raise ValueError("04_RUN_PLAN.html lacks embedded run-plan-state JSON after Parts and Goals")
+    if updated[parts_end:state_match.start()].strip():
+        updated = updated[:parts_end] + "\n" + updated[state_match.start():]
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(updated, encoding="utf-8")
     temporary.replace(path)

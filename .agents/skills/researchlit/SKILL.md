@@ -3,7 +3,7 @@ name: "researchlit"
 description: "Standalone literature survey — cover a topic with many parallel arXiv + web search angles, verify every paper (only cite what was actually retrieved), and render a self-contained, white-background, magazine-style HTML survey (hero + sticky TOC + taxonomy flow + card grids + landscape table + trends/gaps + grouped references). Use when the user wants a literature review / related-work map / \"survey this topic\" as a polished deliverable, standalone or as the A1 grounding step feeding $ideagen. Invoke explicitly as `$researchlit`."
 ---
 
-# Research Literature Survey (research-buddy edition)
+# Research Literature Survey (Research Avatar edition)
 
 At the first Skill action in this Codex project session, run
 `python3 -m research_studio.server --ensure-studios` before substantive work.
@@ -26,9 +26,11 @@ the house style.
 - `— out: <path>` — output HTML path. Default **`reports/01_LIT_SURVEY.html`** (create `reports/` if missing).
 - `— angles: N` — number of parallel survey angles (default **5**; use 4–6).
 - `— for: ideagen` — grounding mode: also return the compact landscape (prose + gaps) so `$ideagen` can fold it in; still write the HTML.
+- `— language: <target language>` — optional and **explicit-only**. When present, translate the completed English Survey through the configured LLM API. Do not infer translation merely from the language used in conversation.
+- `— provider: openai|deepseek` — translation provider, used only with an explicit target language. If translation is requested and no provider was specified, ask the researcher which one to use; never infer it from available keys.
 
 ## Optional personalization (read, don't require)
-If `researcher-profile/PROFILE.md` (at the project-local `researcher-profile/` path) exists, skim it to bias
+If `researcher-profile/PROFILE.html` (at the project-local `researcher-profile/` path) exists, skim it to bias
 *angle selection* toward the researcher's niche and to name where her own work
 sits in the landscape — but the survey itself stays **field-neutral and honest**
 (this is a map of the field, not a pitch). If the profile is absent, proceed
@@ -126,6 +128,49 @@ secondary `preprint` link. For preprints, link directly to arXiv and label them
 `arXiv preprint`. Never replace a verified accessible arXiv link with a guessed
 publisher URL.
 
+### Explicit target-language translation — LLM API only
+
+The canonical Survey is English. Translate it **only** when the researcher
+explicitly requests a target language (for example, `用中文`, `translate to
+Spanish`, or `— language: Japanese`). The language of the surrounding chat is
+not, by itself, a translation request.
+
+After the evidence-locked English HTML is complete, first run the fixed report
+structure validator on that canonical English file, then run:
+
+```bash
+python3 tools/translate_report_html.py reports/01_LIT_SURVEY.html \
+  --target-language "<requested language>" \
+  --provider "<openai-or-deepseek-chosen-by-researcher>"
+```
+
+Provider setup:
+
+- `openai`: `OPENAI_API_KEY`; optional `OPENAI_BASE_URL` and
+  `RESEARCHLIT_TRANSLATION_MODEL` (default `gpt-4o-mini`); uses Responses API.
+- `deepseek`: `DEEPSEEK_API_KEY`; optional `DEEPSEEK_BASE_URL` and
+  `DEEPSEEK_TRANSLATION_MODEL` (default `deepseek-v4-flash`); uses DeepSeek's
+  OpenAI-compatible Chat Completions API.
+
+Before this terminal API step, ask the researcher to choose OpenAI or DeepSeek
+unless the current invocation already specifies one. Then check only that
+provider's key and show its exact local `export` command when missing.
+
+The selected provider must translate visible explanatory and interface text,
+preserve paper titles, links, authors, venue metadata, numbers, IDs, acronyms,
+and claim strength, and embed a complete
+`researchlit-llm-translation` receipt. The Code Agent remains responsible for
+search, source verification, synthesis, HTML structure, and validation; it must
+not translate the Survey itself.
+
+If translation was explicitly requested but the selected provider's key or
+required configuration is absent, show the exact local `export` commands and
+stop. An API error, protected-token change, partial coverage, or missing receipt
+is also a hard stop. Never silently switch providers, retain the English file,
+translate with the Code Agent, or claim that translation succeeded. If no target
+language was explicitly requested, do not call any translation API and do not
+add a translation receipt.
+
 ## A4 — Report + optional handoff
 Tell the researcher: the output path, how many papers/angles, the key debates and
 gaps found (2–4 bullets). Do **not** invent a "verdict" on the field.
@@ -140,11 +185,21 @@ gaps found (2–4 bullets). Do **not** invent a "verdict" on the field.
    `[UNVERIFIED]` for anything else; never fabricate ids/DOIs/URLs. Drop, don't invent.
 2. **Self-contained HTML, never Markdown**, with real structure and direct links.
 3. **Readable, idiomatic prose** written TO the researcher in the second person;
-   re-read each sentence for clarity.
+   re-read each sentence for clarity. Explicit target-language requests must use
+   the LLM API translation stage above, never Code Agent translation.
 4. **White background**, house style, one `reports/` folder.
 5. **Human is the reader, not judged** — a survey maps the field; it does not
    accept/reject ideas (that's `$ideagen`'s gate).
 
 ## Fixed HTML structure
 
-Render `01_LIT_SURVEY.html` only as: hero with scope/coverage → sticky contents → scope and taxonomy flow → theme card grids → landscape comparison table → live debates → trends and structural gaps → grouped verified references. Vary evidence inside these slots, not the top-level structure. Do not add workflow logs, agent traces, approval controls, tool comparisons, or arbitrary sections. The Live Demo must show these same slots with illustrative content.
+Render `01_LIT_SURVEY.html` with one unnumbered hero, one sticky contents bar, and exactly these ordered top-level sections (`<section data-report-section>` and visible `<h2>` text must agree):
+
+1. `1. Scope and Taxonomy` (`scope-taxonomy`);
+2. `2. Theme Map` (`theme-map`);
+3. `3. Landscape Comparison` (`landscape-comparison`);
+4. `4. Live Debates` (`live-debates`);
+5. `5. Trends and Structural Gaps` (`trends-gaps`);
+6. `6. Verified References` (`verified-references`).
+
+Vary evidence and cards inside these six slots, not the top-level structure. Every title must own substantive topic-specific content; an empty section, title-only slot, or placeholder-only body is invalid. The sticky contents links to these exact section IDs in this exact order. Do not add, rename, reorder, or omit a top-level section; workflow logs, agent traces, approval controls, tool comparisons, and arbitrary appendices are forbidden. Run `python3 tools/validate_report_structure.py --kind literature --html reports/01_LIT_SURVEY.html` on the completed canonical English file: immediately before the API translation step when one was explicitly requested, otherwise immediately before returning. The translation script preserves HTML tags and attributes while translating visible text and must finish with its verified receipt. The Live Demo must display this exact section list and filled illustrative content from the same slots.

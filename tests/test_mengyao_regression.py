@@ -50,7 +50,7 @@ def write_plan(path: Path, contract: dict) -> None:
 def write_profile_fixture(root: Path) -> None:
     profile = root / "researcher-profile"
     profile.mkdir()
-    (profile / "PROFILE.md").write_text("# Fixture Researcher\n", encoding="utf-8")
+    (profile / "PROFILE.html").write_text("<title>Fixture Researcher</title>\n", encoding="utf-8")
     (profile / "publications.json").write_text(
         json.dumps({"publications": [{"citation_key": "owned2026",
                                       "authors": ["Fixture Researcher"],
@@ -63,7 +63,7 @@ def minimal_contract() -> dict:
     return {
         "approval_status": "pending",
         "profile_contract": {
-            "profile_path": "researcher-profile/PROFILE.md",
+            "profile_path": "researcher-profile/PROFILE.html",
             "publications_path": "researcher-profile/publications.json",
             "researcher_identity": "Fixture Researcher",
             "authorship_verified": True,
@@ -95,6 +95,40 @@ def minimal_contract() -> dict:
 
 
 class MengyaoRegressionTests(unittest.TestCase):
+    def test_expplan_contract_versioning(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_profile_fixture(root)
+            reports = root / "reports"
+            reports.mkdir()
+            plan = reports / "03_EXPERIMENT_PLAN.html"
+            contract = minimal_contract()
+            contract.update({
+                "schema_version": "1.1",
+                "contract_version": 1,
+                "revision_history": [{
+                    "version": 1,
+                    "changed_at": "2026-08-14",
+                    "reason": "Initial approved scientific contract",
+                    "changed_fields": ["*"],
+                    "compatibility": "initial version",
+                }],
+            })
+            write_plan(plan, contract)
+            errors = EXPPLAN.validate(plan)
+            self.assertFalse(any("schema 1.1" in error for error in errors), errors)
+
+            amended = json.loads(json.dumps(contract))
+            amended["contract_version"] = 2
+            amended["revision_history"].append({
+                "version": 2, "changed_at": "2026-08-14", "reason": "Change threshold",
+                "changed_fields": ["decision_space_contract.D1"],
+                "compatibility": "results must be regenerated",
+            })
+            write_plan(plan, amended)
+            errors = EXPPLAN.validate(plan)
+            self.assertTrue(any("parent_approval_sha256" in error for error in errors))
+
     def test_1_differentiable_idea_cannot_be_default_recommendation(self):
         audit = '<script id="idea-novelty-audit" type="application/json">' + json.dumps({
             "candidates": [{
@@ -520,7 +554,10 @@ class MengyaoRegressionTests(unittest.TestCase):
                     ]
                 }}},
             }), encoding="utf-8")
-            (results / "bundle.json").write_text(json.dumps({"rows": []}), encoding="utf-8")
+            (results / "bundle.json").write_text(
+                json.dumps({"rows": [{"method": "fixture", "score": 0.5}]}),
+                encoding="utf-8",
+            )
             waiver = paper / "SEMANTIC_WAIVER.md"
             waiver.write_text("waive dimensions", encoding="utf-8")
             process = subprocess.run(
