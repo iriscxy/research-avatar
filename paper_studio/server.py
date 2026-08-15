@@ -57,6 +57,17 @@ PROVIDER_DEFAULT_MODELS = {
     "openai": DEFAULT_MODEL,
     "deepseek": os.environ.get("DEEPSEEK_PAPER_MODEL", "deepseek-v4-flash"),
 }
+PROVIDER_MODEL_OPTIONS = {
+    "openai": (
+        ("gpt-5", "GPT-5"),
+        ("gpt-5-mini", "GPT-5 mini"),
+        ("gpt-5-nano", "GPT-5 nano"),
+    ),
+    "deepseek": (
+        ("deepseek-v4-pro", "DeepSeek V4 Pro"),
+        ("deepseek-v4-flash", "DeepSeek V4 Flash"),
+    ),
+}
 MECHANISM_AGENT_TIMEOUT_SECONDS = 120
 API_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 API_URL += "/responses"
@@ -2590,6 +2601,40 @@ def select_llm_provider(state: dict[str, Any], provider: str) -> bool:
         return False
     state["llm_provider"] = provider
     state["model"] = PROVIDER_DEFAULT_MODELS[provider]
+    state.setdefault("title_editor", {})["previous_response_id"] = None
+    for section_state in state.get("sections", {}).values():
+        section_state["previous_response_id"] = None
+        section_state["bibliography_fingerprint"] = None
+    for figure_state in state.get("figures", {}).values():
+        figure_state["previous_response_id"] = None
+    return True
+
+
+def model_options_for_provider(provider: str, current_model: str = "") -> list[dict[str, str]]:
+    """Return the supported browser choices, retaining an explicit deployment override."""
+    provider_configuration(provider)
+    options = [
+        {"id": model_id, "label": label}
+        for model_id, label in PROVIDER_MODEL_OPTIONS[provider]
+    ]
+    current_model = current_model.strip()
+    if current_model and current_model not in {item["id"] for item in options}:
+        options.append({"id": current_model, "label": f"{current_model}（当前配置）"})
+    return options
+
+
+def select_llm_model(state: dict[str, Any], model: str) -> bool:
+    """Select one provider-compatible model and reset every incompatible LLM chain."""
+    provider = str(state.get("llm_provider") or DEFAULT_PROVIDER).strip().lower()
+    allowed = {item["id"] for item in model_options_for_provider(provider, state.get("model", ""))}
+    model = model.strip()
+    if not model:
+        raise StudioError("模型名称不能为空。")
+    if model not in allowed:
+        raise StudioError(f"{provider_configuration(provider)['label']} 不支持该模型选项：{model}")
+    if model == state.get("model"):
+        return False
+    state["model"] = model
     state.setdefault("title_editor", {})["previous_response_id"] = None
     for section_state in state.get("sections", {}).values():
         section_state["previous_response_id"] = None
@@ -6021,6 +6066,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         }
         for candidate in ("openai", "deepseek")
     ]
+    model_options = model_options_for_provider(provider, str(state.get("model") or ""))
     if EMPTY_PROJECT_MODE:
         return {
             "schema_version": state.get("schema_version", "1.2"),
@@ -6037,6 +6083,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
             "model": state.get("model", DEFAULT_MODEL),
             "llm_provider": provider,
             "llm_provider_options": provider_options,
+            "llm_model_options": model_options,
             "sections": {},
             "figures": [],
             "tables": [],
@@ -6149,6 +6196,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
     result["outline_confirmed"] = outline_confirmed
     result["llm_provider"] = provider
     result["llm_provider_options"] = provider_options
+    result["llm_model_options"] = model_options
     result["api_key_configured"] = api_key_configured
     result["api_key_setup"] = api_key_setup
     result["figures"] = figure_public_state(state)
@@ -6380,6 +6428,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.handle_full_draft_cancel()
             elif self.path == "/api/llm-provider":
                 self.handle_llm_provider(body)
+            elif self.path == "/api/llm-model":
+                self.handle_llm_model(body)
             elif self.path == "/api/reset-conversation":
                 self.handle_reset(body)
             elif self.path == "/api/reset-generated-paper":
@@ -6445,6 +6495,15 @@ class Handler(BaseHTTPRequestHandler):
             raise StudioError("全文初稿正在生成；请先停止任务再切换 LLM API。")
         provider = str(body.get("provider") or "").strip().lower()
         if select_llm_provider(state, provider):
+            save_state(state)
+        self.send_json({"ok": True, "state": public_state(state)})
+
+    def handle_llm_model(self, body: dict[str, Any]) -> None:
+        state = load_state()
+        if full_draft_running(state):
+            raise StudioError("全文初稿正在生成；请先停止任务再切换写作模型。")
+        model = str(body.get("model") or "").strip()
+        if select_llm_model(state, model):
             save_state(state)
         self.send_json({"ok": True, "state": public_state(state)})
 

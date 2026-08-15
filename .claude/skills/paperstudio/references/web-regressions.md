@@ -3,7 +3,9 @@
 ## LLM API setup
 
 - The terminal writing workflow selects only OpenAI or DeepSeek before launching
-  Paper Studio; the webpage shows runtime status but no persistent API/model settings panel.
+  Paper Studio; the webpage shows runtime status and a provider-specific writing-model
+  selector, but no provider/key settings panel. Changing the model resets incompatible
+  LLM chains and preserves accepted manuscript content.
   Read their secrets only from `OPENAI_API_KEY` or `DEEPSEEK_API_KEY`.
 - When the selected provider is not configured, show one prominent page-level banner that says the key is
   entered in the local terminal that starts Paper Studio, gives the export and

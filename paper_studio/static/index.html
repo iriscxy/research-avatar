@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Paper Studio</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/static/style.css?v=20260815.3">
+  <link rel="stylesheet" href="/static/style.css?v=20260815.4">
 </head>
 <body>
   <div class="app">
@@ -23,8 +23,13 @@
             <option value="openai">OpenAI</option>
             <option value="deepseek">DeepSeek</option>
           </select>
-          <label for="model">模型</label>
-          <input id="model" value="gpt-5-nano" disabled tabindex="-1">
+        </div>
+        <div id="model-runtime-config" class="model-runtime-config">
+          <label for="model">写作模型</label>
+          <select id="model" disabled>
+            <option value="gpt-5-nano">GPT-5 nano</option>
+          </select>
+          <small id="model-provider-note">由当前 LLM API 提供</small>
         </div>
         <button id="reset" class="ghost" disabled>重置当前 section 对话</button>
         <button id="reset-generated" class="ghost danger" disabled>清空生成内容</button>
@@ -389,6 +394,6 @@
       </div>
     </section>
   </div>
-  <script src="/static/app.js?v=20260815.2"></script>
+  <script src="/static/app.js?v=20260815.4"></script>
 </body>
 </html>

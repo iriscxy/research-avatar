@@ -303,6 +303,7 @@ class PaperStudioTests(unittest.TestCase):
 
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="llm-runtime-config" hidden', html)
+        self.assertIn('id="model-runtime-config"', html)
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('id="api-key-setup"', html)
         self.assertIn("写论文需要 LLM API", html)
@@ -310,6 +311,10 @@ class PaperStudioTests(unittest.TestCase):
         self.assertEqual(
             [item["id"] for item in configured["llm_provider_options"]],
             ["openai", "deepseek"],
+        )
+        self.assertEqual(
+            [item["id"] for item in configured["llm_model_options"]],
+            ["gpt-5", "gpt-5-mini", "gpt-5-nano"],
         )
         self.assertIn('$("api-key-setup").hidden = apiKeyReady', source)
 
@@ -359,6 +364,28 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIsNone(first_section["previous_response_id"])
         with self.assertRaisesRegex(StudioError, "不支持的 LLM API"):
             studio.select_llm_provider(state, "compatible")
+
+    def test_model_selection_is_provider_specific_and_resets_all_llm_chains(self):
+        state = _default_state()
+        state["title_editor"]["previous_response_id"] = "title-old"
+        first_section = next(iter(state["sections"].values()))
+        first_section["previous_response_id"] = "section-old"
+        first_figure = next(iter(state["figures"].values()))
+        first_figure["previous_response_id"] = "figure-old"
+        self.assertTrue(studio.select_llm_model(state, "gpt-5-mini"))
+        self.assertEqual(state["model"], "gpt-5-mini")
+        self.assertIsNone(state["title_editor"]["previous_response_id"])
+        self.assertIsNone(first_section["previous_response_id"])
+        self.assertIsNone(first_figure["previous_response_id"])
+        with self.assertRaisesRegex(StudioError, "OpenAI 不支持"):
+            studio.select_llm_model(state, "deepseek-v4-pro")
+
+        state["llm_provider"] = "deepseek"
+        state["model"] = "deepseek-v4-flash"
+        self.assertEqual(
+            [item["id"] for item in studio.model_options_for_provider("deepseek")],
+            ["deepseek-v4-pro", "deepseek-v4-flash"],
+        )
 
     def test_human_figure_label_produces_safe_paths_without_colon(self):
         original = FIGURES["F2"]["label"]
@@ -448,7 +475,7 @@ class PaperStudioTests(unittest.TestCase):
                 "/api/figure/caption/generate", "/api/figure/compose",
                 "/api/figure/draw", "/api/figure/panel/generate",
                 "/api/figure/placement", "/api/figure/prompt", "/api/generate",
-                "/api/llm-provider",
+                "/api/llm-provider", "/api/llm-model",
                 "/api/pdf/locate", "/api/reset-conversation",
                 "/api/reset-generated-paper", "/api/select-paragraph", "/api/state",
                 "/api/table/agent-edit", "/api/table/approve", "/api/table/generate",
@@ -1234,7 +1261,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('/static/app.js?v=20260815.2', html)
+        self.assertIn('/static/app.js?v=20260815.4', html)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
         self.assertIn('id="figures-view" disabled', html)
         self.assertIn('id="compile" class="secondary" disabled', html)
@@ -1324,7 +1351,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('"table_latex"', source)
         self.assertIn('const commentDrafts = new Map()', source)
         self.assertIn('rememberCommentDraft(`${activeSection}:${paragraph.id}`', source)
-        self.assertIn('renderTitleDraftInput($("model"), "model"', source)
+        self.assertIn('const modelOptions = state.llm_model_options || []', source)
         self.assertIn('let acceptRequestBusy = false', source)
         self.assertIn('let proseRequestBusy = false', source)
         self.assertIn('let paragraphRequestBusy = false', source)
@@ -1369,7 +1396,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('/static/app.js?v=20260815.2', html)
+        self.assertIn('/static/app.js?v=20260815.4', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1379,7 +1406,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('roundLabel.textContent = `第 ${round} 轮`', source)
         self.assertIn('message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`', source)
         self.assertIn("agent-chat-round", source)
-        self.assertIn('/static/style.css?v=20260815.3', html)
+        self.assertIn('/static/style.css?v=20260815.4', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)

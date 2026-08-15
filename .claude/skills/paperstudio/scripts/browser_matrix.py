@@ -62,6 +62,7 @@ class Matrix:
         self.visit(page, "", "!document.querySelector('#empty-project').hidden")
         assert page.locator("#empty-project").is_visible()
         assert page.locator("#llm-runtime-config").is_hidden()
+        assert page.locator("#model-runtime-config").is_visible()
         assert page.locator("#model").input_value() == "gpt-5-nano"
         controls = (
             "llm-provider", "model", "reset", "reset-generated", "writing-view",
@@ -118,6 +119,8 @@ class Matrix:
                 )
                 visited.append((section, view))
                 assert page.locator("#llm-runtime-config").is_hidden()
+                assert page.locator("#model-runtime-config").is_visible()
+                assert page.locator("#model option").count() >= 2
         assert not posts, posts
         assert not errors, errors
         self.results["all_views"] = len(visited)

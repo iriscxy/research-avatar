@@ -1601,6 +1601,18 @@ function render() {
     }));
   }
   providerSelect.value = state.llm_provider || "openai";
+  const modelSelect = $("model");
+  const modelOptions = state.llm_model_options || [];
+  if (modelOptions.length) {
+    modelSelect.replaceChildren(...modelOptions.map((option) => {
+      const element = document.createElement("option");
+      element.value = option.id;
+      element.textContent = option.label;
+      return element;
+    }));
+  }
+  modelSelect.value = state.model || "gpt-5-nano";
+  $("model-provider-note").textContent = `${apiKeySetup.provider_label || "当前 API"} 提供；切换后会重置 LLM 对话链，已写入正文不变。`;
   $("api-key-setup").hidden = apiKeyReady;
   $("api-key-setup-command").textContent = apiKeySetup.setup_command || 'export OPENAI_API_KEY="粘贴你的 API key"';
   $("api-key-setup-description").textContent = `${apiKeySetup.provider_label || "当前"} API 尚未配置。请在启动 Paper Studio 的本机终端设置；密钥不会进入网页。GPT Image 仍单独使用 OpenAI。`;
@@ -1648,7 +1660,6 @@ function render() {
   $("section-kicker").textContent = "SECTION";
   const section = state.sections[activeSection];
   $("section-title").textContent = section.title;
-  renderTitleDraftInput($("model"), "model", state.model || "gpt-5-nano");
   $("api-status").textContent = `${apiKeySetup.provider_label || "LLM"} · ${state.api_key_configured ? "API ready" : "API missing"}`;
   $("api-status").className = "status " + (state.api_key_configured ? "ok" : "warn");
   $("conversation-status").textContent = section.conversation_active ? "Conversation active" : "New conversation";
@@ -1868,8 +1879,35 @@ $("comment").addEventListener("input", (event) => {
   if (paragraph) rememberCommentDraft(`${activeSection}:${paragraph.id}`, event.currentTarget.value);
 });
 
-$("model").addEventListener("input", (event) => {
-  rememberTitleDraft("model", event.currentTarget.value, state.model || "gpt-5-nano");
+$("model").addEventListener("change", async (event) => {
+  if (proseRequestBusy || fullDraftRequestBusy || titleBusy || conversationResetBusy) {
+    event.currentTarget.value = state.model || "gpt-5-nano";
+    return;
+  }
+  const requestedModel = event.currentTarget.value;
+  if (requestedModel === state.model) return;
+  if (!confirm(`切换到 ${requestedModel}？这会重置所有 LLM 对话链，但不会修改已写入的正文、图表或 PDF。`)) {
+    event.currentTarget.value = state.model || "gpt-5-nano";
+    return;
+  }
+  conversationResetBusy = true;
+  try {
+    setBusy(true, `正在切换写作模型为 ${requestedModel}…`);
+    const payload = await request("/api/llm-model", {
+      method: "POST",
+      body: JSON.stringify({model: requestedModel}),
+    });
+    state = payload.state;
+    forgetTitleDraft("model");
+    render();
+    showMessage(`写作模型已切换为 ${state.model}；LLM 对话链已重置，已写入内容保持不变。`);
+  } catch (error) {
+    event.currentTarget.value = state.model || "gpt-5-nano";
+    showMessage(error.message, true);
+  } finally {
+    conversationResetBusy = false;
+    setBusy(false);
+  }
 });
 
 $("llm-provider").addEventListener("change", async (event) => {

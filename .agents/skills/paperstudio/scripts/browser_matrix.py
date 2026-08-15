@@ -62,6 +62,7 @@ class Matrix:
         self.visit(page, "", "!document.querySelector('#empty-project').hidden")
         assert page.locator("#empty-project").is_visible()
         assert page.locator("#llm-runtime-config").is_hidden()
+        assert page.locator("#model-runtime-config").is_visible()
         assert page.locator("#model").input_value() == "gpt-5-nano"
         controls = (
             "llm-provider", "model", "reset", "reset-generated", "writing-view",
@@ -119,6 +120,8 @@ class Matrix:
                 )
                 visited.append((section, view))
                 assert page.locator("#llm-runtime-config").is_hidden()
+                assert page.locator("#model-runtime-config").is_visible()
+                assert page.locator("#model option").count() >= 2
         assert not posts, posts
         assert not errors, errors
         self.results["all_views"] = len(visited)
@@ -225,6 +228,7 @@ class Matrix:
         assert "/api/full-draft/start" in (self.base_url + "/api/full-draft/start")
         assert "/api/full-draft/cancel" in (self.base_url + "/api/full-draft/cancel")
         assert "/api/llm-provider" in (self.base_url + "/api/llm-provider")
+        assert "/api/llm-model" in (self.base_url + "/api/llm-model")
         fixture = safe_fixture(self.state)
         fixture["outline_confirmed"] = True
         fixture["api_key_configured"] = True

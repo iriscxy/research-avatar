@@ -65,7 +65,7 @@ Paper Studio is a permanent, paper-independent shell. It must start even when `p
    - Drive table Agent/edit/save/approve controls from the visible LaTeX textarea. Enable save only for a nonempty dirty value; keep clean approved `已插入正文` disabled, and expose a dirty approved table as `更新表格 → PDF` so the visible revision can be compiled transactionally.
 12. Use `gpt-5-nano` as the default text GPT API model for a new or empty Paper Studio state. Keep the model field editable and preserve `PAPER_STUDIO_MODEL` as an explicit deployment override; a persisted project selection still takes precedence over the default.
 13. Keep text-LLM API selection and key setup explicit without moving secrets into
-    browser state. Ask for OpenAI or DeepSeek in the terminal workflow and pass the choice at server startup; do not show a persistent provider/model settings panel in the webpage. Persist only the provider and model; public state
+    browser state. Ask for OpenAI or DeepSeek in the terminal workflow and pass the choice at server startup; do not show provider or key settings in the webpage. Do show a provider-specific writing-model selector (for example GPT mini/nano or DeepSeek V4 Pro/Flash); switching it resets incompatible LLM conversation chains without changing accepted prose. Persist only the provider and model; public state
     exposes only whether that provider's environment configuration is ready plus
     safe setup commands. Switching providers resets incompatible response chains
     and selects that provider's default model. Never render, accept, persist, log,
