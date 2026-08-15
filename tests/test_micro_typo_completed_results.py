@@ -8,8 +8,19 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+INSTANCE_PATHS = (
+    ROOT / "paper/figsrc/micro_typo_intent/result_fixture.json",
+    ROOT / "code/RESULTS_LEDGER.csv",
+    ROOT / "reports/05_EXP_RESULT.html",
+    ROOT / "paper/fig/micro_typo_intent/results/F2_typo_sensitivity.png",
+    ROOT / "paper/fig/micro_typo_intent/results/F2_typo_sensitivity.pdf",
+)
 
 
+@unittest.skipUnless(
+    all(path.is_file() for path in INSTANCE_PATHS),
+    "local completed micro-typo result instance is not included in a clean clone",
+)
 class MicroTypoCompletedResultTests(unittest.TestCase):
     def test_real_fixture_is_exactly_ledger_backed(self) -> None:
         fixture = json.loads((ROOT / "paper/figsrc/micro_typo_intent/result_fixture.json").read_text())

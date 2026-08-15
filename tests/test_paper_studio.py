@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import subprocess
 import unittest
@@ -3694,6 +3695,7 @@ args = parser.parse_args()
                 }
 
             with (
+                patch.dict(os.environ, {"OPENAI_API_KEY": "unit-test-placeholder"}),
                 patch.object(studio, "FIGURE_SOURCE_DIR", source_dir),
                 patch.object(studio, "post_openai", side_effect=fake_post),
             ):

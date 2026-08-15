@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import shutil
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
+
+ROOT = Path(__file__).resolve().parents[1]
+if not (ROOT / "code/micro_typo/core.py").is_file():
+    raise unittest.SkipTest("local micro-typo experiment instance is not included in a clean clone")
 
 from code.micro_typo.core import (
     CharacterTrigramNaiveBayes,
@@ -58,10 +64,14 @@ class MicroTypoTests(unittest.TestCase):
         self.assertEqual(robustness_drop(0.75, 0.5), 0.25)
 
     def test_workspace_manifest_is_frozen_and_reopenable(self) -> None:
-        root = Path(__file__).resolve().parents[1]
-        manifest_path = root / "data/micro_typo_intent/manifest.json"
-        first = build_manifest(root / "data/micro_typo_intent/source", manifest_path)
-        second = load_manifest(manifest_path)
+        root = ROOT
+        with TemporaryDirectory() as directory:
+            temporary_root = Path(directory)
+            temporary_source = temporary_root / "data/micro_typo_intent/source"
+            shutil.copytree(root / "data/micro_typo_intent/source", temporary_source)
+            manifest_path = temporary_root / "data/micro_typo_intent/manifest.json"
+            first = build_manifest(temporary_source, manifest_path)
+            second = load_manifest(manifest_path)
         self.assertEqual(first, second)
         self.assertEqual(second["source"]["approved_revision"], APPROVED_REVISION)
         self.assertEqual(len(second["records"]), 120)
@@ -71,7 +81,7 @@ class MicroTypoTests(unittest.TestCase):
             self.assertTrue((root / metadata["path"]).is_file())
 
     def test_word_level_pass_has_only_the_twelve_owned_targets(self) -> None:
-        root = Path(__file__).resolve().parents[1]
+        root = ROOT
         manifest = load_manifest(root / "data/micro_typo_intent/manifest.json")
         import json
         config = json.loads((root / "code/micro_typo/config.json").read_text())
@@ -87,7 +97,7 @@ class MicroTypoTests(unittest.TestCase):
         self.assertEqual(len(payload["test_record_ids"]), 40)
 
     def test_character_pass_has_only_the_eight_owned_targets(self) -> None:
-        root = Path(__file__).resolve().parents[1]
+        root = ROOT
         manifest = load_manifest(root / "data/micro_typo_intent/manifest.json")
         import json
         config = json.loads((root / "code/micro_typo/config.json").read_text())

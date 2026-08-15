@@ -73,6 +73,10 @@ class ReportStructureTests(unittest.TestCase):
         runplan = (ROOT / ".agents/skills/runplan/SKILL.md").read_text(encoding="utf-8")
         self.assertIn("--kind results", runplan)
 
+    @unittest.skipUnless(
+        (ROOT / "researcher-profile/PROFILE.html").is_file(),
+        "local researcher profile is not included in a clean clone",
+    )
     def test_canonical_profile_html_matches_its_fixed_structure(self):
         self.assertEqual(validate("profile", ROOT / "researcher-profile/PROFILE.html"), [])
 
