@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Theorization"
+  short_description: "Build one unified and mechanically checked formal framing"
+  default_prompt: "Use $papertheorization to develop a unified formal framing for this work."

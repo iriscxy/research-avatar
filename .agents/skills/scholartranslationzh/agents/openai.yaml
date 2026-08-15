@@ -1,0 +1,4 @@
+interface:
+  display_name: "Academic Chinese Translation"
+  short_description: "Translate academic English into accurate natural Chinese"
+  default_prompt: "Use $scholartranslationzh to translate this academic text into Chinese."

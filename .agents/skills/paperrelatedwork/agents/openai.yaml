@@ -1,0 +1,4 @@
+interface:
+  display_name: "Related Work Builder"
+  short_description: "Build and verify a focused scholarly related-work section"
+  default_prompt: "Use $paperrelatedwork to strengthen and verify this paper's related work."

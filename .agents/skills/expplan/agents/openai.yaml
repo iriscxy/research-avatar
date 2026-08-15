@@ -1,0 +1,4 @@
+interface:
+  display_name: "Experiment Plan"
+  short_description: "Plan the paper and its evidence cells"
+  default_prompt: "Use $expplan to outline every paper section one paragraph at a time, summarize each paragraph in one concrete sentence, and preregister the evidence cells its figures and tables require."

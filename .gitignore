@@ -1,0 +1,27 @@
+.DS_Store
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+.venv/
+venv/
+dist/
+build/
+node_modules
+.wrangler/
+*.egg-info/
+.watson/
+experiments/
+paper/
+
+# Local researcher and paper-run data. Skills regenerate these per project.
+researcher-profile/
+reports/
+results/
+code/
+tmp/
+
+# Generated presentations and process artifacts stay local.
+outputs/
+.paper_preflight/
