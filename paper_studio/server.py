@@ -2624,14 +2624,14 @@ def model_options_for_provider(provider: str, current_model: str = "") -> list[d
 
 
 def select_llm_model(state: dict[str, Any], model: str) -> bool:
-    """Select one provider-compatible model and reset every incompatible LLM chain."""
+    """Persist a researcher-entered model name and reset incompatible LLM chains."""
     provider = str(state.get("llm_provider") or DEFAULT_PROVIDER).strip().lower()
-    allowed = {item["id"] for item in model_options_for_provider(provider, state.get("model", ""))}
+    provider_configuration(provider)
     model = model.strip()
     if not model:
         raise StudioError("模型名称不能为空。")
-    if model not in allowed:
-        raise StudioError(f"{provider_configuration(provider)['label']} 不支持该模型选项：{model}")
+    if len(model) > 128 or any(character.isspace() or ord(character) < 32 for character in model):
+        raise StudioError("模型名称必须是不含空格或控制字符的单行标识，且不超过 128 个字符。")
     if model == state.get("model"):
         return False
     state["model"] = model

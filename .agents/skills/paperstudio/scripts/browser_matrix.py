@@ -65,7 +65,7 @@ class Matrix:
         assert page.locator("#model-runtime-config").is_visible()
         assert page.locator("#model").input_value() == "gpt-5-nano"
         controls = (
-            "llm-provider", "model", "reset", "reset-generated", "writing-view",
+            "llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view",
             "figures-view", "tables-view", "compile", "full-draft-start",
             "full-draft-cancel",
         )
@@ -121,7 +121,7 @@ class Matrix:
                 visited.append((section, view))
                 assert page.locator("#llm-runtime-config").is_hidden()
                 assert page.locator("#model-runtime-config").is_visible()
-                assert page.locator("#model option").count() >= 2
+                assert page.locator("#model-suggestions option").count() >= 2
         assert not posts, posts
         assert not errors, errors
         self.results["all_views"] = len(visited)
@@ -140,7 +140,7 @@ class Matrix:
             ),
         )
         self.visit(page, "", "!document.querySelector('#load-error').hidden")
-        controls = ("llm-provider", "model", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "full-draft-start", "full-draft-cancel")
+        controls = ("llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "full-draft-start", "full-draft-cancel")
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()

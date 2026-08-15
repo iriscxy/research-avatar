@@ -4,7 +4,7 @@ Local, section-aware drafting UI for `$paperwrite`.
 
 Choose OpenAI or DeepSeek in the terminal, then configure the matching environment
 before starting the server. The browser shows runtime status and provider-specific
-writing-model choices (GPT-5/mini/nano or DeepSeek V4 Pro/Flash), but no provider
+an editable writing-model field with non-binding suggestions (GPT-5/mini/nano or DeepSeek V4 Pro/Flash), but no provider
 or API-key settings panel:
 
 ```bash

@@ -62,7 +62,7 @@ export OPENAI_API_KEY="粘贴你的 API key"
 export DEEPSEEK_API_KEY="粘贴你的 API key"
 ```
 
-启动写作流程时先在终端选择 OpenAI 或 DeepSeek；Paper Studio 不显示 API 服务商或 Key 设置，但会按当前服务商提供写作模型选择，例如 GPT-5 mini/nano 或 DeepSeek V4 Pro/Flash。正文、标题、
+启动写作流程时先在终端选择 OpenAI 或 DeepSeek；Paper Studio 不显示 API 服务商或 Key 设置，但允许自行输入写作模型名称，并提供 GPT-5 mini/nano 或 DeepSeek V4 Pro/Flash 等非强制建议。正文、标题、
 Caption 和机制图设计 Prompt 使用启动时选定的文本 API 与网页中选定的模型；GPT Image 绘图仍使用
 OpenAI，因此需要绘图时仍需配置 `OPENAI_API_KEY`。
 

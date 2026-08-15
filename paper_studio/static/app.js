@@ -417,6 +417,7 @@ function setBusy(busy, label = "") {
   $("comment").disabled = busy;
   $("llm-provider").disabled = busy;
   $("model").disabled = busy;
+  $("model-apply").disabled = busy;
   if (busy) {
     $("accept").disabled = true;
     const paragraph = state && state.sections && state.sections[activeSection]
@@ -428,6 +429,7 @@ function setBusy(busy, label = "") {
     $("message").textContent = label || "Working…";
   } else {
     updateAcceptButton();
+    updateModelApplyButton();
   }
   document.querySelectorAll(".section-button").forEach((button) => {
     button.disabled = busy;
@@ -446,6 +448,16 @@ function setBusy(busy, label = "") {
     });
     updateFigureButtonStates();
   }
+}
+
+function updateModelApplyButton() {
+  const visibleModel = $("model").value.trim();
+  $("model-apply").disabled = conversationResetBusy
+    || proseRequestBusy
+    || fullDraftRequestBusy
+    || titleBusy
+    || !visibleModel
+    || visibleModel === String((state && state.model) || "gpt-5-nano");
 }
 
 function showMessage(message, error = false) {
@@ -1601,18 +1613,17 @@ function render() {
     }));
   }
   providerSelect.value = state.llm_provider || "openai";
-  const modelSelect = $("model");
+  const modelInput = $("model");
   const modelOptions = state.llm_model_options || [];
-  if (modelOptions.length) {
-    modelSelect.replaceChildren(...modelOptions.map((option) => {
-      const element = document.createElement("option");
-      element.value = option.id;
-      element.textContent = option.label;
-      return element;
-    }));
-  }
-  modelSelect.value = state.model || "gpt-5-nano";
-  $("model-provider-note").textContent = `${apiKeySetup.provider_label || "当前 API"} 提供；切换后会重置 LLM 对话链，已写入正文不变。`;
+  $("model-suggestions").replaceChildren(...modelOptions.map((option) => {
+    const element = document.createElement("option");
+    element.value = option.id;
+    element.label = option.label;
+    return element;
+  }));
+  renderTitleDraftInput(modelInput, "model", state.model || "gpt-5-nano");
+  $("model-provider-note").textContent = `${apiKeySetup.provider_label || "当前 API"} 提供；可自行输入模型名称，建议项仅作参考。`;
+  updateModelApplyButton();
   $("api-key-setup").hidden = apiKeyReady;
   $("api-key-setup-command").textContent = apiKeySetup.setup_command || 'export OPENAI_API_KEY="粘贴你的 API key"';
   $("api-key-setup-description").textContent = `${apiKeySetup.provider_label || "当前"} API 尚未配置。请在启动 Paper Studio 的本机终端设置；密钥不会进入网页。GPT Image 仍单独使用 OpenAI。`;
@@ -1633,7 +1644,7 @@ function render() {
     $("api-status").textContent = apiKeyReady ? "Shell ready · API key ready" : "Shell ready · API key missing";
     $("api-status").className = "status " + (apiKeyReady ? "ok" : "warn");
     $("conversation-status").style.display = "none";
-    ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model"].forEach((id) => {
+    ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model", "model-apply"].forEach((id) => {
       $(id).disabled = true;
     });
     $("agent-chat-launcher").hidden = true;
@@ -1643,6 +1654,7 @@ function render() {
   ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model"].forEach((id) => {
     $(id).disabled = false;
   });
+  updateModelApplyButton();
   renderAgentChat();
   const artifactMode = ["figures", "tables"].includes(activeView);
   $("writing-workspace").hidden = artifactMode;
@@ -1879,15 +1891,18 @@ $("comment").addEventListener("input", (event) => {
   if (paragraph) rememberCommentDraft(`${activeSection}:${paragraph.id}`, event.currentTarget.value);
 });
 
-$("model").addEventListener("change", async (event) => {
+async function applyWritingModel() {
   if (proseRequestBusy || fullDraftRequestBusy || titleBusy || conversationResetBusy) {
-    event.currentTarget.value = state.model || "gpt-5-nano";
     return;
   }
-  const requestedModel = event.currentTarget.value;
+  const requestedModel = $("model").value.trim();
+  if (!requestedModel) {
+    showMessage("请先输入写作模型名称。", true);
+    updateModelApplyButton();
+    return;
+  }
   if (requestedModel === state.model) return;
   if (!confirm(`切换到 ${requestedModel}？这会重置所有 LLM 对话链，但不会修改已写入的正文、图表或 PDF。`)) {
-    event.currentTarget.value = state.model || "gpt-5-nano";
     return;
   }
   conversationResetBusy = true;
@@ -1902,13 +1917,26 @@ $("model").addEventListener("change", async (event) => {
     render();
     showMessage(`写作模型已切换为 ${state.model}；LLM 对话链已重置，已写入内容保持不变。`);
   } catch (error) {
-    event.currentTarget.value = state.model || "gpt-5-nano";
     showMessage(error.message, true);
   } finally {
     conversationResetBusy = false;
     setBusy(false);
   }
+}
+
+$("model").addEventListener("input", (event) => {
+  rememberTitleDraft("model", event.currentTarget.value, state.model || "gpt-5-nano");
+  event.currentTarget.dataset.dirty = String(event.currentTarget.value !== (state.model || "gpt-5-nano"));
+  updateModelApplyButton();
 });
+
+$("model").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  applyWritingModel();
+});
+
+$("model-apply").addEventListener("click", applyWritingModel);
 
 $("llm-provider").addEventListener("change", async (event) => {
   if (proseRequestBusy || fullDraftRequestBusy || titleBusy) {

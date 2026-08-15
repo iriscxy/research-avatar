@@ -365,7 +365,7 @@ class PaperStudioTests(unittest.TestCase):
         with self.assertRaisesRegex(StudioError, "不支持的 LLM API"):
             studio.select_llm_provider(state, "compatible")
 
-    def test_model_selection_is_provider_specific_and_resets_all_llm_chains(self):
+    def test_model_selection_accepts_researcher_input_and_resets_all_llm_chains(self):
         state = _default_state()
         state["title_editor"]["previous_response_id"] = "title-old"
         first_section = next(iter(state["sections"].values()))
@@ -377,8 +377,10 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIsNone(state["title_editor"]["previous_response_id"])
         self.assertIsNone(first_section["previous_response_id"])
         self.assertIsNone(first_figure["previous_response_id"])
-        with self.assertRaisesRegex(StudioError, "OpenAI 不支持"):
-            studio.select_llm_model(state, "deepseek-v4-pro")
+        self.assertTrue(studio.select_llm_model(state, "gpt-5.9-research-preview"))
+        self.assertEqual(state["model"], "gpt-5.9-research-preview")
+        with self.assertRaisesRegex(StudioError, "不含空格"):
+            studio.select_llm_model(state, "invalid model")
 
         state["llm_provider"] = "deepseek"
         state["model"] = "deepseek-v4-flash"
@@ -428,7 +430,7 @@ class PaperStudioTests(unittest.TestCase):
         parser = InteractionParser()
         parser.feed(html)
         expected_controls = {
-            "llm-provider", "model", "reset", "reset-generated", "writing-view", "figures-view",
+            "llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view",
             "tables-view", "compile", "paper-title", "title-gpt-prompt",
             "title-generate", "title-save", "candidate", "comment", "generate",
             "accept", "pdf-navigation-toggle", "table-agent-prompt", "table-agent-edit",
@@ -1261,7 +1263,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('/static/app.js?v=20260815.4', html)
+        self.assertIn('/static/app.js?v=20260815.5', html)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
         self.assertIn('id="figures-view" disabled', html)
         self.assertIn('id="compile" class="secondary" disabled', html)
@@ -1396,7 +1398,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('/static/app.js?v=20260815.4', html)
+        self.assertIn('/static/app.js?v=20260815.5', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1406,7 +1408,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('roundLabel.textContent = `第 ${round} 轮`', source)
         self.assertIn('message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`', source)
         self.assertIn("agent-chat-round", source)
-        self.assertIn('/static/style.css?v=20260815.4', html)
+        self.assertIn('/static/style.css?v=20260815.5', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)
