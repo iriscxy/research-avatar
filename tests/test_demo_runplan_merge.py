@@ -16,7 +16,10 @@ class DemoRunPlanMergeTests(unittest.TestCase):
         self.assertNotIn('reportDocument("results"', source)
         self.assertNotIn("05 只保留完整 provenance，不再单独展示", source)
         self.assertNotIn("执行进度和已完成图表都在 04 Run Plan", source)
-        self.assertIn("把实验拆成一个个 Goal，逐项完成", source)
+        self.assertIn("把完整实验拆成一个个 Goal", source)
+        self.assertIn("一次确认全部 Goals", source)
+        self.assertIn("逐个查看并确认", source)
+        self.assertNotIn("复制 /goal", source)
 
     def test_completed_goal_contains_source_table_plot_and_hover_process(self):
         source = (ROOT / "demo/app.js").read_text(encoding="utf-8")

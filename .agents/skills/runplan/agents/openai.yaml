@@ -1,4 +1,4 @@
 interface:
   display_name: "Run Plan"
   short_description: "Fill approved paper cells with traceable data"
-  default_prompt: "Use $runplan to organize the approved evidence into major experiment parts and bounded subparts, map every figure or table target to a deterministic acquisition source, and propose only the next manual /goal."
+  default_prompt: "Use $runplan to organize the approved evidence into major experiment parts and bounded Goals, map every figure or table target to a deterministic acquisition source, then ask the researcher either to confirm all Goals for automatic sequential execution or to review and confirm each Goal individually."

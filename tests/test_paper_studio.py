@@ -511,6 +511,12 @@ class PaperStudioTests(unittest.TestCase):
             ),
             [],
         )
+        self.assertEqual(
+            latex_prose_issues(
+                r"\begin{equation}e_i(r)=E_i(r)/L_i\end{equation}"
+            ),
+            [],
+        )
 
     def test_latex_normalization_canonicalizes_decorated_citation_placeholder(self):
         self.assertEqual(
@@ -518,6 +524,42 @@ class PaperStudioTests(unittest.TestCase):
                 r"Claim [CITATION NEEDED; \cite{provisional_key}]."
             ),
             "Claim [CITATION NEEDED].",
+        )
+
+    def test_latex_normalization_removes_inline_delimiters_nested_in_display_math(self):
+        self.assertEqual(
+            normalize_latex_ready_text(r"Before. \[\(x = y\).\] After."),
+            r"Before. \[x = y.\] After.",
+        )
+        self.assertEqual(
+            normalize_latex_ready_text(
+                r"\begin{equation}\(A(r)=A(0)-r\)\end{equation}"
+            ),
+            r"\begin{equation}A(r)=A(0)-r\end{equation}",
+        )
+        self.assertEqual(
+            normalize_latex_ready_text(
+                "\\begin{equation}\n\nA(r)=A(0)-r\n\n\\end{equation}"
+            ),
+            "\\begin{equation}\nA(r)=A(0)-r\n\\end{equation}",
+        )
+        self.assertEqual(
+            normalize_latex_ready_text("\\[\n\nx=y\n\n\\]"),
+            "\\[\nx=y\n\\]",
+        )
+
+    def test_latex_normalization_escapes_prose_specials_but_preserves_math_and_keys(self):
+        self.assertEqual(
+            normalize_latex_ready_text(
+                r"restaurant_reviews reaches 10% & see \(x_i=1\), \cite{safe_key}."
+            ),
+            r"restaurant\_reviews reaches 10\% \& see \(x_i=1\), \cite{safe_key}.",
+        )
+
+    def test_table_cell_escape_converts_direction_arrows_to_latex_math(self):
+        self.assertEqual(
+            studio.latex_escape_cell("Accuracy ↑ / Drop ↓"),
+            r"Accuracy $\uparrow$ / Drop $\downarrow$",
         )
 
     def test_newer_accepted_section_survives_an_unrelated_stale_save(self):
@@ -1483,6 +1525,129 @@ First accepted paragraph.
         )
         self.assertEqual(path, Path("/tmp/paper/sections/method.tex"))
         self.assertEqual(line, 21)
+
+    def test_synctex_maps_terminal_rewritten_prose_by_planned_heading(self):
+        state = _default_state()
+        state["sections"]["experiments"]["paragraphs"][0]["accepted_text"] = (
+            "\\subsection{Experimental Setup}\n\nOld browser-state prose."
+        )
+        source = (
+            "\\section{Experiments}\n\n"
+            "\\subsection{Experimental Setup}\n\n"
+            "Completely rewritten terminal prose that is not present in browser state.\n\n"
+            "\\subsection{Main Results}\n\nAnother paragraph.\n"
+        )
+        with TemporaryDirectory() as temporary:
+            paper = Path(temporary)
+            (paper / "sections").mkdir()
+            path = paper / "sections" / studio.SECTION_MAP["experiments"]["file"]
+            path.write_text(source, encoding="utf-8")
+            with patch.object(studio, "PAPER", paper):
+                target = studio.source_edit_target(path, 5, state)
+        self.assertEqual(target["view"], "writing")
+        self.assertEqual(target["paragraph_id"], "E1")
+
+    def test_pdf_reverse_lookup_rebuilds_a_missing_synctex_index(self):
+        state = _default_state()
+        paragraph = state["sections"]["introduction"]["paragraphs"][0]
+        paragraph["accepted_text"] = "Recovered reverse-search paragraph."
+        with TemporaryDirectory() as temporary:
+            paper = Path(temporary)
+            sections = paper / "sections"
+            sections.mkdir()
+            source_path = sections / studio.SECTION_MAP["introduction"]["file"]
+            source_path.write_text(
+                "\\section{Introduction}\n\nRecovered reverse-search paragraph.\n",
+                encoding="utf-8",
+            )
+            (paper / "main.pdf").write_bytes(b"%PDF-fixture")
+
+            def compile_with_synctex():
+                (paper / "main.synctex.gz").write_bytes(b"fixture")
+                return studio.CompileResult(True, "rebuilt")
+
+            completed = CompletedProcess(
+                args=["synctex"],
+                returncode=0,
+                stdout=f"Input:{source_path}\nLine:3\nColumn:-1\n",
+                stderr="",
+            )
+            with (
+                patch.object(studio, "PAPER", paper),
+                patch.object(studio, "compile_paper", side_effect=compile_with_synctex) as compile_mock,
+                patch.object(studio, "shutil_which", return_value="/usr/bin/synctex"),
+                patch.object(
+                    studio,
+                    "paper_pdf_metadata",
+                    return_value={"page_count": 1, "page_width_pt": 600, "page_height_pt": 800},
+                ),
+                patch.object(studio.subprocess, "run", return_value=completed),
+            ):
+                target = studio.locate_pdf_source(1, 100, 100, state)
+
+        compile_mock.assert_called_once_with()
+        self.assertEqual(target["view"], "writing")
+        self.assertEqual(target["paragraph_id"], paragraph["id"])
+
+    def test_terminal_manuscript_recovers_figure_and_table_workbenches(self):
+        state = _default_state()
+        discussion = state["sections"]["analysis_discussion"]
+        discussion["paragraphs"][0]["accepted_text"] = "Accepted discussion paragraph."
+        table_latex = studio.generate_table_latex(
+            "T2", studio.metrics_bundle(), studio.default_table_prompt("T2")
+        )
+        with TemporaryDirectory() as temporary:
+            paper = Path(temporary)
+            sections = paper / "sections"
+            figure_dir = paper / "fig"
+            figure_source_dir = paper / "figsrc"
+            table_preview_dir = paper / ".paper_studio/table_previews"
+            sections.mkdir(parents=True)
+            figure_dir.mkdir()
+            figure_source_dir.mkdir()
+            with (
+                patch.object(studio, "PAPER", paper),
+                patch.object(studio, "FIGURE_DIR", figure_dir),
+                patch.object(studio, "FIGURE_SOURCE_DIR", figure_source_dir),
+                patch.object(studio, "TABLE_PREVIEW_DIR", table_preview_dir),
+            ):
+                figure_pdf = studio.figure_paths("F5")["pdf"]
+                figure_pdf.write_bytes(b"%PDF-recovered-figure")
+                relative_figure = figure_pdf.relative_to(paper).as_posix()
+                source_path = sections / studio.SECTION_MAP["analysis_discussion"]["file"]
+                source_path.write_text(
+                    "\\section{Analysis and Discussion}\n\n"
+                    "Accepted discussion paragraph.\n\n"
+                    + table_latex
+                    + "\n\n\\begin{figure}[t]\n  \\centering\n"
+                    + f"  \\includegraphics[width=\\columnwidth]{{{relative_figure}}}\n"
+                    + "  \\caption{Recovered data figure.}\n"
+                    + "  \\label{fig:defense}\n\\end{figure}\n",
+                    encoding="utf-8",
+                )
+
+                changed = studio.synchronize_artifact_workbenches_from_manuscript(
+                    state, build_table_previews=False
+                )
+                public_figure = next(
+                    item for item in studio.figure_public_state(state) if item["id"] == "F5"
+                )
+                public_table = next(
+                    item for item in studio.table_public_state(state) if item["id"] == "T2"
+                )
+
+        self.assertTrue(changed)
+        self.assertEqual(state["figures"]["F5"]["status"], "approved")
+        self.assertTrue(state["figures"]["F5"]["composed_at"])
+        self.assertEqual(state["figures"]["F5"]["panels"]["a"]["status"], "built")
+        self.assertEqual(public_figure["preview_url"].split("?", 1)[0], "/figure-file/F5/pdf")
+        self.assertEqual(
+            public_figure["panels"][0]["preview_url"].split("?", 1)[0],
+            "/figure-file/F5/pdf",
+        )
+        self.assertEqual(state["tables"]["T2"]["status"], "approved")
+        self.assertEqual(state["tables"]["T2"]["latex"], table_latex)
+        self.assertEqual(public_table["latex"], table_latex)
 
     def test_custom_figure_caption_is_public_and_used_in_latex(self):
         state = _default_state()
@@ -2507,19 +2672,99 @@ args = parser.parse_args()
         section["paragraphs"][0]["accepted_text"] = "First."
         source, accepted = render_section_source("introduction", section)
         self.assertTrue(source.startswith("\\section{Introduction}\n"))
-        self.assertIn("First.\n\nSecond.", source)
+        self.assertIn("% PAPER_STUDIO_PARAGRAPH:I1", source)
+        self.assertIn("% PAPER_STUDIO_PARAGRAPH:I2", source)
+        self.assertLess(source.index("First."), source.index("Second."))
         self.assertEqual(accepted, "First.\n\nSecond.")
 
     def test_abstract_has_no_section_heading_and_conclusion_keeps_label(self):
         state = _default_state()["sections"]
         state["abstract"]["paragraphs"][0]["accepted_text"] = "Abstract prose."
         abstract_source, _ = render_section_source("abstract", state["abstract"])
-        self.assertEqual(abstract_source, "Abstract prose.\n")
+        self.assertEqual(
+            abstract_source,
+            "% PAPER_STUDIO_PARAGRAPH:A1\nAbstract prose.\n",
+        )
 
         state["conclusion"]["paragraphs"][0]["accepted_text"] = "Conclusion prose."
         conclusion_source, _ = render_section_source("conclusion", state["conclusion"])
         self.assertTrue(conclusion_source.startswith("\\section{Conclusion and Future Work}"))
         self.assertTrue(conclusion_source.rstrip().endswith("\\label{paper:endconclusion}"))
+
+    def test_marked_terminal_prose_recovers_browser_editor_content(self):
+        state = _default_state()
+        source = (
+            "\\section{Introduction}\n\n"
+            "% PAPER_STUDIO_PARAGRAPH:I1\nFinal first paragraph.\n\n"
+            "% PAPER_STUDIO_PARAGRAPH:I2\nFinal second paragraph.\n"
+        )
+        state["sections"]["introduction"]["paragraphs"] = state["sections"][
+            "introduction"
+        ]["paragraphs"][:2]
+
+        recovered = studio.paragraph_texts_from_manuscript(
+            "introduction", source, state
+        )
+
+        self.assertEqual(
+            recovered,
+            {"I1": "Final first paragraph.", "I2": "Final second paragraph."},
+        )
+
+    def test_markerless_heading_prose_stops_before_unplanned_heading(self):
+        state = _default_state()
+        paragraphs = state["sections"]["experiments"]["paragraphs"][:2]
+        state["sections"]["experiments"]["paragraphs"] = paragraphs
+        first = studio.heading_latex(
+            paragraphs[0].get("heading"), paragraphs[0].get("heading_style")
+        )
+        second = studio.heading_latex(
+            paragraphs[1].get("heading"), paragraphs[1].get("heading_style")
+        )
+        source = (
+            f"\\section{{Experiments}}\n\n{first}\n\nFinal setup.\n\n"
+            f"{second}\n\nFinal result.\n\n"
+            "\\subsection{Extra terminal-only analysis}\n\nDo not absorb this.\n"
+        )
+
+        recovered = studio.paragraph_texts_from_manuscript(
+            "experiments", source, state
+        )
+
+        self.assertEqual(recovered[paragraphs[0]["id"]], f"{first}\n\nFinal setup.")
+        self.assertEqual(recovered[paragraphs[1]["id"]], f"{second}\n\nFinal result.")
+
+    def test_markerless_unheaded_prose_recovers_around_float(self):
+        state = _default_state()
+        state["sections"]["introduction"]["paragraphs"] = state["sections"][
+            "introduction"
+        ]["paragraphs"][:2]
+        source = (
+            "\\section{Introduction}\n\nFinal first paragraph.\n\n"
+            "\\begin{figure}[t]\n\\caption{Example}\n\\end{figure}\n\n"
+            "Final second paragraph.\n"
+        )
+
+        recovered = studio.paragraph_texts_from_manuscript(
+            "introduction", source, state
+        )
+
+        self.assertEqual(
+            recovered,
+            {"I1": "Final first paragraph.", "I2": "Final second paragraph."},
+        )
+
+    def test_ambiguous_markerless_prose_does_not_overwrite_state(self):
+        state = _default_state()
+        state["sections"]["introduction"]["paragraphs"] = state["sections"][
+            "introduction"
+        ]["paragraphs"][:2]
+        recovered = studio.paragraph_texts_from_manuscript(
+            "introduction",
+            "\\section{Introduction}\n\nOnly one block.\n",
+            state,
+        )
+        self.assertIsNone(recovered)
 
     def test_approved_figure_is_inserted_after_its_bound_paragraph(self):
         state = _default_state()
@@ -3756,6 +4001,11 @@ args = parser.parse_args()
                     "accept_full_draft_paragraph",
                     side_effect=fake_accept,
                 ),
+                patch.object(
+                    studio,
+                    "materialize_direct_full_draft_artifacts",
+                    return_value=False,
+                ) as materialize,
             ):
                 studio.save_state(state)
                 studio.full_draft_worker(token, "gpt-5-nano")
@@ -3768,6 +4018,7 @@ args = parser.parse_args()
             )
             self.assertEqual(accepted["accepted_text"], "Batch draft.")
             self.assertEqual(generate.call_count, 1)
+            materialize.assert_called_once()
 
     def test_direct_full_draft_uses_same_job_without_opening_browser(self):
         with TemporaryDirectory() as directory:

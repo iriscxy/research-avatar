@@ -95,6 +95,43 @@ def minimal_contract() -> dict:
 
 
 class MengyaoRegressionTests(unittest.TestCase):
+    def test_expplan_rejects_temporary_or_missing_external_reference_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_profile_fixture(root)
+            reports = root / "reports"
+            reports.mkdir()
+            plan = reports / "03_EXPERIMENT_PLAN.html"
+            contract = minimal_contract()
+            contract["references"]["external_mechanism"] = {
+                "url": "https://example.org/external",
+                "local_full_text": "/tmp/disposable-reference.txt",
+            }
+            write_plan(plan, contract)
+            errors = EXPPLAN.validate(plan)
+            self.assertIn(
+                "external mechanism reference local full text must be project-relative",
+                errors,
+            )
+
+            contract["references"]["external_mechanism"]["local_full_text"] = (
+                "reports/sources/external.txt"
+            )
+            write_plan(plan, contract)
+            errors = EXPPLAN.validate(plan)
+            self.assertIn(
+                "external mechanism reference local full text does not exist", errors
+            )
+
+            source = root / "reports/sources/external.txt"
+            source.parent.mkdir(parents=True)
+            source.write_text("retrieved primary source", encoding="utf-8")
+            write_plan(plan, contract)
+            errors = EXPPLAN.validate(plan)
+            self.assertNotIn(
+                "external mechanism reference local full text does not exist", errors
+            )
+
     def test_expplan_contract_versioning(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

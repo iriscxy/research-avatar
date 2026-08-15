@@ -36,6 +36,30 @@ def fixture_state(proposed="G1.1"):
 
 
 class RunPlanProgressTests(unittest.TestCase):
+    def test_sequential_execution_mode_is_visible_and_keeps_one_current_goal(self):
+        state = fixture_state()
+        state["execution_mode"] = "sequential_all_goals"
+        rendered = render_parts_and_goals(state)
+        self.assertIn('data-execution-mode="sequential_all_goals"', rendered)
+        self.assertIn("自动依次执行全部 Goal", rendered)
+        self.assertIn("任一检查失败会停止队列", rendered)
+        self.assertEqual(rendered.count('class="current-goal"'), 1)
+
+    def test_unknown_execution_mode_is_rejected(self):
+        state = fixture_state()
+        state["execution_mode"] = "skip_failed_goals"
+        with self.assertRaisesRegex(ValueError, "unsupported run-plan execution_mode"):
+            render_parts_and_goals(state)
+
+    def test_confirmation_gate_shows_both_paths_before_any_goal_runs(self):
+        state = fixture_state(proposed=None)
+        state["execution_mode"] = "awaiting_goal_confirmation"
+        rendered = render_parts_and_goals(state)
+        self.assertIn('data-execution-mode="awaiting_goal_confirmation"', rendered)
+        self.assertIn("一次确认全部 Goals", rendered)
+        self.assertIn("逐个查看并确认", rendered)
+        self.assertNotIn('class="current-goal"', rendered)
+
     def test_current_goal_is_nested_in_matching_goal_card(self):
         rendered = render_parts_and_goals(fixture_state())
         self.assertEqual(rendered.count('class="current-goal"'), 1)

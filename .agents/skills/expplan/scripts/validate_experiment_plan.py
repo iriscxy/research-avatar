@@ -528,6 +528,15 @@ def validate(plan: Path) -> list[str]:
     if structure_publication and publication_fulltext != local_full_text:
         errors.append("structure reference local full text must match its publications.json record")
 
+    external_ref = contract.get("references", {}).get("external_mechanism", {})
+    external_full_text = str(external_ref.get("local_full_text", "")).strip()
+    if not external_ref.get("url") or not external_full_text:
+        errors.append("external mechanism reference must have a URL and local full text")
+    elif Path(external_full_text).is_absolute():
+        errors.append("external mechanism reference local full text must be project-relative")
+    elif not (project_root / external_full_text).is_file():
+        errors.append("external mechanism reference local full text does not exist")
+
     body_figures = sum(item.get("kind") == "figure" for item in artifacts)
     body_tables = sum(item.get("kind") == "table" for item in artifacts)
     float_budget = contract.get("float_budget", {})

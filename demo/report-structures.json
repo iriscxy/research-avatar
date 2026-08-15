@@ -57,12 +57,12 @@
   },
   "runplan": {
     "artifact": "实验执行计划",
-    "note": "把完整实验拆成可验证的里程碑，每次只推进一个任务",
+    "note": "把完整实验拆成可验证的 Goals，可一次确认全部 Goals 自动执行，也可逐个查看并确认",
     "sections": [
       {"number": "1", "title": "Execution Estimate", "content": "完整实验分为 12 个任务和 8 个阶段；预计使用 4×A100、约 428 GPU 小时，也可以使用单张 GPU 延长运行时间完成。"},
       {"number": "2", "title": "Implementation Sources", "content": "所有基线和新方法都运行在同一个本地框架中；有官方实现时通过适配器接入，其余方法按论文描述实现。"},
       {"number": "3", "title": "Figure/Table Coverage", "content": "每张图和每张表都对应明确的执行任务；任务完成后，核验过的数据会直接填入相应图表。"},
-      {"number": "4", "title": "Parts and Goals", "content": "执行顺序依次覆盖基础设施、现象验证、方法可行性、开发调参、主结果、因果消融、鲁棒性和成本分析。当前只开放第一个基础任务，完成并核验后才会解锁下一项。", "details": ["当前状态：第一个任务可以开始；尚未填入论文结果数字。"]}
+      {"number": "4", "title": "Parts and Goals", "content": "执行顺序依次覆盖基础设施、现象验证、方法可行性、开发调参、主结果、因果消融、鲁棒性和成本分析。全部 Goals 展示后进入确认门：研究者可以一次确认全部 Goals 自动执行，也可以逐个查看并确认。", "details": ["每个 Goal 都独立保存、核验并更新图表；自动执行会在失败或需要研究判断时停止。"]}
     ]
   },
   "results": {

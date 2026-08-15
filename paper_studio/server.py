@@ -314,6 +314,7 @@ SECTION_MAP = {
         "file": str(item["file"]),
         "render": str(item.get("render", "section")),
         "latex_title": str(item.get("latex_title", "")),
+        "start_label": str(item.get("start_label", "")),
         "end_label": str(item.get("end_label", "")),
     }
     for item in SECTION_SPECS
@@ -682,19 +683,25 @@ def render_section_source(
 ) -> tuple[str, str]:
     """Render accepted paragraphs without discarding the section's LaTeX wrapper."""
     accepted_paragraphs = [
-        (item["id"], item["accepted_text"].strip())
+        (item["id"], normalize_latex_ready_text(item["accepted_text"].strip()))
         for item in section_state["paragraphs"]
         if item["accepted_text"].strip()
     ]
     accepted_text = "\n\n".join(text for _, text in accepted_paragraphs)
     section_metadata = SECTION_MAP[section]
     if section_metadata.get("render") == "abstract":
-        return accepted_text + "\n", accepted_text
+        marked = "\n\n".join(
+            f"% PAPER_STUDIO_PARAGRAPH:{paragraph_id}\n{text}"
+            for paragraph_id, text in accepted_paragraphs
+        )
+        return marked + "\n", accepted_text
 
     title = SECTION_LATEX_TITLES.get(section)
     if not title:
         raise StudioError(f"Section {section} is missing latex_title in paper_studio.json")
     parts = [f"\\section{{{title}}}"]
+    if section_metadata.get("start_label"):
+        parts.append(f"\\label{{{section_metadata['start_label']}}}")
     figure_anchors = section_figure_anchors(section, figure_states or {})
     placeholder_anchors = (
         section_figure_placeholder_anchors(section, section_state, figure_states)
@@ -703,6 +710,7 @@ def render_section_source(
     )
     table_anchors = section_table_anchors(section, table_states or {})
     for paragraph_id, text in accepted_paragraphs:
+        parts.append(f"% PAPER_STUDIO_PARAGRAPH:{paragraph_id}")
         parts.append(text)
         parts.extend(
             figure_latex(figure_id, (figure_states or {}).get(figure_id))
@@ -1497,6 +1505,22 @@ def figure_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
             panel_paths = data_panel_paths(figure_id, panel_id)
             panel_preview_kind = "pdf" if panel_paths["pdf"].exists() else "preview"
             panel_preview_path = panel_paths[panel_preview_kind]
+            recovered_single_panel = bool(
+                len(definition.get("panels", [])) == 1
+                and composition_ready
+                and not panel_preview_path.exists()
+                and paths["pdf"].exists()
+            )
+            panel_preview_url = (
+                f"/figure-file/{figure_id}/pdf?v={int(paths['pdf'].stat().st_mtime)}"
+                if recovered_single_panel
+                else (
+                    f"/figure-panel-file/{figure_id}/{panel_id}/{panel_preview_kind}"
+                    f"?v={int(panel_preview_path.stat().st_mtime)}"
+                    if panel_preview_path.exists()
+                    else None
+                )
+            )
             panels.append(
                 {
                     **panel,
@@ -1506,17 +1530,16 @@ def figure_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
                     "last_message": panel_stored.get("last_message", ""),
                     "progress": int(panel_stored.get("progress", 0)),
                     "progress_message": panel_stored.get("progress_message", ""),
-                    "preview_url": (
-                        f"/figure-panel-file/{figure_id}/{panel_id}/{panel_preview_kind}"
-                        f"?v={int(panel_preview_path.stat().st_mtime)}"
-                        if panel_preview_path.exists()
-                        else None
-                    ),
-                    "preview_type": panel_preview_kind,
+                    "preview_url": panel_preview_url,
+                    "preview_type": "pdf" if recovered_single_panel else panel_preview_kind,
                     "downloads": {
-                        "pdf": f"/figure-panel-file/{figure_id}/{panel_id}/pdf"
+                        "pdf": (
+                            f"/figure-file/{figure_id}/pdf"
+                            if recovered_single_panel
+                            else f"/figure-panel-file/{figure_id}/{panel_id}/pdf"
+                        )
                     }
-                    if panel_paths["pdf"].exists()
+                    if panel_paths["pdf"].exists() or recovered_single_panel
                     else {},
                 }
             )
@@ -1799,6 +1822,8 @@ def latex_escape_cell(value: str) -> str:
         "_": r"\_",
         "{": r"\{",
         "}": r"\}",
+        "↑": r"$\uparrow$",
+        "↓": r"$\downarrow$",
     }
     return "".join(replacements.get(character, character) for character in value)
 
@@ -1956,6 +1981,412 @@ def compile_table_preview(
         os.replace(pdf_target, paths["pdf"])
         os.replace(png_target, paths["preview"])
     return paths
+
+
+def labeled_float_from_source(
+    source: str, kind: str, label: str
+) -> tuple[str, int, int] | None:
+    """Return one exact labelled figure/table float and its source offsets."""
+    if kind not in {"figure", "table"}:
+        raise StudioError(f"Unsupported LaTeX float kind: {kind}")
+    pattern = re.compile(
+        rf"\\begin\{{({kind}\*?)\}}.*?\\end\{{\1\}}",
+        flags=re.DOTALL,
+    )
+    marker = f"\\label{{{label}}}"
+    for match in pattern.finditer(source):
+        if marker in match.group(0):
+            return match.group(0).strip(), match.start(), match.end()
+    return None
+
+
+def latex_command_content(source: str, command: str) -> str:
+    """Extract the first balanced ``\\command{...}`` body without flattening LaTeX."""
+    marker = f"\\{command}{{"
+    start = source.find(marker)
+    if start < 0:
+        return ""
+    cursor = start + len(marker)
+    depth = 1
+    body_start = cursor
+    while cursor < len(source):
+        character = source[cursor]
+        if character == "{" and (cursor == 0 or source[cursor - 1] != "\\"):
+            depth += 1
+        elif character == "}" and (cursor == 0 or source[cursor - 1] != "\\"):
+            depth -= 1
+            if depth == 0:
+                return source[body_start:cursor].strip()
+        cursor += 1
+    return ""
+
+
+def artifact_anchor_before_offset(
+    section: str, source: str, offset: int, state: dict[str, Any]
+) -> str | None:
+    """Find the last accepted paragraph that precedes a recovered float."""
+    candidates: list[tuple[int, str]] = []
+    for paragraph in state.get("sections", {}).get(section, {}).get("paragraphs", []):
+        text = str(paragraph.get("accepted_text", "")).strip()
+        if not text:
+            continue
+        position = source.find(text)
+        if position >= 0 and position + len(text) <= offset:
+            candidates.append((position + len(text), str(paragraph.get("id", ""))))
+    return max(candidates)[1] if candidates else None
+
+
+def _without_complete_floats(source: str) -> str:
+    """Remove complete figure/table floats while preserving prose around them."""
+    for kind in ("figure", "table"):
+        source = re.sub(
+            rf"\\begin\{{({kind}\*?)\}}.*?\\end\{{\1\}}",
+            "\n\n",
+            source,
+            flags=re.DOTALL,
+        )
+    return source
+
+
+def _clean_recovered_paragraph(text: str) -> str:
+    """Remove renderer bookkeeping that is not part of editable paragraph prose."""
+    text = _without_complete_floats(text)
+    text = re.sub(r"(?m)^% PAPER_STUDIO_PARAGRAPH:[^\n]*\n?", "", text)
+    text = re.sub(r"(?m)^\\label\{[^{}]+\}\s*$", "", text)
+    return text.strip()
+
+
+def paragraph_texts_from_manuscript(
+    section: str, source: str, state: dict[str, Any]
+) -> dict[str, str] | None:
+    """Recover every planned editable paragraph from a terminal-written section.
+
+    Explicit renderer markers are preferred. Older manuscripts are recovered only
+    when their planned headings or ordered prose blocks give a complete one-to-one
+    mapping. Returning ``None`` leaves browser state untouched instead of guessing.
+    """
+    paragraphs = state.get("sections", {}).get(section, {}).get("paragraphs", [])
+    if not paragraphs:
+        return {}
+
+    marker_pattern = re.compile(r"(?m)^% PAPER_STUDIO_PARAGRAPH:([^\s]+)\s*$")
+    markers = list(marker_pattern.finditer(source))
+    planned_ids = [str(paragraph["id"]) for paragraph in paragraphs]
+    if markers and [match.group(1) for match in markers] == planned_ids:
+        recovered: dict[str, str] = {}
+        for index, match in enumerate(markers):
+            end = markers[index + 1].start() if index + 1 < len(markers) else len(source)
+            text = _clean_recovered_paragraph(source[match.end() : end])
+            if not text:
+                return None
+            recovered[match.group(1)] = text
+        return recovered
+
+    headings: list[tuple[str, str, int, int]] = []
+    for paragraph in paragraphs:
+        paragraph_id = str(paragraph["id"])
+        heading = heading_latex(
+            paragraph.get("heading"), paragraph.get("heading_style")
+        )
+        if not heading:
+            headings = []
+            break
+        start = source.find(heading)
+        if start < 0:
+            return None
+        headings.append((paragraph_id, heading, start, start + len(heading)))
+    if headings:
+        recovered = {}
+        generic_heading = re.compile(r"\\(?:section|subsection|paragraph|textbf)\{")
+        float_start = re.compile(r"\\begin\{(?:figure|table)\*?\}")
+        for index, (paragraph_id, _heading, start, body_start) in enumerate(headings):
+            candidates = [len(source)]
+            if index + 1 < len(headings):
+                candidates.append(headings[index + 1][2])
+            next_heading = generic_heading.search(source, body_start)
+            if next_heading:
+                candidates.append(next_heading.start())
+            next_float = float_start.search(source, body_start)
+            if next_float:
+                candidates.append(next_float.start())
+            text = _clean_recovered_paragraph(source[start : min(candidates)])
+            if not text:
+                return None
+            recovered[paragraph_id] = text
+        return recovered
+
+    # Abstract, Introduction, Conclusion, and Limitations use ordered prose blocks.
+    prose = _without_complete_floats(source)
+    prose = re.sub(r"(?m)^\\section\*?\{[^{}]+\}\s*$", "", prose)
+    prose = re.sub(r"(?m)^\\label\{[^{}]+\}\s*$", "", prose)
+    prose = re.sub(r"(?m)^% PAPER_STUDIO_PARAGRAPH:[^\n]*$", "", prose)
+    blocks = [
+        block.strip()
+        for block in re.split(r"\n\s*\n", prose)
+        if block.strip() and not block.lstrip().startswith("%")
+    ]
+    if len(blocks) != len(paragraphs):
+        return None
+    return {
+        str(paragraph["id"]): block
+        for paragraph, block in zip(paragraphs, blocks)
+    }
+
+
+def synchronize_paragraph_editors_from_manuscript(state: dict[str, Any]) -> bool:
+    """Make browser paragraph editors reflect the canonical terminal-written LaTeX."""
+    changed = False
+    for section, section_state in state.get("sections", {}).items():
+        metadata = SECTION_MAP.get(section)
+        if not metadata:
+            continue
+        source_path = PAPER / "sections" / metadata["file"]
+        if not source_path.is_file():
+            continue
+        recovered = paragraph_texts_from_manuscript(
+            section, read_text(source_path, 500000), state
+        )
+        if recovered is None:
+            continue
+        section_changed = False
+        for paragraph in section_state.get("paragraphs", []):
+            paragraph_id = str(paragraph["id"])
+            text = recovered.get(paragraph_id, "")
+            if text and str(paragraph.get("accepted_text", "")).strip() != text:
+                paragraph["accepted_text"] = text
+                paragraph["candidate"] = None
+                section_changed = True
+        if section_changed:
+            section_state["revision"] = int(section_state.get("revision", 0)) + 1
+            changed = True
+    return changed
+
+
+def synchronize_artifact_workbenches_from_manuscript(
+    state: dict[str, Any], *, build_table_previews: bool = True
+) -> bool:
+    """Recover editable artifact state from labelled floats in canonical section sources.
+
+    A loose file on disk is never enough. Recovery requires a matching configured
+    label in the manuscript source; figures additionally require that the exact
+    included PDF exists. This makes terminal full-draft output and the browser one
+    shared artifact state without mistaking abandoned files for approved results.
+    """
+    changed = False
+    section_sources: dict[str, tuple[Path, str]] = {}
+
+    def section_source(section: str) -> tuple[Path, str]:
+        if section not in section_sources:
+            path = PAPER / "sections" / SECTION_MAP[section]["file"]
+            section_sources[section] = (path, read_text(path, 500000))
+        return section_sources[section]
+
+    for figure_id in FIGURE_ORDER:
+        definition = FIGURES[figure_id]
+        stored = state["figures"][figure_id]
+        recovered: tuple[str, int, int, str, Path] | None = None
+        for section in definition.get("source_sections", []):
+            source_path, source = section_source(section)
+            match = labeled_float_from_source(source, "figure", definition["label"])
+            if match:
+                recovered = (*match, section, source_path)
+                break
+        if not recovered:
+            continue
+        latex, start, _end, section, source_path = recovered
+        include = re.search(
+            r"\\includegraphics(?:\[[^\]]*\])?\{([^{}]+)\}", latex
+        )
+        paths = figure_paths(figure_id)
+        if not include or not paths["pdf"].is_file():
+            continue
+        included = (PAPER / include.group(1)).resolve()
+        expected = paths["pdf"].resolve()
+        if included != expected and included.with_suffix(".pdf") != expected:
+            continue
+        recovered_at = int(max(source_path.stat().st_mtime, paths["pdf"].stat().st_mtime))
+        updates: dict[str, Any] = {
+            "status": "approved",
+            "approved_at": int(stored.get("approved_at") or recovered_at),
+            "placement_after": artifact_anchor_before_offset(
+                section, section_source(section)[1], start, state
+            )
+            or stored.get("placement_after")
+            or (first_artifact_binding(figure_id) or (None, None))[1],
+            "caption": latex_command_content(latex, "caption")
+            or stored.get("caption")
+            or definition["caption"],
+            "progress": 100,
+            "progress_message": "已从论文源码恢复图片工作台。",
+        }
+        if "\\begin{figure*}" in latex:
+            updates.update(layout_mode="two-column", requested_layout_width="two-column")
+        else:
+            updates.update(layout_mode="single-column", requested_layout_width="single-column")
+        if definition.get("kind") == "data":
+            updates["composed_at"] = int(stored.get("composed_at") or recovered_at)
+            for panel in stored.get("panels", {}).values():
+                if panel.get("status") != "built":
+                    panel.update(
+                        status="built",
+                        progress=100,
+                        progress_message="已从论文中的最终数据图恢复。",
+                    )
+                    changed = True
+        for field, value in updates.items():
+            if stored.get(field) != value:
+                stored[field] = value
+                changed = True
+
+    for table_id in TABLE_ORDER:
+        definition = TABLES[table_id]
+        stored = state["tables"][table_id]
+        recovered = None
+        for section in definition.get("source_sections", []):
+            source_path, source = section_source(section)
+            match = labeled_float_from_source(source, "table", definition["label"])
+            if match:
+                recovered = (*match, section, source_path)
+                break
+        if not recovered:
+            continue
+        latex, start, _end, section, source_path = recovered
+        latex = validate_table_latex_source(table_id, latex)
+        recovered_at = int(source_path.stat().st_mtime)
+        updates = {
+            "latex": latex,
+            "status": "approved",
+            "approved_at": int(stored.get("approved_at") or recovered_at),
+            "placement_after": artifact_anchor_before_offset(
+                section, section_source(section)[1], start, state
+            )
+            or stored.get("placement_after")
+            or (definition.get("related_paragraphs", {}).get(section, []) or [None])[-1],
+            "progress": 100,
+            "progress_message": "已从论文源码恢复表格工作台。",
+        }
+        latex_changed = stored.get("latex", "").strip() != latex
+        for field, value in updates.items():
+            if stored.get(field) != value:
+                stored[field] = value
+                changed = True
+        preview = table_preview_paths(table_id)["preview"]
+        if build_table_previews and (latex_changed or not preview.is_file()):
+            try:
+                compile_table_preview(table_id, latex)
+            except StudioError as exc:
+                stored["last_message"] = (
+                    "表格 LaTeX 已恢复，但浏览器预览生成失败：" + str(exc)
+                )
+            else:
+                stored["last_message"] = "已从论文源码恢复可编辑表格与预览。"
+            changed = True
+    return changed
+
+
+def materialize_direct_full_draft_artifacts(state: dict[str, Any]) -> bool:
+    """Fill bound figure/table workbenches after unattended prose drafting.
+
+    Direct drafting must end in the same project state as interactive acceptance.
+    Only configured deliverable paths are accepted, and every artifact remains gated
+    on its bound paragraph being present. Data tables are regenerated from the real
+    metrics fixture rather than copied from prose.
+    """
+    changed = False
+    for figure_id in FIGURE_ORDER:
+        definition = FIGURES[figure_id]
+        stored = state["figures"][figure_id]
+        binding = first_artifact_binding(figure_id)
+        if not binding:
+            continue
+        section, paragraph_id = binding
+        paragraph, _index = paragraph_by_id(state, section, paragraph_id)
+        if not str(paragraph.get("accepted_text", "")).strip():
+            continue
+        paths = figure_paths(figure_id)
+        if not paths["pdf"].is_file():
+            continue
+        if definition.get("kind") == "mechanism" and not paths["pptx"].is_file():
+            continue
+        updates = {
+            "status": "approved",
+            "approved_at": int(paths["pdf"].stat().st_mtime),
+            "placement_after": stored.get("placement_after") or paragraph_id,
+            "progress": 100,
+            "progress_message": "已从 direct full draft 的配置产物恢复图片工作台。",
+        }
+        if definition.get("kind") == "data":
+            updates["composed_at"] = int(paths["pdf"].stat().st_mtime)
+            for panel in stored.get("panels", {}).values():
+                panel.update(
+                    status="built",
+                    progress=100,
+                    progress_message="已从验证结果图恢复。",
+                )
+        for field, value in updates.items():
+            if stored.get(field) != value:
+                stored[field] = value
+                changed = True
+
+    metrics = metrics_bundle()
+    for table_id in TABLE_ORDER:
+        definition = TABLES[table_id]
+        stored = state["tables"][table_id]
+        binding = first_artifact_binding(table_id)
+        if not binding:
+            continue
+        section, paragraph_id = binding
+        paragraph, _index = paragraph_by_id(state, section, paragraph_id)
+        if not str(paragraph.get("accepted_text", "")).strip():
+            continue
+        # Project configuration is the canonical unattended brief. A stale UI
+        # draft from an earlier schema must not break terminal full-draft sync.
+        prompt = default_table_prompt(table_id)
+        latex = validate_table_latex_source(
+            table_id, generate_table_latex(table_id, metrics, prompt)
+        )
+        compile_table_preview(table_id, latex)
+        updates = {
+            "latex": latex,
+            "status": "approved",
+            "approved_at": int(time.time()),
+            "placement_after": stored.get("placement_after") or paragraph_id,
+            "progress": 100,
+            "progress_message": "已从验证 metrics 恢复可编辑表格与预览。",
+            "last_message": "表格数字由 paper/metrics.json 确定性生成。",
+            "generation_prompt": prompt,
+        }
+        for field, value in updates.items():
+            if stored.get(field) != value:
+                stored[field] = value
+                changed = True
+
+    if not changed:
+        return False
+    for section, section_state in state["sections"].items():
+        for paragraph in section_state.get("paragraphs", []):
+            accepted_text = str(paragraph.get("accepted_text", ""))
+            if accepted_text:
+                paragraph["accepted_text"] = normalize_latex_ready_text(accepted_text)
+        source, accepted = render_section_source(
+            section, section_state, state["figures"], state["tables"]
+        )
+        target = PAPER / "sections" / SECTION_MAP[section]["file"]
+        temporary = target.with_suffix(".tex.tmp")
+        temporary.write_text(source, encoding="utf-8")
+        os.replace(temporary, target)
+        section_state["accepted_text"] = accepted
+    compile_result = compile_paper()
+    if not compile_result.ok:
+        raise StudioError(
+            "Direct full draft 图表物化后 LaTeX 编译失败。\n" + compile_result.message
+        )
+    state["compile"] = {
+        "status": "ok",
+        "message": compile_result.message,
+        "updated_at": int(time.time()),
+    }
+    return True
 
 
 def extract_agent_table_latex(text: str) -> str:
@@ -2387,6 +2818,47 @@ def normalize_latex_ready_text(source: str) -> str:
         r"paragraph|footnote|url|href"
     )
     normalized = re.sub(rf"\\\\(?=(?:{commands})\b)", lambda _match: "\\", source)
+    # LLMs sometimes obey the general "put mathematics in \( ... \)" rule
+    # inside an already-open display environment.  TeX rejects those nested
+    # inline delimiters with "Bad math environment delimiter".  Removing only
+    # the redundant pair preserves the expression and its display/numbering.
+    display_patterns = (
+        r"\\\[.*?\\\]",
+        r"\\begin\{(?:equation\*?|align\*?|gather\*?|multline\*?)\}.*?"
+        r"\\end\{(?:equation\*?|align\*?|gather\*?|multline\*?)\}",
+    )
+    for pattern in display_patterns:
+        normalized = re.sub(
+            pattern,
+            lambda match: match.group(0).replace(r"\(", "").replace(r"\)", ""),
+            normalized,
+            flags=re.S,
+        )
+    normalized = re.sub(
+        r"(\\begin\{(?:equation\*?|align\*?|gather\*?|multline\*?)\})"
+        r"[ \t]*\n(?:[ \t]*\n)+",
+        r"\1\n",
+        normalized,
+    )
+    normalized = re.sub(
+        r"(?:[ \t]*\n)+([ \t]*\\end\{(?:equation\*?|align\*?|gather\*?|multline\*?)\})",
+        r"\n\1",
+        normalized,
+    )
+    normalized = re.sub(r"(\\\[)[ \t]*\n(?:[ \t]*\n)+", r"\1\n", normalized)
+    normalized = re.sub(r"(?:[ \t]*\n)+([ \t]*\\\])", r"\n\1", normalized)
+    # Escape TeX specials only in prose. Mathematical environments and
+    # identifier-bearing citation/reference commands remain verbatim.
+    protected = re.compile(
+        r"(?s)(\\\(.*?\\\)|\\\[.*?\\\]|(?<!\\)\$.*?(?<!\\)\$|"
+        r"\\begin\{(?:equation\*?|align\*?|gather\*?|multline\*?)\}.*?"
+        r"\\end\{(?:equation\*?|align\*?|gather\*?|multline\*?)\}|"
+        r"\\(?:cite\w*|ref|pageref|label)\{[^{}]*\})"
+    )
+    pieces = protected.split(normalized)
+    for index in range(0, len(pieces), 2):
+        pieces[index] = re.sub(r"(?<!\\)([_%&#])", r"\\\1", pieces[index])
+    normalized = "".join(pieces)
     # Models occasionally decorate the reserved placeholder with notes or even
     # provisional cite commands. Canonicalize the whole bracket so the verified
     # citation resolver handles it instead of leaking workflow syntax into prose.
@@ -2414,6 +2886,8 @@ def latex_prose_issues(source: str) -> list[str]:
         r"(?s)\\\(.*?\\\)",
         r"(?s)\\\[.*?\\\]",
         r"(?s)(?<!\\)\$.*?(?<!\\)\$",
+        r"(?s)\\begin\{(?:equation\*?|align\*?|gather\*?|multline\*?)\}.*?"
+        r"\\end\{(?:equation\*?|align\*?|gather\*?|multline\*?)\}",
         r"\\(?:cite\w*|ref|pageref|label)\{[^{}]*\}",
     ):
         masked = re.sub(pattern, "", masked)
@@ -3005,12 +3479,19 @@ def call_openai(
     )
 
     venue = str(PROJECT_METADATA.get("venue", "academic")).strip() or "academic"
+    synthetic_fixture = bool(metrics_bundle().get("synthetic", False))
+    measurement_marker_rule = (
+        "Every numerical measurement or outcome from the paper-writing fixture must "
+        "include the literal marker [SYNTHETIC]."
+        if synthetic_fixture
+        else "The paper-writing fixture is verified real data; do not add a [SYNTHETIC] marker."
+    )
     instructions = f"""You are an expert {venue} paper editor. Return only the proposed
 LaTeX-ready manuscript prose for the requested paragraph; do not explain your process.
 Write in precise academic English. Preserve the approved paper framing and evidence
-boundaries. Never invent a result, citation key, or experimental detail. Every numerical
-measurement or outcome from the paper-writing fixture must include the literal marker
-[SYNTHETIC]. Do not attach that marker to design counts such as the number of models,
+boundaries. Never invent a result, citation key, or experimental detail. Numerical
+measurements and outcomes must follow this fixture rule: {measurement_marker_rule}
+Do not attach a synthetic marker to design counts such as the number of models,
 benchmarks, clusters, samples, layers, or queries. Treat the reference paragraph only
 as a rhetorical template. Use citation keys already introduced in this section
 conversation. If a necessary source is absent, write [CITATION NEEDED]; the server will
@@ -3664,6 +4145,11 @@ def full_draft_worker(token: str, model: str) -> None:
             state = load_state()
             job = state.get("full_draft_job") or {}
             if job.get("token") == token and job.get("status") == "running":
+                materialize_direct_full_draft_artifacts(state)
+                synchronize_paragraph_editors_from_manuscript(state)
+                synchronize_artifact_workbenches_from_manuscript(
+                    state, build_table_previews=True
+                )
                 job.update(
                     status="completed",
                     token=None,
@@ -3852,6 +4338,67 @@ def _line_span(source: str, fragment: str) -> tuple[int, int] | None:
     return source.count("\n", 0, start) + 1, source.count("\n", 0, end) + 1
 
 
+def structural_paragraph_spans(
+    section: str, source: str, state: dict[str, Any]
+) -> list[tuple[int, int, str]]:
+    """Recover paragraph line spans when terminal edits changed accepted prose text."""
+    paragraphs = state.get("sections", {}).get(section, {}).get("paragraphs", [])
+    line_count = max(1, len(source.splitlines()))
+    heading_starts: list[tuple[int, int, str]] = []
+    for index, paragraph in enumerate(paragraphs):
+        heading = heading_latex(
+            paragraph.get("heading"), paragraph.get("heading_style")
+        )
+        if not heading:
+            continue
+        offset = source.find(heading)
+        if offset >= 0:
+            heading_starts.append(
+                (source.count("\n", 0, offset) + 1, index, str(paragraph["id"]))
+            )
+    if heading_starts:
+        heading_starts.sort()
+        return [
+            (
+                start,
+                heading_starts[position + 1][0] - 1
+                if position + 1 < len(heading_starts)
+                else line_count,
+                paragraph_id,
+            )
+            for position, (start, _index, paragraph_id) in enumerate(heading_starts)
+        ]
+
+    # Unheaded sections such as Abstract and Introduction are rendered as ordered
+    # blank-line-separated prose blocks. Remove complete floats and the section
+    # wrapper, then bind the remaining blocks in plan order.
+    masked = source
+    for kind in ("figure", "table"):
+        pattern = re.compile(
+            rf"\\begin\{{({kind}\*?)\}}.*?\\end\{{\1\}}",
+            flags=re.DOTALL,
+        )
+        masked = pattern.sub(lambda match: "\n" * match.group(0).count("\n"), masked)
+    spans: list[tuple[int, int]] = []
+    for match in re.finditer(r"(?:^|\n\s*\n)(\S.*?)(?=\n\s*\n|\Z)", masked, re.DOTALL):
+        block = match.group(1).strip()
+        if not block or re.fullmatch(r"\\section\{.*\}", block):
+            continue
+        if re.fullmatch(r"\\label\{.*\}", block):
+            continue
+        start_offset = masked.find(block, match.start(1), match.end(1))
+        spans.append(
+            (
+                masked.count("\n", 0, start_offset) + 1,
+                masked.count("\n", 0, start_offset + len(block)) + 1,
+            )
+        )
+    return [
+        (*span, str(paragraph["id"]))
+        for span, paragraph in zip(spans, paragraphs)
+    ]
+
+
 def source_edit_target(source_path: Path, line: int, state: dict[str, Any]) -> dict[str, str]:
     """Map a SyncTeX source line to a Paper Studio paragraph or artifact editor."""
     filename = source_path.name
@@ -3892,12 +4439,19 @@ def source_edit_target(source_path: Path, line: int, state: dict[str, Any]) -> d
         text = str(paragraph.get("accepted_text", "")).strip()
         if text and (span := _line_span(source, text)):
             paragraph_spans.append((*span, str(paragraph["id"])))
-    if not paragraph_spans:
-        raise StudioError("该 section 还没有可返回编辑的正文段落。")
     containing = [span for span in paragraph_spans if span[0] <= line <= span[1]]
-    chosen = containing[0] if containing else min(
-        paragraph_spans,
-        key=lambda span: min(abs(line - span[0]), abs(line - span[1])),
+    structural_spans = structural_paragraph_spans(section, source, state)
+    structural_containing = [
+        span for span in structural_spans if span[0] <= line <= span[1]
+    ]
+    all_spans = paragraph_spans or structural_spans
+    if not all_spans:
+        raise StudioError("该 section 还没有可返回编辑的正文段落。")
+    chosen = containing[0] if containing else (
+        structural_containing[0] if structural_containing else min(
+            all_spans,
+            key=lambda span: min(abs(line - span[0]), abs(line - span[1])),
+        )
     )
     return {"view": "writing", "section": section, "paragraph_id": chosen[2]}
 
@@ -3907,8 +4461,14 @@ def locate_pdf_source(page: int, x: float, y: float, state: dict[str, Any]) -> d
     pdf = PAPER / "main.pdf"
     synctex_file = PAPER / "main.synctex.gz"
     synctex = shutil_which("synctex")
-    if not pdf.exists() or not synctex_file.exists():
-        raise StudioError("请先重新编译 PDF，以生成双击定位索引。")
+    if not pdf.exists():
+        raise StudioError("请先编译 PDF，再使用双击定位。")
+    if not synctex_file.exists():
+        compile_result = compile_paper()
+        if not compile_result.ok or not synctex_file.exists():
+            raise StudioError(
+                "PDF 双击定位索引缺失，自动重建失败。\n" + compile_result.message
+            )
     if not synctex:
         raise StudioError("PDF 双击定位需要本地 SyncTeX。")
     metadata = paper_pdf_metadata()
@@ -7899,6 +8459,13 @@ def main() -> None:
     if not EMPTY_PROJECT_MODE:
         recover_interrupted_figure_jobs()
         recover_interrupted_table_jobs()
+        state = load_state()
+        prose_changed = synchronize_paragraph_editors_from_manuscript(state)
+        artifacts_changed = synchronize_artifact_workbenches_from_manuscript(
+            state, build_table_previews=True
+        )
+        if prose_changed or artifacts_changed:
+            save_state(state)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     url = f"http://{args.host}:{args.port}"
     print(f"Paper Studio: {url}")

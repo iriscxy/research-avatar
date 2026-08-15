@@ -48,6 +48,15 @@
   new current paragraph, completed count, accepted text/navigation state, and PDF
   revision within one polling cycle without a manual reload. Assert an intermediate
   update before CLI completion so an end-only refresh cannot pass this regression.
+- At CLI completion and project-backed server startup, reconcile labelled artifact
+  floats in canonical section source into the browser workbenches. A matching
+  figure label plus its configured included PDF restores the real preview; a
+  matching table label restores the full editable LaTeX and compiled preview.
+  Never recover from an unreferenced file alone.
+- Reconcile terminal-written canonical section prose into browser paragraph
+  editors at the same boundaries. Prefer stable paragraph markers; permit legacy
+  heading/order recovery only when every planned paragraph maps one-to-one. Assert
+  that the editor contains the final LaTeX prose, not the pre-CLI draft.
 
 ## Data figures
 
@@ -171,6 +180,7 @@
 - The destructive “清空生成内容” confirmation must show the exact project ID in a selectable read-only input with a dedicated `复制 ID` action and a separate confirmation input. Do not rely on a native `prompt()` message whose project-ID hint cannot be selected. Copying must provide visible success/fallback feedback; mismatch must keep the dialog open and must not call the reset endpoint.
 - Render the LIVE OUTPUT manuscript as crisp vector pages in a browser-owned viewer; do not use the native PDF plugin when page interaction is required. Keep page navigation hidden by default, provide a title-bar show/hide button, and persist that browser-local choice across reloads.
 - A double-click on a manuscript PDF page must return to the corresponding edit surface. Compile with SyncTeX, convert browser click coordinates to PDF points, reverse-map them to the included section source and line, then prioritize a surrounding figure/table float over nearby prose. Open the exact Figure/Table editor for float content or select the exact paragraph for prose. Template-only content must return a clear non-destructive message.
+- If a valid manuscript PDF exists but its SyncTeX index is missing, rebuild that index automatically from the canonical LaTeX before reverse lookup; do not make the researcher repair a missing build sidecar manually.
 - Preserve PDF clarity in the interactive viewer: serve vector SVG pages generated locally from the final PDF, cache them by PDF revision, and never substitute raster screenshots for the manuscript pages.
 - Preserve the reader's PDF position across Accept → LaTeX and every recompilation. Before replacing pages for a new PDF revision, capture the page under the viewport center plus its relative within-page offset; give replacement pages stable aspect ratios and restore that same visual anchor after rendering. Do not jump back to page 1.
 - Keep a visible `当前页 / 总页数` indicator in the LIVE OUTPUT title bar. Derive the current page from the page containing the viewport center; update it during scrolling, thumbnail navigation, and post-compilation position restoration, and keep the matching thumbnail highlighted.

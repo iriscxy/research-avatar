@@ -1,6 +1,14 @@
 {
   "source": "reports/04_RUN_PLAN.html",
   "schema_version": "1.0",
+  "execution_mode": "sequential_all_goals",
+  "goal_confirmation": {
+    "status": "confirmed",
+    "scope": "all_goals",
+    "confirmed_goal_ids": ["G1.1", "G2.1", "G2.2", "G3.1", "G4.1", "G4.2", "G5.1", "G6.1", "G6.2", "G6.3", "G7.1", "G8.1"],
+    "plan_digest": "demo-approved-runplan",
+    "confirmed_at": "2026-08-15T00:00:00Z"
+  },
   "active_goal": null,
   "proposed_goal_id": "G1.1",
   "approved_artifact_ids": [

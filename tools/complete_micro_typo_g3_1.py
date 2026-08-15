@@ -131,13 +131,24 @@ def build_real_fixture() -> dict:
 
 
 def render_figure() -> None:
-    plot_python = shutil.which("python")
-    if not plot_python:
+    candidates = [
+        shutil.which("python"),
+        shutil.which("python3"),
+        "/Users/xiuying.chen/miniconda3/bin/python3.12",
+    ]
+    plot_python = None
+    probe = None
+    for candidate in dict.fromkeys(item for item in candidates if item):
+        attempt = subprocess.run(
+            [candidate, "-c", "import json,sys,matplotlib; print(json.dumps({'python':sys.version.split()[0],'matplotlib':matplotlib.__version__}))"],
+            cwd=ROOT, capture_output=True, text=True,
+        )
+        if attempt.returncode == 0:
+            plot_python = candidate
+            probe = attempt
+            break
+    if not plot_python or probe is None:
         raise ValueError("no Python interpreter with the approved plotting dependency is available")
-    probe = subprocess.run(
-        [plot_python, "-c", "import json,sys,matplotlib; print(json.dumps({'python':sys.version.split()[0],'matplotlib':matplotlib.__version__}))"],
-        cwd=ROOT, check=True, capture_output=True, text=True,
-    )
     figure_environment = json.loads(probe.stdout)
     if not figure_environment["matplotlib"].startswith(("3.9.", "3.10.")):
         raise ValueError("matplotlib does not satisfy the approved >=3.9,<4 range")
@@ -157,6 +168,10 @@ def render_figure() -> None:
 
 def fill_report(rows: list[dict[str, str]], raw_sha: str, now: str) -> None:
     source = REPORT.read_text(encoding="utf-8")
+    source = re.sub(
+        r'<script type="application/json" id="result-provenance">.*?</script>', "", source,
+        flags=re.S,
+    )
     for row in rows:
         pattern = re.compile(
             rf'<td\b[^>]*data-target-id="{re.escape(row["target_id"])}"[^>]*'
@@ -241,7 +256,7 @@ def main() -> None:
             goal["status"] = "completed"
             goal["visible_evidence"] = "T1 最后一行和 F2 character-trigram 系列共 8 个真实目标已验证；F2 已从全部 8 个源格生成真实图。C2 因两种方法的 10% Drop 均为 0 而被否证。"
             goal["completion_check"] = "两次完整 raw SHA-256 一致；160 条预测和 8 个目标可重算；完整 T1、F2 源表、真实 PNG/PDF 与 provenance 均可重新打开。"
-    state["state"] = "complete"
+    state["state"] = "completed"
     state["active_goal"] = None
     state["proposed_goal_id"] = None
     state["completed_results"] = [

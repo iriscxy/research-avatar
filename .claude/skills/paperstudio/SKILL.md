@@ -81,6 +81,19 @@ Paper Studio is a permanent, paper-independent shell. It must start even when `p
     stale in-memory snapshot. Within one polling cycle and without reload, update
     the page's current paragraph, completed/total progress, accepted prose and
     navigation state, and compiled PDF revision. Never synchronize only at the end.
+    At CLI completion and project-backed startup, treat canonical section LaTeX as
+    authoritative for browser paragraph editors. Recover terminal-written prose by
+    stable paragraph markers when present, or only by a complete unambiguous
+    heading/order mapping for older source; never guess and overwrite an ambiguous
+    section.
+    At successful direct-draft completion, materialize every bound artifact before
+    the final compile: use only configured figure deliverable paths whose owning
+    paragraphs are accepted (mechanism figures also require their editable PPTX),
+    and regenerate table LaTeX/previews deterministically from the configured real
+    metrics fixture. Re-render canonical sections so actual figures and tables
+    replace drafting placeholders, then recover the workbench state transactionally.
+    For later source recovery, require both the configured label and expected
+    artifact path; never infer approval from an unbound loose file alone.
 
 ## Workspace data map
 

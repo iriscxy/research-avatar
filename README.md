@@ -20,7 +20,7 @@ Research Avatar 是一套面向**有经验研究者**的轻量级、个性化科
 
 ### 🧪 实验：从想法到证据
 1. **从论文反推实验**——先起草预期摘要与逐段论文框架，明确每项核心论点所需的实验、图表和证据；所有结果均保留为空，等待实际实验数据填充；
-2. **有计划的实验执行**——先出整体 plan，再一次给一个 goal，你确认后手动执行 `/goal`；每完成一项就在计划网页上标记一个 ✅，整理对应代码和文件后才给下一项；
+2. **把实验拆成可完成的 Goals**——先生成整体 plan，再把实验拆成一个个有明确产出和完成标准的 Goal；看完完整计划后，你可以一次确认全部 Goals，让系统按依赖顺序自动执行，也可以逐个查看并确认。无论采用哪种方式，每完成一项都会立即保存结果、核验证据、更新图表并在计划网页上标记 ✅；
 3. **重要决定始终由你做**——过程全程透明可控，每个节点的结果是否支持 claim、要不要补实验、要不要继续，都由你裁决。
 
 ### ✍️ 论文写作
@@ -42,9 +42,7 @@ Research Avatar 是一套面向**有经验研究者**的轻量级、个性化科
 
 ## 使用前准备
 
-首次使用前，需要你**手动下载完整的 Google Scholar 个人主页 HTML**：打开目标 Scholar 主页，持续点击 **Show more**，直到全部论文都已加载，再通过浏览器开发者工具复制页面的 `outerHTML` 并保存为 `.html` 文件。普通 `Cmd/Ctrl+S` 可能只保存最初加载的约 20 篇论文，因此不要使用未完整展开的页面建立画像。
-
-随后把该 HTML 文件的本地路径交给 `$profileconstruct`，例如：
+首次使用前，需要你**手动保存完整的 Google Scholar 个人主页 HTML**。随后把该 HTML 文件的本地路径交给 `$profileconstruct`，例如：
 
 ```text
 $profileconstruct 使用 ~/Downloads/scholar_profile.html
@@ -52,9 +50,9 @@ $profileconstruct 使用 ~/Downloads/scholar_profile.html
 
 你可以下载自己的 Scholar 主页，也可以下载希望模仿其研究品味和论文结构的研究者主页。
 
-论文写作，以及用户明确要求把 Literature Survey 翻译成其他语言时，需要
-LLM API。终端流程会先询问本次使用 OpenAI 还是 DeepSeek；只需在运行命令
-和启动 Paper Studio 的同一个本机终端中配置所选服务的 Key：
+论文写作或翻译功能需要调用 LLM API。使用前，请在**本机终端中配置相应服务的 API Key**：
+
+未明确请求翻译时，`$researchlit` 不会调用任何翻译 API；只有用户明确要求其他语言版本时才进行翻译。
 
 ```bash
 # 使用 OpenAI 时需要
@@ -63,23 +61,6 @@ export OPENAI_API_KEY="粘贴你的 API key"
 # 使用 DeepSeek 时需要
 export DEEPSEEK_API_KEY="粘贴你的 API key"
 ```
-
-启动写作流程时先在终端选择 OpenAI 或 DeepSeek；Paper Studio 不显示 API 服务商或 Key 设置，但允许自行输入写作模型名称，并提供 GPT-5 mini/nano 或 DeepSeek V4 Pro/Flash 等非强制建议。正文、标题、
-Caption 和机制图设计 Prompt 使用启动时选定的文本 API 与网页中选定的模型；GPT Image 绘图仍使用
-OpenAI，因此需要绘图时仍需配置 `OPENAI_API_KEY`。
-
-用户明确要求翻译 Survey 时，终端同样会先询问使用 OpenAI 还是 DeepSeek；
-未要求翻译时不会调用翻译 API。
-
-```bash
-# 选择 OpenAI
-export OPENAI_API_KEY="粘贴你的 API key"
-
-# 选择 DeepSeek
-export DEEPSEEK_API_KEY="粘贴你的 API key"
-```
-
-API Key 只保存在本机终端环境变量中，不要输入聊天、写入仓库或保存在浏览器里。未明确请求翻译时，`$researchlit` 不会调用任何翻译 API，也不会因为对话语言自动翻译。
 
 ---
 
@@ -118,7 +99,7 @@ researcher-profile/PROFILE.html
 
 **1. 先规划论文，再反推实验**——`$expplan` 从选定 idea 出发，先写预期摘要，再写出 Projected Paper：每个 section 的每个段落用一句话说明要写什么。随后逐条冻结 claim，为每条 claim 明确“什么结果支持它、什么结果证伪它”，再据此设计实验并倒推出 baseline、数据集、指标和待填图表。实验不是独立清单，而是为论文中明确的证据空位服务。
 
-**2. 有计划的实验执行**——`$runplan` 把已批准的证据需求写成自然语言计划网页 `reports/04_RUN_PLAN.html`，默认顺序是：环境 smoke → 验证 hypothesis/motivation → 验证方法可行性 → 冻结调参 → 主结果 → 完整 baseline/消融/敏感性。每次只提出**一个当前 goal**，你认可后手动执行给出的 `/goal`；每完成一项，先整理该 goal 的代码和文件，再在网页上标记 **✅**，然后才提出下一项。可恢复状态嵌入同一个网页，不再维护单独的 `RUN_STATE.json`。
+**2. 把计划拆成一个个可验证的 Goal**——`$runplan` 把已批准的证据需求写成自然语言计划网页 `reports/04_RUN_PLAN.html`，默认顺序是：环境 smoke → 验证 hypothesis/motivation → 验证方法可行性 → 冻结调参 → 主结果 → 完整 baseline/消融/敏感性。完整 Goal 列表生成后会进入确认门：你可以**一次确认全部 Goals**，让系统按依赖顺序自动执行；也可以选择**逐个查看并确认 Goal**。自动模式仍然逐项落盘、核验、整理代码、更新图表并标记 **✅**，遇到检查失败、预算耗尽或需要新的研究判断时立即停止，不会越过失败任务继续运行。可恢复状态嵌入同一个网页，不再维护单独的 `RUN_STATE.json`。
 
 **3. 重要决定由你做**——每个节点，当前结果是否支持 claim、是否需要补实验、是否继续下一阶段，都由你判断；结果不达预期时系统只会提出 refine / pivot / 停止三个选项，不会擅自开始调参或补实验。
 
@@ -141,7 +122,7 @@ researcher-profile/PROFILE.html
 | `$researchlit "你的研究主题"` | 多角度检索并生成文献综述；只收录实际检索核对过的论文，每条引用可回到原始来源 |
 | `$ideagen` | 按 engineering / theory / benchmark 生成并核查候选 idea；可基于指定论文寻找突破口，也可显式开启 `--disruptive-wildcard on`，追加一个经证据、可证伪性和“不可被现有路线轻易吸收”检查的大胆候选 D1 |
 | `$expplan` | 逐段规划 Projected Paper 和待填图表，再反推出实验合同 |
-| `$runplan` | 生成整体 plan，然后提示你逐个 `/goal` 完成 |
+| `$runplan` | 把整体实验拆成可验证的 Goals；可一次确认全部 Goals 自动执行，也可逐个查看并确认 |
 | `$paperwrite` | 交互写作、作图、编译与审查 |
 
 ---

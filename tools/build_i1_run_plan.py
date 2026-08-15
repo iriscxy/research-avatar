@@ -39,7 +39,7 @@ def load_contract() -> dict:
 def goal(gid: str, part: str, stage: str, title: str, why: str, work: str, evidence: str, check: str, artifacts: list[str], deps: list[str], decisions: list[str], budget: str, experiment_ids: list[str]) -> dict:
     return {
         "id": gid, "part_id": part, "subpart_id": gid, "stage": stage, "title": title,
-        "status": "proposed" if gid == "G1.1" else "locked", "decision_question": why,
+        "status": "pending" if gid == "G1.1" else "locked", "decision_question": why,
         "visible_work": work, "visible_evidence": evidence, "completion_check": check,
         "artifact_ids": artifacts, "dependencies": deps, "decision_ids": decisions,
         "budget": budget, "experiment_ids": experiment_ids,
@@ -168,13 +168,15 @@ def main() -> None:
             "disjoint":True,"frozen_before_final":True,
         })
     state = {
-        "schema_version":"1.0","source_plan":"reports/03_EXPERIMENT_PLAN.html",
-        "source_plan_approval":{"status":"approved","approved_at":contract["approved_at"],"digest":contract["approval_contract_sha256"]},
-        "state":"awaiting_goal_activation","proposed_goal_id":"G1.1","active_goal":None,
+        "schema_version":"1.0","generated_at":"2026-08-15","source_plan":"reports/03_EXPERIMENT_PLAN.html",
+        "source_plan_approval":{"status":"approved","approved_at":contract["approved_at"],"contract_version":contract.get("approval_contract_version", contract.get("contract_version")),"digest":contract["approval_contract_sha256"]},
+        "state":"awaiting_goal_confirmation","execution_mode":"awaiting_goal_confirmation",
+        "goal_confirmation":{"status":"pending","scope":None,"confirmed_goal_ids":[],"plan_digest":None,"confirmed_at":None},
+        "proposed_goal_id":None,"active_goal":None,
         "parts":parts,"goals":goals,"completed_results":[],"frozen_configuration":{},"attempts":[],
         "raw_paths":[],"result_paths":[],"gate_decisions":[],"amendments":[],"skips":[],
-        "next_authorized_action":"Researcher manually activates exactly G1.1 using the displayed /goal command.",
-        "ledger_audit":{"status":"PASS_EMPTY","checked_at":"2026-08-09","ledger":"code/RESULTS_LEDGER.csv"},
+        "next_authorized_action":"Researcher chooses either confirm-all automatic execution or one-goal-at-a-time review.",
+        "ledger_audit":{"status":"PASS_EMPTY","checked_at":"2026-08-15","ledger":"code/RESULTS_LEDGER.csv"},
         "decision_space_contract":contract["decision_space_contract"],"execution_splits":execution_splits,
         "implementation_contract":contract["implementation_contract"],
         "approved_artifact_ids":[item["id"] for item in contract["paper_artifacts"]],

@@ -93,11 +93,13 @@ def append_rows(state: dict, raw: dict, now: str, revision: str) -> list[dict[st
 
 def fill_report(rows: list[dict[str, str]], raw_sha: str, now: str) -> None:
     source = REPORT.read_text(encoding="utf-8")
-    if "<!-- RESULT_PROVENANCE_START -->" not in source:
-        source = re.sub(
-            r'<script type="application/json" id="result-provenance">.*?</script>', "", source,
-            count=1, flags=re.S,
-        )
+    # The report shell contains an empty payload and the renderer appends the
+    # canonical payload block.  Never leave two identical element IDs: browsers
+    # and the strict validator would otherwise read the stale empty shell first.
+    source = re.sub(
+        r'<script type="application/json" id="result-provenance">.*?</script>', "", source,
+        flags=re.S,
+    )
     source = source.replace('id="result-provenance-index" data-result-id="R-G1.1-A-INF"', 'id="g1-instrumentation-provenance" data-result-id="R-G1.1-A-INF"')
     for row in rows:
         target_id = re.escape(row["target_id"])
@@ -196,7 +198,7 @@ def main() -> None:
          "reason": "Word-unigram clean and 10% swap Accuracy are both 1.0 on the frozen 40-record test, so the observed 10% Robustness Drop is 0; retain without tuning or replacement.",
          "paper_targets_filled": sorted(raw["paper_targets"])},
     ]
-    state["next_authorized_action"] = "Researcher may manually activate exactly G3.1 using the nested /goal command."
+    state["next_authorized_action"] = "Automatically continue to G3.1 after the G2.1 boundary checks pass."
     state["ledger_audit"] = {"status": "PASS_G2.1", "checked_at": now, "ledger": "code/RESULTS_LEDGER.csv"}
     serialized = json.dumps(state, ensure_ascii=False, separators=(",", ":"))
     source = STATE_RE.sub(f'<script type="application/json" id="run-plan-state">{serialized}</script>', source, count=1)

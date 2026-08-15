@@ -502,8 +502,24 @@ def validate(args: argparse.Namespace) -> list[str]:
         state = load_plan_state(args.plan)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return [f"cannot load embedded run-plan state: {exc}"]
-    source_plan = Path(str(state.get("source_plan", "")))
-    if source_plan.is_file() and args.plan:
+    source_plan_value = str(state.get("source_plan", "")).strip()
+    source_plan = Path(source_plan_value)
+    has_source_contract = bool(
+        source_plan_value
+        or state.get("source_plan_approval")
+        or state.get("approved_artifact_ids")
+        or state.get("artifact_coverage")
+    )
+    if args.plan and source_plan_value and not source_plan.is_absolute():
+        project_root = (
+            args.plan.parent.parent
+            if args.plan.parent.name == "reports"
+            else args.plan.parent
+        )
+        source_plan = project_root / source_plan
+    if args.plan and has_source_contract and not source_plan.is_file():
+        errors.append(f"source experiment plan does not exist: {source_plan}")
+    elif source_plan.is_file() and args.plan:
         source_text = source_plan.read_text(encoding="utf-8")
         contract_match = re.search(
             r'<script type="application/json" id="experiment-plan-contract">(.*?)</script>',
@@ -514,6 +530,19 @@ def validate(args: argparse.Namespace) -> list[str]:
             errors.append("source experiment plan lacks embedded contract")
         else:
             experiment_contract = json.loads(contract_match.group(1))
+            source_approval = state.get("source_plan_approval", {})
+            if not isinstance(source_approval, dict):
+                errors.append("run-plan source_plan_approval must be an object")
+                source_approval = {}
+            if source_approval.get("status") != experiment_contract.get("approval_status"):
+                errors.append("run-plan source approval status differs from the approved expplan")
+            if source_approval.get("digest") != experiment_contract.get("approval_contract_sha256"):
+                errors.append("run-plan source approval digest differs from the approved expplan")
+            expected_version = experiment_contract.get(
+                "approval_contract_version", experiment_contract.get("contract_version")
+            )
+            if source_approval.get("contract_version") != expected_version:
+                errors.append("run-plan source contract version differs from the approved expplan")
             expected_artifacts = [item.get("id") for item in experiment_contract.get("paper_artifacts", [])]
             approved_artifacts = state.get("approved_artifact_ids", [])
             coverage = state.get("artifact_coverage", {})

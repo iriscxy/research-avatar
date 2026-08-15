@@ -197,7 +197,7 @@ def render_runplan(contract: dict, state: dict) -> str:
     ])
     state_json = json.dumps(state, ensure_ascii=False, separators=(",", ":"))
     return f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Micro Typo Run Plan</title><style>{stylesheet()}</style></head><body><main>
-    <p class="kicker">RUN PLAN · APPROVED REAL-DATA MICRO STUDY</p><h1>Character Granularity under Typographical Shift</h1><p>3 Parts · 3 Goals；一次只解锁一个 Goal。当前只批准执行 G1.1，不运行论文结果。</p>
+    <p class="kicker">RUN PLAN · APPROVED REAL-DATA MICRO STUDY</p><h1>Character Granularity under Typographical Shift</h1><p>3 Parts · 3 Goals；已授权按顺序自动执行全部 Goal。每个 Goal 仍单独保存、校验并更新结果，任一边界检查失败即停止。</p>
     <section data-report-section="execution-estimate"><h2>1. Execution Estimate</h2><p><strong>推荐资源：</strong>本地 CPU，0 GPU。数据和依赖就绪后，全部实验计算预计少于 1 分钟；代码实现、审计与页面更新预计 20–40 分钟。</p><p><strong>单 GPU：</strong>不是必要条件；使用 GPU 不改变批准的实验合同。估计假设为 80 条训练、40 条测试、3 个经典分类器、4 个固定扰动率、无超参数搜索。</p><p class="coverage">图表覆盖：3/3 — F1, T1, F2</p></section>
     <section data-report-section="implementation-sources"><h2>2. Implementation Sources</h2><p>三个方法都在同一个本地框架中实现，共用数据适配器、扰动器、分类器 API、评估器和 JSON 结果模式。</p><div class="table-wrap"><table><thead><tr><th>Method</th><th>Final implementation</th></tr></thead><tbody>{impl_rows}</tbody></table></div></section>
     <section data-report-section="artifact-coverage"><h2>3. Figure/Table Coverage</h2><div class="table-wrap"><table><thead><tr><th>Artifact</th><th>Owning goals</th><th>Completion contract</th></tr></thead><tbody>{coverage_rows}</tbody></table></div></section>
@@ -291,26 +291,24 @@ def main() -> None:
     ]
     acquisitions = make_acquisitions(contract)
     frozen = {
-        item["id"]: {"value": item["allowed_values"], "source_goal": "approved expplan contract v2", "status": "fixed_before_execution"}
+        item["id"]: {"value": item["allowed_values"], "source_goal": "approved expplan contract v1", "status": "fixed_before_execution"}
         for item in contract["decision_space_contract"]
     }
     state = {
         "schema_version": "1.0", "source_plan": "reports/03_EXPERIMENT_PLAN.html",
         "source_plan_identity": {"path": "reports/03_EXPERIMENT_PLAN.html", "sha256": hashlib.sha256(EXPPLAN.read_bytes()).hexdigest(), "approval_contract_version": contract["approval_contract_version"]},
-        "source_plan_approval": {"status": "approved", "approved_at": contract["approved_at"], "digest": contract["approval_contract_sha256"]},
+        "source_plan_approval": {"status": "approved", "approved_at": contract["approved_at"], "contract_version": contract["approval_contract_version"], "digest": contract["approval_contract_sha256"]},
+        "execution_mode": "sequential_all_goals",
         "state": "awaiting_goal_activation", "proposed_goal_id": "G1.1", "active_goal": None,
         "parts": parts, "goals": goals, "completed_results": [], "frozen_configuration": frozen,
         "attempts": [], "raw_paths": [], "result_paths": [], "gate_decisions": [],
-        "amendments": [
-            {"at": "2026-08-14", "reason": "Approved micro-study contract v2 replaces the prior empty I1 execution graph.", "preserved_evidence": "none; ledger had no result rows"},
-            {"at": "2026-08-14", "reason": "Corrected generated G1.1 revision 828f4a3c20fba50712b2e7eb6a42486e9590d206, which GitHub rejects as not our ref, to the approved 03 contract revision 828f8093932c8fe6ca7936c3d2e52903b1c523de.", "scope_change": "none; source repository, dataset file, labels, counts, and experiment design are unchanged"},
-        ],
-        "skips": [], "next_authorized_action": "Researcher manually activates exactly G1.1 using the nested /goal command.",
-        "ledger_audit": {"status": "PASS_EMPTY", "checked_at": "2026-08-14", "ledger": "code/RESULTS_LEDGER.csv"},
+        "amendments": [{"at": "2026-08-15", "reason": "Replace the oversized I1 graph with an explicitly approved three-goal real-data skill test.", "preserved_evidence": "none; prior ledger had no result rows"}],
+        "skips": [], "next_authorized_action": "Automatically execute G1.1, then continue sequentially only after each goal passes its boundary checks.",
+        "ledger_audit": {"status": "PASS_EMPTY", "checked_at": "2026-08-15", "ledger": "code/RESULTS_LEDGER.csv"},
         "decision_space_contract": contract["decision_space_contract"],
         "execution_splits": [
             {"experiment_id": "E0", "development_source": "Tiny instrumentation-only subset drawn from the frozen manifest; it cannot fill paper cells.", "final_source": "Not applicable; E0 produces no paper-facing result.", "protocol_source": "Approved E0 contract and official CLINC150 source metadata.", "disjoint": True, "frozen_before_final": True},
-            {"experiment_id": "E1", "development_source": "None; all decisions are FIXED_BY_DESIGN and no hyperparameter search is authorized.", "final_source": "Official CLINC150 test split: first 10 stable SHA-256-sorted records per approved label (40 total).", "training_source": "Official CLINC150 train split: first 20 stable SHA-256-sorted records per approved label (80 total).", "selection_rule": "record_id = SHA-256(split + label + source text); sort ascending within label and split, then take the fixed count.", "protocol_source": "Official CLINC150 JSON at revision 828f4a3c20fba50712b2e7eb6a42486e9590d206 and approved D1–D7.", "disjoint": True, "frozen_before_final": True},
+            {"experiment_id": "E1", "development_source": "None; all decisions are FIXED_BY_DESIGN and no hyperparameter search is authorized.", "final_source": "Official CLINC150 test split: first 10 stable SHA-256-sorted records per approved label (40 total).", "training_source": "Official CLINC150 train split: first 20 stable SHA-256-sorted records per approved label (80 total).", "selection_rule": "record_id = SHA-256(split + label + source text); sort ascending within label and split, then take the fixed count.", "protocol_source": "Official CLINC150 JSON at revision 828f8093932c8fe6ca7936c3d2e52903b1c523de and approved D1–D7.", "disjoint": True, "frozen_before_final": True},
         ],
         "implementation_contract": contract["implementation_contract"],
         "approved_artifact_ids": [item["id"] for item in contract["paper_artifacts"]],

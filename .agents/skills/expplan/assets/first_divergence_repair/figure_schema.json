@@ -1,0 +1,87 @@
+{
+  "schema_version": "1.0",
+  "project": "first_divergence_repair",
+  "figures": {
+    "F2": [
+      {
+        "panel": "exit_depth",
+        "fixture_key": "F2.exit_depth",
+        "table_kind": "fixed_x_points",
+        "dataset": "AdvBench 50 + matched-style counterfactuals",
+        "metric": "Safety-tube exit rate",
+        "x_axis": "Normalized transformer depth",
+        "y_axis": "Exit rate",
+        "x_values": [0.0, 0.14, 0.29, 0.43, 0.57, 0.71, 0.86, 1.0],
+        "series": ["Direct harmful", "Style-transformed harmful"],
+        "required_fields": ["model_id", "intent_id", "style_id", "layer_id", "tube_exit"],
+        "aggregation": "Macro-average over intent families and models with paired prompt bootstrap 95% CI",
+        "plotted_marks": 16,
+        "pending_values": 16
+      },
+      {
+        "panel": "first_exit_concentration",
+        "fixture_key": "F2.first_exit_concentration",
+        "table_kind": "fixed_x_points",
+        "dataset": "HarmBench 1.0 + matched-style counterfactuals",
+        "metric": "First-exit probability",
+        "x_axis": "Normalized transformer depth",
+        "y_axis": "First-exit probability",
+        "x_values": [0.0, 0.14, 0.29, 0.43, 0.57, 0.71, 0.86, 1.0],
+        "series": ["Successful jailbreak", "Unsuccessful jailbreak"],
+        "required_fields": ["model_id", "intent_id", "style_id", "layer_id", "first_exit_layer", "judge_label"],
+        "aggregation": "Macro-average over intent families and models with paired prompt bootstrap 95% CI",
+        "plotted_marks": 16,
+        "pending_values": 16
+      }
+    ],
+    "F3": [
+      {
+        "panel": "repair_offset",
+        "fixture_key": "F3.repair_offset",
+        "table_kind": "fixed_x_points",
+        "dataset": "AdvBench 50 + XSTest",
+        "metric": "Normalized safety recovery and benign utility retention",
+        "x_axis": "Repair-layer offset from first exit",
+        "y_axis": "Normalized score",
+        "x_values": [-3, -2, -1, 0, 1, 2, 3],
+        "series": ["Safety recovery", "Benign utility retention"],
+        "required_fields": ["model_id", "intent_id", "first_exit_layer", "repair_layer", "judge_label", "benign_refusal"],
+        "aggregation": "Macro-average over models with paired prompt bootstrap 95% CI",
+        "plotted_marks": 14,
+        "pending_values": 14
+      },
+      {
+        "panel": "downstream_recovery",
+        "fixture_key": "F3.downstream_recovery",
+        "table_kind": "fixed_x_points",
+        "dataset": "HarmBench 1.0 + matched-style counterfactuals",
+        "metric": "Safe-reference trajectory cosine similarity",
+        "x_axis": "Depth after first exit",
+        "y_axis": "Trajectory similarity",
+        "x_values": [0, 1, 2, 3, 4, 5, 6],
+        "series": ["No repair", "First-exit repair", "Wrong-layer repair"],
+        "required_fields": ["model_id", "intent_id", "layer_id", "repair_condition", "safe_reference_similarity"],
+        "aggregation": "Macro-average over paired intents and models with prompt bootstrap 95% CI",
+        "plotted_marks": 21,
+        "pending_values": 21
+      }
+    ],
+    "F4": [
+      {
+        "panel": "repair_strength",
+        "fixture_key": "F4.repair_strength",
+        "table_kind": "fixed_x_points",
+        "dataset": "AdvBench 50 + HarmBench 1.0 + XSTest",
+        "metric": "DSR, false-refusal complement, and Just-Eval retention",
+        "x_axis": "Repair strength",
+        "y_axis": "Normalized score",
+        "x_values": [0.25, 0.5, 0.75, 1.0, 1.25],
+        "series": ["Defense success", "1 − false refusal", "Just-Eval retention"],
+        "required_fields": ["model_id", "repair_strength", "judge_label", "benign_refusal", "just_eval_score"],
+        "aggregation": "Macro-average over models; prompt bootstrap 95% CI",
+        "plotted_marks": 15,
+        "pending_values": 15
+      }
+    ]
+  }
+}

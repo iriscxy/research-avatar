@@ -119,12 +119,15 @@ const publicArtifactLabels = {
   T1: "表 1",
 };
 
-const currentGoalPanel = goal => `<div class="demo-current-goal" data-demo-current-goal="${escapeHtml(goal.id)}">
-  <p class="artifact-kicker">当前任务 · ${escapeHtml(goal.id)}</p>
-  <h5>${escapeHtml(goal.title)}</h5>
-  <pre>${escapeHtml(goal.goal_command)}</pre>
-  <button type="button" data-copy="${escapeHtml(goal.goal_command)}">复制 /goal</button>
-  <dl><dt>预期产出</dt><dd>${(goal.outputs || []).map(escapeHtml).join(" · ")}</dd><dt>所需资源</dt><dd>${escapeHtml(goal.budget)}</dd><dt>完成标准</dt><dd>${escapeHtml(goal.completion_check)}</dd></dl>
+const executionModePanel = goal => `<div class="demo-current-goal execution-mode-panel" data-demo-current-goal="${escapeHtml(goal.id)}">
+  <p class="artifact-kicker">Goal 确认</p>
+  <h5>查看完整计划后，选择如何确认</h5>
+  <div class="execution-mode-options">
+    <div class="selected"><b>一次确认全部 Goals</b><span>系统按依赖顺序自动执行；每个 Goal 仍分别保存、核验、更新图表和标记完成。</span></div>
+    <div><b>逐个查看并确认</b><span>每个 Goal 开始前先查看任务、产出和完成标准，再决定是否执行。</span></div>
+  </div>
+  <p class="execution-stop-rule">遇到验证失败、预算耗尽或需要新的研究判断时，自动执行会立即停止。</p>
+  <dl><dt>下一个 Goal</dt><dd>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}</dd><dt>预期产出</dt><dd>${(goal.outputs || []).map(escapeHtml).join(" · ")}</dd><dt>完成标准</dt><dd>${escapeHtml(goal.completion_check)}</dd></dl>
 </div>`;
 
 const goalHierarchy = () => {
@@ -138,10 +141,10 @@ const goalHierarchy = () => {
     const part = runPlanDemoState.parts.find(item => item.id === goal.part_id);
     return {part, goal};
   });
-  return `<section class="goal-hierarchy"><p class="artifact-kicker">实验进度示例</p><p class="runplan-demo-note">这里选取当前任务、下一阶段和主结果三个里程碑，展示任务如何逐步解锁，以及完成后数据表和图如何回到对应任务中。</p>${representativeParts.map(({part, goal}) => {
+  return `<section class="goal-hierarchy"><p class="artifact-kicker">Goal 执行计划</p><p class="runplan-demo-note">完整实验先被拆成有依赖关系的 Goals。这里选取基础通路、关键现象和主结果三个里程碑，展示每个 Goal 的任务、完成标准，以及完成后数据表和图如何回到对应位置。</p>${representativeParts.map(({part, goal}) => {
     const destination = goal.artifact_ids?.length ? goal.artifact_ids.map(id => publicArtifactLabels[id] || id).join("、") : "本任务不直接更新图表";
     const completedExample = goal.id === "G2.1";
-    return `<div class="part-row"><h4><span>${escapeHtml(part.id.replace("P", "阶段 "))}</span>${escapeHtml(publicPartTitles[part.id] || part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p><div class="expanded-goal ${completedExample ? "demo-completed-goal" : ""}"><b>${completedExample ? "✅" : runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}${completedExample ? '<small>完成效果示例</small>' : ""}</strong><span>对应论文内容：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成标准：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? currentGoalPanel(goal) : ""}${completedExample ? resultProvenanceDemo() : ""}</div></div>`;
+    return `<div class="part-row"><h4><span>${escapeHtml(part.id.replace("P", "阶段 "))}</span>${escapeHtml(publicPartTitles[part.id] || part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p><div class="expanded-goal ${completedExample ? "demo-completed-goal" : ""}"><b>${completedExample ? "✅" : runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}${completedExample ? '<small>完成效果示例</small>' : ""}</strong><span>对应论文内容：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成标准：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? executionModePanel(goal) : ""}${completedExample ? resultProvenanceDemo() : ""}</div></div>`;
   }).join("")}</section>`;
 };
 
@@ -244,12 +247,13 @@ const stages = [
       ${experimentPlanDemo()}`
   },
   {
-    id: "runplan", short: "实验执行", path: "run-plan", title: "把实验拆成一个个 Goal，完成一个再继续下一个",
-    compare: ["强调连续自主探索与整体吞吐", "适合可自动判分的大规模搜索", "每个 Goal 落盘、验证、填表、打勾，再解锁下一项"],
+    id: "runplan", short: "实验执行", path: "run-plan", title: "把完整实验拆成一个个可验证的 Goal",
+    compare: ["强调连续自主探索与整体吞吐", "执行过程通常缺少清晰的证据边界", "先展示完整 Goals；可一次确认后自动执行，也可逐个查看并确认"],
     render: () => {
       const currentId = runPlanDemoState?.active_goal || runPlanDemoState?.proposed_goal_id || "NONE";
+      const allGoalsConfirmed = runPlanDemoState?.goal_confirmation?.scope === "all_goals";
       return `
-      <div class="stage-head"><div><p class="eyebrow">第五步 · 实验执行</p><h3>把实验拆成一个个 Goal，逐项完成</h3><p>每个 Goal 都有明确的任务、完成标准和对应图表；完成并核验一个后，再继续下一个。</p></div><span class="status-pill">${escapeHtml(currentId)} ${runPlanDemoState?.active_goal ? "执行中" : "可开始"}</span></div>
+      <div class="stage-head"><div><p class="eyebrow">第五步 · 实验执行</p><h3>把完整实验拆成一个个 Goal</h3><p>先查看全部 Goal 的任务、依赖、完成标准和对应图表；随后可以一次确认全部 Goals 自动执行，也可以逐个查看并确认。</p></div><span class="status-pill">${allGoalsConfirmed ? "全部 Goals 已确认" : `${escapeHtml(currentId)} 等待确认`}</span></div>
       ${reportDocument("runplan")}
       ${goalHierarchy()}`;
     }
@@ -350,8 +354,8 @@ document.addEventListener("click", async event => {
 async function initializeDemo() {
   try {
     const [structureResponse, runPlanResponse] = await Promise.all([
-      fetch("report-structures.json?v=20260814-reader-copy"),
-      fetch("runplan-state.json?v=20260814-reader-copy")
+      fetch("report-structures.json?v=20260815-goal-modes"),
+      fetch("runplan-state.json?v=20260815-goal-modes")
     ]);
     if (!structureResponse.ok) throw new Error(`report structures HTTP ${structureResponse.status}`);
     if (!runPlanResponse.ok) throw new Error(`run plan snapshot HTTP ${runPlanResponse.status}`);

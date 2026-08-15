@@ -169,7 +169,29 @@ def render_parts_and_goals(state: dict, completed_artifacts: dict[str, list[str]
     if current_id and current_id not in goals_by_id:
         raise ValueError(f"current goal {current_id!r} is absent from run-plan-state.goals")
 
-    chunks = ['<section data-report-section="parts-and-goals"><h2>4. Parts and Goals</h2>']
+    execution_mode = str(state.get("execution_mode", "manual_each_goal"))
+    if execution_mode not in {"awaiting_goal_confirmation", "manual_each_goal", "sequential_all_goals"}:
+        raise ValueError(f"unsupported run-plan execution_mode: {execution_mode}")
+    if execution_mode == "awaiting_goal_confirmation":
+        if current_id:
+            raise ValueError("awaiting_goal_confirmation must not expose a current goal")
+        mode_text = (
+            "Goal 确认：请先查看完整计划，然后选择“一次确认全部 Goals，由系统自动依次执行”"
+            "或“逐个查看并确认”。确认前不会开始实验。"
+        )
+    elif execution_mode == "sequential_all_goals":
+        mode_text = (
+            "Goal 确认：已一次确认全部 Goals；系统自动依次执行全部 Goal。"
+            "每个 Goal 仍单独保存、校验和更新网页；"
+            "任一检查失败会停止队列，不会跳过失败继续运行。"
+        )
+    else:
+        mode_text = "Goal 确认：逐个查看并确认；每次只运行当前解锁项。"
+    chunks = [
+        '<section data-report-section="parts-and-goals"><h2>4. Parts and Goals</h2>'
+        f'<p class="execution-mode" data-execution-mode="{execution_mode}">'
+        f'{html.escape(mode_text)}</p>'
+    ]
     current_count = 0
     for part in parts:
         chunks.append(

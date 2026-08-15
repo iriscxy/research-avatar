@@ -161,7 +161,7 @@ def main() -> None:
     }
     if correction not in state["amendments"]:
         state["amendments"].append(correction)
-    state["next_authorized_action"] = "Researcher may manually activate exactly G2.1 using the nested /goal command."
+    state["next_authorized_action"] = "Automatically continue to G2.1 after the G1.1 boundary checks pass."
     state["ledger_audit"] = {"status": "PASS_G1.1", "checked_at": now, "ledger": "code/RESULTS_LEDGER.csv"}
     rendered = render_parts_and_goals(state)
     source = PARTS_RE.sub(rendered, source, count=1)

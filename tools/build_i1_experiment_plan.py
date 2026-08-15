@@ -7,16 +7,24 @@ import base64
 import hashlib
 import html
 import json
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "reports/03_EXPERIMENT_PLAN.html"
+ASSET_ROOT = ROOT / ".agents/skills/expplan/assets"
 SCHEMA_REL = "paper/figsrc/first_divergence_repair/figure_schema.json"
 FIXTURE_REL = "paper/figsrc/first_divergence_repair/projected_fixture.json"
 FIG_SOURCE = "paper/fig/make_figs.py"
 FIXTURE_GEN = "paper/figsrc/first_divergence_repair/make_projected_fixture.py"
-SCHEMA = json.loads((ROOT / SCHEMA_REL).read_text(encoding="utf-8"))
+SCHEMA = json.loads(
+    (ASSET_ROOT / "first_divergence_repair/figure_schema.json").read_text(
+        encoding="utf-8"
+    )
+)
 
 
 URLS = {
@@ -116,7 +124,76 @@ def metric(mid: str, name: str, provenance: str, definition: str, range_: str, c
     }
 
 
+def plotting_python() -> str:
+    """Return an available interpreter that satisfies the locked plotting stack."""
+    candidates = [sys.executable, shutil.which("python3.12"), shutil.which("python3")]
+    for candidate in dict.fromkeys(item for item in candidates if item):
+        check = subprocess.run(
+            [candidate, "-c", "import matplotlib, numpy"],
+            capture_output=True,
+            text=True,
+        )
+        if check.returncode == 0:
+            return candidate
+    raise RuntimeError(
+        "No Python interpreter with the locked matplotlib/numpy dependencies is "
+        "available; install requirements.lock before building the experiment plan."
+    )
+
+
+def materialize_projected_assets() -> None:
+    """Create every Expplan-owned preview input/output from tracked skill assets."""
+    schema_path = ROOT / SCHEMA_REL
+    fixture_generator = ROOT / FIXTURE_GEN
+    figure_source = ROOT / FIG_SOURCE
+    fixture_path = ROOT / FIXTURE_REL
+    for source, target in (
+        (ASSET_ROOT / "first_divergence_repair/figure_schema.json", schema_path),
+        (ASSET_ROOT / "first_divergence_repair/make_projected_fixture.py", fixture_generator),
+        (ASSET_ROOT / "make_figs.py", figure_source),
+    ):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+    python = plotting_python()
+    subprocess.run(
+        [
+            python,
+            str(fixture_generator),
+            "--schema",
+            str(schema_path),
+            "--output",
+            str(fixture_path),
+            "--source-schema",
+            SCHEMA_REL,
+        ],
+        check=True,
+    )
+    for figure, panels in SCHEMA["figures"].items():
+        for panel in panels:
+            stem = ROOT / f"paper/fig/first_divergence_repair/projected/{figure}_{panel['panel']}"
+            subprocess.run(
+                [
+                    python,
+                    str(figure_source),
+                    "--schema",
+                    str(schema_path),
+                    "--figure",
+                    figure,
+                    "--panel",
+                    panel["panel"],
+                    "--metrics",
+                    str(fixture_path),
+                    "--pdf",
+                    str(stem.with_suffix(".pdf")),
+                    "--png",
+                    str(stem.with_suffix(".png")),
+                ],
+                check=True,
+            )
+
+
 def main() -> None:
+    materialize_projected_assets()
     f2_html, f2_cells, f2_data = figure_shell_html("F2", "Where the safety trajectory first leaves its tube")
     f3_html, f3_cells, f3_data = figure_shell_html("F3", "Does one repair restore the downstream trajectory?")
     f4_html, f4_cells, f4_data = figure_shell_html("F4", "Repair-strength safety–utility sensitivity")
@@ -211,7 +288,7 @@ def main() -> None:
         repo_contract.append({"id":rid,"name":name,"url":url,"use_mode":mode,"allowed_scope":scope,"prohibited_scope":"May not replace the local unified execution/result contract.","integration_target":"adapter or frozen source asset","precedence":"approved experiment contract first; original dataset labels next","verification_checklist":["pin revision","inspect license/dependencies","smallest smoke test","record reused files"],"fallback":"local schema-compatible reimplementation from the approved paper/protocol","discovery_source":"paper/project official link","provenance_status":"official or author-provided","priority":"Preferred" if rid != "R6" else "Supplementary","verification_status":"paper-linked; not verified runnable","license_revision":license_rev,"dependencies":deps,"compatibility_risk":risk})
 
     artifacts = []
-    artifacts.append({"id":"F1","kind":"figure","label":"fig:motivation","span":"single-column","placement":"body","supports":["C1"],"section_id":"introduction","dimensions":["matched intent","style","depth"],"visible_dimensions":["matched intent","style","depth"],"introduced_after":"I-P3","shell":{"data_driven":False,"rhetorical_role":"motivation","caption":"Same harmful intent, different style, first divergent depth highlighted."}})
+    artifacts.append({"id":"F1","kind":"figure","label":"fig:motivation","span":"single_column","placement":"body","supports":["C1"],"section_id":"introduction","dimensions":["matched intent","style","depth"],"visible_dimensions":["matched intent","style","depth"],"introduced_after":"I-P3","shell":{"data_driven":False,"rhetorical_role":"motivation","caption":"Same harmful intent, different style, first divergent depth highlighted."}})
     plotting_common = {"source":FIG_SOURCE,"schema":SCHEMA_REL,"fixture_generator":FIXTURE_GEN,"fixture":FIXTURE_REL}
     for aid, title, supports, section_id, introduced, data, first_panel in [
         ("F2","First-exit localization",["C1"],"observation","O-P2",f2_data,"exit_depth"),
@@ -224,7 +301,7 @@ def main() -> None:
             panels[slug] = {"pdf":f"paper/fig/first_divergence_repair/projected/{aid}_{slug}.pdf","png":f"paper/fig/first_divergence_repair/projected/{aid}_{slug}.png"}
         plot = dict(plotting_common)
         plot.update({"pdf":panels[first_panel]["pdf"],"png":panels[first_panel]["png"],"panels":panels})
-        artifacts.append({"id":aid,"kind":"figure","label":f"fig:{aid.lower()}-i1","span":"two-column","placement":"body","supports":supports,"section_id":section_id,"dimensions":["dataset","model","condition","depth"],"visible_dimensions":["dataset","model","condition","depth"],"introduced_after":introduced,"shell":{"data_driven":True,"caption":title,"panels":[x["panel"] for x in data],"axes_legend":"Frozen in figure schema","source_variables":["V1","V2","V4"],"aggregation":"Prompt-level paired bootstrap 95% CI","required_data":data,"plotting":plot}})
+        artifacts.append({"id":aid,"kind":"figure","label":f"fig:{aid.lower()}-i1","span":"double_column","placement":"body","supports":supports,"section_id":section_id,"dimensions":["dataset","model","condition","depth"],"visible_dimensions":["dataset","model","condition","depth"],"introduced_after":introduced,"shell":{"data_driven":True,"caption":title,"panels":[x["panel"] for x in data],"axes_legend":"Frozen in figure schema","source_variables":["V1","V2","V4"],"aggregation":"Prompt-level paired bootstrap 95% CI","required_data":data,"plotting":plot}})
     for aid, title, supports, section_id, introduced, rows, cols, cells, label in [
         ("T1","Main safety–utility comparison",["C2","C3"],"experiments","E-P3",methods,t1_cols,t1_cells,"tab:main-results"),
         ("T2","Single-site causal ablation matrix",["C2"],"experiments","E-P4",ablations,t2_cols,t2_cells,"tab:causal-ablation"),
@@ -232,9 +309,12 @@ def main() -> None:
     ]:
         shell = {"caption":title,"row_labels":rows,"column_labels":cols,"dataset_bearing_headers":["AdvBench","HarmBench","XSTest","Just-Eval"],"metric_uncertainty":"Prompt-bootstrap 95% CI; median/IQR for latency","pending_cell_ids":cells}
         if aid == "T2": shell["required_visible_tokens"] = ablations
-        artifacts.append({"id":aid,"kind":"table","label":label,"span":"two-column","placement":"body" if aid != "T3" else "body_or_appendix","supports":supports,"section_id":section_id,"dimensions":["dataset","model","method","metric"],"visible_dimensions":["dataset","model","method","metric"],"introduced_after":introduced,"shell":shell})
+        artifacts.append({"id":aid,"kind":"table","label":label,"span":"double_column","placement":"body" if aid != "T3" else "body_or_appendix","supports":supports,"section_id":section_id,"dimensions":["dataset","model","method","metric"],"visible_dimensions":["dataset","model","method","metric"],"introduced_after":introduced,"shell":shell})
 
     paragraphs = [
+        ("abstract","Abstract",[
+            ("A-P1","The abstract states the style-induced safety failure, the first-exit hypothesis, the single-layer repair, the matched evaluation, and only the results eventually supported by the frozen cells.","summary","C2",[]),
+        ]),
         ("introduction","1. Introduction",[
             ("I-P1","Safety-aligned LLMs remain vulnerable when harmful intent is restyled without changing its meaning.","problem","C1",[]),
             ("I-P2","Prior representation defenses detect or reshape broad trajectories but do not identify a unique causal origin of failure.","gap","C1",[]),
@@ -266,6 +346,15 @@ def main() -> None:
         ("conclusion","6. Conclusion",[
             ("C-P1","The paper will conclude only if one first-exit repair survives the causal controls; otherwise it will report the failed single-origin hypothesis.","closure","C2",[]),
         ]),
+        ("limitations","7. Limitations",[
+            ("L-P1","The limitations bound the claims to the approved open models, style families, white-box access, evaluators, and the uncertainty of semantic-equivalence judgments.","scope boundary","C3",[]),
+        ]),
+        ("ethics","8. Ethics Statement",[
+            ("H-P1","The ethics statement describes controlled handling of harmful prompts, restricted release of attack material, evaluator limitations, and the intended defensive use.","risk disclosure","C3",[]),
+        ]),
+        ("appendix","Appendix A. Reproducibility and Extended Results",[
+            ("X-P1","The appendix records prompts, frozen configurations, additional uncertainty analyses, provenance, and any body float moved under the approved page-pressure rule.","reproducibility","C3",[]),
+        ]),
     ]
     paper_outline = []
     for sid, title, items in paragraphs:
@@ -285,10 +374,12 @@ def main() -> None:
         result_requirements.append({"id":rid,"artifact_id":aid,"cell_ids":cells,"experiment_id":eid,"source_action":"RUN_LOCAL","any_of":[f"results/{eid}.json:records.*"],"supports":supports})
 
     contract = {
-        "schema_version":"1.0","source_plan":"reports/03_EXPERIMENT_PLAN.html","approval_status":"approved","generated_at":"2026-08-09",
+        "schema_version":"1.1","contract_version":1,
+        "revision_history":[{"version":1,"changed_at":"2026-08-15","reason":"Regenerate the approved I1 design after removing the disposable Toy workflow and normalize it to the current experiment-plan contract.","changed_fields":["*"],"compatibility":"Scientific scope and the researcher-approved choices from 2026-08-09 are unchanged; downstream artifacts must be regenerated."}],
+        "source_plan":"reports/02_IDEA_REPORT.html","approval_status":"approved","generated_at":"2026-08-15",
         "profile_contract":{"profile_path":"researcher-profile/PROFILE.html","publications_path":"researcher-profile/publications.json","researcher_identity":"Xiuying Chen","authorship_verified":True,"structure_reference_key":"gao2024shaping"},
-        "target":{"venue":"ACL 2027 Main Conference / Long Paper","track":"Main Conference / Long Paper","cycle":"2027","submission_content_pages":8,"page_rule":"Official 2027 body-length rule is TBA; 8 content pages is a planning assumption and must be replaced when the CFP appears.","official_rules_url":URLS["venue"],"deadline_status":"call_pending","confirmed_at":"2026-08-09"},
-        "references":{"confirmed_at":"2026-08-09","external_mechanism":{"title":"Revisiting JBShield: Breaking and Rebuilding Representation-Level Jailbreak Defenses","authors":"Kemal Derya and Berk Sunar","venue":"arXiv 2026","url":URLS["rtv"],"local_full_text":"/tmp/expplan_i1.rncpmN/rtv.txt","role":"scientific-content authority"},"researcher_owned_structure":{"title":"Shaping the Safety Boundaries: Understanding and Defending Against Jailbreaks in Large Language Models","authors":"Gao et al., including Xiuying Chen","venue":"ACL 2025","url":URLS["abd"],"local_full_text":"researcher-profile/fulltext/txt/gao2024shaping.txt","publication_key":"gao2024shaping","role":"structure-only authority"}},
+        "target":{"venue":"ACL 2027 Main Conference / Long Paper","track":"Main Conference / Long Paper","cycle":"2027","submission_content_pages":8,"page_rule":"Official 2027 body-length rule is TBA; 8 content pages is a planning assumption and must be replaced when the CFP appears.","official_rules_url":URLS["venue"],"deadline_status":"call_pending","confirmed_at":"2026-08-15"},
+        "references":{"confirmed_at":"2026-08-15","external_mechanism":{"title":"Revisiting JBShield: Breaking and Rebuilding Representation-Level Jailbreak Defenses","authors":"Kemal Derya and Berk Sunar","venue":"arXiv 2026","url":URLS["rtv"],"local_full_text":"reports/sources/i1/rtv.txt","role":"scientific-content authority"},"researcher_owned_structure":{"title":"Shaping the Safety Boundaries: Understanding and Defending Against Jailbreaks in Large Language Models","authors":"Gao et al., including Xiuying Chen","venue":"ACL 2025","url":URLS["abd"],"local_full_text":"researcher-profile/fulltext/txt/gao2024shaping.txt","publication_key":"gao2024shaping","role":"structure-only authority"}},
         "dataset_confirmation":{"confirmed":True,"confirmed_at":"2026-08-09"},
         "dataset_citations":[{"name":"AdvBench 50-behavior subset","url":URLS["advbench"]},{"name":"HarmBench 1.0","url":URLS["harmbench"]},{"name":"XSTest","url":URLS["xstest"]},{"name":"Just-Eval","url":URLS["justeval"]},{"name":"Alpaca benign controls","url":URLS["alpaca"]},{"name":"SORRY-Bench evaluator","url":URLS["sorry"]}],
         "grounding":{"selected_idea":"I1 — First-Divergence Repair","proposed_method":"First-Divergence Repair","primary_reference":"ABD","closest_papers":[URLS["rtv"],URLS["trajguard"],URLS["abd"],URLS["jbshield"]],"architecture":"One local unified experiment framework owns model, data, evaluator, trace, intervention, and result interfaces.","architecture_confirmed_at":"2026-08-09"},
@@ -311,6 +402,7 @@ def main() -> None:
     canonical = json.dumps(unsigned_contract, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     contract["approved_at"] = "2026-08-09"
     contract["approval_channel"] = "researcher conversation"
+    contract["approval_contract_version"] = 1
     contract["approval_contract_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     setup_impl_rows = []
@@ -348,7 +440,7 @@ def main() -> None:
     '''
     contract_json = json.dumps(contract, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
     document = f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>I1 Experiment Plan</title><style>{css}</style></head><body><main>
-    <p class="kicker">EXPERIMENT PLAN · I1 · 2026-08-09</p><h1>First-Divergence Repair</h1><p>从预计论文反推证据：每一个数字都保持待填，每一个图形都绑定旁侧真实数据表。</p>
+    <p class="kicker">EXPERIMENT PLAN · I1 · 2026-08-15</p><h1>First-Divergence Repair</h1><p>从预计论文反推证据：每一个数字都保持待填，每一个图形都绑定旁侧真实数据表。</p>
     <template aria-hidden="true"><h2>1. Target Conference and Reference Papers</h2><div class="hero"><p><strong>Target conference:</strong> <a href="{URLS["venue"]}">ACL 2027</a></p><p><strong>External mechanism reference:</strong> <a href="{URLS["rtv"]}">RTV</a></p><p><strong>Researcher-owned structure reference:</strong> <a href="{URLS["abd"]}">ABD</a></p></div><h2>2. Projected Paper</h2></template>
     <section data-report-section="target-and-references"><h2>1. Target Conference and Reference Papers</h2><div class="hero">
       <p><strong>Target conference:</strong> ACL 2027 Main Conference / Long Paper；官方 2027 页数与截止日期尚未发布（<code>call_pending</code>），当前按 8 个正文内容页规划，提交前必须以 <a href="{URLS["venue"]}">ACL 2027 官方网站</a>更新。</p>
@@ -356,8 +448,8 @@ def main() -> None:
       <p><strong>Researcher-owned structure reference:</strong> Gao et al., <a href="{URLS["abd"]}">Shaping the Safety Boundaries</a>（ACL 2025；publication key <code>gao2024shaping</code>），只负责段落功能、章节比例和图表节奏。</p>
     </div></section>
     <section data-report-section="projected-paper"><h2>2. Projected Paper</h2><p class="float-budget">图表数量：本计划 7（4 图，3 表） · 参考论文 7（4 图，3 表）</p>
-      <section data-report-subsection="projected-title-abstract"><h3>2.1 Projected Title and Abstract</h3><p><strong>Projected title:</strong> First-Divergence Repair: Causal Single-Layer Recovery from Style-Induced Jailbreaks</p><p><strong>PROJECTED abstract:</strong> We test whether intent-preserving style transformations cause a reproducible first exit from a model's safety trajectory and whether repairing only that layer restores downstream safety. A unified white-box framework compares five rerun representation defenses across AdvBench, HarmBench, XSTest, and Just-Eval. The claim survives only if first-exit repair uniquely beats wrong-layer and repeated-repair controls while improving the safety–utility–cost frontier.</p></section>
-      <section data-report-subsection="figure-table-count"><h3>2.2 Figure/Table Count</h3><p>Figure/table count is frozen at 4 figures and 3 tables; all seven are distinct claim-bearing floats, and T3 alone may move to the appendix under page pressure.</p></section>
+      <section data-report-subsection="projected-title-abstract"><h3>2.1 Projected Title and Abstract</h3><p><strong>Projected title:</strong> First-Divergence Repair: Causal Single-Layer Recovery from Style-Induced Jailbreaks</p><p><strong>PROJECTED abstract:</strong> Safety-aligned language models can respond differently when the same harmful intent is expressed through a new persona, narrative, register, encoding, or language. Existing representation defenses monitor or alter broad activation regions, but they do not establish where a successful style-induced jailbreak first departs from safe computation or whether that origin is sufficient for repair. We study a depth-wise safety trajectory tube calibrated on direct harmful and benign prompts, then define the first exit of each matched style counterfactual. First-Divergence Repair applies one norm-controlled correction only at that layer and leaves subsequent computation unchanged. Across three open 7–8B models, AdvBench, HarmBench, XSTest, and Just-Eval, the planned evaluation compares five rerun baselines under common generation and judging protocols. The central hypothesis is supported only if first exits are stable across matched styles, the proposed intervention improves defense success by [X%] while limiting false-refusal change to [Y%] and retaining [Z%] response quality, and wrong-layer or repeated-repair controls do not explain the same recovery. These tests separate a causal single-origin account from generic multi-layer steering and report latency, memory, and unrecovered cases alongside safety and utility.</p></section>
+      <section data-report-subsection="figure-table-count"><h3>2.2 Figure/Table Count</h3><p>4 figures · 3 tables.</p></section>
       <section data-report-subsection="paragraph-blueprint"><h3>2.3 Paragraph Blueprint and Evidence Shells</h3>{''.join(blueprint_parts)}</section>
       <h3>Compact artifact ledger</h3><div class="table-wrap"><table><thead><tr><th>Artifact</th><th>Kind</th><th>Paper section</th><th>Claims</th><th>Placement</th></tr></thead><tbody>{ledger_rows}</tbody></table></div>
       <p><strong>Page-fill feasibility:</strong> seven claim-bearing floats match the structure reference's four-figure/three-table body rhythm and cover diagnosis, mechanism, main comparison, ablation, sensitivity, cost, and failure analysis.</p>
@@ -368,6 +460,7 @@ def main() -> None:
     <section data-report-section="approval"><h2>3. Approval</h2><div class="approval"><p><strong>Status: approved by the researcher on 2026-08-09.</strong></p><p>All observed values remain unfilled. Approval freezes claims, baselines, datasets, metrics, implementation authority, artifact dimensions, and source actions; later experiments may fill only the signed cells.</p><p>The signed contract digest is stored in the embedded machine-readable contract.</p></div></section>
     <script type="application/json" id="experiment-plan-contract">{contract_json}</script>
     </main></body></html>'''
+    OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(document, encoding="utf-8")
 
 

@@ -1,6 +1,6 @@
 ---
 name: "runplan"
-description: "Turn an approved EXPERIMENT_PLAN.html into a resumable, evidence-ordered hierarchy of major experiment parts, bounded subparts, and executable goals for filling its projected-paper figure and table targets. Give every datum a deterministic acquisition contract and source, show the complete hierarchy, propose exactly one unlocked goal, and give the researcher a direct manual /goal command. This skill plans and proposes only; it never runs experiments. The /goal function performs the actual engineering and experiment work one milestone at a time. Use when the researcher says runplan, asks what experiment to run next, or wants to fill an approved experiment plan incrementally."
+description: "Turn an approved EXPERIMENT_PLAN.html into a resumable, evidence-ordered hierarchy of executable goals for filling its projected-paper figure and table targets. Give every datum a deterministic acquisition contract, show the complete hierarchy, then let the researcher either confirm all Goals for automatic sequential execution or review and confirm them one by one. Use when the researcher says runplan, asks what experiment to run next, or wants to fill an approved experiment plan incrementally."
 ---
 
 # Run Plan
@@ -20,12 +20,22 @@ deterministic acquisition contracts; it does not execute them.
 The ownership boundary is strict:
 
 - `$expplan` defines and receives approval for the scientific plan.
-- `$runplan` creates/resumes the execution graph and proposes one goal.
-- A researcher-issued `/goal` performs the actual code, engineering, runs,
-  evidence collection, and report updates for that one goal.
+- `$runplan` creates/resumes the execution graph, presents every Goal for
+  approval, and records one of two researcher-selected execution modes:
+  `manual_each_goal` or `sequential_all_goals`.
+- In `manual_each_goal`, a researcher-issued `/goal` performs the actual code,
+  engineering, runs, evidence collection, and report updates for that one goal.
+- In `sequential_all_goals`, the researcher must explicitly request automatic
+  execution. That one authorization lets the active coding agent execute the
+  ordered goals without another prompt between them, while preserving every
+  ordinary goal boundary, ledger append, validator, report refresh, and gate.
 
-Never run an experiment, call `create_goal`, or start a successor from
-`$runplan`.
+Never infer either mode from silence. `$runplan` first builds and presents the
+complete graph, then stops at a Goal-confirmation gate. Execution begins only
+after the researcher explicitly chooses to confirm all Goals at once or review
+them one by one. The automatic executor must stop immediately on a failed
+check, exhausted approved budget, `pivot`, `blocked`, or newly required
+scientific decision; it may not skip the failed goal and continue.
 
 ## 1. Validate the approved input
 
@@ -333,7 +343,35 @@ each resume and goal boundary, tidy temporary files, keep code/results easy to
 identify, and verify that ledger paths still resolve. Never auto-delete raw
 evidence or move a ledger-referenced file without updating its references.
 
-## 4. Propose exactly one manual goal
+## 4. Confirm the Goals, choose the execution mode, and expose one current goal
+
+After presenting the complete hierarchy, stop at one explicit confirmation
+gate. Ask the researcher to choose exactly one of these two paths:
+
+1. **Confirm all Goals and execute automatically.** Record
+   `execution_mode=sequential_all_goals`, record the full ordered Goal-ID list
+   and current plan digest as the approved scope, then start the first Goal.
+2. **Review Goals one by one.** Record `execution_mode=manual_each_goal`; show
+   the first unlocked Goal, wait for its individual approval, execute it, and
+   repeat the review gate for every successor.
+
+Do not describe the second path as the default, and do not make copying a
+`/goal` command the main workflow. The command remains a recovery affordance
+for manual mode. Store the choice in `run-plan-state.goal_confirmation` with
+`status=confirmed`, `scope=all_goals` or `one_goal_at_a_time`, the confirmed
+Goal IDs, a plan digest, and confirmation time. Before choice, keep
+`execution_mode=awaiting_goal_confirmation`, keep
+`goal_confirmation.status=pending`, expose no Current Goal, and do not begin
+experimental work.
+
+The webpage must show this two-path confirmation gate before execution and,
+after selection, state the selected mode in plain language at the beginning of
+`4. Parts and Goals`. Automatic mode is not a bulk job: each goal independently
+transitions through running/completed, writes its own raw evidence and ledger
+rows, runs strict validation, updates `04` and `05`, evaluates its gate, and
+only then unlocks the successor. A failed or non-continue gate stops the queue.
+
+### Manual mode
 
 Choose only the first/next unlocked goal with the highest information value.
 Store it as embedded `run-plan-state.proposed_goal_id`, then print one self-contained
@@ -347,13 +385,27 @@ Replace every placeholder with actual work. The command must make sense without
 any skill name. It must never invoke `$runplan` or another skill, and it must
 not use a vague instruction such as “run the next experiment.”
 
-Tell the researcher: “If this goal looks right, run the `/goal` above manually;
-I will not start it for you.” Then stop.
+Ask the researcher to confirm the displayed Goal before running it. Provide the
+copyable `/goal` only as an optional recovery/manual-resume command, not as the
+required way to proceed. Then stop.
 
-## 5. Contract for the `/goal` executor
+### Sequential mode
 
-The manually activated `/goal`—not `$runplan`—owns execution. Its direct command
-and `04_RUN_PLAN.html` must require it to:
+When the researcher has explicitly selected `sequential_all_goals`, acknowledge
+that authorization once and start the first proposed goal. After every goal,
+perform the complete boundary protocol in §5 before advancing. Do not ask the
+researcher to copy intermediate `/goal` commands. Keep the copyable command in
+the Current Goal panel as a recovery/manual-resume affordance. When all goals
+are complete, set `proposed_goal_id` and `active_goal` to null, set the plan
+state to `completed`, run the final strict ledger/report validation, and hand
+the validated evidence to `$paperwrite` only if the user's request includes
+paper generation.
+
+## 5. Contract for each goal executor
+
+Each goal executor—whether manually activated or reached by an explicitly
+authorized sequential queue—owns exactly one goal. Its command and
+`04_RUN_PLAN.html` must require it to:
 
 1. Verify the requested `Gn.m` equals `proposed_goal_id`, all predecessors are
    complete, and no unrelated goal is active.
@@ -415,9 +467,13 @@ and `04_RUN_PLAN.html` must require it to:
    marked `无直接图表` are exempt from the snapshot requirement.
    Report negative results and uncertainty honestly; a goal means “produce
    evidence,” not “make the hypothesis succeed.”
-8. Evaluate only the preregistered gate, record the result, propose the next
-   unlocked or bounded refinement `/goal`, and stop. Printing the next command
-   is not authorization to execute it.
+8. Evaluate only the preregistered gate and record the result. In
+   `manual_each_goal`, propose the next unlocked or bounded refinement `/goal`
+   and stop; printing it is not authorization to execute it. In
+   `sequential_all_goals`, advance only when the gate says `continue`, then run
+   the next unlocked goal under the same already-recorded authorization. Stop
+   the queue on `refine`, `pivot`, `stopped`, `blocked`, validation failure, or
+   any need for a new researcher-controlled choice.
 
 If evidence requires a new claim, metric, dataset, baseline, or search space,
 record `pivot` and return to `$expplan` for amendment and approval. `refine` may
@@ -536,7 +592,7 @@ Render exactly two user-facing experiment artifacts. In both files, each `<secti
 1. `1. Execution Estimate` (`execution-estimate`): Goals, GPUs, approximate time, and assumptions;
 2. `2. Implementation Sources` (`implementation-sources`): the inherited per-method implementation contract;
 3. `3. Figure/Table Coverage` (`artifact-coverage`): the complete approved artifact checklist;
-4. `4. Parts and Goals` (`parts-and-goals`): ordered `Pn` parts with nested `Gn.m` goals, status, and destination. The exactly one copyable Current Goal panel, including its dedicated `复制 /goal` button, is nested inside the matching goal card and moves with `proposed_goal_id` / `active_goal`.
+4. `4. Parts and Goals` (`parts-and-goals`): ordered `Pn` parts with nested `Gn.m` goals, status, and destination. Before approval it shows the two-path Goal confirmation gate and no Current Goal. After approval, the exactly one Current Goal panel is nested inside the matching goal card and moves with `proposed_goal_id` / `active_goal`; its copyable `/goal` is only a manual/recovery affordance.
 
 `05_EXP_RESULT.html` has exactly these ordered top-level sections:
 
