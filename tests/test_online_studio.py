@@ -1,4 +1,5 @@
 import base64
+import io
 import json
 import os
 import subprocess
@@ -9,10 +10,12 @@ import unittest
 import urllib.error
 import urllib.parse
 import urllib.request
+import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
 import research_avatar.online_studio.server as online
+from research_avatar.online_studio.package import build_archive
 import research_avatar.paper_studio.server as paper_studio
 
 
@@ -21,6 +24,78 @@ PROFILE_HTML = """<!doctype html><html><body>
 <h2>Writing Style</h2><p>Concise, evidence-first prose.</p>
 <script>doNotIncludeThisSecret()</script>
 </body></html>"""
+
+PLAN_CONTRACT = {
+    "schema_version": "1.1",
+    "approval_status": "approved",
+    "paper_title": "Evidence Writing",
+    "target": {"venue": "ACL 2027", "submission_content_pages": 8},
+    "paper_outline": [
+        {
+            "id": "abstract",
+            "title": "Abstract",
+            "paragraphs": [
+                {"id": "A1", "plan_sentence": "Summarize the supported paper.", "artifact_refs": []}
+            ],
+        },
+        {
+            "id": "experiments",
+            "title": "Experiments",
+            "paragraphs": [
+                {"id": "E1", "plan_sentence": "Report the verified comparison.", "artifact_refs": ["T1"]}
+            ],
+        },
+        {
+            "id": "conclusion",
+            "title": "Conclusion",
+            "paragraphs": [
+                {"id": "C1", "plan_sentence": "Close with supported findings.", "artifact_refs": []}
+            ],
+        },
+    ],
+    "paper_artifacts": [
+        {
+            "id": "T1", "kind": "table", "label": "tab:main", "span": "two-column",
+            "placement": "body", "section_id": "experiments", "introduced_after": "E1",
+            "shell": {"caption": "Verified main comparison.", "column_labels": ["Method", "Score"]},
+        }
+    ],
+    "result_requirements": [
+        {
+            "id": "R1", "artifact_id": "T1", "cell_ids": ["t1-score"],
+            "any_of": ["results/main.json:rows.*"],
+        }
+    ],
+}
+
+
+def pipeline_files():
+    plan = (
+        "<html><head><title>Experiment Plan</title></head><body><h1>Evidence Writing</h1>"
+        '<script type="application/json" id="experiment-plan-contract">'
+        + json.dumps(PLAN_CONTRACT)
+        + "</script></body></html>"
+    )
+    results = (
+        '<html><body><section data-artifact-id="T1"><table>'
+        '<tr><th>Method</th><th>Score</th></tr><tr><td>Ours</td>'
+        '<td data-target-id="t1-score" data-result-id="R1">91.0</td>'
+        "</tr></table></section></body></html>"
+    )
+    return [
+        ("PROFILE.html", PROFILE_HTML),
+        ("03_EXPERIMENT_PLAN.html", plan),
+        ("05_EXP_RESULT.html", results),
+    ]
+
+
+def evidence_archive():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("results/main.json", json.dumps({"rows": [{"method": "Ours", "score": 91.0}]}))
+        archive.writestr("researcher-profile/publications.json", "[]")
+        archive.writestr("researcher-profile/fulltext/txt/reference.txt", "Reference paper structure and prose.")
+    return buffer.getvalue()
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -48,21 +123,88 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("Concise, evidence-first prose.", text)
         self.assertNotIn("doNotIncludeThisSecret", text)
 
-    def test_project_identity_comes_from_supporting_html(self):
-        files = [
-            ("PROFILE.html", PROFILE_HTML),
-            (
-                "EXPERIMENT_PLAN.html",
-                "<html><head><title>Fallback Plan</title></head>"
-                "<body><h1>Mechanism-Aware Evaluation</h1></body></html>",
-            ),
-        ]
+    def test_project_identity_comes_from_approved_plan(self):
+        plan = pipeline_files()[1][1]
         self.assertEqual(
-            online._project_identity(files),
-            ("Mechanism-Aware Evaluation", "Mechanism-Aware Evaluation"),
+            online._project_identity(plan, PLAN_CONTRACT),
+            ("Evidence Writing · ACL 2027", "Evidence Writing"),
         )
-        with self.assertRaisesRegex(online.OnlineStudioError, "结果 HTML"):
-            online._project_identity([("PROFILE.html", PROFILE_HTML)])
+
+    def test_pipeline_sources_require_profile_plan_and_results(self):
+        sources = online._canonical_pipeline_sources(pipeline_files())
+        self.assertEqual(set(sources), {
+            "PROFILE.html", "03_EXPERIMENT_PLAN.html", "05_EXP_RESULT.html",
+        })
+        with self.assertRaisesRegex(online.OnlineStudioError, "05_EXP_RESULT"):
+            online._canonical_pipeline_sources(pipeline_files()[:2])
+
+    def test_evidence_zip_rejects_path_traversal(self):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as archive:
+            archive.writestr("../escape.json", "{}")
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(online.OnlineStudioError, "不允许的路径"):
+                online._extract_evidence_archive(buffer.getvalue(), Path(directory))
+
+    def test_result_parser_survives_void_tags_inside_artifact(self):
+        parser = online._ResultArtifactTables()
+        parser.feed(
+            '<section data-artifact-id="T1"><img src="preview.png">'
+            '<table><tr><th>Method</th><th>Score</th></tr>'
+            '<tr><td>Ours<br>final</td><td data-target-id="t1-score">91.0</td></tr>'
+            '</table></section><section data-artifact-id="T2"></section>'
+        )
+        parser.close()
+        self.assertEqual(parser.artifact_ids, ["T1", "T2"])
+        self.assertEqual(parser.rows["T1"][1], ["Ours final", "91.0"])
+
+    def test_required_artifact_never_receives_fabricated_placeholder_rows(self):
+        contract = {**PLAN_CONTRACT, "_result_tables": {"T1": []}}
+        sections = online._outline_sections(contract)
+        with self.assertRaisesRegex(online.OnlineStudioError, "不会用占位值"):
+            online._artifact_definitions(contract, sections)
+
+    def test_contract_rejects_unapproved_or_incomplete_results(self):
+        plan = pipeline_files()[1][1]
+        pending = plan.replace('"approval_status": "approved"', '"approval_status": "pending"')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "reports").mkdir()
+            (root / "results").mkdir()
+            (root / "reports/03_EXPERIMENT_PLAN.html").write_text(pending)
+            (root / "reports/05_EXP_RESULT.html").write_text(pipeline_files()[2][1])
+            with self.assertRaisesRegex(online.OnlineStudioError, "尚未批准"):
+                online._validated_upstream_contract(root, pending, pipeline_files()[2][1])
+        incomplete = pipeline_files()[2][1].replace(' data-target-id="t1-score"', "")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "reports").mkdir()
+            (root / "results").mkdir()
+            (root / "reports/03_EXPERIMENT_PLAN.html").write_text(plan)
+            (root / "reports/05_EXP_RESULT.html").write_text(incomplete)
+            with self.assertRaisesRegex(online.OnlineStudioError, "尚未填满"):
+                online._validated_upstream_contract(root, plan, incomplete)
+
+    def test_evidence_packager_emits_only_supported_project_inputs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "results").mkdir()
+            (root / "results/main.json").write_text("{}")
+            (root / "researcher-profile/fulltext/txt").mkdir(parents=True)
+            (root / "researcher-profile/publications.json").write_text("[]")
+            (root / "researcher-profile/fulltext/txt/ref.txt").write_text("reference")
+            output = root / "bundle.zip"
+            files = build_archive(root, output)
+            self.assertEqual(
+                files,
+                [
+                    "researcher-profile/fulltext/txt/ref.txt",
+                    "researcher-profile/publications.json",
+                    "results/main.json",
+                ],
+            )
+            with zipfile.ZipFile(output) as archive:
+                self.assertEqual(sorted(archive.namelist()), files)
 
     def test_online_latex_blocks_file_and_execution_primitives(self):
         with patch.object(paper_studio, "ONLINE_PROJECT_MODE", True):
@@ -191,15 +333,11 @@ class OnlineStudioTests(unittest.TestCase):
     def test_scaffold_is_a_valid_paper_studio_project(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            online._write_workspace(
-                root,
-                project_name="Online Test",
-                title="Evidence & Writing",
-                files=[
-                    ("PROFILE.html", PROFILE_HTML),
-                    ("results.html", "<h1>Results</h1><p>Accuracy: 91%.</p>"),
-                ],
-            )
+            validator = subprocess.CompletedProcess([], 0, stdout="ok", stderr="")
+            with patch.object(online.subprocess, "run", return_value=validator):
+                online._write_workspace(
+                    root, files=pipeline_files(), archive=evidence_archive()
+                )
             environment = {**os.environ, "RESEARCH_AVATAR_ROOT": str(root)}
             result = subprocess.run(
                 [
@@ -215,36 +353,37 @@ class OnlineStudioTests(unittest.TestCase):
                 timeout=20,
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn(r"\title{Evidence \& Writing}", (root / "paper/main.tex").read_text())
+            self.assertIn(r"\title{Evidence Writing}", (root / "paper/main.tex").read_text())
             self.assertIn(
                 r"\input{sections/bibliography}", (root / "paper/main.tex").read_text()
             )
             self.assertTrue((root / "paper/.outline-approved").is_file())
             plan = json.loads((root / "paper/paragraph_plan.json").read_text())
-            self.assertEqual(set(plan["sections"]), {item[0] for item in online.DEFAULT_SECTIONS})
+            self.assertEqual(set(plan["sections"]), {"abstract", "experiments", "conclusion"})
+            config = json.loads((root / "paper/paper_studio.json").read_text())
+            self.assertEqual(config["table_order"], ["T1"])
+            self.assertEqual(config["tables"]["T1"]["label"], "tab:main")
 
     def test_live_worker_hides_root_and_never_persists_api_key(self):
         key = "sk-online-test-never-write-this"
-        encoded_profile = base64.b64encode(PROFILE_HTML.encode()).decode()
+        encoded_files = [
+            {"name": name, "data": base64.b64encode(source.encode()).decode()}
+            for name, source in pipeline_files()
+        ]
+        encoded_archive = base64.b64encode(evidence_archive()).decode()
         with tempfile.TemporaryDirectory() as directory, patch.object(
             online, "DATA_ROOT", Path(directory)
         ):
-            session = online.create_session(
-                {
-                    "api_key": key,
-                    "files": [
-                        {"name": "PROFILE.html", "data": encoded_profile},
-                        {
-                            "name": "results.html",
-                            "data": base64.b64encode(
-                                b"<html><body><h1>Private Online Draft</h1>"
-                                b"<p>Accuracy: 91%.</p></body></html>"
-                            ).decode(),
-                        },
-                    ],
-                },
-                user_id="test-user",
-            )
+            validator = subprocess.CompletedProcess([], 0, stdout="ok", stderr="")
+            with patch.object(online.subprocess, "run", return_value=validator):
+                session = online.create_session(
+                    {
+                        "api_key": key,
+                        "files": encoded_files,
+                        "evidence_archive": {"name": "evidence.zip", "data": encoded_archive},
+                    },
+                    user_id="test-user",
+                )
             with urllib.request.urlopen(
                 f"http://127.0.0.1:{session.port}/api/state", timeout=5
             ) as response:
@@ -267,7 +406,9 @@ class OnlineStudioTests(unittest.TestCase):
     def test_setup_page_only_asks_for_generated_html_and_openai_key(self):
         source = (online.STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn('name="profile_file"', source)
-        self.assertIn('name="research_files"', source)
+        self.assertIn('name="plan_file"', source)
+        self.assertIn('name="result_file"', source)
+        self.assertIn('name="evidence_archive"', source)
         self.assertIn('name="api_key"', source)
         self.assertNotIn('name="project_name"', source)
         self.assertNotIn('name="outline"', source)

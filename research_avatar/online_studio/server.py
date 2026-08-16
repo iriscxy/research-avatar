@@ -40,9 +40,13 @@ STATIC = Path(__file__).resolve().parent / "static"
 COOKIE_NAME = "paper_studio_session"
 AUTH_COOKIE_NAME = "online_studio_auth"
 GOOGLE_STATE_COOKIE = "online_studio_google_state"
-MAX_BODY_BYTES = 24 * 1024 * 1024
+# Base64 expands the three bounded HTML files plus the 32 MB ZIP by roughly 4/3.
+MAX_BODY_BYTES = 80 * 1024 * 1024
 MAX_FILE_BYTES = 8 * 1024 * 1024
 MAX_FILES = 20
+MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
+MAX_ARCHIVE_EXPANDED_BYTES = 128 * 1024 * 1024
+MAX_ARCHIVE_FILES = 2000
 MAX_SOURCE_TEXT_CHARS = 60_000
 MAX_ACTIVE_SESSIONS = int(os.environ.get("ONLINE_STUDIO_MAX_SESSIONS", "16"))
 SESSION_IDLE_SECONDS = int(os.environ.get("ONLINE_STUDIO_IDLE_SECONDS", "14400"))
@@ -152,6 +156,67 @@ class _HTMLIdentity(HTMLParser):
 
     def value(self, tag: str) -> str:
         return " ".join("".join(self.parts[tag]).split()).strip()
+
+
+class _ResultArtifactTables(HTMLParser):
+    """Extract verified table-shaped evidence from canonical 05 HTML."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.artifact_id: str | None = None
+        self.artifact_tag: str | None = None
+        self.artifact_tag_depth = 0
+        self.row: list[str] | None = None
+        self.cell_tag: str | None = None
+        self.cell_parts: list[str] = []
+        self.rows: dict[str, list[list[str]]] = {}
+        self.artifact_ids: list[str] = []
+        self.target_ids: set[str] = set()
+        self.result_ids: set[str] = set()
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self.cell_tag and tag not in {"th", "td"}:
+            self.cell_parts.append(" ")
+        attributes = {key: value or "" for key, value in attrs}
+        artifact_id = attributes.get("data-artifact-id", "").strip()
+        if artifact_id:
+            self.artifact_ids.append(artifact_id)
+            if self.artifact_id is None:
+                self.artifact_id = artifact_id
+                self.artifact_tag = tag
+                self.artifact_tag_depth = 1
+        elif self.artifact_id and tag == self.artifact_tag:
+            self.artifact_tag_depth += 1
+        target_id = attributes.get("data-target-id", "").strip()
+        result_id = attributes.get("data-result-id", "").strip()
+        if target_id:
+            self.target_ids.add(target_id)
+        if result_id:
+            self.result_ids.add(result_id)
+        if self.artifact_id and tag == "tr":
+            self.row = []
+        if self.artifact_id and self.row is not None and tag in {"th", "td"}:
+            self.cell_tag = tag
+            self.cell_parts = []
+
+    def handle_data(self, data: str) -> None:
+        if self.cell_tag:
+            self.cell_parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.cell_tag == tag and self.row is not None:
+            self.row.append(" ".join("".join(self.cell_parts).split()).strip())
+            self.cell_tag = None
+            self.cell_parts = []
+        if tag == "tr" and self.artifact_id and self.row is not None:
+            if any(self.row):
+                self.rows.setdefault(self.artifact_id, []).append(self.row)
+            self.row = None
+        if self.artifact_id and tag == self.artifact_tag:
+            self.artifact_tag_depth -= 1
+        if self.artifact_id and self.artifact_tag_depth == 0:
+            self.artifact_id = None
+            self.artifact_tag = None
 
 
 def _database() -> sqlite3.Connection:
@@ -489,6 +554,196 @@ def _decode_html_files(raw_files: Any) -> list[tuple[str, str]]:
     return decoded
 
 
+def _canonical_pipeline_sources(files: list[tuple[str, str]]) -> dict[str, str]:
+    expected = {
+        "profile.html": "PROFILE.html",
+        "03_experiment_plan.html": "03_EXPERIMENT_PLAN.html",
+        "05_exp_result.html": "05_EXP_RESULT.html",
+    }
+    sources = {name.lower(): source for name, source in files}
+    missing = [display for key, display in expected.items() if key not in sources]
+    extras = [name for name, _source in files if name.lower() not in expected]
+    if missing:
+        raise OnlineStudioError("缺少必需文件：" + "、".join(missing) + "。")
+    if extras:
+        raise OnlineStudioError(
+            "HTML 上传区只接受 PROFILE、03 和 05；其他证据请放入 ZIP："
+            + "、".join(extras)
+        )
+    return {display: sources[key] for key, display in expected.items()}
+
+
+def _script_json(source: str, identifier: str) -> dict[str, Any]:
+    match = re.search(
+        rf'<script\b[^>]*\bid=["\']{re.escape(identifier)}["\'][^>]*>(.*?)</script>',
+        source,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if match is None:
+        raise OnlineStudioError(f"上传文件缺少 {identifier} 数据契约。")
+    try:
+        payload = json.loads(match.group(1))
+    except json.JSONDecodeError as exc:
+        raise OnlineStudioError(f"{identifier} 数据契约不是有效 JSON。") from exc
+    if not isinstance(payload, dict):
+        raise OnlineStudioError(f"{identifier} 数据契约必须是 JSON object。")
+    return payload
+
+
+def _decode_evidence_archive(raw_archive: Any) -> bytes:
+    if not isinstance(raw_archive, dict):
+        raise OnlineStudioError("请上传研究证据 ZIP。")
+    name = Path(str(raw_archive.get("name") or "")).name
+    if Path(name).suffix.lower() != ".zip":
+        raise OnlineStudioError("研究证据包必须是 .zip 文件。")
+    try:
+        content = base64.b64decode(str(raw_archive.get("data") or ""), validate=True)
+    except (ValueError, TypeError) as exc:
+        raise OnlineStudioError("研究证据 ZIP 内容无效。") from exc
+    if not content or len(content) > MAX_ARCHIVE_BYTES:
+        raise OnlineStudioError("研究证据 ZIP 必须非空且不超过 32 MB。")
+    return content
+
+
+def _archive_path_allowed(path: Path) -> bool:
+    value = path.as_posix()
+    return (
+        value.startswith("results/")
+        or value.startswith("figures/")
+        or value.startswith("researcher-profile/fulltext/")
+        or value in {
+            "researcher-profile/publications.json",
+            "code/RESULTS_LEDGER.csv",
+            "reports/01_LIT_SURVEY.html",
+            "reports/04_RUN_PLAN.html",
+        }
+    )
+
+
+def _extract_evidence_archive(content: bytes, root: Path) -> None:
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(content))
+    except zipfile.BadZipFile as exc:
+        raise OnlineStudioError("研究证据包不是有效 ZIP。") from exc
+    infos = [item for item in archive.infolist() if not item.is_dir()]
+    if not infos or len(infos) > MAX_ARCHIVE_FILES:
+        raise OnlineStudioError(f"研究证据 ZIP 必须包含 1–{MAX_ARCHIVE_FILES} 个文件。")
+    expanded = 0
+    accepted: list[tuple[zipfile.ZipInfo, Path]] = []
+    for info in infos:
+        candidate = Path(info.filename.replace("\\", "/"))
+        mode = (info.external_attr >> 16) & 0o170000
+        if (
+            candidate.is_absolute()
+            or ".." in candidate.parts
+            or not candidate.parts
+            or mode == 0o120000
+            or not _archive_path_allowed(candidate)
+        ):
+            raise OnlineStudioError(f"研究证据 ZIP 包含不允许的路径：{info.filename}")
+        expanded += int(info.file_size)
+        if expanded > MAX_ARCHIVE_EXPANDED_BYTES:
+            raise OnlineStudioError("研究证据 ZIP 解压后不得超过 128 MB。")
+        accepted.append((info, candidate))
+    if not any(path.parts and path.parts[0] == "results" for _info, path in accepted):
+        raise OnlineStudioError("研究证据 ZIP 必须包含非空的 results/ 目录。")
+    if not any(path.as_posix() == "researcher-profile/publications.json" for _info, path in accepted):
+        raise OnlineStudioError("研究证据 ZIP 必须包含 researcher-profile/publications.json。")
+    if not any(
+        path.as_posix().startswith("researcher-profile/fulltext/")
+        and path.suffix.lower() == ".txt"
+        for _info, path in accepted
+    ):
+        raise OnlineStudioError("研究证据 ZIP 必须包含 researcher-profile/fulltext/ 下的 .txt 参考论文全文。")
+    for info, relative in accepted:
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with archive.open(info) as source, target.open("wb") as destination:
+            shutil.copyfileobj(source, destination)
+
+
+def _validated_upstream_contract(root: Path, plan_source: str, result_source: str) -> dict[str, Any]:
+    contract = _script_json(plan_source, "experiment-plan-contract")
+    if contract.get("approval_status") != "approved":
+        raise OnlineStudioError("03_EXPERIMENT_PLAN.html 尚未批准，请先完成 expplan approval。")
+    outline = contract.get("paper_outline")
+    artifacts = contract.get("paper_artifacts")
+    if not isinstance(outline, list) or not outline:
+        raise OnlineStudioError("03 的 paper_outline 为空，无法构建 Paper Studio。")
+    if not isinstance(artifacts, list):
+        raise OnlineStudioError("03 的 paper_artifacts 格式无效。")
+    result_parser = _ResultArtifactTables()
+    result_parser.feed(result_source)
+    result_parser.close()
+    duplicates = sorted(
+        artifact_id
+        for artifact_id in set(result_parser.artifact_ids)
+        if result_parser.artifact_ids.count(artifact_id) > 1
+    )
+    if duplicates:
+        raise OnlineStudioError("05 中存在重复 artifact：" + "、".join(duplicates))
+    required_artifacts = {
+        str(requirement.get("artifact_id"))
+        for requirement in contract.get("result_requirements", [])
+        if isinstance(requirement, dict) and requirement.get("artifact_id")
+    }
+    missing_artifacts = sorted(required_artifacts - set(result_parser.artifact_ids))
+    if missing_artifacts:
+        raise OnlineStudioError("05 缺少结果 artifact：" + "、".join(missing_artifacts))
+    required_targets = {
+        str(target)
+        for requirement in contract.get("result_requirements", [])
+        if isinstance(requirement, dict)
+        for key in ("cell_ids", "panel_ids")
+        for target in requirement.get(key, [])
+    }
+    missing_targets = sorted(required_targets - result_parser.target_ids)
+    if missing_targets:
+        raise OnlineStudioError(
+            "05 尚未填满 03 规定的结果目标：" + "、".join(missing_targets[:12])
+        )
+    validation_commands = [
+        [
+            sys.executable,
+            str(Path(__file__).resolve().parents[2] / "research_avatar/tools/validate_report_structure.py"),
+            "--kind", "expplan", "--html", str(root / "reports/03_EXPERIMENT_PLAN.html"),
+        ],
+        [
+            sys.executable,
+            str(Path(__file__).resolve().parents[2] / "research_avatar/tools/validate_report_structure.py"),
+            "--kind", "results", "--html", str(root / "reports/05_EXP_RESULT.html"),
+        ],
+        [
+            sys.executable,
+            str(Path(__file__).resolve().parents[2] / ".agents/skills/expplan/scripts/validate_experiment_plan.py"),
+            "--plan", str(root / "reports/03_EXPERIMENT_PLAN.html"),
+        ],
+        [
+            sys.executable,
+            str(Path(__file__).resolve().parents[2] / ".agents/skills/paperwrite/scripts/plan_conformance.py"),
+            "--plan", str(root / "reports/03_EXPERIMENT_PLAN.html"),
+            "--results-dir", str(root / "results"),
+            "--results-only",
+        ],
+    ]
+    for command in validation_commands:
+        completed = subprocess.run(
+            command,
+            cwd=Path(__file__).resolve().parents[2],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        if completed.returncode:
+            detail = (completed.stderr or completed.stdout).strip().splitlines()
+            raise OnlineStudioError(
+                "上传产物未通过科研契约校验：" + (detail[0] if detail else "validator failed")
+            )
+    contract["_result_tables"] = result_parser.rows
+    return contract
+
+
 def _source_text(files: list[tuple[str, str]]) -> str:
     blocks: list[str] = []
     for name, source in files:
@@ -509,17 +764,21 @@ def _source_text(files: list[tuple[str, str]]) -> str:
     return merged
 
 
-def _project_identity(files: list[tuple[str, str]]) -> tuple[str, str]:
-    """Derive safe setup metadata so the upload page does not ask for it twice."""
+def _project_identity(plan_source: str, contract: dict[str, Any]) -> tuple[str, str]:
+    """Derive display metadata without replacing the approved scientific contract."""
 
-    supporting = [(name, source) for name, source in files if name.lower() != "profile.html"]
-    if not supporting:
-        raise OnlineStudioError("除 PROFILE.html 外，还必须上传结果 HTML 或实验计划 HTML。")
-    name, source = supporting[0]
     parser = _HTMLIdentity()
-    parser.feed(source)
+    parser.feed(plan_source)
     parser.close()
-    candidates = [parser.value("h1"), parser.value("title"), Path(name).stem]
+    source_plan = contract.get("source_plan")
+    target = contract.get("target") if isinstance(contract.get("target"), dict) else {}
+    candidates = [
+        str(contract.get("paper_title") or "").strip(),
+        str(contract.get("title") or "").strip(),
+        str(source_plan.get("title") or "").strip() if isinstance(source_plan, dict) else "",
+        parser.value("h1"),
+        parser.value("title"),
+    ]
     project_name = next((value for value in candidates if value), "Online Paper")[:160]
     title = next(
         (
@@ -529,43 +788,276 @@ def _project_identity(files: list[tuple[str, str]]) -> tuple[str, str]:
         ),
         "Research Paper Draft",
     )
+    if title.lower().startswith("experiment plan"):
+        title = "Research Paper Draft"
+    venue = str(target.get("venue") or "").strip()
+    if venue and venue not in project_name:
+        project_name = f"{project_name} · {venue}"[:160]
     return project_name, title
+
+
+def _outline_sections(contract: dict[str, Any]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    used: set[str] = set()
+    for index, raw in enumerate(contract.get("paper_outline", []), 1):
+        if not isinstance(raw, dict):
+            raise OnlineStudioError("03 paper_outline section 必须是 object。")
+        title = str(raw.get("title") or raw.get("name") or raw.get("id") or "").strip()
+        if not title:
+            raise OnlineStudioError("03 paper_outline 存在无标题 section。")
+        candidate = str(raw.get("id") or "").strip()
+        section_id = _safe_slug(candidate or title, f"section-{index}").replace("-", "_")
+        if title.lower() == "abstract" or section_id == "abstract":
+            section_id = "abstract"
+        if section_id in used:
+            raise OnlineStudioError(f"03 paper_outline section ID 重复：{section_id}")
+        paragraphs = raw.get("paragraphs")
+        if not isinstance(paragraphs, list) or not paragraphs:
+            raise OnlineStudioError(f"03 section {title} 没有 paragraph blueprint。")
+        normalized_paragraphs = []
+        for paragraph_index, paragraph in enumerate(paragraphs, 1):
+            if not isinstance(paragraph, dict):
+                raise OnlineStudioError(f"03 section {title} 的 paragraph 格式无效。")
+            paragraph_id = str(paragraph.get("id") or f"{section_id}-P{paragraph_index}").strip()
+            purpose = str(paragraph.get("plan_sentence") or paragraph.get("purpose") or "").strip()
+            if not paragraph_id or not purpose:
+                raise OnlineStudioError(f"03 section {title} 存在缺少 ID 或规划句的 paragraph。")
+            normalized_paragraphs.append(
+                {
+                    "id": paragraph_id,
+                    "purpose": purpose,
+                    "artifacts": [str(item) for item in paragraph.get("artifact_refs", [])],
+                    "heading": str(paragraph.get("heading") or paragraph.get("subsection") or "").strip(),
+                    "heading_style": str(paragraph.get("heading_style") or "").strip(),
+                }
+            )
+        normalized.append(
+            {
+                "id": section_id,
+                "source_id": candidate or section_id,
+                "title": title,
+                "render": "abstract" if section_id == "abstract" else "section",
+                "paragraphs": normalized_paragraphs,
+            }
+        )
+        used.add(section_id)
+    return normalized
+
+
+def _artifact_rows(raw_rows: Any, labels: list[str]) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    rows = [list(map(str, row)) for row in raw_rows or [] if isinstance(row, list) and row]
+    width = max([len(row) for row in rows] + [len(labels), 1])
+    headers = [str(item).strip() for item in labels if str(item).strip()]
+    if len(headers) < width:
+        headers.extend(f"Value {index}" for index in range(len(headers) + 1, width + 1))
+    headers = headers[:width]
+    keys: list[str] = []
+    for index, header in enumerate(headers, 1):
+        base = _safe_slug(header, f"value-{index}").replace("-", "_")
+        key = base
+        suffix = 2
+        while key in keys:
+            key = f"{base}_{suffix}"
+            suffix += 1
+        keys.append(key)
+    if rows and [item.casefold() for item in rows[0][:width]] == [item.casefold() for item in headers]:
+        rows = rows[1:]
+    records = [
+        {key: (row[index] if index < len(row) else "—") for index, key in enumerate(keys)}
+        for row in rows
+    ]
+    return records, [
+        {"key": key, "label": header} for key, header in zip(keys, headers)
+    ]
+
+
+def _artifact_definitions(
+    contract: dict[str, Any], sections: list[dict[str, Any]]
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    section_ids = {item["id"] for item in sections}
+    section_aliases = {
+        str(alias): section["id"]
+        for section in sections
+        for alias in (section["id"], section.get("source_id"), section["title"])
+        if alias
+    }
+    paragraph_locations = {
+        paragraph["id"]: section["id"]
+        for section in sections
+        for paragraph in section["paragraphs"]
+    }
+    figures: dict[str, Any] = {}
+    tables: dict[str, Any] = {}
+    metrics: dict[str, Any] = {"artifacts": {}}
+    raw_tables = contract.get("_result_tables", {})
+    requirement_artifacts = {
+        str(item.get("artifact_id"))
+        for item in contract.get("result_requirements", [])
+        if isinstance(item, dict) and item.get("artifact_id")
+    }
+    for raw in contract.get("paper_artifacts", []):
+        if not isinstance(raw, dict):
+            raise OnlineStudioError("03 paper_artifacts entry 必须是 object。")
+        artifact_id = str(raw.get("id") or "").strip()
+        contract_kind = str(raw.get("kind") or "").strip().lower()
+        if not artifact_id or contract_kind not in {"figure", "table"}:
+            raise OnlineStudioError("03 artifact 必须包含 ID，kind 必须是 figure 或 table。")
+        section_id = section_aliases.get(str(raw.get("section_id") or "").strip(), "")
+        if section_id not in section_ids:
+            introduced = str(raw.get("introduced_after") or "").strip()
+            section_id = paragraph_locations.get(introduced, section_id)
+        if section_id not in section_ids:
+            raise OnlineStudioError(f"03 artifact {artifact_id} 引用了未知 section。")
+        shell = raw.get("shell") if isinstance(raw.get("shell"), dict) else {}
+        caption = str(shell.get("caption") or raw.get("caption") or artifact_id).strip()
+        title = str(raw.get("title") or caption or artifact_id).strip()
+        span = str(raw.get("span") or raw.get("width") or "single-column").lower()
+        width = "two-column" if any(token in span for token in ("two", "full", "double")) else "single-column"
+        bindings = [
+            paragraph["id"]
+            for section in sections
+            for paragraph in section["paragraphs"]
+            if artifact_id in paragraph["artifacts"]
+        ]
+        if not bindings:
+            introduced = str(raw.get("introduced_after") or "").strip()
+            bindings = [introduced] if introduced in paragraph_locations else []
+        if not bindings:
+            raise OnlineStudioError(f"03 artifact {artifact_id} 没有 paragraph binding。")
+        rows = raw_tables.get(artifact_id, []) if isinstance(raw_tables, dict) else []
+        labels = [str(item) for item in shell.get("column_labels", [])]
+        records, columns = _artifact_rows(rows, labels)
+        if artifact_id in requirement_artifacts and not records:
+            raise OnlineStudioError(
+                f"05 中的结果 artifact {artifact_id} 没有可读取的数据行；不会用占位值代替实验结果。"
+            )
+        metrics["artifacts"][artifact_id] = {
+            "rows": records,
+            "source": "reports/05_EXP_RESULT.html",
+            "contract_verified": True,
+        }
+        result_path = f"artifacts.{artifact_id}.rows"
+        common = {
+            "title": title,
+            "label": str(raw.get("label") or ("fig:" if contract_kind == "figure" else "tab:") + artifact_id.lower()),
+            "width": width,
+            "source_sections": [section_id],
+            "description": str(raw.get("description") or caption),
+            "caption": caption,
+            "result_keys": [result_path] if artifact_id in requirement_artifacts else [],
+            "related_paragraphs": {section_id: bindings},
+        }
+        if contract_kind == "table":
+            tables[artifact_id] = {
+                **common,
+                "kind": "table",
+                "data_grid": {"type": "records", "path": result_path, "columns": columns},
+                "prompt": {
+                    "columns": " | ".join(item["label"] for item in columns),
+                    "rows": "保持 05 的已验证顺序",
+                    "font_size": "small",
+                    "best_values": "仅按 03 指定的 metric direction 标记",
+                },
+            }
+            continue
+        data_driven = bool(raw.get("data_driven")) or artifact_id in requirement_artifacts
+        raw_panels = shell.get("panels")
+        if raw_panels is None and isinstance(shell.get("plotting"), dict):
+            raw_panels = shell["plotting"].get("panels")
+        if isinstance(raw_panels, dict):
+            panel_items = [(str(key), value) for key, value in raw_panels.items()]
+        elif isinstance(raw_panels, list):
+            panel_items = [
+                (str(item.get("id") or chr(97 + index)), item)
+                for index, item in enumerate(raw_panels)
+                if isinstance(item, dict)
+            ]
+        else:
+            panel_items = []
+        panels = [
+            {
+                "id": panel_id,
+                "title": str(panel.get("title") or panel.get("name") or panel_id),
+                "goal": str(panel.get("goal") or panel.get("description") or caption),
+                "result_keys": [result_path] if data_driven else [],
+            }
+            for panel_id, panel in panel_items
+        ]
+        if data_driven and not panels:
+            panels = [{"id": "a", "title": title, "goal": caption, "result_keys": [result_path]}]
+        figure = {
+            **common,
+            "kind": "data" if data_driven else "mechanism",
+            "panels": panels,
+            "depends_on_paragraphs": {section_id: bindings},
+            "deliverable_stem": _safe_slug(artifact_id),
+        }
+        if not data_driven:
+            figure["generation_requires_paragraphs"] = {section_id: bindings}
+        figures[artifact_id] = figure
+    return figures, tables, metrics
 
 
 def _write_workspace(
     root: Path,
     *,
-    project_name: str,
-    title: str,
     files: list[tuple[str, str]],
-    sections: list[tuple[str, str, str, str]] | None = None,
+    archive: bytes,
 ) -> None:
+    sources = _canonical_pipeline_sources(files)
+    profile = sources["PROFILE.html"]
+    if "writing style" not in profile.lower():
+        raise OnlineStudioError("PROFILE.html 缺少完整的 Writing Style 部分，请先刷新 profileconstruct。")
     paper = root / "paper"
     sections_dir = paper / "sections"
     sources_dir = root / "sources"
     profile_dir = root / "researcher-profile"
+    reports_dir = root / "reports"
     sections_dir.mkdir(parents=True)
     sources_dir.mkdir(parents=True)
     profile_dir.mkdir(parents=True)
-    profile = next(
-        (source for name, source in files if name.lower() == "profile.html"), None
-    )
-    if profile is None:
-        raise OnlineStudioError("必须上传名为 PROFILE.html 的研究者画像。")
+    reports_dir.mkdir(parents=True)
+    _extract_evidence_archive(archive, root)
     (profile_dir / "PROFILE.html").write_text(profile, encoding="utf-8")
-    for name, source in files:
+    (reports_dir / "03_EXPERIMENT_PLAN.html").write_text(
+        sources["03_EXPERIMENT_PLAN.html"], encoding="utf-8"
+    )
+    (reports_dir / "05_EXP_RESULT.html").write_text(
+        sources["05_EXP_RESULT.html"], encoding="utf-8"
+    )
+    for name, source in sources.items():
         (sources_dir / name).write_text(source, encoding="utf-8")
+    contract = _validated_upstream_contract(
+        root, sources["03_EXPERIMENT_PLAN.html"], sources["05_EXP_RESULT.html"]
+    )
+    project_name, title = _project_identity(sources["03_EXPERIMENT_PLAN.html"], contract)
+    sections = _outline_sections(contract)
+    figures, tables, metrics = _artifact_definitions(contract, sections)
 
-    reference = _source_text(files)
+    reference_files = sorted((root / "researcher-profile/fulltext").rglob("*.txt"))
+    reference_blocks = [path.read_text(encoding="utf-8", errors="replace") for path in reference_files[:3]]
+    reference = _source_text(list(sources.items()))
+    if reference_blocks:
+        reference += "\n\nSTRUCTURAL REFERENCE PAPER:\n" + "\n\n".join(reference_blocks)
     reference_path = paper / "uploaded_sources.txt"
     reference_path.write_text(reference + "\n", encoding="utf-8")
     line_count = max(1, len(reference.splitlines()))
-    sections = sections or list(DEFAULT_SECTIONS)
     section_specs = []
     plan_sections: dict[str, list[dict[str, Any]]] = {}
     outline_lines = [f"Title: {title}", "", "Approved section plan:"]
-    for index, (section_id, section_title, render, purpose) in enumerate(sections, 1):
+    for index, section in enumerate(sections, 1):
+        section_id = section["id"]
+        section_title = section["title"]
+        render = section["render"]
         filename = f"{section_id}.tex"
+        result_keys = sorted(
+            {
+                key
+                for definition in list(figures.values()) + list(tables.values())
+                if section_id in definition["source_sections"]
+                for key in definition.get("result_keys", [])
+            }
+        )
         section_specs.append(
             {
                 "id": section_id,
@@ -573,26 +1065,32 @@ def _write_workspace(
                 "latex_title": "" if render == "abstract" else section_title,
                 "file": filename,
                 "render": render,
-                "result_keys": [],
+                "result_keys": result_keys,
             }
         )
-        paragraph_id = f"P{index}"
-        plan_sections[section_id] = [
-            {
-                "id": paragraph_id,
-                "purpose": purpose,
+        plan_sections[section_id] = []
+        outline_lines.append(f"{index}. {section_title}")
+        for paragraph in section["paragraphs"]:
+            planned = {
+                "id": paragraph["id"],
+                "purpose": paragraph["purpose"],
                 "reference_lines": [1, line_count],
-                "artifacts": [],
+                "artifacts": paragraph["artifacts"],
             }
-        ]
-        outline_lines.append(f"{index}. {section_title}: {purpose}")
+            if paragraph["heading"]:
+                planned["heading"] = paragraph["heading"]
+                planned["heading_style"] = paragraph["heading_style"] or "subsection"
+            plan_sections[section_id].append(planned)
+            outline_lines.append(f"  - {paragraph['id']}: {paragraph['purpose']}")
         placeholder = "% Awaiting paragraph-level drafting in Paper Studio.\n"
         if render != "abstract":
             placeholder = f"\\section{{{_latex_escape(section_title)}}}\n\n" + placeholder
         (sections_dir / filename).write_text(placeholder, encoding="utf-8")
 
     main_inputs = []
-    for section_id, _title, render, _purpose in sections:
+    for section in sections:
+        section_id = section["id"]
+        render = section["render"]
         if render == "abstract":
             main_inputs.append(
                 "\\begin{abstract}\n\\input{sections/abstract}\n\\end{abstract}"
@@ -624,13 +1122,13 @@ def _write_workspace(
         "% Paper Studio enables the bibliography after the first accepted citation.\n",
         encoding="utf-8",
     )
+    metrics["online_sources"] = {
+        "files": list(sources),
+        "evidence_archive": True,
+        "contract_approval_sha256": contract.get("approval_contract_sha256"),
+    }
     (paper / "metrics.json").write_text(
-        json.dumps(
-            {"online_sources": {"files": [name for name, _ in files], "user_supplied": True}},
-            ensure_ascii=False,
-            indent=2,
-        )
-        + "\n",
+        json.dumps(metrics, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     (paper / "working_abstract.txt").write_text(
@@ -639,24 +1137,26 @@ def _write_workspace(
     )
     (paper / "outline.txt").write_text("\n".join(outline_lines) + "\n", encoding="utf-8")
     (paper / ".outline-approved").write_text(
-        "Approved by the user in Online Paper Studio setup.\n", encoding="utf-8"
+        "Inherited from approved reports/03_EXPERIMENT_PLAN.html.\n", encoding="utf-8"
     )
+    target = contract.get("target") if isinstance(contract.get("target"), dict) else {}
     config = {
         "schema_version": "1.0",
         "project": {
             "id": _safe_slug(project_name) + "-" + secrets.token_hex(4),
             "name": project_name,
             "initial_title": title,
+            "venue": str(target.get("venue") or ""),
             "eyebrow": "ONLINE PAPER STUDIO",
             "studio_title": "Paper Studio",
-            "subtitle": "基于已上传研究资料的隔离在线写作会话",
+            "subtitle": "继承已批准 03、已验证 05 与 results 的隔离在线写作会话",
         },
         "sections": section_specs,
-        "batch_writing_order": [item[0] for item in sections],
-        "figure_order": [],
-        "figures": {},
-        "table_order": [],
-        "tables": {},
+        "batch_writing_order": [item["id"] for item in sections],
+        "figure_order": [item["id"] for item in contract.get("paper_artifacts", []) if item.get("id") in figures],
+        "figures": figures,
+        "table_order": [item["id"] for item in contract.get("paper_artifacts", []) if item.get("id") in tables],
+        "tables": tables,
         "paths": {
             "metrics": "paper/metrics.json",
             "main": "paper/main.tex",
@@ -755,8 +1255,7 @@ def create_session(payload: dict[str, Any], *, user_id: str) -> Session:
     if not model or len(model) > 128 or any(character.isspace() for character in model):
         raise OnlineStudioError("模型名称格式无效。")
     files = _decode_html_files(payload.get("files"))
-    project_name, title = _project_identity(files)
-    sections = _validated_sections(payload.get("sections"))
+    archive = _decode_evidence_archive(payload.get("evidence_archive"))
     session_id = secrets.token_urlsafe(32)
     root = (
         DATA_ROOT
@@ -767,10 +1266,8 @@ def create_session(payload: dict[str, Any], *, user_id: str) -> Session:
     try:
         _write_workspace(
             root,
-            project_name=project_name,
-            title=title,
             files=files,
-            sections=sections,
+            archive=archive,
         )
         process, port = _start_worker(root, provider, model, api_key)
     except Exception:

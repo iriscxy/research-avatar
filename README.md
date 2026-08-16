@@ -62,7 +62,10 @@ export DEEPSEEK_API_KEY="粘贴你的 API key"
 
 远程用户可以直接打开
 **[Online Paper Studio](https://research-avatar-studio.yingtaomj.workers.dev/)**，注册后上传
-`PROFILE.html`、实验/调研 HTML 和自己的 LLM API key 并开始写作。邮箱账户与登录
+`PROFILE.html`、已批准的 `03_EXPERIMENT_PLAN.html`、已完成的 `05_EXP_RESULT.html`、
+研究证据 ZIP 和自己的 OpenAI API key 并开始写作。在原项目根目录用
+`python3 -m research_avatar.online_studio.package` 生成证据 ZIP；其中包含可追溯的
+`results/`、出版记录和已确认参考论文全文。邮箱账户与登录
 会话持久保存在 Cloudflare D1；写作工作区和 API key 都是临时会话数据，请及时导出项目 ZIP。
 
 也可以在本地启动同一入口：

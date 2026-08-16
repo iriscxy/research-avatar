@@ -3,11 +3,28 @@
 Public deployment: <https://research-avatar-studio.yingtaomj.workers.dev/>
 
 This is the private, deployable entry point for the fixed Paper Studio UI. It
-accepts the generated `PROFILE.html` plus at least one result or experiment-plan
-HTML file, creates one isolated writing workspace per browser session, and starts
-the existing Paper Studio as a localhost-only worker. The upload page derives its
-project label and working title from the supporting HTML, uses OpenAI with the
-default writing model, and does not ask the researcher to recreate an outline.
+accepts the exact upstream writing contract: `PROFILE.html`, an approved
+`03_EXPERIMENT_PLAN.html`, a completed `05_EXP_RESULT.html`, and a bounded evidence
+ZIP. It creates one isolated writing workspace per browser session and starts the
+existing Paper Studio as a localhost-only worker. The approved embedded contract
+supplies the paper outline, paragraph plan, artifact bindings, venue, and title;
+the uploader never invents a generic outline or treats 03 and 05 as alternatives.
+
+Build the evidence ZIP from the original Research Avatar project root:
+
+```bash
+python3 -m research_avatar.online_studio.package
+```
+
+The package command includes `results/`, `researcher-profile/publications.json`,
+and `researcher-profile/fulltext/`. When present it also includes `figures/`,
+`code/RESULTS_LEDGER.csv`, `reports/01_LIT_SURVEY.html`, and
+`reports/04_RUN_PLAN.html`. The server rejects path traversal, symlinks, unknown
+paths, more than 2,000 files, more than 32 MB compressed, or more than 128 MB
+expanded. Before creating Paper Studio data it runs the repository's expplan,
+report-structure, and result-conformance validators and requires every 03 result
+target to be present in 05. Missing result rows are rejected instead of replaced
+with placeholders.
 
 For a local smoke test:
 

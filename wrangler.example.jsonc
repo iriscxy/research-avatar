@@ -8,9 +8,9 @@
   "containers": [
     {
       "class_name": "OnlineStudioContainer",
-      "image": "registry.cloudflare.com/CLOUDFLARE_ACCOUNT_ID/research-avatar-studio-onlinestudiocontainer:uploadflowv1",
+      "image": "registry.cloudflare.com/CLOUDFLARE_ACCOUNT_ID/research-avatar-studio-onlinestudiocontainer:contractv2",
       "instance_type": "basic",
-      "max_instances": 5
+      "max_instances": 6
     }
   ],
   "durable_objects": {

@@ -93,24 +93,43 @@ form.addEventListener('submit', async (event) => {
   submit.disabled = true;
   const files = [];
   try {
-    const selectedFiles = [
-      form.elements.profile_file.files[0],
-      ...form.elements.research_files.files,
-    ].filter(Boolean);
-    for (const file of selectedFiles) {
+    const expectedFiles = [
+      [form.elements.profile_file.files[0], 'PROFILE.html'],
+      [form.elements.plan_file.files[0], '03_EXPERIMENT_PLAN.html'],
+      [form.elements.result_file.files[0], '05_EXP_RESULT.html'],
+    ];
+    for (const [file, expected] of expectedFiles) {
+      if (!file || file.name.toLowerCase() !== expected.toLowerCase()) {
+        throw new Error(`请选择项目中原名为 ${expected} 的文件。`);
+      }
+    }
+    const selectedFiles = expectedFiles.map(([file]) => file);
+    const archiveFile = form.elements.evidence_archive.files[0];
+    if (!archiveFile || !archiveFile.name.toLowerCase().endsWith('.zip')) {
+      throw new Error('研究证据包必须是 ZIP 文件。');
+    }
+    if (archiveFile.size > 32 * 1024 * 1024) {
+      throw new Error('研究证据 ZIP 不能超过 32 MB。');
+    }
+    const encodeFile = async (file) => {
       const bytes = new Uint8Array(await file.arrayBuffer());
       let binary = '';
       const chunk = 0x8000;
       for (let index = 0; index < bytes.length; index += chunk) {
         binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
       }
-      files.push({ name: file.name, data: btoa(binary) });
+      return { name: file.name, data: btoa(binary) };
+    };
+    for (const file of selectedFiles) {
+      files.push(await encodeFile(file));
     }
+    const evidenceArchive = await encodeFile(archiveFile);
     const payload = {
       provider: 'openai',
       api_key: form.elements.api_key.value,
       access_token: form.elements.access_token.value,
       files,
+      evidence_archive: evidenceArchive,
     };
     const response = await fetch('/api/online/session', {
       method: 'POST',
