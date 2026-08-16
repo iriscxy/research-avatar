@@ -96,6 +96,8 @@ CANCELLED_AGENT_CHAT_JOBS: set[str] = set()
 FULL_DRAFT_JOB_LOCK = threading.RLock()
 CANCELLED_FULL_DRAFT_JOBS: set[str] = set()
 SERVER_INSTANCE_TOKEN = uuid.uuid4().hex
+REFERENCE_EXCERPT_MAX_CHARS = 6000
+BIBLIOGRAPHY_PROMPT_MAX_CHARS = 120000
 
 
 class StudioHTTPServer(ThreadingHTTPServer):
@@ -876,6 +878,9 @@ def validate_project_workspace() -> None:
         raise StudioError(
             "paragraph_plan.reference_file 必须与 paper_studio.json paths.reference 完全一致。"
         )
+    for section, paragraphs in planned_sections.items():
+        for paragraph in paragraphs:
+            reference_excerpt(paragraph["reference_lines"])
     unbound = sorted(
         artifact_id for artifact_id, bindings in artifact_bindings.items() if not bindings
     )
@@ -977,7 +982,14 @@ def reference_excerpt(lines: list[int]) -> str:
     start, end = lines
     selected = source_lines[max(start - 1, 0) : min(end, len(source_lines))]
     text = " ".join(line.strip("\f ").strip() for line in selected if line.strip())
-    return re.sub(r"\s+", " ", text).strip()
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > REFERENCE_EXCERPT_MAX_CHARS:
+        raise StudioError(
+            "reference_lines 选中了过长的参考论文片段（"
+            f"{len(text)} 字符，上限 {REFERENCE_EXCERPT_MAX_CHARS}）；"
+            "请只绑定与当前段落修辞作用匹配的局部段落。"
+        )
+    return text
 
 
 def _default_state() -> dict[str, Any]:
@@ -1002,6 +1014,7 @@ def _default_state() -> dict[str, Any]:
                 "file": filename,
                 "previous_response_id": None,
                 "bibliography_fingerprint": None,
+                "conversation_section_fingerprint": None,
                 "revision": 0,
                 "current_index": 0,
                 "paragraphs": planned_paragraphs(key),
@@ -1328,12 +1341,20 @@ def read_text(path: Path, limit: int = 24000) -> str:
 
 def writing_style_context() -> str:
     profile = read_text(ROOT / "researcher-profile/PROFILE.html", 50000)
+    html_match = re.search(
+        r"<section\b[^>]*(?:id|data-report-section)=[\"']writing-style[\"'][^>]*>"
+        r"(.*?)</section>",
+        profile,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if html_match:
+        return strip_html(html_match.group(1))[:16000]
     match = re.search(
         r"## Writing Style\s*(.*?)(?=\n## Experiment Templates)",
         profile,
         re.DOTALL,
     )
-    return match.group(1).strip() if match else ""
+    return match.group(1).strip()[:16000] if match else ""
 
 
 def strip_html(source: str) -> str:
@@ -3012,8 +3033,62 @@ def bibliography_catalog() -> str:
     return read_text(PAPER / "references.bib", 2_000_000)
 
 
+def _bibtex_field(entry: str, field: str) -> str:
+    """Extract one prompt-facing BibTeX field without requiring a BibTeX dependency."""
+    match = re.search(rf"(?:^|,)\s*{re.escape(field)}\s*=\s*", entry, re.I | re.M)
+    if not match:
+        return ""
+    cursor = match.end()
+    if cursor >= len(entry):
+        return ""
+    opener = entry[cursor]
+    if opener in "{\"":
+        closer = "}" if opener == "{" else '"'
+        cursor += 1
+        start = cursor
+        depth = 1
+        while cursor < len(entry):
+            character = entry[cursor]
+            if opener == "{" and character == "{":
+                depth += 1
+            elif character == closer:
+                depth -= 1
+                if depth == 0:
+                    return re.sub(r"\s+", " ", entry[start:cursor]).strip()
+            cursor += 1
+        return ""
+    end = entry.find(",", cursor)
+    return entry[cursor : end if end >= 0 else len(entry)].strip()
+
+
+def bibliography_prompt_catalog() -> str:
+    """Return compact citation metadata for prompts, never full local BibTeX records."""
+    source = bibliography_catalog()
+    starts = list(re.finditer(r"@\w+\s*\{\s*([^,\s]+)\s*,", source))
+    records: list[str] = []
+    fields = ("author", "title", "year", "booktitle", "journal", "doi", "eprint", "url")
+    for index, match in enumerate(starts):
+        entry = source[match.start() : starts[index + 1].start() if index + 1 < len(starts) else len(source)]
+        values = [f"key={match.group(1).strip()}"]
+        for field in fields:
+            value = _bibtex_field(entry, field)
+            if value:
+                values.append(f"{field}={value[:800]}")
+        record = " | ".join(values)
+        if sum(len(item) + 1 for item in records) + len(record) > BIBLIOGRAPHY_PROMPT_MAX_CHARS:
+            records.append("[catalog truncated; use verified keys already present or citation resolution]")
+            break
+        records.append(record)
+    return "\n".join(records)
+
+
 def bibliography_fingerprint() -> str:
     return hashlib.sha256(bibliography_catalog().encode("utf-8")).hexdigest()
+
+
+def section_source_fingerprint(section: str) -> str:
+    section_path = PAPER / "sections" / SECTION_MAP[section]["file"]
+    return hashlib.sha256(read_text(section_path, 500_000).encode("utf-8")).hexdigest()
 
 
 def citation_keys(source: str) -> set[str]:
@@ -3129,6 +3204,7 @@ def select_llm_provider(state: dict[str, Any], provider: str) -> bool:
     for section_state in state.get("sections", {}).values():
         section_state["previous_response_id"] = None
         section_state["bibliography_fingerprint"] = None
+        section_state["conversation_section_fingerprint"] = None
     for figure_state in state.get("figures", {}).values():
         figure_state["previous_response_id"] = None
     return True
@@ -3163,6 +3239,7 @@ def select_llm_model(state: dict[str, Any], model: str) -> bool:
     for section_state in state.get("sections", {}).values():
         section_state["previous_response_id"] = None
         section_state["bibliography_fingerprint"] = None
+        section_state["conversation_section_fingerprint"] = None
     for figure_state in state.get("figures", {}).values():
         figure_state["previous_response_id"] = None
     return True
@@ -3380,7 +3457,7 @@ claims, wording, and required heading. Use only citation keys present in
 <paragraph_purpose>{purpose}</paragraph_purpose>
 <newly_added_keys>{", ".join(added_keys)}</newly_added_keys>
 <paragraph>{paragraph}</paragraph>
-<verified_bibliography>{bibliography_catalog()}</verified_bibliography>
+<verified_bibliography>{bibliography_prompt_catalog()}</verified_bibliography>
 
 Return the paragraph with citations synchronized to this exact bibliography.""",
         "text": {"verbosity": "low"},
@@ -3446,7 +3523,7 @@ requires.""",
         "input": f"""<section>{section}</section>
 <paragraph_purpose>{purpose}</paragraph_purpose>
 <paragraph>{paragraph}</paragraph>
-<existing_bibliography>{bibliography_catalog()}</existing_bibliography>
+<existing_bibliography>{bibliography_prompt_catalog()}</existing_bibliography>
 
 Search only for citations that are missing from the existing bibliography. For each
 new source, provide a complete BibTeX entry and the exact scholarly URL consulted.""",
@@ -3509,11 +3586,14 @@ def call_openai(
     artifacts: list[str] | None = None,
     figure_states: dict[str, dict[str, Any]] | None = None,
     required_heading_style: str | None = None,
+    include_section_context: bool | None = None,
 ) -> tuple[str, str, list[str]]:
     previous_response_id = reusable_response_id(previous_response_id)
     section_meta = SECTION_MAP[section]
     section_path = PAPER / "sections" / section_meta["file"]
-    current_section = read_text(section_path, 24000)
+    if include_section_context is None:
+        include_section_context = not previous_response_id
+    current_section = read_text(section_path, 24000) if include_section_context else ""
     if "awaiting paragraph-level drafting" in current_section.lower() or (
         section_meta.get("render") == "abstract"
         and "working abstract will be drafted" in current_section.lower()
@@ -3525,7 +3605,7 @@ def call_openai(
 <approved_outline>{read_text(PAPER / 'outline.txt', 22000)}</approved_outline>
 <working_abstract>{read_text(PAPER / 'working_abstract.txt', 10000)}</working_abstract>
 <writing_style>{writing_style_context()}</writing_style>
-<bibliography_catalog>{bibliography_catalog()}</bibliography_catalog>
+<bibliography_catalog>{bibliography_prompt_catalog()}</bibliography_catalog>
 <section_evidence>{section_evidence(section)}</section_evidence>
 </conversation_bootstrap>"""
     bound_artifacts = artifact_writing_context(artifacts, figure_states)
@@ -3583,11 +3663,6 @@ use Figure~\\ref{{...}} or Table~\\ref{{...}}."""
 <bound_artifacts>{json.dumps(bound_artifacts, ensure_ascii=False, indent=2)}</bound_artifacts>
 {f"<bibliography_update>{bibliography_update}</bibliography_update>" if bibliography_update else ""}
 {stable_context}
-
-<primary_editing_objective>{comment.strip()}</primary_editing_objective>
-When the primary editing objective is nonempty, execute every nonconflicting part of it
-before returning the complete paragraph. It is the authoritative revision target for
-this turn; prior prose and reference style are subordinate to it.
 
 Revise or draft exactly one coherent paragraph for the stated purpose. If required
 evidence or a citation key is unavailable, retain an explicit bracketed placeholder
@@ -3697,7 +3772,7 @@ instead of guessing."""
                     "markers, and figure/table cross-references."
                 ),
                 "input": (
-                    f"<verified_bibliography>{bibliography_catalog()}</verified_bibliography>\n"
+                    f"<verified_bibliography>{bibliography_prompt_catalog()}</verified_bibliography>\n"
                     f"<paragraph>{text}</paragraph>"
                 ),
                 "text": {"verbosity": "medium"},
@@ -4075,6 +4150,7 @@ def accept_full_draft_paragraph(
 
     section_state["revision"] = int(section_state.get("revision", 0)) + 1
     section_state["accepted_text"] = accepted_section
+    section_state["conversation_section_fingerprint"] = section_source_fingerprint(section)
     next_index = next_unaccepted_index(section_state["paragraphs"])
     section_state["current_index"] = (
         len(section_state["paragraphs"]) - 1
@@ -4124,6 +4200,12 @@ def full_draft_worker(token: str, model: str) -> None:
                     continue
                 section_state = state["sections"][section]
                 previous_response_id = section_state.get("previous_response_id")
+                source_fingerprint = section_source_fingerprint(section)
+                include_section_context = (
+                    not previous_response_id
+                    or section_state.get("conversation_section_fingerprint")
+                    != source_fingerprint
+                )
                 current_bib_fingerprint = bibliography_fingerprint()
                 bibliography_update = ""
                 if (
@@ -4131,7 +4213,7 @@ def full_draft_worker(token: str, model: str) -> None:
                     and section_state.get("bibliography_fingerprint")
                     != current_bib_fingerprint
                 ):
-                    bibliography_update = bibliography_catalog()
+                    bibliography_update = bibliography_prompt_catalog()
                 figure_states = json.loads(json.dumps(state.get("figures", {})))
                 job.update(
                     current_section=section,
@@ -4154,6 +4236,7 @@ def full_draft_worker(token: str, model: str) -> None:
                 bibliography_update=bibliography_update,
                 artifacts=[str(item) for item in paragraph.get("artifacts", [])],
                 figure_states=figure_states,
+                include_section_context=include_section_context,
             )
 
             with FULL_DRAFT_JOB_LOCK:
@@ -4189,6 +4272,7 @@ def full_draft_worker(token: str, model: str) -> None:
                 paragraph["history"] = paragraph["history"][-40:]
                 section_state["previous_response_id"] = response_id
                 section_state["bibliography_fingerprint"] = bibliography_fingerprint()
+                section_state["conversation_section_fingerprint"] = source_fingerprint
                 section_state["current_index"] = paragraph_index
 
             # Compilation can take minutes. Do not hold the job lock: cancellation
@@ -7325,13 +7409,18 @@ class Handler(BaseHTTPRequestHandler):
         purpose = paragraph["purpose"]
         reference = reference_excerpt(paragraph["reference_lines"])
         current_bib_fingerprint = bibliography_fingerprint()
+        source_fingerprint = section_source_fingerprint(section)
+        include_section_context = (
+            not section_state.get("previous_response_id")
+            or section_state.get("conversation_section_fingerprint") != source_fingerprint
+        )
         bibliography_update = ""
         if (
             section_state.get("previous_response_id")
             and section_state.get("bibliography_fingerprint")
             != current_bib_fingerprint
         ):
-            bibliography_update = bibliography_catalog()
+            bibliography_update = bibliography_prompt_catalog()
         response_id, text, citations_added = call_openai(
             section=section,
             model=model,
@@ -7345,10 +7434,12 @@ class Handler(BaseHTTPRequestHandler):
             bibliography_update=bibliography_update,
             artifacts=[str(item) for item in paragraph.get("artifacts", [])],
             figure_states=state["figures"],
+            include_section_context=include_section_context,
         )
         candidate_id = uuid.uuid4().hex
         section_state["previous_response_id"] = response_id
         section_state["bibliography_fingerprint"] = bibliography_fingerprint()
+        section_state["conversation_section_fingerprint"] = source_fingerprint
         paragraph["candidate"] = {
             "id": candidate_id,
             "text": text,
@@ -7503,6 +7594,8 @@ class Handler(BaseHTTPRequestHandler):
 
         section_state["revision"] = int(section_state.get("revision", 0)) + 1
         section_state["accepted_text"] = accepted_section
+        if candidate.get("source") != "manual_edit":
+            section_state["conversation_section_fingerprint"] = section_source_fingerprint(section)
         accepted_index = int(section_state.get("current_index", 0))
         if was_accepted:
             section_state["current_index"] = accepted_index
@@ -7575,6 +7668,7 @@ class Handler(BaseHTTPRequestHandler):
         state["model"] = model
         state["sections"][section]["previous_response_id"] = None
         state["sections"][section]["bibliography_fingerprint"] = None
+        state["sections"][section]["conversation_section_fingerprint"] = None
         save_state(state)
         self.send_json({"ok": True, "state": public_state(state)})
 

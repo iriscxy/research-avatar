@@ -2202,6 +2202,48 @@ args = parser.parse_args()
             text.startswith(r"\textbf{Safety alignment and refusal behavior.}")
         )
 
+    def test_html_profile_writing_style_is_extracted(self):
+        style = studio.writing_style_context()
+        self.assertIn("Measured abstract tendencies", style)
+        self.assertIn("Introduction architecture", style)
+        self.assertNotIn("<section", style)
+
+    def test_prompt_bibliography_is_compact_metadata(self):
+        bibliography = studio.PAPER / "references.bib"
+        previous = bibliography.read_text(encoding="utf-8") if bibliography.exists() else None
+        try:
+            bibliography.write_text(
+                """@article{compact2026,
+  author={Ada Author and Ben Writer},
+  title={A Compact Citation Record},
+  year={2026},
+  journal={Journal of Prompt Economy},
+  abstract={THIS ABSTRACT MUST NOT ENTER THE PROMPT},
+  file={/private/fulltext.pdf}
+}\n""",
+                encoding="utf-8",
+            )
+            compact = studio.bibliography_prompt_catalog()
+            self.assertIn("key=compact2026", compact)
+            self.assertIn("title=A Compact Citation Record", compact)
+            self.assertNotIn("THIS ABSTRACT", compact)
+            self.assertNotIn("/private/fulltext.pdf", compact)
+        finally:
+            if previous is None:
+                bibliography.unlink(missing_ok=True)
+            else:
+                bibliography.write_text(previous, encoding="utf-8")
+
+    def test_reference_excerpt_rejects_whole_paper_sized_selection(self):
+        reference = Path(studio.paragraph_plan()["reference_file"])
+        original = reference.read_text(encoding="utf-8")
+        try:
+            reference.write_text("\n".join(["x" * 1000] * 8), encoding="utf-8")
+            with self.assertRaisesRegex(StudioError, "过长"):
+                reference_excerpt([1, 8])
+        finally:
+            reference.write_text(original, encoding="utf-8")
+
     def test_changed_bibliography_is_sent_to_an_existing_section_conversation(self):
         captured = {}
 
@@ -2250,13 +2292,33 @@ args = parser.parse_args()
         self.assertIn("primary editing objective", captured["instructions"])
         self.assertIn("Do not weaken, reinterpret, or silently omit", captured["instructions"])
         self.assertIn(
-            f"<primary_editing_objective>{comment}</primary_editing_objective>",
+            f"<researcher_comment>{comment}</researcher_comment>",
             captured["input"],
         )
-        self.assertGreater(
-            captured["input"].rfind(comment),
-            captured["input"].rfind("<current_candidate>"),
-        )
+        self.assertEqual(captured["input"].count(comment), 1)
+
+    def test_existing_conversation_omits_unchanged_section_context(self):
+        captured = {}
+
+        def fake_post(payload):
+            captured.update(payload)
+            return {"id": "resp-next", "output_text": "Revised prose."}
+
+        with patch.object(studio, "post_openai", side_effect=fake_post):
+            call_openai(
+                section="introduction",
+                model="gpt-5.6",
+                previous_response_id="resp-previous",
+                purpose="Revise one paragraph.",
+                required_heading=None,
+                reference_paragraph="Reference prose.",
+                comment="",
+                current_text="Current prose.",
+                include_section_context=False,
+            )
+
+        self.assertIn("<current_section_context></current_section_context>", captured["input"])
+        self.assertNotIn("% fixture", captured["input"])
 
     def test_nonempty_revision_comment_retries_identical_gpt_output(self):
         payloads = []

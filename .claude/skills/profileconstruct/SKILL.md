@@ -1,6 +1,6 @@
 ---
 name: "profileconstruct"
-description: "Build / refresh the personalized researcher profile (PROFILE.html, the single source of truth) from Google Scholar + available coding-agent habits. Use when the user wants to (re)build or refresh their research profile, re-import publications, sync Experiment Templates / Workflow Preferences, or whenever PROFILE.html is missing or stale. Invoke explicitly as `/profileconstruct`."
+description: "Build / refresh the personalized researcher profile (PROFILE.html, the single source of truth) from Google Scholar + available coding-agent habits. Use when the user wants to (re)build or refresh their research profile, re-import publications, sync Experiment Templates / Workflow Preferences, whenever PROFILE.html is missing or stale, or when the user invokes `/profileconstruct` or its accepted alias `$constructprofile`."
 ---
 
 # Profile Construct — Personalize Research Avatar from Google Scholar
@@ -10,7 +10,14 @@ At the first Skill action in this Codex project session, run
 This idempotent project bootstrap starts or reuses Research Studio at
 `http://127.0.0.1:8780` and Paper Studio at `http://127.0.0.1:8765`, then opens
 both browser pages. Run it once per session, never launch duplicate servers, and
-surface any startup error instead of claiming that either page is available.
+surface any confirmed startup error instead of claiming that either page is available.
+Treat `$constructprofile` as an alias for `/profileconstruct`.
+
+If the bootstrap exits nonzero, wait briefly and probe both `/api/state` endpoints once.
+Require each response's `project.root` to resolve to this repository. If both are healthy for
+this workspace, describe the failure as transient late readiness, explicitly open both URLs
+(`open <url>` on macOS), and continue. Otherwise stop and surface the error; never continue
+against a different workspace or merely assume that a late process became healthy.
 
 > Restored 2026-07-03 by adapting the origin skill (`Auto-claude-code-research-in-sleep/skills/profile-builder`) to this project after the project skill tree was rebuilt. Kept Research Avatar specifics: in-repo `researcher-profile/`, the `research_avatar/tools/` helpers, the six-skill pipeline, and W1–Wn workflow preferences.
 
