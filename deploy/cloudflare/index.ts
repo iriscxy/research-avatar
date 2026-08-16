@@ -25,7 +25,7 @@ export class OnlineStudioContainer extends Container {
     ONLINE_STUDIO_PUBLIC_REGISTRATION: "1",
     ONLINE_STUDIO_TRUST_PROXY_AUTH: "1",
     ONLINE_STUDIO_IDLE_SECONDS: "5400",
-    ONLINE_STUDIO_MAX_SESSIONS: "4",
+    ONLINE_STUDIO_MAX_SESSIONS: "2",
   };
 }
 
