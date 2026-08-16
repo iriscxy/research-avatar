@@ -65,7 +65,7 @@ class TexTreeError(RuntimeError):
 
 
 def strip_inactive_tex(tex):
-    """Remove simple/nested \iffalse branches so hidden evidence cannot satisfy gates."""
+    r"""Remove simple/nested \iffalse branches so hidden evidence cannot satisfy gates."""
     token_re = re.compile(r"\\iffalse\b|\\iftrue\b|\\fi\b")
     output, stack, cursor = [], [], 0
     for match in token_re.finditer(tex):
@@ -85,7 +85,7 @@ def strip_inactive_tex(tex):
 
 
 def read_tex_tree(main_path, *, root=None):
-    """Recursively expand \input/\include from one workspace-contained TeX tree.
+    r"""Recursively expand \input/\include from one workspace-contained TeX tree.
 
     Checks must inspect the manuscript that LaTeX compiles, not only main.tex.
     Commented includes are ignored; missing files, cycles, and paths escaping the
@@ -209,7 +209,7 @@ def check_budget(args):
     shares = [(t, c, round(c / total, 4)) for t, c in counts]
 
     bpath = os.path.join(args.paper_dir, args.budget)
-    budget = json.load(open(bpath)) if os.path.exists(bpath) else None
+    budget = json.loads(Path(bpath).read_text(encoding="utf-8")) if os.path.exists(bpath) else None
 
     violations = []
     if budget:

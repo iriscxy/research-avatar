@@ -48,21 +48,31 @@ Each flagged card must include an **Ethics assessment** covering: affected parti
 - **Every deliverable is self-contained HTML, never Markdown** — inline `<style>`, no external assets, real structure (`<h1>/<h2>`, `<table>`, `<ul>`). **Every paper reference is a direct `<a href>`** to its arXiv/DOI; unverifiable → visible `pending`, never a fabricated URL.
 - The single file `reports/02_IDEA_REPORT.html` is the **primary** — it is what `$expplan` reads, and the `SELECTED` stamp lives in it. Address the researcher directly, never in the third person.
 
-### Mandatory GPT API readability rewrite — every visible explanatory sentence
+### Mandatory LLM API readability rewrite — every visible explanatory sentence
 
 The first complete HTML draft is **not** the deliverable. After A5 has fixed the
 scientific content, novelty verdicts, links, attributes, machine audit, and pick
-state, pass every eligible visible explanatory text node through the OpenAI GPT
-API by running:
+state, ask the researcher to choose OpenAI or DeepSeek unless the current
+invocation already specifies one. Then pass every eligible visible explanatory
+text node through that LLM API by running:
 
 ```bash
-/Users/xiuying.chen/miniconda3/bin/python tools/rewrite_ideagen_html.py \
-  reports/02_IDEA_REPORT.html --model "${IDEAGEN_REWRITE_MODEL:-gpt-4o-mini}"
+python3 tools/rewrite_ideagen_html.py \
+  reports/02_IDEA_REPORT.html \
+  --provider "<openai-or-deepseek-chosen-by-researcher>" \
+  --model "<researcher-specified-model-if-any>"
 ```
 
+Omit `--model` when the researcher did not specify one. OpenAI reads
+`OPENAI_API_KEY` and optionally `OPENAI_BASE_URL` / `IDEAGEN_REWRITE_MODEL`;
+DeepSeek reads `DEEPSEEK_API_KEY` and optionally `DEEPSEEK_BASE_URL` /
+`DEEPSEEK_IDEAGEN_REWRITE_MODEL`. Show the exact local `export` command for the
+selected provider when its key is missing. Never infer the provider from which
+key happens to be present, inspect the other provider's key, or silently switch.
+
 This is a hard generation stage, not an optional polish pass and not a request
-to the current agent to paraphrase from memory. The script must receive a real
-`OPENAI_API_KEY`, make successful API calls, rewrite the prose in place for an
+to the current agent to paraphrase from memory. The script must receive the
+selected provider's real API key, make successful API calls, rewrite the prose in place for an
 adjacent-area researcher, and embed one hidden `ideagen-readable-rewrite` JSON
 receipt containing the provider, model, API response IDs, eligible/rewritten
 node counts, and output digests. **No API key, API error, malformed response,
@@ -88,10 +98,10 @@ the researcher.
 After the rewrite, run all ordinary validators **and**:
 
 ```bash
-/Users/xiuying.chen/miniconda3/bin/python tools/validate_ideagen_readability.py reports/02_IDEA_REPORT.html
+python3 tools/validate_ideagen_readability.py reports/02_IDEA_REPORT.html
 ```
 
-If any subsequent edit changes visible prose, rerun the GPT API rewrite so the
+If any subsequent edit changes visible prose, rerun the selected LLM API rewrite so the
 receipt covers the final delivered wording. Selection stamping is exempt only
 for the fixed `Selected: I<k> — <title>` banner and row tag; changing any idea
 explanation requires a fresh API pass.
@@ -186,7 +196,7 @@ Never create a second report for the disruptive pass. Set `data-idea-branch="sta
 - Keep the standard ranking table unchanged. Do not insert D1 as rank 8 and do not compare its Disruptive score to standard Novelty / qualitative ranks.
 - When the wildcard is on, run `python3 tools/validate_ideagen_wildcard.py reports/02_IDEA_REPORT.html` and fix all errors before presenting it. Ask the researcher to pick / kill / redirect by id (`I*` or `D1`). Never auto-proceed.
 
-Present a **4–6 idea decision slate when evidence supports it**; fewer is valid after the second generation pass. Use `ID | Tier | Idea | Novelty status | Scope necessity | Closest work | Concrete difference | Strongest objection | Confidence` (plus conditional ethics risk). Each selectable card carries `data-idea-id`, `data-novelty-status`, `data-idea-tier`, `data-default-pick`, and the scope attributes from 2b. Only Tier A may be default; Tier B says `needs framing`; at most one card is default. Before the gate, give a fresh-context reviewer only the cards and retrieved sources; embed its per-ID verdict, absorbability result, closest-work overlap/difference, ISO latest-search date, fresh-context run ID, and ≥2 non-placeholder direct URLs as `idea-novelty-audit` JSON. The card and audit must agree. Non-selectable survivors have no pick ID. Run the mandatory GPT API readability rewrite, then `tools/validate_ideagen_report.py`, `tools/validate_ideagen_readability.py`, and the fixed-structure validator; only the API-rewritten final HTML may be presented. Then stop for pick/kill/redirect.
+Present a **4–6 idea decision slate when evidence supports it**; fewer is valid after the second generation pass. Use `ID | Tier | Idea | Novelty status | Scope necessity | Closest work | Concrete difference | Strongest objection | Confidence` (plus conditional ethics risk). Each selectable card carries `data-idea-id`, `data-novelty-status`, `data-idea-tier`, `data-default-pick`, and the scope attributes from 2b. Only Tier A may be default; Tier B says `needs framing`; at most one card is default. Before the gate, give a fresh-context reviewer only the cards and retrieved sources; embed its per-ID verdict, absorbability result, closest-work overlap/difference, ISO latest-search date, fresh-context run ID, and ≥2 non-placeholder direct URLs as `idea-novelty-audit` JSON. The card and audit must agree. Non-selectable survivors have no pick ID. Run the mandatory LLM API readability rewrite, then `tools/validate_ideagen_report.py`, `tools/validate_ideagen_readability.py`, and the fixed-structure validator; only the API-rewritten final HTML may be presented. Then stop for pick/kill/redirect.
 
 
 If any ethics risk is `HIGH` or `CRITICAL`, the gate must state that the candidate requires explicit human ethics review before implementation, data collection, deployment, or release, as applicable. Ask only the concrete review question needed for the flagged pathway; do not show an ethics prompt for unflagged work. For `LOW` or `MEDIUM`, show the risk and safeguards in the report and let the normal idea-selection gate handle the decision.

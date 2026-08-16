@@ -71,16 +71,32 @@ Paper Studio is a permanent, paper-independent shell. It must start even when `p
     and selects that provider's default model. Never render, accept, persist, log,
     or return a key. Remove `OPENAI_API_KEY` and `DEEPSEEK_API_KEY`
     from local-Agent subprocesses. Keep GPT Image explicitly OpenAI-only.
-14. Terminal one-shot full-draft generation and the webpage are one live workflow.
-    `$paperwrite` keeps a same-project Paper Studio server/page open while
-    `python3 -m paper_studio.server --direct-full-draft --provider <openai|deepseek>` runs as a separate process.
-    Require the terminal workflow to ask the researcher which API to use and
-    reject direct mode when `--provider` is omitted.
-    Persist every paragraph's successful Accept-and-compile revision before moving
-    on; make public-state reads detect external CLI revisions instead of serving a
-    stale in-memory snapshot. Within one polling cycle and without reload, update
-    the page's current paragraph, completed/total progress, accepted prose and
-    navigation state, and compiled PDF revision. Never synchronize only at the end.
+14. Offer one optional `直接生成全文初稿` action inside the existing `正文`
+    workspace; do not add a fourth primary tab or a second manuscript state. The
+    action runs as a persisted background job, follows the project-configured
+    `batch_writing_order`, and sends every still-pending paragraph through the
+    same GPT, citation, LaTeX-safety, artifact-reference, Accept, and compile
+    contracts as interactive writing. It never overwrites accepted prose. A
+    failure or cancellation preserves completed paragraphs and can resume from
+    the remaining set. Disable conflicting prose/title/reset mutations while it
+    runs, keep reading/navigation available, and expose progress plus a stop
+    action. The engine must not infer a scientific writing order from section
+    names; `/paperwrite` owns and writes that order into project data.
+    The same job must also be available as
+    `python3 -m paper_studio.server --direct-full-draft --provider <openai|deepseek>`, which runs synchronously
+    and exits without starting the HTTP server or opening a browser. CLI and UI
+    must share the exact state and worker; do not maintain a second batch writer.
+    Require the terminal workflow to ask the researcher which of the two APIs to
+    use; reject direct mode when `--provider` is omitted.
+    When `/paperwrite` uses this terminal entry point, a same-project Paper Studio
+    server and browser page remain live in parallel. Atomically persist the job
+    revision after every paragraph's successful Accept-and-compile transaction,
+    before starting the next paragraph. The server's public-state read path must
+    notice revisions written by the external CLI process instead of serving a stale
+    in-memory snapshot. Within one normal polling cycle, the open page must update
+    current section/paragraph, completed/total counts, accepted prose/navigation,
+    and the compiled vector-PDF revision without a reload. Never defer web-state or
+    PDF synchronization until the whole draft finishes.
     At CLI completion and project-backed startup, treat canonical section LaTeX as
     authoritative for browser paragraph editors. Recover terminal-written prose by
     stable paragraph markers when present, or only by a complete unambiguous
@@ -98,7 +114,7 @@ Paper Studio is a permanent, paper-independent shell. It must start even when `p
 ## Workspace data map
 
 - `paper_studio/` is the fixed reusable web engine: server, frontend assets, empty-project shell, and PDF/PPTX composition implementation. It exists and starts independently of any paper. Do not regenerate or fork it for each paper, and do not put project-specific section, figure, table, branding, or result definitions there.
-- `paper/paper_studio.json` is the single project configuration: stable project ID, identity/venue, ordered sections and LaTeX filenames, result bindings, Figure/Table definitions and order, typed data-grid mappings, mechanism shape-spec paths, and explicit `paths.main`, `paths.reference`, and `paths.metrics`. Starting another paper means supplying a new config and project data—not rewriting the web application. Change `project.id` for a genuinely different paper so persisted runtime state cannot leak across projects; preserve it for ordinary config revisions within the same paper.
+- `paper/paper_studio.json` is the single project configuration: stable project ID, identity/venue, ordered sections and LaTeX filenames, project-owned `batch_writing_order`, result bindings, Figure/Table definitions and order, typed data-grid mappings, mechanism shape-spec paths, and explicit `paths.main`, `paths.reference`, and `paths.metrics`. Starting another paper means supplying a new config and project data—not rewriting the web application. Change `project.id` for a genuinely different paper so persisted runtime state cannot leak across projects; preserve it for ordinary config revisions within the same paper.
 - The fixed `paper_studio/` product must contain no paper title, method name, benchmark name, metric path, or project-specific mechanism fallback. Generic placeholders and config-driven fallback shapes are allowed; every paper-specific label, plotting program, or shape specification belongs under `paper/` or `results/`.
 - `paper/paragraph_plan.json` is the canonical paragraph/subsection and artifact-binding plan. `paper/working_abstract.txt`, `paper/reference_stylization_jailbreak.txt`, and `paper/references.bib` are writing/reference inputs.
 - `paper/sections/*.tex` contains accepted rendered manuscript text; `paper/main.tex` and `paper/main.pdf` are the manuscript entry point and compiled output.

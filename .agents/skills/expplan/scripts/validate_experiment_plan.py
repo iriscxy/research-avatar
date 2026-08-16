@@ -471,7 +471,9 @@ def validate(plan: Path) -> list[str]:
                 schema_panels = schema.get("figures", {}).get(aid, [])
                 if len(schema_panels) != len(panel_pairs):
                     errors.append(f"{aid}: table schema panel count does not match HTML")
-                for index, (pair, panel_schema) in enumerate(zip(panel_pairs, schema_panels), 1):
+                for index, (pair, panel_schema) in enumerate(
+                    zip(panel_pairs, schema_panels), 1  # noqa: B905 - mismatch reported above
+                ):
                     expected_marks = panel_schema.get("plotted_marks")
                     expected_pending = panel_schema.get("pending_values", expected_marks)
                     actual_pending = len(PENDING_TD_RE.findall(pair))

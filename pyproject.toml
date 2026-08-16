@@ -3,11 +3,14 @@ requires = ["setuptools>=75"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "research-buddy"
+name = "research-avatar"
 version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
+  "beautifulsoup4>=4.15,<5",
   "matplotlib>=3.9,<4",
+  "openai>=3.1,<4",
+  "Pillow>=12.3,<13",
   "python-pptx>=1.0,<2",
 ]
 
@@ -18,8 +21,16 @@ dev = [
 ]
 
 [project.scripts]
+research-avatar = "tools.research_buddy_cli:main"
+# Compatibility alias for clones/scripts created before the project rename.
 research-buddy = "tools.research_buddy_cli:main"
 
 [tool.setuptools.packages.find]
-include = ["tools*", "paper_studio*"]
+include = ["tools*", "paper_studio*", "research_studio*", "demo*", "functions*"]
 namespaces = true
+
+[tool.setuptools.package-data]
+paper_studio = ["static/*", "*.mjs", "README.md"]
+research_studio = ["static/*"]
+demo = ["*.html", "*.js", "*.css", "*.json", "_routes.json", "assets/**/*"]
+functions = ["*.js"]

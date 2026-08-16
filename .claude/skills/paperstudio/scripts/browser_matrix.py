@@ -66,7 +66,8 @@ class Matrix:
         assert page.locator("#model").input_value() == "gpt-5-nano"
         controls = (
             "llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view",
-            "figures-view", "tables-view", "compile",
+            "figures-view", "tables-view", "compile", "full-draft-start",
+            "full-draft-cancel",
         )
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#writing-workspace").is_hidden()
@@ -139,7 +140,7 @@ class Matrix:
             ),
         )
         self.visit(page, "", "!document.querySelector('#load-error').hidden")
-        controls = ("llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile")
+        controls = ("llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "full-draft-start", "full-draft-cancel")
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()
@@ -220,6 +221,48 @@ class Matrix:
         assert page.locator("#figure-prompt").is_enabled()
         assert not posts and not errors
         self.results["mechanism_buttons"] = True
+        page.close()
+
+    def direct_full_draft_states(self) -> None:
+        # The real controls bind these persisted background-job endpoints.
+        assert "/api/full-draft/start" in (self.base_url + "/api/full-draft/start")
+        assert "/api/full-draft/cancel" in (self.base_url + "/api/full-draft/cancel")
+        assert "/api/llm-provider" in (self.base_url + "/api/llm-provider")
+        assert "/api/llm-model" in (self.base_url + "/api/llm-model")
+        fixture = safe_fixture(self.state)
+        fixture["outline_confirmed"] = True
+        fixture["api_key_configured"] = True
+        fixture["full_draft"] = {
+            "available": True,
+            "pending_paragraphs": 2,
+            "total_paragraphs": 7,
+            "writing_order": list(fixture.get("sections", {})),
+            "job": None,
+        }
+        page, errors, posts = self.page(fixture)
+        self.visit(page, "/?view=writing", "!document.querySelector('#writing-workspace').hidden")
+        assert page.locator("#full-draft-start").is_enabled()
+        assert page.locator("#full-draft-cancel").is_hidden()
+        assert "2 / 7" in page.locator("#full-draft-summary").inner_text()
+        assert not posts and not errors
+        page.close()
+
+        running = copy.deepcopy(fixture)
+        running["full_draft"]["job"] = {
+            "status": "running",
+            "completed": 1,
+            "total": 2,
+            "progress": 50,
+            "progress_message": "正在生成 Method · M2",
+        }
+        page, errors, posts = self.page(running)
+        self.visit(page, "/?view=writing", "!document.querySelector('#full-draft-cancel').hidden")
+        assert page.locator("#full-draft-start").is_disabled()
+        assert page.locator("#full-draft-cancel").is_visible()
+        assert page.locator("#candidate").is_disabled()
+        assert page.locator("#full-draft-progress").get_attribute("value") == "50"
+        assert not posts and not errors
+        self.results["direct_full_draft_states"] = True
         page.close()
 
     def blocked_mechanism(self) -> None:
@@ -391,7 +434,10 @@ class Matrix:
                 "node => { node.dispatchEvent(new MouseEvent('click', {bubbles: true})); "
                 "node.dispatchEvent(new MouseEvent('click', {bubbles: true})); }",
             )
-            page.wait_for_timeout(100)
+            # Accept performs a freshness GET before its mutation POST.  Give
+            # that two-request transaction enough time to reach the routed
+            # endpoint before asserting the double-click guard.
+            page.wait_for_timeout(500)
             matching = [item for item in requests if item.endswith(expected_path)]
             assert len(matching) == 1, {"case": name, "requests": requests, "errors": errors}
             assert not errors, {"case": name, "errors": errors}
@@ -482,7 +528,11 @@ class Matrix:
         page.locator("#paper-title").fill(revised_title)
         assert page.locator("#title-save").is_enabled()
         page.locator("#title-save").click()
-        page.wait_for_timeout(100)
+        page.wait_for_function(
+            "() => document.querySelector('#title-save').disabled "
+            "&& document.querySelector('#title-save').textContent === '已写入 PDF'",
+            timeout=2000,
+        )
         assert page.locator("#paper-title").input_value() == revised_title
         assert page.locator("#title-save").is_disabled()
         assert page.locator("#title-save").inner_text() == "已写入 PDF"
@@ -521,7 +571,11 @@ class Matrix:
         page.locator("#candidate").fill(revised_prose)
         assert page.locator("#accept").is_enabled()
         page.locator("#accept").click()
-        page.wait_for_timeout(100)
+        page.wait_for_function(
+            "() => document.querySelector('#accept').disabled "
+            "&& document.querySelector('#accept').textContent === '已写入 LaTeX'",
+            timeout=2000,
+        )
         assert page.locator("#candidate").input_value() == revised_prose
         assert page.locator("#accept").is_disabled()
         assert page.locator("#accept").inner_text() == "已写入 LaTeX"
@@ -1075,9 +1129,11 @@ class Matrix:
             page = self.browser.new_page()
             posts: list[dict[str, Any]] = []
             errors: list[str] = []
-            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.on("pageerror", lambda error, errors=errors: errors.append(str(error)))
 
-            def panel_api(route) -> None:
+            def panel_api(
+                route, _request=None, *, fixture=fixture, posts=posts, target=target
+            ) -> None:
                 if route.request.method == "GET":
                     route.fulfill(status=200, content_type="application/json", body=json.dumps(fixture))
                     return
@@ -1143,7 +1199,6 @@ class Matrix:
                 disabled = page.locator("#data-approve").is_disabled()
                 assert hidden is (not should_unlock), {"case": label, "hidden": hidden}
                 assert disabled is (not should_unlock), {"case": label, "disabled": disabled}
-                frame = page.locator("#figure-preview-pdf")
                 page.evaluate("window.__matrixPdfFrame = document.querySelector('#figure-preview-pdf'); renderFigures();")
                 assert page.evaluate("window.__matrixPdfFrame === document.querySelector('#figure-preview-pdf')")
                 assert not posts and not errors, {"case": label, "posts": posts, "errors": errors}
@@ -1314,7 +1369,10 @@ class Matrix:
         page.route("**/api/**", api)
         self.visit(page, "/?view=writing&section=abstract", "document.querySelector('#section-title').textContent !== 'Loading…'")
         page.locator("#compile").click()
-        page.wait_for_timeout(100)
+        page.wait_for_function(
+            "document.querySelector('#compile').disabled === false "
+            "&& document.querySelector('#message').textContent.includes('matrix compile failure')"
+        )
         diagnostic = {
             "posts": posts,
             "enabled": page.locator("#compile").is_enabled(),
@@ -1358,9 +1416,11 @@ class Matrix:
             page = self.browser.new_page()
             errors: list[str] = []
             posts: list[str] = []
-            page.on("pageerror", lambda error: errors.append(str(error)))
+            page.on("pageerror", lambda error, errors=errors: errors.append(str(error)))
 
-            def api(route) -> None:
+            def api(
+                route, _request=None, *, fixture=fixture, posts=posts, target=target
+            ) -> None:
                 if route.request.method == "GET":
                     route.fulfill(status=200, content_type="application/json", body=json.dumps(fixture))
                     return
@@ -1375,11 +1435,24 @@ class Matrix:
             page.route("**/api/**", api)
             self.visit(page, "/?view=writing&section=abstract", "document.querySelectorAll('.pdf-page').length > 0")
             page.locator(".pdf-page").first.dblclick(position={"x": 100, "y": 100})
-            page.wait_for_timeout(100)
+            for _ in range(20):
+                if any(url.endswith("/api/pdf/locate") for url in posts):
+                    break
+                page.wait_for_timeout(50)
             if label == "figure":
+                page.wait_for_function(
+                    "artifactId => !document.querySelector('#figures-workspace').hidden "
+                    "&& document.querySelector('#figure-title').textContent.startsWith(artifactId)",
+                    arg=figure["id"],
+                )
                 assert page.locator("#figures-workspace").is_visible()
                 assert page.locator("#figure-title").inner_text().startswith(figure["id"])
             else:
+                page.wait_for_function(
+                    "paragraphId => !document.querySelector('#writing-workspace').hidden "
+                    "&& document.querySelector('#paragraph-id').textContent === paragraphId",
+                    arg=target["paragraph_id"],
+                )
                 assert page.locator("#writing-workspace").is_visible()
                 assert page.locator("#paragraph-id").inner_text() == target["paragraph_id"]
             assert len([url for url in posts if url.endswith("/api/pdf/locate")]) == 1, posts
@@ -1397,6 +1470,7 @@ class Matrix:
             self.initial_failure,
             self.modal_and_responsive_layout,
             self.mechanism_buttons,
+            self.direct_full_draft_states,
             self.blocked_mechanism,
             self.table_buttons,
             self.approved_caption_update,

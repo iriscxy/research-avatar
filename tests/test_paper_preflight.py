@@ -45,6 +45,18 @@ class PaperPreflightTests(unittest.TestCase):
                 issues = paper_preflight.source_checks(paper, main)
             self.assertIn("pdflatex_unsafe_unicode_math", {item["issue"] for item in issues})
 
+    def test_includegraphics_is_not_parsed_as_tex_include(self):
+        with tempfile.TemporaryDirectory() as directory:
+            paper = Path(directory)
+            main = paper / "main.tex"
+            main.write_text(
+                r"\documentclass{article}\includegraphics[width=\columnwidth]{fig/result.pdf}",
+                encoding="utf-8",
+            )
+            source, issues = paper_preflight.read_tex_tree(main, paper)
+            self.assertEqual(issues, [])
+            self.assertIn(r"\includegraphics", source)
+
 
 if __name__ == "__main__":
     unittest.main()

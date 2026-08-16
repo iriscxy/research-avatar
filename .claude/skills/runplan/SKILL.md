@@ -425,7 +425,7 @@ authorized sequential queue—owns exactly one goal. Its command and
    immediately refill the matching approved cell in `05_EXP_RESULT.html` and
    regenerate its clickable provenance target; never wait until the whole goal
    or whole table is complete to expose already verified evidence.
-5. Run `python3 .agents/skills/runplan/scripts/validate_results_ledger.py
+5. Run `python3 .claude/skills/runplan/scripts/validate_results_ledger.py
    --ledger code/RESULTS_LEDGER.csv --plan reports/04_RUN_PLAN.html --report
    reports/05_EXP_RESULT.html --goal Gn.m --strict-report` before accepting a
    gate or completing the goal. On every resume, run the validator before new
@@ -434,7 +434,7 @@ authorized sequential queue—owns exactly one goal. Its command and
    validated ledger rows. Missing evidence is `MISSING`, never an estimate.
    Before that validation, after the matching cells have been regenerated with
    their `data-result-id` attributes, run
-   `python3 .agents/skills/runplan/scripts/render_result_provenance.py --ledger
+   `python3 .claude/skills/runplan/scripts/render_result_provenance.py --ledger
    code/RESULTS_LEDGER.csv --plan reports/04_RUN_PLAN.html --report
    reports/05_EXP_RESULT.html`. This deterministically linkifies every newly
    filled value, attaches its hover/focus provenance summary, and refreshes the

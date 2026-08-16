@@ -1,4 +1,5 @@
 import json
+import io
 import os
 import re
 import subprocess
@@ -26,7 +27,6 @@ from paper_studio.server import (
     data_figure_layout,
     compile_table_preview,
     default_table_prompt,
-    default_data_figure_layout_prompt,
     edit_table_with_local_agent,
     extract_agent_table_latex,
     extract_agent_layout_json,
@@ -63,6 +63,9 @@ from paper_studio.server import (
 
 
 class PaperStudioTests(unittest.TestCase):
+    def test_http_server_accepts_browser_asset_bursts(self):
+        self.assertGreaterEqual(studio.StudioHTTPServer.request_queue_size, 32)
+
     @classmethod
     def setUpClass(cls):
         """Run project-level regressions against an isolated legacy fixture."""
@@ -411,6 +414,13 @@ class PaperStudioTests(unittest.TestCase):
         handler.close_connection = False
         handler.write_body(b"preview")
         self.assertTrue(handler.close_connection)
+
+    def test_request_body_must_be_a_json_object(self):
+        handler = object.__new__(studio.Handler)
+        handler.headers = {"Content-Length": "2"}
+        handler.rfile = io.BytesIO(b"[]")
+        with self.assertRaisesRegex(StudioError, "JSON object"):
+            handler.read_json()
 
     def test_browser_interaction_inventory_is_explicit_and_complete(self):
         class InteractionParser(HTMLParser):

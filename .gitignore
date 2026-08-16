@@ -1,5 +1,9 @@
 .DS_Store
 .env
+# Local Cloudflare deployment binding; copy from wrangler.example.jsonc.
+wrangler.jsonc
+# Locally downloaded Scholar export used by profileconstruct.
+example_mine.html
 __pycache__/
 *.py[cod]
 .pytest_cache/

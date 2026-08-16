@@ -5,8 +5,8 @@ The mechanism (per the researcher):
   1. GENPROMPT  the fixed "expert scientific-figure designer" META_PROMPT (system) + the paper
                 (user), nothing appended, via GPT chat → a BioRender-style image prompt written
                 into spec.draw_prompt. The draw prompt is GENERATED from the paper, not hand-written.
-  2. DRAW       that prompt drives an image model VERBATIM (nothing appended). Drawer swappable:
-                --provider openai (gpt-image-1, OPENAI_API_KEY) now; gemini later. Every draw is
+  2. DRAW       that prompt drives an image model VERBATIM (nothing appended):
+                --provider openai (gpt-image-1, OPENAI_API_KEY). Every draw is
                 ARCHIVED to iterations/<id>/round_NN.png + round_NN.prompt.txt (no overwrite).
   3. REFINE     AGENT-DRIVEN, no CLI command: the calling agent READS the drawn image, decides
                 what is wrong, rewrites spec.draw_prompt itself, re-runs draw. Loop. (First-draft
@@ -42,6 +42,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+from pathlib import Path
 
 # ---------- the fixed prompt-generation meta-prompt (verbatim, per the researcher) ----------
 META_PROMPT = (
@@ -84,13 +85,15 @@ def _openai_chat(model, system, user):
 
 
 def cmd_genprompt(args):
-    paper = open(args.paper, encoding="utf-8", errors="replace").read()
+    paper = Path(args.paper).read_text(encoding="utf-8", errors="replace")
     # only the meta-prompt (system) + the paper (user); nothing appended.
     prompt = _openai_chat(args.model, META_PROMPT, paper)
     if args.spec and os.path.exists(args.spec):
-        spec = json.load(open(args.spec))
+        spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
         spec["draw_prompt"] = prompt
-        json.dump(spec, open(args.spec, "w"), ensure_ascii=False, indent=2)
+        Path(args.spec).write_text(
+            json.dumps(spec, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         print(json.dumps({"genprompt": "written to spec.draw_prompt", "spec": args.spec,
                           "chars": len(prompt)}, ensure_ascii=False))
     print(prompt)
@@ -111,12 +114,7 @@ def draw_openai(prompt, size, out_png, quality="high"):
     return out_png
 
 
-def draw_gemini(prompt, size, out_png, quality="high"):
-    sys.exit("gemini provider not wired yet (needs GEMINI_API_KEY + google-generativeai); "
-             "use --provider openai for now")
-
-
-DRAWERS = {"openai": draw_openai, "gemini": draw_gemini}
+DRAWERS = {"openai": draw_openai}
 
 
 def _archive_iteration(spec_path, fid, img, prompt):
@@ -132,7 +130,7 @@ def _archive_iteration(spec_path, fid, img, prompt):
 
 
 def cmd_draw(args):
-    spec = json.load(open(args.spec))
+    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
     if not spec.get("draw_prompt"):
         sys.exit("spec.draw_prompt is empty — run `genprompt --paper <file> --spec <spec>` first")
     out = args.out or f"{spec['figure_id']}.bg.png"
@@ -151,9 +149,9 @@ def cmd_build(args):
     from pptx.dml.color import RGBColor
     from pptx.enum.text import PP_ALIGN
     from PIL import Image
-    spec = json.load(open(args.spec))
+    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
     W, H = spec["canvas_in"]
-    img = args.img or f"{spec['figure_id']}.bg.png"
+    img = getattr(args, "img", None) or f"{spec['figure_id']}.bg.png"
     out = args.out or f"{spec['figure_id']}.pptx"
     prs = Presentation()
     prs.slide_width, prs.slide_height = Inches(W), Inches(H)
@@ -208,7 +206,7 @@ def cmd_buildshapes(args):
     from pptx.enum.text import PP_ALIGN
     from pptx.enum.shapes import MSO_SHAPE, MSO_CONNECTOR
     from pptx.oxml.ns import qn
-    spec = json.load(open(args.spec))
+    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
     W, H = spec["canvas_in"]
     out = args.out or f"{spec['figure_id']}.pptx"
     prs = Presentation(); prs.slide_width, prs.slide_height = Inches(W), Inches(H)
@@ -366,7 +364,7 @@ def shape_spec_html(spec):
 def image_spec_html(spec, image_path):
     """Render the exact GPT image plus the same editable-label coordinates as the PPT."""
     W, H = map(float, spec["canvas_in"])
-    encoded = base64.b64encode(open(image_path, "rb").read()).decode("ascii")
+    encoded = base64.b64encode(Path(image_path).read_bytes()).decode("ascii")
     labels = []
     for label in spec.get("labels", []):
         text = html.escape(str(label.get("text", "")))
@@ -455,14 +453,14 @@ def _write_html_pdf(source_html, out, error_message):
 
 
 def cmd_pdfshapes(args):
-    spec = json.load(open(args.spec, encoding="utf-8"))
+    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
     out = os.path.abspath(args.out or f"{spec['figure_id']}.pdf")
     _write_html_pdf(shape_spec_html(spec), out, "无界面 Chrome 导出机制图 PDF 失败。")
     print(json.dumps({"pdf": out, "renderer": "headless-chrome-shape-spec", "ok": True}))
 
 
 def cmd_pdfimage(args):
-    spec = json.load(open(args.spec, encoding="utf-8"))
+    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
     image_path = args.img or f"{spec['figure_id']}.bg.png"
     if not os.path.exists(image_path):
         sys.exit("GPT Image 草图不存在，无法导出同视觉 PDF。")
@@ -521,7 +519,7 @@ def cmd_all(args):
     cmd_genprompt(args)
     cmd_draw(args)
     cmd_build(args)
-    spec = json.load(open(args.spec))
+    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
     args.pptx = f"{spec['figure_id']}.pptx"
     cmd_pdf(args)
 

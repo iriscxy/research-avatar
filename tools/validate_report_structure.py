@@ -143,10 +143,14 @@ def validate(kind: str, html_path: Path) -> list[str]:
         errors.append(
             f"subsections: expected {expected_subsections!r}, got {actual_subsections!r}"
         )
-    for (section_id, _title), body in zip(actual_sections, parser.section_bodies):
+    for (section_id, _title), body in zip(  # noqa: B905 - parser lists are compared above
+        actual_sections, parser.section_bodies
+    ):
         if len(" ".join(body.split())) < 10:
             errors.append(f"section {section_id!r} has no substantive content")
-    for (subsection_id, _title), body in zip(actual_subsections, parser.subsection_bodies):
+    for (subsection_id, _title), body in zip(  # noqa: B905 - parser lists are compared above
+        actual_subsections, parser.subsection_bodies
+    ):
         if len(" ".join(body.split())) < 10:
             errors.append(f"subsection {subsection_id!r} has no substantive content")
     return errors

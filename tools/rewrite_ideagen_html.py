@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rewrite Idea-report prose through the OpenAI API and leave a verifiable receipt."""
+"""Rewrite Idea-report prose through a selected LLM API and leave a receipt."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from openai import OpenAI
 
 
 RECEIPT_ID = "ideagen-readable-rewrite"
+SUPPORTED_PROVIDERS = {"openai", "deepseek"}
 ALLOWED_PARENTS = {"p", "li", "dd", "td"}
 EXCLUDED_ANCESTORS = {"a", "code", "pre", "script", "style", "h1", "h2", "h3", "h4", "h5", "h6", "th", "dt"}
 FIXED_LABELS = {
@@ -24,13 +25,7 @@ FIXED_LABELS = {
     "essential", "evaluation_scope_only", "application_swap", "high", "medium", "low",
     "selected", "needs framing", "pending", "unverified",
 }
-LEGACY_SEMANTIC_REPAIRS = {
-    # Repair a known modality loss from reports generated before the editor
-    # explicitly preserved hypotheses and falsifiers. The repaired sentence is
-    # still sent through the API below; this is only the faithful source seed.
-    "识别和执行之间有直接的因果关系。稳定性无法预测安全干预的效果。与LLM-VA和ABD的比较没有提高安全性，这导致了安全—误拒答权衡。":
-        "如果识别与执行无法被因果分开，稳定性不能预测干预是否安全，或者相较 LLM-VA 和 ABD 没有改善安全—误拒答权衡，则该方法被否定。",
-}
+LEGACY_SEMANTIC_REPAIRS: dict[str, str] = {}
 PROTECTED_RE = re.compile(
     r"(?<![A-Za-z0-9_])(?:[A-Z][A-Z0-9_-]{1,}|[A-Z][a-z]+(?:[A-Z][A-Za-z0-9]*)+|[A-Z]?\d+(?:\.\d+)?%?|[A-Z]\d+)(?![A-Za-z0-9_])|"
     r"\[[^\]]+\]|`[^`]+`"
@@ -116,17 +111,17 @@ def response_items(client: OpenAI, model: str, batch: list[dict], retry_note: st
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"GPT API returned invalid JSON: {exc}") from exc
+        raise RuntimeError(f"LLM API returned invalid JSON: {exc}") from exc
     values = parsed.get("items")
     if not isinstance(values, list) or len(values) != len(batch):
-        raise RuntimeError("GPT API returned partial or malformed item coverage")
+        raise RuntimeError("LLM API returned partial or malformed item coverage")
     output: dict[str, str] = {}
-    for expected, actual in zip(batch, values):
+    for expected, actual in zip(batch, values):  # noqa: B905 - equal lengths checked above
         if not isinstance(actual, dict) or actual.get("id") != expected["id"]:
-            raise RuntimeError(f"GPT API changed item order/id near {expected['id']}")
+            raise RuntimeError(f"LLM API changed item order/id near {expected['id']}")
         text = normalize(str(actual.get("text", "")))
         if not text:
-            raise RuntimeError(f"GPT API returned empty text for {expected['id']}")
+            raise RuntimeError(f"LLM API returned empty text for {expected['id']}")
         for placeholder, token in locks_by_id[expected["id"]]:
             # Some models copy a familiar acronym verbatim instead of retaining
             # its placeholder. That is safe only if the final multiset check below
@@ -143,21 +138,51 @@ def response_items(client: OpenAI, model: str, batch: list[dict], retry_note: st
         # but introducing or deleting an identifier remains forbidden.
         if actual_numbers != expected_numbers or actual_ids != expected_ids:
             raise RuntimeError(
-                f"GPT API changed protected tokens for {expected['id']}: "
+                f"LLM API changed protected tokens for {expected['id']}: "
                 f"expected={expected_tokens!r}, actual={actual_tokens!r}"
             )
         output[expected["id"]] = text
     return completion.id, output
 
 
+def provider_settings(provider: str, requested_model: str | None = None) -> dict[str, str]:
+    """Resolve one explicitly selected provider without inspecting another key."""
+    provider = provider.strip().lower()
+    if provider not in SUPPORTED_PROVIDERS:
+        raise ValueError(f"unsupported provider: {provider}")
+    if provider == "openai":
+        return {
+            "provider": provider,
+            "receipt_provider": "openai-api",
+            "key_environment_variable": "OPENAI_API_KEY",
+            "base_url": os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
+            "model": requested_model or os.environ.get("IDEAGEN_REWRITE_MODEL", "gpt-4o-mini"),
+        }
+    return {
+        "provider": provider,
+        "receipt_provider": "deepseek-api",
+        "key_environment_variable": "DEEPSEEK_API_KEY",
+        "base_url": os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/"),
+        "model": requested_model or os.environ.get("DEEPSEEK_IDEAGEN_REWRITE_MODEL", "deepseek-v4-flash"),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("html", type=Path)
-    parser.add_argument("--model", default=os.environ.get("IDEAGEN_REWRITE_MODEL", "gpt-4o-mini"))
+    parser.add_argument(
+        "--provider", choices=sorted(SUPPORTED_PROVIDERS),
+        default=os.environ.get("IDEAGEN_REWRITE_PROVIDER", "openai").strip().lower(),
+    )
+    parser.add_argument("--model")
     parser.add_argument("--batch-size", type=int, default=18)
     args = parser.parse_args()
-    if not os.environ.get("OPENAI_API_KEY"):
-        parser.error("OPENAI_API_KEY is required; no non-API fallback is allowed")
+    settings = provider_settings(args.provider, args.model)
+    key_name = settings["key_environment_variable"]
+    api_key = os.environ.get(key_name)
+    if not api_key:
+        parser.error(f"{key_name} is required for --provider {args.provider}; no non-API fallback is allowed")
+    model = settings["model"]
     source = args.html.read_text(encoding="utf-8")
     soup = BeautifulSoup(source, "html.parser")
     old_receipt = soup.find("script", id=RECEIPT_ID)
@@ -182,13 +207,13 @@ def main() -> int:
             "input_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
         })
 
-    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    client = OpenAI(api_key=api_key, base_url=settings["base_url"])
     response_ids: list[str] = []
     rewritten: dict[str, str] = {}
     for start in range(0, len(items), args.batch_size):
         batch = items[start : start + args.batch_size]
         try:
-            response_id, values = response_items(client, args.model, batch)
+            response_id, values = response_items(client, model, batch)
             response_ids.append(response_id)
             rewritten.update(values)
         except RuntimeError:
@@ -200,7 +225,7 @@ def main() -> int:
                     try:
                         response_id, values = response_items(
                             client,
-                            args.model,
+                            model,
                             [item],
                             retry_note=(
                                 "This is a correction request. Copy every required protected token verbatim, with the same occurrence count. "
@@ -212,7 +237,7 @@ def main() -> int:
                     except RuntimeError as exc:
                         last_error = exc
                 else:
-                    raise RuntimeError(f"GPT API failed three protected-token retries for {item['id']}: {last_error}")
+                    raise RuntimeError(f"LLM API failed three protected-token retries for {item['id']}: {last_error}")
                 response_ids.append(response_id)
                 rewritten.update(values)
 
@@ -233,8 +258,8 @@ def main() -> int:
     receipt = {
         "schema_version": "1.0",
         "status": "complete",
-        "provider": "openai-api",
-        "model": args.model,
+        "provider": settings["receipt_provider"],
+        "model": model,
         "rewritten_at": datetime.now(timezone.utc).isoformat(),
         "eligible_nodes": len(items),
         "rewritten_nodes": len(records),
@@ -246,7 +271,7 @@ def main() -> int:
     (soup.body or soup).append(receipt_tag)
     args.html.write_text(str(soup), encoding="utf-8")
     print(json.dumps({
-        "status": "PASS", "file": str(args.html), "model": args.model,
+        "status": "PASS", "file": str(args.html), "provider": settings["receipt_provider"], "model": model,
         "rewritten_nodes": len(records), "api_calls": len(response_ids),
         "response_ids": response_ids,
     }, ensure_ascii=False))

@@ -8,11 +8,21 @@ import json
 import re
 from pathlib import Path
 
-from run_plan_progress import completed_artifact_snapshots, render_parts_and_goals
+try:
+    from tools.run_plan_progress import (
+        completed_artifact_snapshots,
+        render_parts_and_goals,
+        replace_report_section,
+    )
+except ModuleNotFoundError:  # Direct ``python tools/activate_run_plan_goal.py`` execution.
+    from run_plan_progress import (  # type: ignore[no-redef]
+        completed_artifact_snapshots,
+        render_parts_and_goals,
+        replace_report_section,
+    )
 
 
 STATE_RE = re.compile(r'<script type="application/json" id="run-plan-state">(.*?)</script>', re.S)
-PARTS_RE = re.compile(r'<section data-report-section="parts-and-goals">.*?</section>', re.S)
 
 
 def main() -> None:
@@ -38,7 +48,9 @@ def main() -> None:
     state["proposed_goal_id"] = None
     state["next_authorized_action"] = f"Complete exactly {args.goal_id}; do not start a successor."
     snapshots = completed_artifact_snapshots(state, args.plan.parent / "05_EXP_RESULT.html")
-    source = PARTS_RE.sub(render_parts_and_goals(state, snapshots), source, count=1)
+    source = replace_report_section(
+        source, "parts-and-goals", render_parts_and_goals(state, snapshots)
+    )
     serialized = json.dumps(state, ensure_ascii=False, separators=(",", ":"))
     source = STATE_RE.sub(
         f'<script type="application/json" id="run-plan-state">{serialized}</script>', source, count=1
