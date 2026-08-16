@@ -15,6 +15,12 @@ from pathlib import Path
 from bs4 import BeautifulSoup, NavigableString
 from openai import OpenAI
 
+PACKAGE_ROOT = Path(__file__).resolve().parents[2]
+if str(PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_ROOT))
+
+from research_avatar.paper_studio.api_usage import summarize_records, usage_record
+
 
 RECEIPT_ID = "ideagen-readable-rewrite"
 SUPPORTED_PROVIDERS = {"openai", "deepseek"}
@@ -68,7 +74,9 @@ def parent_context(node: NavigableString) -> str:
     return f"最近的小节标题：{normalize(heading.get_text(' ', strip=True))}" if heading else "研究想法报告正文"
 
 
-def response_items(client: OpenAI, model: str, batch: list[dict], retry_note: str = "") -> tuple[str, dict[str, str]]:
+def response_items(
+    client: OpenAI, model: str, batch: list[dict], provider: str, retry_note: str = ""
+) -> tuple[str, dict[str, str], dict]:
     payload = []
     locks_by_id: dict[str, list[tuple[str, str]]] = {}
     for item in batch:
@@ -142,7 +150,13 @@ def response_items(client: OpenAI, model: str, batch: list[dict], retry_note: st
                 f"expected={expected_tokens!r}, actual={actual_tokens!r}"
             )
         output[expected["id"]] = text
-    return completion.id, output
+    api_record = usage_record(
+        completion.model_dump(),
+        provider=provider,
+        requested_model=model,
+        operation="ideagen_readability_rewrite",
+    )
+    return completion.id, output, api_record
 
 
 def provider_settings(provider: str, requested_model: str | None = None) -> dict[str, str]:
@@ -209,12 +223,14 @@ def main() -> int:
 
     client = OpenAI(api_key=api_key, base_url=settings["base_url"])
     response_ids: list[str] = []
+    api_usage_records: list[dict] = []
     rewritten: dict[str, str] = {}
     for start in range(0, len(items), args.batch_size):
         batch = items[start : start + args.batch_size]
         try:
-            response_id, values = response_items(client, model, batch)
+            response_id, values, api_record = response_items(client, model, batch, args.provider)
             response_ids.append(response_id)
+            api_usage_records.append(api_record)
             rewritten.update(values)
         except RuntimeError:
             # Recover a malformed batch with strict, independently verifiable one-item calls.
@@ -223,10 +239,11 @@ def main() -> int:
                 last_error: RuntimeError | None = None
                 for _attempt in range(3):
                     try:
-                        response_id, values = response_items(
+                        response_id, values, api_record = response_items(
                             client,
                             model,
                             [item],
+                            args.provider,
                             retry_note=(
                                 "This is a correction request. Copy every required protected token verbatim, with the same occurrence count. "
                                 "Do not merge clauses that contain repeated numbers or identifiers. The output must contain exactly "
@@ -239,6 +256,7 @@ def main() -> int:
                 else:
                     raise RuntimeError(f"LLM API failed three protected-token retries for {item['id']}: {last_error}")
                 response_ids.append(response_id)
+                api_usage_records.append(api_record)
                 rewritten.update(values)
 
     records = []
@@ -264,6 +282,8 @@ def main() -> int:
         "eligible_nodes": len(items),
         "rewritten_nodes": len(records),
         "api_response_ids": response_ids,
+        "api_usage": summarize_records(api_usage_records),
+        "api_usage_records": api_usage_records,
         "nodes": records,
     }
     receipt_tag = soup.new_tag("script", type="application/json", id=RECEIPT_ID)

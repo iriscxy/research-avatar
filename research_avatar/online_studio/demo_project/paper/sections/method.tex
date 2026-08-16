@@ -1,0 +1,39 @@
+\section{Footprint-Cover Basis}
+\subsection{Operator Footprints}
+Let $D=\{(x_i,y_i)\}_{i=1}^n$ be clean utterances and intents, $V(D)$ the word vocabulary, and $T_o(x;s)$ a deterministic corruption by operator $o$ and seed $s$. For each operator, we compute the out-of-vocabulary increase
+\begin{equation}
+u_o=\mathbb{E}_{x,s}\left[\frac{|\operatorname{tok}(T_o(x;s))\setminus V(D)|}{|\operatorname{tok}(T_o(x;s))|}\right],
+\end{equation}
+and character-trigram disruption
+\begin{equation}
+q_o=\mathbb{E}_{x,s}\left[1-J\bigl(G_3(x),G_3(T_o(x;s))\bigr)\right],
+\end{equation}
+where $J$ is Jaccard similarity. The label-free footprint is $z_o=(u_o,q_o)$. We separately record mean edit count $e_o$ because it measures corruption magnitude but is not used to select the basis.
+
+\subsection{Transfer Hypothesis}
+For a classifier augmented with operator $a$, let $\Delta_{a\rightarrow b}$ be its accuracy gain over clean-only training when evaluated on held-out operator $b$. We define footprint distance and the tested association as
+\begin{align}
+d(a,b)&=\lVert z_a-z_b\rVert_2,\\
+\rho_*&=\operatorname{corr}(d(a,b),\Delta_{a\rightarrow b}\mid |e_a-e_b|).
+\end{align}
+The first claim is falsified if the seed-bootstrap 95\% interval for $\rho_*$ includes zero. This conditioning matters because two operators may look distant merely because one edits more tokens.
+
+\subsection{Minimal Cover}
+For tolerance $\epsilon$, we select
+\begin{align}
+B^*&=\arg\min_{B\subseteq O}|B|,\\
+\text{s.t.}\quad
+\max_{o\in O}\operatorname{dist}\bigl(z_o,\operatorname{conv}(Z_B)\bigr)&\leq\epsilon,
+\end{align}
+where $Z_B=\{z_b:b\in B\}$. For this four-operator study, exhaustive enumeration is preferable to an approximate solver: at most $2^4-1$ nonempty subsets are tested, and segment projections give exact distances in two dimensions. More generally, the construction separates the cheap, label-free selection stage from classifier fitting. Computing footprints is linear in the number of corrupted tokens and does not inspect intent labels or test accuracy.
+Ties are resolved lexicographically, and the augmentation budget is divided equally across the selected operators. This construction is descriptive: it covers observed feature effects and does not assert that the hull is a causal model of spelling.
+
+\subsection{Perturbation Semantics}
+Each operator scans whitespace-separated tokens of length at least four and attempts one edit with probability 0.45. The swap operator samples an index after the first character and before the final character, then exchanges the sampled character with its successor. It is therefore a first-character-preserving adjacent swap; when the penultimate index is sampled, the final character changes position. We use this exact name instead of the stronger ``internal-character swap,'' which would incorrectly imply that both boundary characters are fixed. Deletion removes the sampled character, insertion places a uniformly sampled lowercase letter before it, and keyboard substitution replaces it with a neighbor from a fixed QWERTY map. Punctuation is not normalized before corruption.
+
+The generator is deterministic given operator, record position, and seed, and training and evaluation use disjoint random-number namespaces. Each changed utterance retains its clean form, corrupted form, operator, seed, and edit count. The edits are random rather than adversarial: they never use classifier gradients, scores, or errors. The resulting claim is therefore about a controlled synthetic distribution and cannot be read as worst-case robustness.
+
+\subsection{Analysis Unit and Leakage Boundary}
+The transfer analysis contains the twelve ordered pairs $(a,b)$ for which $a\neq b$. The four diagonal pairs are retained in raw diagnostic matrices but excluded from $\rho_*$ because same-operator augmentation is not cross-operator transfer. This exclusion is load-bearing: diagonal points have zero footprint distance and typically large self-transfer, so including them would manufacture a negative association. The audit that identified this issue motivated a code correction and complete result regeneration; the declared zero-crossing falsifier itself was not relaxed.
+
+Footprints are computed from non-test utterances and use no intent labels. The basis is frozen before any test accuracy is read. This ordering prevents the hull tolerance from becoming a hidden validation parameter.

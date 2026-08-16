@@ -1350,7 +1350,9 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('/static/app.js?v=20260815.5', html)
+        self.assertIn('src="static/app.js?v=20260816.2"', html)
+        self.assertIn('STUDIO_BASE_PATH', source)
+        self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
         self.assertIn('id="figures-view" disabled', html)
         self.assertIn('id="compile" class="secondary" disabled', html)
@@ -1485,7 +1487,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('/static/app.js?v=20260815.5', html)
+        self.assertIn('src="static/app.js?v=20260816.2"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1495,7 +1497,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('roundLabel.textContent = `第 ${round} 轮`', source)
         self.assertIn('message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`', source)
         self.assertIn("agent-chat-round", source)
-        self.assertIn('/static/style.css?v=20260815.5', html)
+        self.assertIn('href="static/style.css?v=20260816.1"', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)
@@ -1504,7 +1506,10 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('navigator.clipboard.writeText(input.value)', source)
         self.assertIn('document.execCommand("copy")', source)
         self.assertNotIn("const typed = prompt(", source)
-        self.assertIn('const latestState = await request("/api/state")', source)
+        self.assertIn(
+            'const latestState = normalizeStateUrls(await request("/api/state"))',
+            source,
+        )
         self.assertIn("candidate_text: visibleCandidateText", source)
         self.assertNotIn("This candidate is stale", source)
         self.assertIn("&& !nextParagraph.accepted_text", source)

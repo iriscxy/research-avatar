@@ -1,0 +1,36 @@
+{
+  "reference_file": "paper/reference_wang2025word.txt",
+  "sections": {
+    "abstract": [{"id":"A1","purpose":"State problem, mechanism, real results, and bounded scope.","reference_lines":[1,7],"artifacts":[]}],
+    "introduction": [
+      {"id":"I1","purpose":"Open with an intent-preserving typo and deployment mismatch.","reference_lines":[1,2],"artifacts":["F1"]},
+      {"id":"I2","purpose":"State footprint-distance and minimal-cover research questions.","reference_lines":[1,4],"artifacts":[]},
+      {"id":"I3","purpose":"State two bounded contributions without preview inflation.","reference_lines":[3,7],"artifacts":[]}
+    ],
+    "related_work": [
+      {"id":"R1","heading":"Noisy intent understanding.","heading_style":"paragraph","purpose":"Separate noisy intent benchmarks from this selection problem.","reference_lines":[3,4],"artifacts":[]},
+      {"id":"R2","heading":"Representations under misspellings.","heading_style":"paragraph","purpose":"Position feature-dependent robustness and the owned reference.","reference_lines":[3,4],"artifacts":[]}
+    ],
+    "method": [
+      {"id":"M1","heading":"Operator Footprints","heading_style":"subsection","purpose":"Define OOV and trigram coordinates.","reference_lines":[5,6],"artifacts":[]},
+      {"id":"M2","heading":"Transfer Hypothesis","heading_style":"subsection","purpose":"Define controlled distance-transfer association and falsifier.","reference_lines":[5,6],"artifacts":[]},
+      {"id":"M3","heading":"Minimal Cover","heading_style":"subsection","purpose":"Define epsilon-expanded convex-hull selection.","reference_lines":[5,6],"artifacts":[]}
+    ],
+    "experiments": [
+      {"id":"E1","heading":"Protocol","heading_style":"subsection","purpose":"Fix data, model, operators, seeds, and matched budget.","reference_lines":[7,8],"artifacts":[]},
+      {"id":"E2","purpose":"State metrics and preregistered falsifiers.","reference_lines":[7,8],"artifacts":[]},
+      {"id":"E3","heading":"Main Comparison","heading_style":"subsection","purpose":"Report clean, worst, mean, and gap values without overclaiming.","reference_lines":[7,8],"artifacts":["T1"]},
+      {"id":"E4","heading":"Footprints and Cross-Operator Transfer","heading_style":"subsection","purpose":"Report association, basis selection, and per-operator behavior.","reference_lines":[7,8],"artifacts":["F2"]}
+    ],
+    "discussion": [
+      {"id":"D1","purpose":"Interpret the result as a bounded allocation principle.","reference_lines":[7,8],"artifacts":[]},
+      {"id":"D2","purpose":"State representation, natural-noise, data, and model limitations.","reference_lines":[7,8],"artifacts":[]},
+      {"id":"D3","purpose":"Clarify uncertainty over seeds versus operators.","reference_lines":[7,8],"artifacts":[]}
+    ],
+    "conclusion": [{"id":"C1","purpose":"Close the research question and scope.","reference_lines":[7,8],"artifacts":[]}],
+    "appendix": [
+      {"id":"AP1","purpose":"Record frozen revision, reproducibility, and compute.","reference_lines":[7,8],"artifacts":[]},
+      {"id":"AP2","purpose":"Explain hull distance and partial-correlation computation.","reference_lines":[7,8],"artifacts":[]}
+    ]
+  }
+}

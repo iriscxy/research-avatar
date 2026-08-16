@@ -168,15 +168,14 @@ const resultProvenanceDemo = () => `
     <div class="completed-result-grid"><div class="table-scroll"><table class="result-shell source-table completed-source"><thead><tr><th>Normalized depth</th><th>Direct harmful</th><th>Style-transformed harmful</th></tr></thead><tbody>${completedF2Rows.map(([depth,direct,styled]) => `<tr><th>${depth}</th><td>${provenanceNumber(direct,depth,"direct harmful")}</td><td>${provenanceNumber(styled,depth,"style-transformed harmful")}</td></tr>`).join("")}</tbody></table><p class="hover-instruction">鼠标停在任一数字上，或用键盘聚焦，即可查看 raw path、筛选、公式、命令与验证过程。</p></div>${completedF2Chart()}</div>
   </section>`;
 
-const paperStudioScreenshots = () => `<section class="paper-studio-screenshots">
+const paperStudioScreenshots = () => `<section class="paper-studio-live">
   <p class="artifact-kicker">论文写作工作区</p>
-  <h4>正文、图片和表格在同一环境中完成</h4>
-  <p>以下界面展示逐段写作、图片制作和表格编辑。右侧 PDF 会在内容确认后自动重新编译。</p>
-  ${[
-    ["writing.png", "逐段完善正文", "查看候选段落、提出修改意见，确认后写入 LaTeX 并更新右侧 PDF。", true],
-    ["figures.png", "制作论文图片", "查看生成的构图方案，并继续整理为可编辑的 PPT 和论文 PDF。", false],
-    ["tables.png", "编辑结果表格", "从已核验数据生成表格，调整 LaTeX 和正文位置后再确认插入。", false],
-  ].map(([file, title, caption, isWriting]) => `<figure><img src="assets/paper-studio/${file}?v=20260814-reader-copy" alt="Paper Studio ${title}界面" loading="lazy"><figcaption><div><strong>${title}</strong><span>${caption}</span></div>${isWriting ? `<aside class="writing-api-note"><b>正文由 LLM API 写作</b><span>不是 Code Agent 生成正文</span></aside>` : ""}</figcaption></figure>`).join("")}
+  <h4>这就是完成论文后的真实 Paper Studio</h4>
+  <p>下面加载固定应用本身，而不是截图或重新绘制的假界面。可以切换正文、图和表，浏览每个已写段落、生成历史、可编辑图表与最终 PDF；Demo 使用完成态项目的只读副本，不会产生 API 费用。</p>
+  <div class="paper-studio-frame-shell">
+    <div class="paper-studio-frame-bar"><span>完成态 Demo · 只读</span><a href="/demo-studio/" target="_blank" rel="noopener">在新页面打开</a></div>
+    <iframe src="/demo-studio/" title="完成态 Paper Studio 交互 Demo" loading="lazy"></iframe>
+  </div>
 </section>`;
 
 let reportStructures = {};

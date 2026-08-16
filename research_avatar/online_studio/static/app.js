@@ -6,9 +6,25 @@ const authForm = document.querySelector('#auth-form');
 const authMessage = document.querySelector('#auth-message');
 const workspaceShell = document.querySelector('#workspace-shell');
 
+function selectProductPanel(panelId) {
+  document.querySelectorAll('.product-panel').forEach((panel) => {
+    panel.classList.toggle('hidden', panel.id !== panelId);
+  });
+  document.querySelectorAll('.product-tab').forEach((tab) => {
+    const active = tab.dataset.panel === panelId;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', String(active));
+  });
+}
+
+document.querySelectorAll('.product-tab').forEach((tab) => {
+  tab.addEventListener('click', () => selectProductPanel(tab.dataset.panel));
+});
+
 async function showAuthenticated(user) {
   authCard.classList.add('hidden');
   workspaceShell.classList.remove('hidden');
+  selectProductPanel('demo-panel');
   document.querySelector('#account-label').textContent =
     user.email + ' · ' + (user.provider === 'google' ? 'Google' : '邮箱账户');
   try {
@@ -91,22 +107,10 @@ form.addEventListener('submit', async (event) => {
   message.className = '';
   message.textContent = '正在读取资料并启动写作台…';
   submit.disabled = true;
-  const files = [];
   try {
-    const expectedFiles = [
-      [form.elements.profile_file.files[0], 'PROFILE.html'],
-      [form.elements.plan_file.files[0], '03_EXPERIMENT_PLAN.html'],
-      [form.elements.result_file.files[0], '05_EXP_RESULT.html'],
-    ];
-    for (const [file, expected] of expectedFiles) {
-      if (!file || file.name.toLowerCase() !== expected.toLowerCase()) {
-        throw new Error(`请选择项目中原名为 ${expected} 的文件。`);
-      }
-    }
-    const selectedFiles = expectedFiles.map(([file]) => file);
-    const archiveFile = form.elements.evidence_archive.files[0];
+    const archiveFile = form.elements.project_package.files[0];
     if (!archiveFile || !archiveFile.name.toLowerCase().endsWith('.zip')) {
-      throw new Error('研究证据包必须是 ZIP 文件。');
+      throw new Error('Research Avatar 项目包必须是 ZIP 文件。');
     }
     if (archiveFile.size > 32 * 1024 * 1024) {
       throw new Error('研究证据 ZIP 不能超过 32 MB。');
@@ -120,15 +124,11 @@ form.addEventListener('submit', async (event) => {
       }
       return { name: file.name, data: btoa(binary) };
     };
-    for (const file of selectedFiles) {
-      files.push(await encodeFile(file));
-    }
     const evidenceArchive = await encodeFile(archiveFile);
     const payload = {
       provider: 'openai',
       api_key: form.elements.api_key.value,
       access_token: form.elements.access_token.value,
-      files,
       evidence_archive: evidenceArchive,
     };
     const response = await fetch('/api/online/session', {

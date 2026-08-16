@@ -1,4 +1,30 @@
 const $ = (id) => document.getElementById(id);
+const STUDIO_BASE_PATH = window.location.pathname === "/demo-studio"
+  || window.location.pathname.startsWith("/demo-studio/")
+  ? "/demo-studio"
+  : "";
+
+function studioPath(path) {
+  const value = String(path || "");
+  if (!STUDIO_BASE_PATH || !value.startsWith("/") || value.startsWith("//")) return value;
+  if (value === STUDIO_BASE_PATH || value.startsWith(STUDIO_BASE_PATH + "/")) return value;
+  return STUDIO_BASE_PATH + value;
+}
+
+function normalizeStateUrls(value, key = "") {
+  if (Array.isArray(value)) return value.map((item) => normalizeStateUrls(item));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([childKey, child]) => [
+        childKey,
+        normalizeStateUrls(child, childKey),
+      ]),
+    );
+  }
+  const urlLikeKey = key.endsWith("_url")
+    || ["pdf", "png", "pptx", "preview", "draft"].includes(key);
+  return typeof value === "string" && urlLikeKey ? studioPath(value) : value;
+}
 const ACTIVE_SECTION_KEY = "paper-studio.active-section";
 const ACTIVE_VIEW_KEY = "paper-studio.active-view";
 const ACTIVE_FIGURE_KEY = "paper-studio.active-figure";
@@ -381,13 +407,13 @@ function uniqueArtifacts(artifacts = []) {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(path, {
+  const response = await fetch(studioPath(path), {
     headers: {"Content-Type": "application/json"},
     ...options,
   });
   const payload = await response.json().catch(() => ({error: response.statusText}));
   if (!response.ok || payload.ok === false) throw new Error(payload.error || payload.message || response.statusText);
-  return payload;
+  return normalizeStateUrls(payload);
 }
 
 function updateAcceptButton() {
@@ -1242,7 +1268,7 @@ async function pollAgentChatJob() {
   agentChatPollTimer = null;
   const wasRunning = Boolean(state && state.agent_chat_job && state.agent_chat_job.status === "running");
   try {
-    state = await request("/api/state");
+    state = normalizeStateUrls(await request("/api/state"));
     const stillRunning = Boolean(state.agent_chat_job && state.agent_chat_job.status === "running");
     if (wasRunning && !stillRunning) render();
     else renderAgentChat();
@@ -1674,6 +1700,10 @@ function render() {
   $("section-title").textContent = section.title;
   $("api-status").textContent = `${apiKeySetup.provider_label || "LLM"} · ${state.api_key_configured ? "API ready" : "API missing"}`;
   $("api-status").className = "status " + (state.api_key_configured ? "ok" : "warn");
+  const usage = state.api_usage || {};
+  const costPrefix = usage.is_complete_estimate ? "" : "≥ ";
+  $("api-usage").textContent = `${Number(usage.total_tokens || 0).toLocaleString()} tokens · ${costPrefix}$${Number(usage.estimated_cost_usd || 0).toFixed(4)}`;
+  $("api-usage").title = `${usage.api_calls || 0} API calls；input ${usage.input_tokens || 0}，cached ${usage.cached_input_tokens || 0}，output ${usage.output_tokens || 0}。费用是按调用当日价目估算；未识别价格的调用不计入金额。`;
   $("conversation-status").textContent = section.conversation_active ? "Conversation active" : "New conversation";
   $("conversation-status").className = "status " + (section.conversation_active ? "ok" : "");
   $("title-editor").hidden = activeSection !== "abstract";
@@ -1803,7 +1833,7 @@ function renderFullDraft() {
 async function pollFullDraft() {
   fullDraftPollTimer = null;
   try {
-    state = await request("/api/state");
+    state = normalizeStateUrls(await request("/api/state"));
     render();
   } catch (error) {
     showMessage(error.message, true);
@@ -1811,7 +1841,7 @@ async function pollFullDraft() {
 }
 
 async function refresh() {
-  state = await request("/api/state");
+  state = normalizeStateUrls(await request("/api/state"));
   if (state.project && state.project.loaded === false) {
     render();
     return;
@@ -2042,7 +2072,7 @@ async function acceptCurrent() {
     const visibleParagraphId = paragraph && paragraph.id;
     const visibleCandidateText = $("candidate").value.trim();
     const visibleBaseText = proseBaselineText.trim();
-    const latestState = await request("/api/state");
+    const latestState = normalizeStateUrls(await request("/api/state"));
     const latestParagraph = latestState.sections[requestedSection].current_paragraph;
     const latestCandidate = latestParagraph && latestParagraph.candidate;
     if (
@@ -2465,7 +2495,7 @@ async function startFigureJob(path, body, startingMessage) {
 async function pollFigureJobs() {
   figurePollTimer = null;
   try {
-    state = await request("/api/state");
+    state = normalizeStateUrls(await request("/api/state"));
     render();
   } catch (error) {
     if (["figures", "tables"].includes(activeView)) {

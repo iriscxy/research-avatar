@@ -1,0 +1,575 @@
+{
+  "schema_version": "1.2",
+  "project_id": "typo-basis-coling-short-20260816",
+  "llm_provider": "openai",
+  "model": "gpt-5-nano",
+  "title_editor": {
+    "prompt": "",
+    "candidate": "Do Label-Free Typo Footprints Predict Augmentation Transfer?",
+    "previous_response_id": null,
+    "last_message": ""
+  },
+  "agent_chat_history": [],
+  "agent_chat_job": null,
+  "full_draft_job": {
+    "status": "completed",
+    "progress": 100,
+    "completed": 19,
+    "total": 19,
+    "message": "All planned paragraphs accepted and audited"
+  },
+  "updated_at": 1786876517,
+  "sections": {
+    "abstract": {
+      "title": "Abstract",
+      "file": "abstract.tex",
+      "previous_response_id": null,
+      "bibliography_fingerprint": null,
+      "conversation_section_fingerprint": null,
+      "revision": 1,
+      "current_index": 0,
+      "paragraphs": [
+        {
+          "id": "A1",
+          "purpose": "State problem, mechanism, real results, and bounded scope.",
+          "reference_lines": [
+            1,
+            7
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "Character-level augmentation improves intent classifiers, but selecting perturbations by name gives no reason to expect transfer to an operator omitted from augmentation training. We test a small, reproducible alternative: represent each typo operator by a label-free footprint measuring its out-of-vocabulary increase and character-trigram disruption, then select the smallest operator subset whose expanded convex hull covers the full operator set. On a fixed 20-intent slice of CLINC150, five deterministic CPU runs do not support the proposed mechanism: footprint distance is not negatively associated with cross-operator transfer after controlling for edit count ($r=0.183$, bootstrap 95\\% CI $[-0.002,0.368]$). The resulting three-operator basis has an observed worst-operator gap of 0.5 percentage points from a four-operator mixture, but its bootstrap interval crosses the declared one-point acceptance boundary. This negative result is scoped to one lightweight classifier and four synthetic operators; it shows that geometric coverage and a favorable point estimate are insufficient evidence for an augmentation-selection rule.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        }
+      ],
+      "accepted_text": "Character-level augmentation improves intent classifiers, but selecting perturbations by name gives no reason to expect transfer to an operator omitted from augmentation training. We test a small, reproducible alternative: represent each typo operator by a label-free footprint measuring its out-of-vocabulary increase and character-trigram disruption, then select the smallest operator subset whose expanded convex hull covers the full operator set. On a fixed 20-intent slice of CLINC150, five deterministic CPU runs do not support the proposed mechanism: footprint distance is not negatively associated with cross-operator transfer after controlling for edit count ($r=0.183$, bootstrap 95\\% CI $[-0.002,0.368]$). The resulting three-operator basis has an observed worst-operator gap of 0.5 percentage points from a four-operator mixture, but its bootstrap interval crosses the declared one-point acceptance boundary. This negative result is scoped to one lightweight classifier and four synthetic operators; it shows that geometric coverage and a favorable point estimate are insufficient evidence for an augmentation-selection rule."
+    },
+    "introduction": {
+      "title": "Introduction",
+      "file": "introduction.tex",
+      "previous_response_id": null,
+      "bibliography_fingerprint": null,
+      "conversation_section_fingerprint": null,
+      "revision": 3,
+      "current_index": 0,
+      "paragraphs": [
+        {
+          "id": "I1",
+          "purpose": "Open with an intent-preserving typo and deployment mismatch.",
+          "reference_lines": [
+            1,
+            2
+          ],
+          "artifacts": [
+            "F1"
+          ],
+          "candidate": null,
+          "accepted_text": "\\section{Introduction}\nIntent classifiers often encounter spelling variation after deployment. A label-preserving adjacent swap can leave a request obvious to a person while changing the lexical evidence available to a word-based classifier. Figure~\\ref{fig:motivation} isolates this mismatch: the semantic intent is fixed, yet the observed feature footprint moves. Misspelling attacks can sharply damage word-dependent classifiers \\citep{pruthi2019combating}, while aggregate noise augmentation recovers part of the loss in intent systems \\citep{sengupta2021robustness}. The unresolved practical choice is which perturbations should populate a limited augmentation budget.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        },
+        {
+          "id": "I2",
+          "purpose": "State footprint-distance and minimal-cover research questions.",
+          "reference_lines": [
+            1,
+            4
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\begin{figure}[tb]\n\\centering\n\\fbox{\\begin{minipage}{0.92\\columnwidth}\\small\n\\textcolor{blue!65!black}{\\textbf{clean utterance}}: ``transfer money today''\\\\[2pt]\n$\\downarrow$ \\textit{internal swap}\\\\[2pt]\n\\textcolor{red!65!black}{\\textbf{perturbed form}}: ``trasnfer money today''\\\\[2pt]\n$\\Rightarrow$ \\textbf{unchanged intent}: money transfer\n\\end{minipage}}\n\\caption{A clean utterance and its internal-swap variant preserve the intent but expose different word features. The unchanged intent motivates measuring operator footprints before allocating augmentation.}\n\\label{fig:motivation}\n\\end{figure}\n\nWe ask whether label-free feature footprints predict cross-operator transfer and whether they can define a smaller augmentation basis without sacrificing worst-case accuracy. Our footprint uses two observable coordinates: the increase in training-vocabulary misses and the disruption of character trigrams. We treat average edit count as a control, preventing a mechanically larger corruption from masquerading as a novel operator. We then cover the four operator footprints with the smallest epsilon-expanded convex hull and train on that basis under a fixed example budget. Here, ``minimal'' means fewer augmentation operator types, not fewer augmented examples or demonstrated training-time savings.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        },
+        {
+          "id": "I3",
+          "purpose": "State two bounded contributions without preview inflation.",
+          "reference_lines": [
+            3,
+            7
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "The study makes two bounded contributions. First, it supplies a falsification-aware, reproducible test of the relation between footprint distance and transfer rather than assuming all typos form one homogeneous noise class. Second, it distinguishes a favorable observed point gap from the stronger uncertainty-aware claim needed to accept a minimal basis. Both proposed claims fail their declared checks. Reported artifact values are backed by deterministic raw JSON cells and a five-seed rerun; the narrow scope is a feature of the experiment rather than evidence for broad deployment readiness.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        }
+      ],
+      "accepted_text": "\\section{Introduction}\nIntent classifiers often encounter spelling variation after deployment. A label-preserving adjacent swap can leave a request obvious to a person while changing the lexical evidence available to a word-based classifier. Figure~\\ref{fig:motivation} isolates this mismatch: the semantic intent is fixed, yet the observed feature footprint moves. Misspelling attacks can sharply damage word-dependent classifiers \\citep{pruthi2019combating}, while aggregate noise augmentation recovers part of the loss in intent systems \\citep{sengupta2021robustness}. The unresolved practical choice is which perturbations should populate a limited augmentation budget.\n\n\\begin{figure}[tb]\n\\centering\n\\fbox{\\begin{minipage}{0.92\\columnwidth}\\small\n\\textcolor{blue!65!black}{\\textbf{clean utterance}}: ``transfer money today''\\\\[2pt]\n$\\downarrow$ \\textit{internal swap}\\\\[2pt]\n\\textcolor{red!65!black}{\\textbf{perturbed form}}: ``trasnfer money today''\\\\[2pt]\n$\\Rightarrow$ \\textbf{unchanged intent}: money transfer\n\\end{minipage}}\n\\caption{A clean utterance and its internal-swap variant preserve the intent but expose different word features. The unchanged intent motivates measuring operator footprints before allocating augmentation.}\n\\label{fig:motivation}\n\\end{figure}\n\nWe ask whether label-free feature footprints predict cross-operator transfer and whether they can define a smaller augmentation basis without sacrificing worst-case accuracy. Our footprint uses two observable coordinates: the increase in training-vocabulary misses and the disruption of character trigrams. We treat average edit count as a control, preventing a mechanically larger corruption from masquerading as a novel operator. We then cover the four operator footprints with the smallest epsilon-expanded convex hull and train on that basis under a fixed example budget. Here, ``minimal'' means fewer augmentation operator types, not fewer augmented examples or demonstrated training-time savings.\n\nThe study makes two bounded contributions. First, it supplies a falsification-aware, reproducible test of the relation between footprint distance and transfer rather than assuming all typos form one homogeneous noise class. Second, it distinguishes a favorable observed point gap from the stronger uncertainty-aware claim needed to accept a minimal basis. Both proposed claims fail their declared checks. Reported artifact values are backed by deterministic raw JSON cells and a five-seed rerun; the narrow scope is a feature of the experiment rather than evidence for broad deployment readiness."
+    },
+    "related_work": {
+      "title": "Related Work",
+      "file": "related_work.tex",
+      "previous_response_id": null,
+      "bibliography_fingerprint": null,
+      "conversation_section_fingerprint": null,
+      "revision": 2,
+      "current_index": 0,
+      "paragraphs": [
+        {
+          "id": "R1",
+          "heading": "Noisy intent understanding.",
+          "heading_style": "paragraph",
+          "purpose": "Separate noisy intent benchmarks from this selection problem.",
+          "reference_lines": [
+            3,
+            4
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\section{Related Work}\n\\paragraph{Noisy intent understanding.} Realistic perturbations substantially reduce intent and slot performance, while multi-noise augmentation recovers part of the loss \\citep{sengupta2021robustness}. Balanced mixtures of insertion, deletion, substitution, and swap noise have also been tested against natural noise in translation \\citep{karpukhin2019training}. LAUG broadens robustness tests to word perturbations, paraphrases, disfluencies, and speech phenomena \\citep{liu2021laug}. HINT3 and covariate-shift evaluations further show that strong in-distribution intent accuracy does not imply robustness in the wild \\citep{arora2020hint3,khosla2022covariate}. We inherit their separation of clean and shifted evaluation, but study augmentation selection rather than a new intent model.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        },
+        {
+          "id": "R2",
+          "heading": "Representations under misspellings.",
+          "heading_style": "paragraph",
+          "purpose": "Position feature-dependent robustness and the owned reference.",
+          "reference_lines": [
+            3,
+            4
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\paragraph{Representations under misspellings.} Character edits can sharply degrade neural text classifiers, motivating word-recognition front ends, stable discrete encodings, and noise-aware embeddings \\citep{pruthi2019combating,jones2020robust,piktus2019misspelling}. Projection-based representations can also lose less accuracy than subword transformers under misspelling attacks \\citep{sankar2021projection}. Related work therefore supports representation-dependent robustness, but does not imply a universal ordering among swap, deletion, insertion, and keyboard substitution. Our own prior analysis of typoglycemia likewise emphasizes that word form matters to semantic reconstruction \\citep{wang2025word}; here it serves only as structural motivation, not as evidence for the classifier claims. None of these studies tests whether a label-free footprint geometry can select an operator subset, which is the hypothesis we falsify here.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        }
+      ],
+      "accepted_text": "\\section{Related Work}\n\\paragraph{Noisy intent understanding.} Realistic perturbations substantially reduce intent and slot performance, while multi-noise augmentation recovers part of the loss \\citep{sengupta2021robustness}. Balanced mixtures of insertion, deletion, substitution, and swap noise have also been tested against natural noise in translation \\citep{karpukhin2019training}. LAUG broadens robustness tests to word perturbations, paraphrases, disfluencies, and speech phenomena \\citep{liu2021laug}. HINT3 and covariate-shift evaluations further show that strong in-distribution intent accuracy does not imply robustness in the wild \\citep{arora2020hint3,khosla2022covariate}. We inherit their separation of clean and shifted evaluation, but study augmentation selection rather than a new intent model.\n\n\\paragraph{Representations under misspellings.} Character edits can sharply degrade neural text classifiers, motivating word-recognition front ends, stable discrete encodings, and noise-aware embeddings \\citep{pruthi2019combating,jones2020robust,piktus2019misspelling}. Projection-based representations can also lose less accuracy than subword transformers under misspelling attacks \\citep{sankar2021projection}. Related work therefore supports representation-dependent robustness, but does not imply a universal ordering among swap, deletion, insertion, and keyboard substitution. Our own prior analysis of typoglycemia likewise emphasizes that word form matters to semantic reconstruction \\citep{wang2025word}; here it serves only as structural motivation, not as evidence for the classifier claims. None of these studies tests whether a label-free footprint geometry can select an operator subset, which is the hypothesis we falsify here."
+    },
+    "method": {
+      "title": "Footprint-Cover Basis",
+      "file": "method.tex",
+      "previous_response_id": null,
+      "bibliography_fingerprint": null,
+      "conversation_section_fingerprint": null,
+      "revision": 3,
+      "current_index": 0,
+      "paragraphs": [
+        {
+          "id": "M1",
+          "heading": "Operator Footprints",
+          "heading_style": "subsection",
+          "purpose": "Define OOV and trigram coordinates.",
+          "reference_lines": [
+            5,
+            6
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\section{Footprint-Cover Basis}\n\\subsection{Operator Footprints}\nLet $D=\\{(x_i,y_i)\\}_{i=1}^n$ be clean utterances and intents, $V(D)$ the word vocabulary, and $T_o(x;s)$ a deterministic corruption by operator $o$ and seed $s$. For each operator, we compute the out-of-vocabulary increase\n\\begin{equation}\nu_o=\\mathbb{E}_{x,s}\\left[\\frac{|\\operatorname{tok}(T_o(x;s))\\setminus V(D)|}{|\\operatorname{tok}(T_o(x;s))|}\\right],\n\\end{equation}\nand character-trigram disruption\n\\begin{equation}\nq_o=\\mathbb{E}_{x,s}\\left[1-J\\bigl(G_3(x),G_3(T_o(x;s))\\bigr)\\right],\n\\end{equation}\nwhere $J$ is Jaccard similarity. The label-free footprint is $z_o=(u_o,q_o)$. We separately record mean edit count $e_o$ because it measures corruption magnitude but is not used to select the basis.\n\n\\subsection{Transfer Hypothesis}\nFor a classifier augmented with operator $a$, let $\\Delta_{a\\rightarrow b}$ be its accuracy gain over clean-only training when evaluated on held-out operator $b$. We define footprint distance and the tested association as\n\\begin{align}\nd(a,b)&=\\lVert z_a-z_b\\rVert_2,\\\\\n\\rho_*&=\\operatorname{corr}(d(a,b),\\Delta_{a\\rightarrow b}\\mid |e_a-e_b|).\n\\end{align}\nThe first claim is falsified if the seed-bootstrap 95\\% interval for $\\rho_*$ includes zero. This conditioning matters because two operators may look distant merely because one edits more tokens.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        },
+        {
+          "id": "M2",
+          "heading": "Transfer Hypothesis",
+          "heading_style": "subsection",
+          "purpose": "Define controlled distance-transfer association and falsifier.",
+          "reference_lines": [
+            5,
+            6
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\subsection{Minimal Cover}\nFor tolerance $\\epsilon$, we select\n\\begin{align}\nB^*&=\\arg\\min_{B\\subseteq O}|B|,\\\\\n\\text{s.t.}\\quad\n\\max_{o\\in O}\\operatorname{dist}\\bigl(z_o,\\operatorname{conv}(Z_B)\\bigr)&\\leq\\epsilon,\n\\end{align}\nwhere $Z_B=\\{z_b:b\\in B\\}$. For this four-operator study, exhaustive enumeration is preferable to an approximate solver: at most $2^4-1$ nonempty subsets are tested, and segment projections give exact distances in two dimensions. More generally, the construction separates the cheap, label-free selection stage from classifier fitting. Computing footprints is linear in the number of corrupted tokens and does not inspect intent labels or test accuracy.\nTies are resolved lexicographically, and the augmentation budget is divided equally across the selected operators. This construction is descriptive: it covers observed feature effects and does not assert that the hull is a causal model of spelling.\n\n\\subsection{Perturbation Semantics}\nEach operator scans whitespace-separated tokens of length at least four and attempts one edit with probability 0.45. The swap operator samples an index after the first character and before the final character, then exchanges the sampled character with its successor. It is therefore a first-character-preserving adjacent swap; when the penultimate index is sampled, the final character changes position. We use this exact name instead of the stronger ``internal-character swap,'' which would incorrectly imply that both boundary characters are fixed. Deletion removes the sampled character, insertion places a uniformly sampled lowercase letter before it, and keyboard substitution replaces it with a neighbor from a fixed QWERTY map. Punctuation is not normalized before corruption.\n\nThe generator is deterministic given operator, record position, and seed, and training and evaluation use disjoint random-number namespaces. Each changed utterance retains its clean form, corrupted form, operator, seed, and edit count. The edits are random rather than adversarial: they never use classifier gradients, scores, or errors. The resulting claim is therefore about a controlled synthetic distribution and cannot be read as worst-case robustness.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        },
+        {
+          "id": "M3",
+          "heading": "Minimal Cover",
+          "heading_style": "subsection",
+          "purpose": "Define epsilon-expanded convex-hull selection.",
+          "reference_lines": [
+            5,
+            6
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\subsection{Analysis Unit and Leakage Boundary}\nThe transfer analysis contains the twelve ordered pairs $(a,b)$ for which $a\\neq b$. The four diagonal pairs are retained in raw diagnostic matrices but excluded from $\\rho_*$ because same-operator augmentation is not cross-operator transfer. This exclusion is load-bearing: diagonal points have zero footprint distance and typically large self-transfer, so including them would manufacture a negative association. The audit that identified this issue motivated a code correction and complete result regeneration; the declared zero-crossing falsifier itself was not relaxed.\n\nFootprints are computed from non-test utterances and use no intent labels. The basis is frozen before any test accuracy is read. This ordering prevents the hull tolerance from becoming a hidden validation parameter.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        }
+      ],
+      "accepted_text": "\\section{Footprint-Cover Basis}\n\\subsection{Operator Footprints}\nLet $D=\\{(x_i,y_i)\\}_{i=1}^n$ be clean utterances and intents, $V(D)$ the word vocabulary, and $T_o(x;s)$ a deterministic corruption by operator $o$ and seed $s$. For each operator, we compute the out-of-vocabulary increase\n\\begin{equation}\nu_o=\\mathbb{E}_{x,s}\\left[\\frac{|\\operatorname{tok}(T_o(x;s))\\setminus V(D)|}{|\\operatorname{tok}(T_o(x;s))|}\\right],\n\\end{equation}\nand character-trigram disruption\n\\begin{equation}\nq_o=\\mathbb{E}_{x,s}\\left[1-J\\bigl(G_3(x),G_3(T_o(x;s))\\bigr)\\right],\n\\end{equation}\nwhere $J$ is Jaccard similarity. The label-free footprint is $z_o=(u_o,q_o)$. We separately record mean edit count $e_o$ because it measures corruption magnitude but is not used to select the basis.\n\n\\subsection{Transfer Hypothesis}\nFor a classifier augmented with operator $a$, let $\\Delta_{a\\rightarrow b}$ be its accuracy gain over clean-only training when evaluated on held-out operator $b$. We define footprint distance and the tested association as\n\\begin{align}\nd(a,b)&=\\lVert z_a-z_b\\rVert_2,\\\\\n\\rho_*&=\\operatorname{corr}(d(a,b),\\Delta_{a\\rightarrow b}\\mid |e_a-e_b|).\n\\end{align}\nThe first claim is falsified if the seed-bootstrap 95\\% interval for $\\rho_*$ includes zero. This conditioning matters because two operators may look distant merely because one edits more tokens.\n\n\\subsection{Minimal Cover}\nFor tolerance $\\epsilon$, we select\n\\begin{align}\nB^*&=\\arg\\min_{B\\subseteq O}|B|,\\\\\n\\text{s.t.}\\quad\n\\max_{o\\in O}\\operatorname{dist}\\bigl(z_o,\\operatorname{conv}(Z_B)\\bigr)&\\leq\\epsilon,\n\\end{align}\nwhere $Z_B=\\{z_b:b\\in B\\}$. For this four-operator study, exhaustive enumeration is preferable to an approximate solver: at most $2^4-1$ nonempty subsets are tested, and segment projections give exact distances in two dimensions. More generally, the construction separates the cheap, label-free selection stage from classifier fitting. Computing footprints is linear in the number of corrupted tokens and does not inspect intent labels or test accuracy.\nTies are resolved lexicographically, and the augmentation budget is divided equally across the selected operators. This construction is descriptive: it covers observed feature effects and does not assert that the hull is a causal model of spelling.\n\n\\subsection{Perturbation Semantics}\nEach operator scans whitespace-separated tokens of length at least four and attempts one edit with probability 0.45. The swap operator samples an index after the first character and before the final character, then exchanges the sampled character with its successor. It is therefore a first-character-preserving adjacent swap; when the penultimate index is sampled, the final character changes position. We use this exact name instead of the stronger ``internal-character swap,'' which would incorrectly imply that both boundary characters are fixed. Deletion removes the sampled character, insertion places a uniformly sampled lowercase letter before it, and keyboard substitution replaces it with a neighbor from a fixed QWERTY map. Punctuation is not normalized before corruption.\n\nThe generator is deterministic given operator, record position, and seed, and training and evaluation use disjoint random-number namespaces. Each changed utterance retains its clean form, corrupted form, operator, seed, and edit count. The edits are random rather than adversarial: they never use classifier gradients, scores, or errors. The resulting claim is therefore about a controlled synthetic distribution and cannot be read as worst-case robustness.\n\n\\subsection{Analysis Unit and Leakage Boundary}\nThe transfer analysis contains the twelve ordered pairs $(a,b)$ for which $a\\neq b$. The four diagonal pairs are retained in raw diagnostic matrices but excluded from $\\rho_*$ because same-operator augmentation is not cross-operator transfer. This exclusion is load-bearing: diagonal points have zero footprint distance and typically large self-transfer, so including them would manufacture a negative association. The audit that identified this issue motivated a code correction and complete result regeneration; the declared zero-crossing falsifier itself was not relaxed.\n\nFootprints are computed from non-test utterances and use no intent labels. The basis is frozen before any test accuracy is read. This ordering prevents the hull tolerance from becoming a hidden validation parameter."
+    },
+    "experiments": {
+      "title": "Experiments",
+      "file": "experiments.tex",
+      "previous_response_id": null,
+      "bibliography_fingerprint": null,
+      "conversation_section_fingerprint": null,
+      "revision": 4,
+      "current_index": 0,
+      "paragraphs": [
+        {
+          "id": "E1",
+          "heading": "Protocol",
+          "heading_style": "subsection",
+          "purpose": "Fix data, model, operators, seeds, and matched budget.",
+          "reference_lines": [
+            7,
+            8
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\section{Experiments}\n\\subsection{Protocol}\nWe use the official frozen CLINC150 train, validation, and test partitions \\citep{larson2019clinc}, restricted before experimentation to the first 20 lexicographically sorted intents. The classifier is a multinomial Naive Bayes model over word counts with additive smoothing 1.0. Four character operators apply adjacent internal swaps, deletions, insertions, or QWERTY-neighbor substitutions with per-token attempt probability 0.45. Seeds are fixed to $\\{11,29,47,71,97\\}$. Clean-only training is compared with single-operator augmentation, a balanced four-operator mixture, and our selected basis; all augmented methods receive the same number of examples.\n\nThe footprint tolerance is $\\epsilon=0.01$. All footprints and basis selection use training or validation utterances only; test labels and accuracies are accessed only after $B^*$ is frozen. Accuracy is averaged across seeds. We report clean accuracy, the minimum accuracy over the four noisy conditions, and mean noisy accuracy. The two declared falsifiers are a bootstrap interval for $\\rho_*$ that crosses zero and a basis whose worst-operator accuracy-gap interval exceeds 0.01 or whose clean-loss interval exceeds 0.01. The geometric $\\epsilon$ and accuracy-gap boundary share the number 0.01 but have different units and roles.\n\n\\subsection{Main Comparison}\nTable~\\ref{tab:micro-main} reports the complete CLINC150 20-intent CPU subset comparison across augmentation policy, input condition, and accuracy metric. The full mixture improves worst-operator accuracy from 0.863 to 0.875. The minimal basis obtains 0.870, an observed gap of 0.005, and slightly higher clean accuracy (0.954 versus 0.953). Its mean noisy accuracy differs by less than one tenth of a percentage point. However, the bootstrap interval for the worst-gap statistic is approximately $[-0.003,0.014]$, crossing the 0.01 acceptance boundary. The point gap therefore does not establish the uncertainty-aware claim.\n\n\\begin{table*}[t]\n\\centering\\scriptsize\\setlength{\\tabcolsep}{4pt}\n\\begin{tabular}{lcccc}\n\\toprule\n\\multicolumn{5}{c}{\\textbf{Dataset: CLINC150 20-intent CPU subset} $\\cdot$ augmentation policy $\\cdot$ input condition $\\cdot$ metric}\\\\\nMethod & Clean Accuracy $\\uparrow$ & Worst-operator Accuracy $\\uparrow$ & Mean noisy Accuracy $\\uparrow$ & Worst-accuracy gap $\\downarrow$\\\\\n\\midrule\nClean-only word Naive Bayes & 0.9517 & 0.8633 & 0.8715 & 0.0117\\\\\nBalanced four-operator augmentation & 0.9530 & \\textbf{0.8750} & \\textbf{0.8902} & 0.0000\\\\\nOur method: minimal footprint-cover basis & \\textbf{0.9540} & 0.8700 & 0.8895 & 0.0050\\\\\n\\bottomrule\n\\end{tabular}\n\\caption{Clean and worst-operator comparison under a matched augmentation budget. Values are five-seed means; the declared accuracy-gap acceptance boundary is 0.01.}\n\\label{tab:micro-main}\n\\end{table*}",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        },
+        {
+          "id": "E2",
+          "purpose": "State metrics and preregistered falsifiers.",
+          "reference_lines": [
+            7,
+            8
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\subsection{Footprints and Cross-Operator Transfer}\nThe selected basis is deletion, insertion, and swap; keyboard substitution lies within 0.0061 of their footprint hull. Across the five seeds, the edit-count-controlled correlation between footprint distance and strictly cross-operator transfer is $0.183$, with bootstrap 95\\% CI $[-0.002,0.368]$. The interval crosses zero and most seed estimates have the opposite sign from the proposed mechanism. C1 is therefore falsified.\n\nFigure~\\ref{fig:typo-sensitivity} shows held-out operator accuracy for the full mixture and minimal basis on the same dataset and augmentation policies. The basis is slightly better on swap, deletion, and insertion, but worse on keyboard substitution (0.870 versus 0.882). That localized loss explains its lower worst-case value and is important: hull coverage is an approximate selection rule, not an invariance guarantee.\n\n\\begin{figure}[tb]\n\\centering\n\\includegraphics[width=\\columnwidth]{fig/typo_basis/results/F2_operator_transfer.pdf}\n\\caption{Held-out operator accuracy on the CLINC150 20-intent CPU subset dataset. The augmentation policy is either the full mixture or minimal basis; the input condition is the named held-out operator and the metric is five-seed mean accuracy.}\n\\label{fig:typo-sensitivity}\n\\end{figure}\n\n\\subsection{What the Footprints Capture}\nThe aggregate footprints are $z_{\\mathrm{swap}}=(0.1764,0.2689)$, $z_{\\mathrm{delete}}=(0.1831,0.1908)$, $z_{\\mathrm{insert}}=(0.1941,0.1882)$, and $z_{\\mathrm{keyboard}}=(0.1914,0.2289)$. Swap is separated mainly by trigram disruption, whereas deletion and insertion form a close pair. Keyboard substitution falls between that pair and swap in the two-dimensional plane, which is why it can be covered without becoming a basis vertex. This interpretation is label-free: neither the selected subset nor the hull distance uses classifier accuracy.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        },
+        {
+          "id": "E3",
+          "heading": "Main Comparison",
+          "heading_style": "subsection",
+          "purpose": "Report clean, worst, mean, and gap values without overclaiming.",
+          "reference_lines": [
+            7,
+            8
+          ],
+          "artifacts": [
+            "T1"
+          ],
+          "candidate": null,
+          "accepted_text": "The mean edit counts range only from 1.990 for swap to 2.161 for insertion. After controlling for edit-count difference, the five seed-level partial correlations are $0.217$, $0.483$, $0.329$, $0.058$, and $-0.170$. Their signs and magnitudes are unstable, which explains why the resampled interval includes zero.\n\n\\subsection{Reading the Acceptance Check}\nThe one-percentage-point boundary was declared before running the comparison. The observed 0.005 worst-operator gap is half that value, but the resampled upper bound is about 0.014. Only the point estimate meets the boundary; the uncertainty-aware claim does not. Keyboard substitution remains the limiting condition. This distinction prevents the qualitative phrase ``matches the mixture'' from hiding both the tolerance and its uncertainty.\n\nClean accuracy does not reveal a trade-off here. The basis scores 0.954, compared with 0.953 for the full mixture and 0.952 for clean-only training after rounding to three decimals. These small differences should not be interpreted as evidence that corruption improves clean generalization. The clean-loss interval does not indicate a harmful loss, but C2 remains false because its joint worst-gap requirement fails. Likewise, the 0.0007 mean-noisy gap between basis and mixture is descriptive and is not promoted to an additional hypothesis.\n\n\\subsection{Reproducibility and Cost}\nThe implementation uses the Python standard library for data preparation, perturbation, multinomial Naive Bayes, metrics, geometry, and bootstrapping. It downloads one pinned official CLINC150 JSON revision if the cache is absent, then runs without network access. A full five-seed execution takes roughly ten seconds on a local CPU, consumes zero GPU hours, and makes no paid model calls. Two executions produced identical result payloads after removing their wall-clock duration fields. Their SHA-256 digest begins \\texttt{5f9e29e5f2fa44a69}; the complete digest is recorded with the released result artifact.\n\nEach paper cell resolves to a JSON pointer in the result ledger. The main table contributes twelve atomic cells and the operator-transfer figure contributes eight. This traceability does not make the experiment broader, but it guards against a common failure in small studies: copying a rounded value into prose after a later rerun has changed the underlying artifact.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        },
+        {
+          "id": "E4",
+          "heading": "Footprints and Cross-Operator Transfer",
+          "heading_style": "subsection",
+          "purpose": "Report association, basis selection, and per-operator behavior.",
+          "reference_lines": [
+            7,
+            8
+          ],
+          "artifacts": [
+            "F2"
+          ],
+          "candidate": null,
+          "accepted_text": "\\subsection{Bootstrap Construction}\nFor C1, one seed contributes a partial correlation over the twelve strict off-diagonal ordered operator pairs; 2,000 seed-bootstrap replicates form the percentile interval. For C2, each replicate recomputes the minimum of seed-mean per-operator accuracies rather than averaging per-seed minima. C2 is accepted only when the upper bounds for both the worst-gap and clean-loss statistics are at most 0.01.\n\nThe observed worst-gap statistic is 0.005, whereas its percentile interval is $[-0.004,0.014]$. The clean-loss interval is approximately $[-0.005,0.000]$ and therefore passes its component boundary. Because C2 is conjunctive, the worst-gap failure decides the overall result. This reporting choice makes the negative adjudication reproducible and avoids treating a small clean-accuracy fluctuation as evidence of improvement.\n\n\\subsection{Negative-Result Diagnostics}\nThe C1 failure is not caused by one isolated seed. Four of five partial correlations are positive, contrary to the proposed negative direction, while the remaining seed is moderately negative. A plausible explanation is that Naive Bayes transfer depends on which intent-bearing tokens are changed, whereas the footprint averages disruption without weighting label-specific evidence.\n\nC2 fails more narrowly. The basis point estimates are close to the full mixture on every operator, yet five seeds do not localize the worst-gap statistic below the one-point boundary. This is a precision failure rather than evidence of a large degradation. Additional seeds could narrow seed uncertainty, but they would constitute a new prospectively frozen experiment; they cannot retroactively convert this run into support. Likewise, redefining the boundary around the observed 0.005 gap would be post hoc and is not attempted.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        }
+      ],
+      "accepted_text": "\\section{Experiments}\n\\subsection{Protocol}\nWe use the official frozen CLINC150 train, validation, and test partitions \\citep{larson2019clinc}, restricted before experimentation to the first 20 lexicographically sorted intents. The classifier is a multinomial Naive Bayes model over word counts with additive smoothing 1.0. Four character operators apply adjacent internal swaps, deletions, insertions, or QWERTY-neighbor substitutions with per-token attempt probability 0.45. Seeds are fixed to $\\{11,29,47,71,97\\}$. Clean-only training is compared with single-operator augmentation, a balanced four-operator mixture, and our selected basis; all augmented methods receive the same number of examples.\n\nThe footprint tolerance is $\\epsilon=0.01$. All footprints and basis selection use training or validation utterances only; test labels and accuracies are accessed only after $B^*$ is frozen. Accuracy is averaged across seeds. We report clean accuracy, the minimum accuracy over the four noisy conditions, and mean noisy accuracy. The two declared falsifiers are a bootstrap interval for $\\rho_*$ that crosses zero and a basis whose worst-operator accuracy-gap interval exceeds 0.01 or whose clean-loss interval exceeds 0.01. The geometric $\\epsilon$ and accuracy-gap boundary share the number 0.01 but have different units and roles.\n\n\\subsection{Main Comparison}\nTable~\\ref{tab:micro-main} reports the complete CLINC150 20-intent CPU subset comparison across augmentation policy, input condition, and accuracy metric. The full mixture improves worst-operator accuracy from 0.863 to 0.875. The minimal basis obtains 0.870, an observed gap of 0.005, and slightly higher clean accuracy (0.954 versus 0.953). Its mean noisy accuracy differs by less than one tenth of a percentage point. However, the bootstrap interval for the worst-gap statistic is approximately $[-0.003,0.014]$, crossing the 0.01 acceptance boundary. The point gap therefore does not establish the uncertainty-aware claim.\n\n\\begin{table*}[t]\n\\centering\\scriptsize\\setlength{\\tabcolsep}{4pt}\n\\begin{tabular}{lcccc}\n\\toprule\n\\multicolumn{5}{c}{\\textbf{Dataset: CLINC150 20-intent CPU subset} $\\cdot$ augmentation policy $\\cdot$ input condition $\\cdot$ metric}\\\\\nMethod & Clean Accuracy $\\uparrow$ & Worst-operator Accuracy $\\uparrow$ & Mean noisy Accuracy $\\uparrow$ & Worst-accuracy gap $\\downarrow$\\\\\n\\midrule\nClean-only word Naive Bayes & 0.9517 & 0.8633 & 0.8715 & 0.0117\\\\\nBalanced four-operator augmentation & 0.9530 & \\textbf{0.8750} & \\textbf{0.8902} & 0.0000\\\\\nOur method: minimal footprint-cover basis & \\textbf{0.9540} & 0.8700 & 0.8895 & 0.0050\\\\\n\\bottomrule\n\\end{tabular}\n\\caption{Clean and worst-operator comparison under a matched augmentation budget. Values are five-seed means; the declared accuracy-gap acceptance boundary is 0.01.}\n\\label{tab:micro-main}\n\\end{table*}\n\n\\subsection{Footprints and Cross-Operator Transfer}\nThe selected basis is deletion, insertion, and swap; keyboard substitution lies within 0.0061 of their footprint hull. Across the five seeds, the edit-count-controlled correlation between footprint distance and strictly cross-operator transfer is $0.183$, with bootstrap 95\\% CI $[-0.002,0.368]$. The interval crosses zero and most seed estimates have the opposite sign from the proposed mechanism. C1 is therefore falsified.\n\nFigure~\\ref{fig:typo-sensitivity} shows held-out operator accuracy for the full mixture and minimal basis on the same dataset and augmentation policies. The basis is slightly better on swap, deletion, and insertion, but worse on keyboard substitution (0.870 versus 0.882). That localized loss explains its lower worst-case value and is important: hull coverage is an approximate selection rule, not an invariance guarantee.\n\n\\begin{figure}[tb]\n\\centering\n\\includegraphics[width=\\columnwidth]{fig/typo_basis/results/F2_operator_transfer.pdf}\n\\caption{Held-out operator accuracy on the CLINC150 20-intent CPU subset dataset. The augmentation policy is either the full mixture or minimal basis; the input condition is the named held-out operator and the metric is five-seed mean accuracy.}\n\\label{fig:typo-sensitivity}\n\\end{figure}\n\n\\subsection{What the Footprints Capture}\nThe aggregate footprints are $z_{\\mathrm{swap}}=(0.1764,0.2689)$, $z_{\\mathrm{delete}}=(0.1831,0.1908)$, $z_{\\mathrm{insert}}=(0.1941,0.1882)$, and $z_{\\mathrm{keyboard}}=(0.1914,0.2289)$. Swap is separated mainly by trigram disruption, whereas deletion and insertion form a close pair. Keyboard substitution falls between that pair and swap in the two-dimensional plane, which is why it can be covered without becoming a basis vertex. This interpretation is label-free: neither the selected subset nor the hull distance uses classifier accuracy.\n\nThe mean edit counts range only from 1.990 for swap to 2.161 for insertion. After controlling for edit-count difference, the five seed-level partial correlations are $0.217$, $0.483$, $0.329$, $0.058$, and $-0.170$. Their signs and magnitudes are unstable, which explains why the resampled interval includes zero.\n\n\\subsection{Reading the Acceptance Check}\nThe one-percentage-point boundary was declared before running the comparison. The observed 0.005 worst-operator gap is half that value, but the resampled upper bound is about 0.014. Only the point estimate meets the boundary; the uncertainty-aware claim does not. Keyboard substitution remains the limiting condition. This distinction prevents the qualitative phrase ``matches the mixture'' from hiding both the tolerance and its uncertainty.\n\nClean accuracy does not reveal a trade-off here. The basis scores 0.954, compared with 0.953 for the full mixture and 0.952 for clean-only training after rounding to three decimals. These small differences should not be interpreted as evidence that corruption improves clean generalization. The clean-loss interval does not indicate a harmful loss, but C2 remains false because its joint worst-gap requirement fails. Likewise, the 0.0007 mean-noisy gap between basis and mixture is descriptive and is not promoted to an additional hypothesis.\n\n\\subsection{Reproducibility and Cost}\nThe implementation uses the Python standard library for data preparation, perturbation, multinomial Naive Bayes, metrics, geometry, and bootstrapping. It downloads one pinned official CLINC150 JSON revision if the cache is absent, then runs without network access. A full five-seed execution takes roughly ten seconds on a local CPU, consumes zero GPU hours, and makes no paid model calls. Two executions produced identical result payloads after removing their wall-clock duration fields. Their SHA-256 digest begins \\texttt{5f9e29e5f2fa44a69}; the complete digest is recorded with the released result artifact.\n\nEach paper cell resolves to a JSON pointer in the result ledger. The main table contributes twelve atomic cells and the operator-transfer figure contributes eight. This traceability does not make the experiment broader, but it guards against a common failure in small studies: copying a rounded value into prose after a later rerun has changed the underlying artifact.\n\n\\subsection{Bootstrap Construction}\nFor C1, one seed contributes a partial correlation over the twelve strict off-diagonal ordered operator pairs; 2,000 seed-bootstrap replicates form the percentile interval. For C2, each replicate recomputes the minimum of seed-mean per-operator accuracies rather than averaging per-seed minima. C2 is accepted only when the upper bounds for both the worst-gap and clean-loss statistics are at most 0.01.\n\nThe observed worst-gap statistic is 0.005, whereas its percentile interval is $[-0.004,0.014]$. The clean-loss interval is approximately $[-0.005,0.000]$ and therefore passes its component boundary. Because C2 is conjunctive, the worst-gap failure decides the overall result. This reporting choice makes the negative adjudication reproducible and avoids treating a small clean-accuracy fluctuation as evidence of improvement.\n\n\\subsection{Negative-Result Diagnostics}\nThe C1 failure is not caused by one isolated seed. Four of five partial correlations are positive, contrary to the proposed negative direction, while the remaining seed is moderately negative. A plausible explanation is that Naive Bayes transfer depends on which intent-bearing tokens are changed, whereas the footprint averages disruption without weighting label-specific evidence.\n\nC2 fails more narrowly. The basis point estimates are close to the full mixture on every operator, yet five seeds do not localize the worst-gap statistic below the one-point boundary. This is a precision failure rather than evidence of a large degradation. Additional seeds could narrow seed uncertainty, but they would constitute a new prospectively frozen experiment; they cannot retroactively convert this run into support. Likewise, redefining the boundary around the observed 0.005 gap would be post hoc and is not attempted."
+    },
+    "discussion": {
+      "title": "Discussion",
+      "file": "discussion.tex",
+      "previous_response_id": null,
+      "bibliography_fingerprint": null,
+      "conversation_section_fingerprint": null,
+      "revision": 3,
+      "current_index": 0,
+      "paragraphs": [
+        {
+          "id": "D1",
+          "purpose": "Interpret the result as a bounded allocation principle.",
+          "reference_lines": [
+            7,
+            8
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\section{Discussion}\nThe experiment supports a negative interpretation. A two-coordinate footprint does not predict augmentation transfer beyond average edit count in this setting, and a geometric cover's favorable point gap is not stable enough to meet the uncertainty-aware acceptance check. It does not establish that deletion, insertion, and swap are the correct basis for another tokenizer, language, classifier, or natural typo distribution.\n\nSeveral limitations sharpen the next test. The footprint coordinates are tied to word vocabulary and character trigrams, so a byte-level model may induce a different geometry. The four operators are synthetic and equally budgeted, whereas natural spelling errors have nonuniform frequencies and dependencies. The 20-intent subset is intentionally small, and Naive Bayes makes lexical effects unusually visible. A stronger follow-up should freeze the selection rule, add the full CLINC150 label space and at least one naturally misspelled corpus, and compare word, subword, and byte representations without retuning $\\epsilon$ on test accuracy.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        },
+        {
+          "id": "D2",
+          "purpose": "State representation, natural-noise, data, and model limitations.",
+          "reference_lines": [
+            7,
+            8
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "The association also uses only ordered pairs from four fixed operators. Seed bootstrapping quantifies perturbation randomness, not uncertainty over the universe of possible typo processes. Consequently, the confidence interval is evidence about this experimental operator set. We report it to make the falsifier operational, not to imply population-level causal identification.\n\n\\paragraph{Why not choose by edit name?} Operator labels encode implementation history rather than feature effect. Two distinct edit procedures can produce similar lexical damage, while the same named procedure can behave differently after tokenization. Footprints make the selection criterion inspectable, but the present result shows that inspectability is not predictive validity. Two coordinates are insufficient in this regime.\n\n\\paragraph{Deployment implications.} A minimal synthetic basis would matter only if reducing operator types had an independently measured operational benefit. This study fixes the sample budget and does not demonstrate such a saving. At most, footprint coverage can be treated as a screening heuristic followed by held-out validation. The keyboard result demonstrates why: geometric coverage gave a small point loss but did not reproduce the full mixture's operator-specific accuracy or pass the uncertainty-aware boundary.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        },
+        {
+          "id": "D3",
+          "purpose": "Clarify uncertainty over seeds versus operators.",
+          "reference_lines": [
+            7,
+            8
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\paragraph{What survives falsification?} The computational scaffold remains useful even though the mechanism does not. It separates label-free measurement, operator selection, augmentation, and held-out adjudication; fixes the test-access boundary; and records enough atomic evidence to expose an incorrect diagonal analysis. The scientific takeaway is methodological rather than positive: a visually plausible footprint map and a favorable aggregate point estimate are not substitutes for a strict cross-operator definition and uncertainty computed on the reported statistic.\n\n\\paragraph{Next decisive experiment.} A follow-up should add operators whose footprint coordinates are deliberately close but whose token-level error locations differ, and operators whose coordinates are distant at matched edit count. That design would test whether the failure arises from inadequate coordinate resolution or from the absence of any stable geometric transfer relation. The analysis must keep diagonals excluded, freeze all coordinates before test access, and add enough seeds to evaluate the one-point acceptance boundary. A second representation would then reveal whether the footprint object is representation-specific, as its definition suggests.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        }
+      ],
+      "accepted_text": "\\section{Discussion}\nThe experiment supports a negative interpretation. A two-coordinate footprint does not predict augmentation transfer beyond average edit count in this setting, and a geometric cover's favorable point gap is not stable enough to meet the uncertainty-aware acceptance check. It does not establish that deletion, insertion, and swap are the correct basis for another tokenizer, language, classifier, or natural typo distribution.\n\nSeveral limitations sharpen the next test. The footprint coordinates are tied to word vocabulary and character trigrams, so a byte-level model may induce a different geometry. The four operators are synthetic and equally budgeted, whereas natural spelling errors have nonuniform frequencies and dependencies. The 20-intent subset is intentionally small, and Naive Bayes makes lexical effects unusually visible. A stronger follow-up should freeze the selection rule, add the full CLINC150 label space and at least one naturally misspelled corpus, and compare word, subword, and byte representations without retuning $\\epsilon$ on test accuracy.\n\nThe association also uses only ordered pairs from four fixed operators. Seed bootstrapping quantifies perturbation randomness, not uncertainty over the universe of possible typo processes. Consequently, the confidence interval is evidence about this experimental operator set. We report it to make the falsifier operational, not to imply population-level causal identification.\n\n\\paragraph{Why not choose by edit name?} Operator labels encode implementation history rather than feature effect. Two distinct edit procedures can produce similar lexical damage, while the same named procedure can behave differently after tokenization. Footprints make the selection criterion inspectable, but the present result shows that inspectability is not predictive validity. Two coordinates are insufficient in this regime.\n\n\\paragraph{Deployment implications.} A minimal synthetic basis would matter only if reducing operator types had an independently measured operational benefit. This study fixes the sample budget and does not demonstrate such a saving. At most, footprint coverage can be treated as a screening heuristic followed by held-out validation. The keyboard result demonstrates why: geometric coverage gave a small point loss but did not reproduce the full mixture's operator-specific accuracy or pass the uncertainty-aware boundary.\n\n\\paragraph{What survives falsification?} The computational scaffold remains useful even though the mechanism does not. It separates label-free measurement, operator selection, augmentation, and held-out adjudication; fixes the test-access boundary; and records enough atomic evidence to expose an incorrect diagonal analysis. The scientific takeaway is methodological rather than positive: a visually plausible footprint map and a favorable aggregate point estimate are not substitutes for a strict cross-operator definition and uncertainty computed on the reported statistic.\n\n\\paragraph{Next decisive experiment.} A follow-up should add operators whose footprint coordinates are deliberately close but whose token-level error locations differ, and operators whose coordinates are distant at matched edit count. That design would test whether the failure arises from inadequate coordinate resolution or from the absence of any stable geometric transfer relation. The analysis must keep diagonals excluded, freeze all coordinates before test access, and add enough seeds to evaluate the one-point acceptance boundary. A second representation would then reveal whether the footprint object is representation-specific, as its definition suggests."
+    },
+    "conclusion": {
+      "title": "Conclusion",
+      "file": "conclusion.tex",
+      "previous_response_id": null,
+      "bibliography_fingerprint": null,
+      "conversation_section_fingerprint": null,
+      "revision": 1,
+      "current_index": 0,
+      "paragraphs": [
+        {
+          "id": "C1",
+          "purpose": "Close the research question and scope.",
+          "reference_lines": [
+            7,
+            8
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\section{Conclusion}\nWe tested typo-augmentation selection by label-free feature-footprint coverage. In a deterministic CPU experiment, footprint distance was not negatively associated with cross-operator transfer, and a three-operator basis had a favorable 0.5-percentage-point observed gap but failed the uncertainty-aware acceptance check against a four-operator mixture. The falsification shows why point estimates and geometric coverage alone are insufficient, while remaining explicitly bounded to one dataset slice, classifier, and synthetic operator family.\\label{paper:endconclusion}",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        }
+      ],
+      "accepted_text": "\\section{Conclusion}\nWe tested typo-augmentation selection by label-free feature-footprint coverage. In a deterministic CPU experiment, footprint distance was not negatively associated with cross-operator transfer, and a three-operator basis had a favorable 0.5-percentage-point observed gap but failed the uncertainty-aware acceptance check against a four-operator mixture. The falsification shows why point estimates and geometric coverage alone are insufficient, while remaining explicitly bounded to one dataset slice, classifier, and synthetic operator family.\\label{paper:endconclusion}"
+    },
+    "appendix": {
+      "title": "Appendix",
+      "file": "appendix.tex",
+      "previous_response_id": null,
+      "bibliography_fingerprint": null,
+      "conversation_section_fingerprint": null,
+      "revision": 2,
+      "current_index": 0,
+      "paragraphs": [
+        {
+          "id": "AP1",
+          "purpose": "Record frozen revision, reproducibility, and compute.",
+          "reference_lines": [
+            7,
+            8
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\section{Reproducibility Details}\nThe source dataset revision begins \\texttt{828f8093932c8fe6}; the full pinned revision is serialized in the configuration. Each run serializes the chosen intents, operators, severity, smoothing, seeds, footprint coordinates, and tolerance. Two complete executions produced the same SHA-256 digest after removing the wall-clock duration field. The experiment requires no GPU and completed in under 11 seconds on the development machine.\n\nThe hull distance is computed by projection onto each line segment and by endpoint distance for singleton sets. We enumerate operator subsets in increasing cardinality, making the selection exact for four operators. Partial correlation is computed by residualizing both footprint distance and transfer gain against edit-count distance, then correlating the residuals. Bootstrap intervals resample the five seed-level correlations with a fixed random generator.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        },
+        {
+          "id": "AP2",
+          "purpose": "Explain hull distance and partial-correlation computation.",
+          "reference_lines": [
+            7,
+            8
+          ],
+          "artifacts": [],
+          "candidate": null,
+          "accepted_text": "\\section{Derivations and Checks}\nResidualization gives $\\tilde d=d-\\widehat{d}(e)$ and $\\widetilde{\\Delta}=\\Delta-\\widehat{\\Delta}(e)$ from separate least-squares projections on edit-count difference; the reported partial correlation is the ordinary Pearson correlation of these residuals. For a candidate line segment with endpoints $p$ and $q$, projection uses $t=((z-p)\\cdot(q-p))/\\lVert q-p\\rVert_2^2$ clipped to $[0,1]$, followed by distance from $z$ to $p+t(q-p)$. Numeric checks verify distance identity and symmetry and confirm that the selected basis is a strict subset of the operator set.",
+          "history": [
+            {
+              "event": "accepted",
+              "source": "audited direct draft",
+              "at": 1786810000
+            }
+          ]
+        }
+      ],
+      "accepted_text": "\\section{Reproducibility Details}\nThe source dataset revision begins \\texttt{828f8093932c8fe6}; the full pinned revision is serialized in the configuration. Each run serializes the chosen intents, operators, severity, smoothing, seeds, footprint coordinates, and tolerance. Two complete executions produced the same SHA-256 digest after removing the wall-clock duration field. The experiment requires no GPU and completed in under 11 seconds on the development machine.\n\nThe hull distance is computed by projection onto each line segment and by endpoint distance for singleton sets. We enumerate operator subsets in increasing cardinality, making the selection exact for four operators. Partial correlation is computed by residualizing both footprint distance and transfer gain against edit-count distance, then correlating the residuals. Bootstrap intervals resample the five seed-level correlations with a fixed random generator.\n\n\\section{Derivations and Checks}\nResidualization gives $\\tilde d=d-\\widehat{d}(e)$ and $\\widetilde{\\Delta}=\\Delta-\\widehat{\\Delta}(e)$ from separate least-squares projections on edit-count difference; the reported partial correlation is the ordinary Pearson correlation of these residuals. For a candidate line segment with endpoints $p$ and $q$, projection uses $t=((z-p)\\cdot(q-p))/\\lVert q-p\\rVert_2^2$ clipped to $[0,1]$, followed by distance from $z$ to $p+t(q-p)$. Numeric checks verify distance identity and symmetry and confirm that the selected basis is a strict subset of the operator set."
+    }
+  },
+  "figures": {
+    "F1": {
+      "status": "approved",
+      "previous_response_id": null,
+      "revision": 1,
+      "approved_at": 1786810000,
+      "prompt_approved_at": null,
+      "last_message": "",
+      "draw_prompt": "",
+      "prompt_instruction": "",
+      "prompt_history": [],
+      "agent_prompt": "",
+      "agent_history": [],
+      "agent_chat_history": [],
+      "layout_prompt": "",
+      "layout_prompt_is_default": false,
+      "layout_plan": {},
+      "composed_at": null,
+      "layout_width": null,
+      "layout_mode": "single-column",
+      "requested_layout_width": "single-column",
+      "panels": {},
+      "placement_after": "I1",
+      "progress": 100,
+      "progress_message": "Completed and inserted",
+      "job_token": null,
+      "job_revision": 0,
+      "job_started_at": null
+    },
+    "F2": {
+      "status": "approved",
+      "previous_response_id": null,
+      "revision": 1,
+      "approved_at": 1786810000,
+      "prompt_approved_at": null,
+      "last_message": "",
+      "draw_prompt": "",
+      "prompt_instruction": "",
+      "prompt_history": [],
+      "agent_prompt": "",
+      "agent_history": [],
+      "agent_chat_history": [],
+      "layout_prompt": "",
+      "layout_prompt_is_default": false,
+      "layout_plan": {},
+      "composed_at": null,
+      "layout_width": null,
+      "layout_mode": "single-column",
+      "requested_layout_width": "single-column",
+      "panels": {
+        "typo_sensitivity": {
+          "status": "approved",
+          "revision": 1,
+          "agent_prompt": "",
+          "last_message": "",
+          "progress": 100,
+          "progress_message": ""
+        }
+      },
+      "placement_after": "E4",
+      "progress": 100,
+      "progress_message": "Completed and inserted",
+      "job_token": null,
+      "job_revision": 0,
+      "job_started_at": null
+    }
+  },
+  "tables": {
+    "T1": {
+      "status": "approved",
+      "revision": 1,
+      "approved_at": 1786810000,
+      "last_message": "",
+      "latex": "\\begin{table*}[t]\n\\centering\\scriptsize\\setlength{\\tabcolsep}{4pt}\n\\begin{tabular}{lcccc}\n\\toprule\n\\multicolumn{5}{c}{\\textbf{Dataset: CLINC150 20-intent CPU subset} $\\cdot$ augmentation policy $\\cdot$ input condition $\\cdot$ metric}\\\\\nMethod & Clean Accuracy $\\uparrow$ & Worst-operator Accuracy $\\uparrow$ & Mean noisy Accuracy $\\uparrow$ & Worst-accuracy gap $\\downarrow$\\\\\n\\midrule\nClean-only word Naive Bayes & 0.9517 & 0.8633 & 0.8715 & 0.0117\\\\\nBalanced four-operator augmentation & 0.9530 & \\textbf{0.8750} & \\textbf{0.8902} & 0.0000\\\\\nOur method: minimal footprint-cover basis & \\textbf{0.9540} & 0.8700 & 0.8895 & 0.0050\\\\\n\\bottomrule\n\\end{tabular}\n\\caption{Clean and worst-operator comparison under a matched augmentation budget. Values are five-seed means; the declared accuracy-gap acceptance boundary is 0.01.}\n\\label{tab:micro-main}\n\\end{table*}",
+      "generation_prompt": "数据源: results/typo_basis/main_results.json\n列: Clean Accuracy ↑ | Worst-operator Accuracy ↑ | Mean noisy Accuracy ↑ | Gap to full mixture ↓\n行: source\nCaption: Clean and worst-operator comparison under a matched augmentation budget.\n字号: small\n最优值: highest accuracy and lowest gap",
+      "prompt_history": [],
+      "agent_prompt": "",
+      "agent_history": [],
+      "placement_after": "E3",
+      "progress": 100,
+      "progress_message": "Completed and inserted",
+      "job_token": null,
+      "job_revision": 0,
+      "job_started_at": null
+    }
+  },
+  "compile": {
+    "status": "success",
+    "message": "Compiled audited four-page body plus references",
+    "updated_at": 1786810000
+  }
+}

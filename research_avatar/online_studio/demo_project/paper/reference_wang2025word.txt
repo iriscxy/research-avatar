@@ -1,0 +1,7 @@
+Word Form Matters studies how a controlled character-order perturbation changes semantic reconstruction while preserving the intended lexical identity. Its introduction begins with a concrete scrambled-word example, narrows the unresolved mechanism, and states bounded contributions.
+
+The related-work section separates empirical robustness observations from representational explanations. Claims about prior systems remain distinct from claims tested in the current experiment.
+
+The method introduces notation only after the task is defined, gives each quantity an operational interpretation, and connects formal objects to the hypotheses later tested in experiments.
+
+The experimental section first fixes data, models, and metrics, then states the main comparison, and finally analyzes a mechanism-specific result. Limitations distinguish evidence from extrapolation.

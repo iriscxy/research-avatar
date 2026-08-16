@@ -34,6 +34,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from .api_usage import append_usage, usage_record, usage_summary
+
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 # Runtime project data belongs to the directory from which the Studio is
@@ -44,6 +46,7 @@ STATIC = Path(__file__).resolve().parent / "static"
 PAPER = ROOT / "paper"
 STATE_DIR = PAPER / ".paper_studio"
 STATE_FILE = STATE_DIR / "state.json"
+API_USAGE_FILE = STATE_DIR / "api_usage.jsonl"
 PARAGRAPH_PLAN_FILE = PAPER / "paragraph_plan.json"
 FIGURE_DIR = PAPER / "fig"
 FIGURE_SOURCE_DIR = PAPER / "figsrc"
@@ -3327,7 +3330,9 @@ def reusable_response_id(response_id: str | None) -> str | None:
         return response_id if response_id in CHAT_RESPONSE_HISTORIES else None
 
 
-def post_openai(payload: dict[str, Any], *, provider: str | None = None) -> dict[str, Any]:
+def post_openai(
+    payload: dict[str, Any], *, provider: str | None = None, operation: str = "paper_text"
+) -> dict[str, Any]:
     """Call the selected text LLM and normalize it to a Responses-style record."""
     provider = (provider or active_llm_provider()).strip().lower()
     config = provider_configuration(provider)
@@ -3369,6 +3374,15 @@ def post_openai(payload: dict[str, Any], *, provider: str | None = None) -> dict
         with urllib.request.urlopen(request, timeout=240) as response:
             body = json.loads(response.read().decode("utf-8"))
             if config["protocol"] == "responses":
+                append_usage(
+                    API_USAGE_FILE,
+                    usage_record(
+                        body,
+                        provider=provider,
+                        requested_model=str(payload.get("model") or ""),
+                        operation=operation,
+                    ),
+                )
                 return body
             choices = body.get("choices") or []
             content = ""
@@ -3380,10 +3394,22 @@ def post_openai(payload: dict[str, Any], *, provider: str | None = None) -> dict
                     CHAT_RESPONSE_HISTORIES[response_id] = history + [
                         {"role": "assistant", "content": content}
                     ]
-            return {
+            normalized = {
                 "id": response_id,
+                "model": body.get("model") or payload.get("model"),
+                "usage": body.get("usage") or {},
                 "output": [{"type": "message", "content": [{"type": "output_text", "text": content}]}],
             }
+            append_usage(
+                API_USAGE_FILE,
+                usage_record(
+                    normalized,
+                    provider=provider,
+                    requested_model=str(payload.get("model") or ""),
+                    operation=operation,
+                ),
+            )
+            return normalized
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise StudioError(f"{config['label']} API returned HTTP {exc.code}: {detail[:1200]}") from exc
@@ -6877,6 +6903,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
             "outline_confirmed": False,
             "api_key_configured": api_key_configured,
             "api_key_setup": api_key_setup,
+            "api_usage": usage_summary(API_USAGE_FILE),
             "agent_chat_history": [],
             "agent_chat_job": None,
             "full_draft": {
@@ -6979,6 +7006,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
     result["llm_model_options"] = model_options
     result["api_key_configured"] = api_key_configured
     result["api_key_setup"] = api_key_setup
+    result["api_usage"] = usage_summary(API_USAGE_FILE)
     result["figures"] = figure_public_state(state)
     result["tables"] = table_public_state(state)
     return result

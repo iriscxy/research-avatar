@@ -31,39 +31,39 @@
         <span id="account-label"></span>
         <button id="logout" class="link-button" type="button">退出登录</button>
       </div>
-      <section class="hero">
-      <p class="eyebrow">ONLINE PAPER STUDIO</p>
-      <h1>带上完整实验契约，进入 Paper Studio。</h1>
-      <p class="lede">上传 profileconstruct、expplan 与 runplan 的正式产物。系统先核验已批准的论文蓝图和底层结果，再构建与本地相同的 Paper Studio 项目。</p>
-      <div id="session-actions" class="session-actions hidden">
-        <a class="resume" href="/studio">继续当前写作会话 →</a>
-        <a class="export" href="/api/online/export">导出项目 ZIP</a>
-      </div>
+      <nav class="product-tabs" aria-label="Online Paper Studio">
+        <button id="demo-tab" class="product-tab active" type="button" data-panel="demo-panel" aria-selected="true">Demo</button>
+        <button id="use-tab" class="product-tab" type="button" data-panel="use-panel" aria-selected="false">Use it</button>
+      </nav>
+
+      <section id="demo-panel" class="product-panel">
+        <div class="demo-heading">
+          <div><p class="eyebrow">COMPLETE WORKED EXAMPLE</p><h1>先看看一篇论文是怎样完成的。</h1></div>
+          <p>这是完整 Research Avatar 流程的可交互示例。论文写作部分展示已完成的真实 Paper Studio 项目，不是产品截图。</p>
+        </div>
+        <iframe id="demo-frame" class="demo-frame" src="/demo/" title="Research Avatar complete demo"></iframe>
       </section>
 
-      <form id="setup-form" class="card">
+      <section id="use-panel" class="product-panel hidden">
+        <section class="hero">
+        <p class="eyebrow">USE ONLINE PAPER STUDIO</p>
+        <h1>上传完整项目，开始自己的论文。</h1>
+        <p class="lede">上传由 Research Avatar 生成的必要研究证据。系统会核验已批准的论文蓝图和底层结果，再构建与本地相同的 Paper Studio 项目。</p>
+        <div id="session-actions" class="session-actions hidden">
+          <a class="resume" href="/studio">继续当前写作会话 →</a>
+          <a class="export" href="/api/online/export">导出项目 ZIP</a>
+        </div>
+        </section>
+
+        <form id="setup-form" class="card">
       <div class="setup-heading">
         <p class="step-index">01</p>
-        <div><h2>上传完整研究输入</h2><p>四项都必须来自同一个 Research Avatar 项目，不能用 03 或 05 互相替代。</p></div>
+        <div><h2>上传 Research Avatar 项目包</h2><p>一个 ZIP 包含 PROFILE、01–05 reports、results、出版记录和 03 选定的结构参考论文；不会打包整套 full text。</p></div>
       </div>
-      <div class="grid two upload-grid">
-        <label class="upload-field">研究者画像 HTML
-          <input id="profile-file" name="profile_file" type="file" accept=".html,.htm,text/html" required>
-          <small>选择由 <code>$constructprofile</code> 生成的 <code>PROFILE.html</code>。</small>
-        </label>
-        <label class="upload-field">已批准实验计划
-          <input id="plan-file" name="plan_file" type="file" accept=".html,.htm,text/html" required>
-          <small>选择 <code>03_EXPERIMENT_PLAN.html</code>；其 embedded contract 必须为 approved。</small>
-        </label>
-        <label class="upload-field">完整实验结果
-          <input id="result-file" name="result_file" type="file" accept=".html,.htm,text/html" required>
-          <small>选择由 <code>$runplan</code> 填满的 <code>05_EXP_RESULT.html</code>。</small>
-        </label>
-        <label class="upload-field">研究证据 ZIP
-          <input id="evidence-archive" name="evidence_archive" type="file" accept=".zip,application/zip" required>
-          <small>在项目根目录运行 <code>python3 -m research_avatar.online_studio.package</code> 生成；最多 32 MB。</small>
-        </label>
-      </div>
+      <label class="upload-field project-package-field">完整项目 ZIP
+        <input id="project-package" name="project_package" type="file" accept=".zip,application/zip" required>
+        <small>在项目根目录运行 <code>python3 -m research_avatar.online_studio.package</code> 生成；最多 32 MB。系统会逐项核验 03 approval、05 完整度与 results provenance。</small>
+      </label>
 
       <div class="setup-heading key-heading">
         <p class="step-index">02</p>
@@ -74,7 +74,8 @@
       <p id="message" role="status" aria-live="polite"></p>
       <button id="submit" type="submit">进入 Paper Studio →</button>
       <p class="security">在线写作会话是临时工作区。关闭或超时前请从写作台导出项目 ZIP；你的 API key 不会写入导出文件。</p>
-      </form>
+        </form>
+      </section>
     </div>
   </main>
   <script src="/online-assets/app.js" defer></script>

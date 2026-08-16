@@ -37,6 +37,8 @@ from typing import Any
 
 
 STATIC = Path(__file__).resolve().parent / "static"
+DEMO_STATIC = Path(__file__).resolve().parents[1] / "web" / "demo"
+DEMO_PROJECT = Path(__file__).resolve().parent / "demo_project"
 COOKIE_NAME = "paper_studio_session"
 AUTH_COOKIE_NAME = "online_studio_auth"
 GOOGLE_STATE_COOKIE = "online_studio_google_state"
@@ -80,12 +82,15 @@ class Session:
     model: str
     process: subprocess.Popen[bytes]
     port: int
+    kind: str = "user"
     created_at: float = field(default_factory=time.time)
     last_access: float = field(default_factory=time.time)
 
 
 SESSIONS: dict[str, Session] = {}
 SESSIONS_LOCK = threading.RLock()
+DEMO_SESSION: Session | None = None
+DEMO_SESSION_LOCK = threading.RLock()
 OAUTH_STATES: dict[str, tuple[str, float]] = {}
 OAUTH_STATES_LOCK = threading.RLock()
 DATA_ROOT = Path(
@@ -610,12 +615,18 @@ def _archive_path_allowed(path: Path) -> bool:
     return (
         value.startswith("results/")
         or value.startswith("figures/")
+        or value.startswith("references/")
         or value.startswith("researcher-profile/fulltext/")
         or value in {
+            "project-package.json",
+            "researcher-profile/PROFILE.html",
             "researcher-profile/publications.json",
             "code/RESULTS_LEDGER.csv",
             "reports/01_LIT_SURVEY.html",
+            "reports/02_IDEA_REPORT.html",
+            "reports/03_EXPERIMENT_PLAN.html",
             "reports/04_RUN_PLAN.html",
+            "reports/05_EXP_RESULT.html",
         }
     )
 
@@ -649,17 +660,59 @@ def _extract_evidence_archive(content: bytes, root: Path) -> None:
         raise OnlineStudioError("研究证据 ZIP 必须包含非空的 results/ 目录。")
     if not any(path.as_posix() == "researcher-profile/publications.json" for _info, path in accepted):
         raise OnlineStudioError("研究证据 ZIP 必须包含 researcher-profile/publications.json。")
-    if not any(
-        path.as_posix().startswith("researcher-profile/fulltext/")
-        and path.suffix.lower() == ".txt"
+    has_structural_reference = any(
+        path.as_posix() == "references/structure.txt" for _info, path in accepted
+    )
+    has_legacy_reference = any(
+        path.as_posix().startswith("researcher-profile/fulltext/") and path.suffix.lower() == ".txt"
         for _info, path in accepted
-    ):
-        raise OnlineStudioError("研究证据 ZIP 必须包含 researcher-profile/fulltext/ 下的 .txt 参考论文全文。")
+    )
+    if not has_structural_reference and not has_legacy_reference:
+        raise OnlineStudioError("研究项目 ZIP 必须包含 03 选定的 references/structure.txt。")
     for info, relative in accepted:
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         with archive.open(info) as source, target.open("wb") as destination:
             shutil.copyfileobj(source, destination)
+
+
+def _validate_project_package(root: Path) -> None:
+    manifest_path = root / "project-package.json"
+    if not manifest_path.is_file():
+        raise OnlineStudioError("研究项目 ZIP 缺少 project-package.json。")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise OnlineStudioError("project-package.json 不是有效 JSON。") from exc
+    if manifest.get("schema_version") != "2.0" or manifest.get("kind") != "research-avatar-paper-input":
+        raise OnlineStudioError("研究项目 ZIP 版本不受支持，请重新运行打包命令。")
+    hashes = manifest.get("files")
+    if not isinstance(hashes, dict):
+        raise OnlineStudioError("project-package.json 缺少文件哈希。")
+    required = {
+        "researcher-profile/PROFILE.html",
+        "researcher-profile/publications.json",
+        "reports/01_LIT_SURVEY.html",
+        "reports/02_IDEA_REPORT.html",
+        "reports/03_EXPERIMENT_PLAN.html",
+        "reports/04_RUN_PLAN.html",
+        "reports/05_EXP_RESULT.html",
+        "references/structure.txt",
+    }
+    missing = sorted(required - set(hashes))
+    if missing:
+        raise OnlineStudioError("研究项目 ZIP 缺少必需文件：" + "、".join(missing))
+    for name, expected in hashes.items():
+        path = (root / str(name)).resolve()
+        try:
+            path.relative_to(root.resolve())
+        except ValueError as exc:
+            raise OnlineStudioError("project-package.json 包含越界路径。") from exc
+        if not path.is_file():
+            raise OnlineStudioError(f"研究项目 ZIP 清单文件不存在：{name}")
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        if not secrets.compare_digest(actual, str(expected)):
+            raise OnlineStudioError(f"研究项目 ZIP 文件哈希不匹配：{name}")
 
 
 def _validated_upstream_contract(root: Path, plan_source: str, result_source: str) -> dict[str, Any]:
@@ -762,6 +815,38 @@ def _source_text(files: list[tuple[str, str]]) -> str:
             + "\n\n[ONLINE STUDIO NOTE: additional uploaded text was truncated at the configured context limit.]"
         )
     return merged
+
+
+def _reference_chunks(source: str, limit: int = 4000) -> list[str]:
+    """Normalize one structural paper into bounded prompt excerpts."""
+    blocks = [re.sub(r"\s+", " ", item).strip() for item in re.split(r"\n\s*\n", source)]
+    blocks = [item for item in blocks if item]
+    if len(blocks) <= 1:
+        blocks = [re.sub(r"\s+", " ", item).strip() for item in source.splitlines() if item.strip()]
+    chunks: list[str] = []
+    current = ""
+    for block in blocks:
+        for start in range(0, len(block), limit):
+            piece = block[start : start + limit]
+            candidate = f"{current} {piece}".strip()
+            if current and len(candidate) > limit:
+                chunks.append(current)
+                current = piece
+            else:
+                current = candidate
+    if current:
+        chunks.append(current)
+    return chunks or ["Structural reference text was empty."]
+
+
+def _matched_reference_line(chunks: list[str], query: str) -> int:
+    terms = {
+        term
+        for term in re.findall(r"[a-z]{4,}", query.lower())
+        if term not in {"this", "that", "with", "from", "into", "only", "paper"}
+    }
+    scores = [sum(chunk.lower().count(term) for term in terms) for chunk in chunks]
+    return max(range(len(chunks)), key=lambda index: (scores[index], -index)) + 1
 
 
 def _project_identity(plan_source: str, contract: dict[str, Any]) -> tuple[str, str]:
@@ -1004,10 +1089,6 @@ def _write_workspace(
     files: list[tuple[str, str]],
     archive: bytes,
 ) -> None:
-    sources = _canonical_pipeline_sources(files)
-    profile = sources["PROFILE.html"]
-    if "writing style" not in profile.lower():
-        raise OnlineStudioError("PROFILE.html 缺少完整的 Writing Style 部分，请先刷新 profileconstruct。")
     paper = root / "paper"
     sections_dir = paper / "sections"
     sources_dir = root / "sources"
@@ -1018,6 +1099,21 @@ def _write_workspace(
     profile_dir.mkdir(parents=True)
     reports_dir.mkdir(parents=True)
     _extract_evidence_archive(archive, root)
+    if not files:
+        _validate_project_package(root)
+        packaged_sources = {
+            "PROFILE.html": root / "researcher-profile/PROFILE.html",
+            "03_EXPERIMENT_PLAN.html": root / "reports/03_EXPERIMENT_PLAN.html",
+            "05_EXP_RESULT.html": root / "reports/05_EXP_RESULT.html",
+        }
+        missing = [name for name, path in packaged_sources.items() if not path.is_file()]
+        if missing:
+            raise OnlineStudioError("研究项目 ZIP 缺少必需文件：" + "、".join(missing))
+        files = [(name, path.read_text(encoding="utf-8")) for name, path in packaged_sources.items()]
+    sources = _canonical_pipeline_sources(files)
+    profile = sources["PROFILE.html"]
+    if "writing style" not in profile.lower():
+        raise OnlineStudioError("PROFILE.html 缺少完整的 Writing Style 部分，请先刷新 profileconstruct。")
     (profile_dir / "PROFILE.html").write_text(profile, encoding="utf-8")
     (reports_dir / "03_EXPERIMENT_PLAN.html").write_text(
         sources["03_EXPERIMENT_PLAN.html"], encoding="utf-8"
@@ -1034,14 +1130,15 @@ def _write_workspace(
     sections = _outline_sections(contract)
     figures, tables, metrics = _artifact_definitions(contract, sections)
 
-    reference_files = sorted((root / "researcher-profile/fulltext").rglob("*.txt"))
-    reference_blocks = [path.read_text(encoding="utf-8", errors="replace") for path in reference_files[:3]]
-    reference = _source_text(list(sources.items()))
-    if reference_blocks:
-        reference += "\n\nSTRUCTURAL REFERENCE PAPER:\n" + "\n\n".join(reference_blocks)
+    reference_files = [root / "references/structure.txt"]
+    if not reference_files[0].is_file():
+        reference_files = sorted((root / "researcher-profile/fulltext").rglob("*.txt"))[:1]
+    if not reference_files:
+        raise OnlineStudioError("研究项目 ZIP 缺少结构参考论文文本。")
+    reference = reference_files[0].read_text(encoding="utf-8", errors="replace")
+    reference_chunks = _reference_chunks(reference)
     reference_path = paper / "uploaded_sources.txt"
-    reference_path.write_text(reference + "\n", encoding="utf-8")
-    line_count = max(1, len(reference.splitlines()))
+    reference_path.write_text("\n".join(reference_chunks) + "\n", encoding="utf-8")
     section_specs = []
     plan_sections: dict[str, list[dict[str, Any]]] = {}
     outline_lines = [f"Title: {title}", "", "Approved section plan:"]
@@ -1071,10 +1168,20 @@ def _write_workspace(
         plan_sections[section_id] = []
         outline_lines.append(f"{index}. {section_title}")
         for paragraph in section["paragraphs"]:
+            reference_line = _matched_reference_line(
+                reference_chunks,
+                " ".join(
+                    [
+                        section_title,
+                        str(paragraph.get("heading") or ""),
+                        paragraph["purpose"],
+                    ]
+                ),
+            )
             planned = {
                 "id": paragraph["id"],
                 "purpose": paragraph["purpose"],
-                "reference_lines": [1, line_count],
+                "reference_lines": [reference_line, reference_line],
                 "artifacts": paragraph["artifacts"],
             }
             if paragraph["heading"]:
@@ -1183,7 +1290,14 @@ def _available_port() -> int:
         return int(sock.getsockname()[1])
 
 
-def _start_worker(root: Path, provider: str, model: str, api_key: str) -> tuple[subprocess.Popen[bytes], int]:
+def _start_worker(
+    root: Path,
+    provider: str,
+    model: str,
+    api_key: str,
+    *,
+    demo_mode: bool = False,
+) -> tuple[subprocess.Popen[bytes], int]:
     port = _available_port()
     environment = dict(os.environ)
     for name in KEY_ENVIRONMENTS:
@@ -1195,6 +1309,7 @@ def _start_worker(root: Path, provider: str, model: str, api_key: str) -> tuple[
             "PAPER_STUDIO_PROVIDER": provider,
             "PAPER_STUDIO_MODEL": model,
             "PAPER_STUDIO_ONLINE": "1",
+            "PAPER_STUDIO_DEMO_MODE": "1" if demo_mode else "0",
             key_environment: api_key,
         }
     )
@@ -1254,7 +1369,7 @@ def create_session(payload: dict[str, Any], *, user_id: str) -> Session:
     model = str(payload.get("model") or PROVIDERS[provider][1]).strip()
     if not model or len(model) > 128 or any(character.isspace() for character in model):
         raise OnlineStudioError("模型名称格式无效。")
-    files = _decode_html_files(payload.get("files"))
+    files = _decode_html_files(payload.get("files")) if payload.get("files") else []
     archive = _decode_evidence_archive(payload.get("evidence_archive"))
     session_id = secrets.token_urlsafe(32)
     root = (
@@ -1278,6 +1393,45 @@ def create_session(payload: dict[str, Any], *, user_id: str) -> Session:
     with SESSIONS_LOCK:
         SESSIONS[session_id] = session
     return session
+
+
+def demo_session() -> Session:
+    """Start one shared read-only worker from the committed completed project."""
+    global DEMO_SESSION
+    with DEMO_SESSION_LOCK:
+        if DEMO_SESSION and DEMO_SESSION.process.poll() is None:
+            DEMO_SESSION.last_access = time.time()
+            return DEMO_SESSION
+        if not (DEMO_PROJECT / "paper/paper_studio.json").is_file():
+            raise OnlineStudioError("完成态 Demo 论文项目尚未安装。")
+        session_id = "demo-" + secrets.token_urlsafe(12)
+        root = DATA_ROOT / "demo" / hashlib.sha256(session_id.encode("utf-8")).hexdigest()
+        if root.exists():
+            raise OnlineStudioError("Demo 工作目录冲突，请重试。")
+        root.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(DEMO_PROJECT, root)
+        try:
+            process, port = _start_worker(
+                root,
+                "openai",
+                "gpt-5-nano",
+                "demo-read-only-no-api-calls",
+                demo_mode=True,
+            )
+        except Exception:
+            shutil.rmtree(root, ignore_errors=True)
+            raise
+        DEMO_SESSION = Session(
+            session_id,
+            "*",
+            root,
+            "openai",
+            "gpt-5-nano",
+            process,
+            port,
+            kind="demo",
+        )
+        return DEMO_SESSION
 
 
 def _session_from_cookie(header: str | None, *, user_id: str) -> Session | None:
@@ -1324,23 +1478,50 @@ class Handler(BaseHTTPRequestHandler):
             f"{self.command} {path} {status}"
         )
 
-    def _headers(self, content_type: str, length: int, status: int = 200) -> None:
+    def _headers(
+        self,
+        content_type: str,
+        length: int,
+        status: int = 200,
+        *,
+        allow_same_origin_frame: bool = False,
+    ) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(length))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("X-Frame-Options", "DENY")
+        self.send_header(
+            "X-Frame-Options",
+            "SAMEORIGIN" if allow_same_origin_frame else "DENY",
+        )
         self.send_header(
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self'; style-src 'self'; "
-            "img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+            "img-src 'self' data:; object-src 'none'; base-uri 'none'; "
+            + (
+                "frame-src 'self'; frame-ancestors 'self'"
+                if allow_same_origin_frame
+                else "frame-ancestors 'none'"
+            ),
         )
         self.end_headers()
 
-    def _bytes(self, data: bytes, content_type: str, status: int = 200) -> None:
-        self._headers(content_type, len(data), status)
+    def _bytes(
+        self,
+        data: bytes,
+        content_type: str,
+        status: int = 200,
+        *,
+        allow_same_origin_frame: bool = False,
+    ) -> None:
+        self._headers(
+            content_type,
+            len(data),
+            status,
+            allow_same_origin_frame=allow_same_origin_frame,
+        )
         self.wfile.write(data)
 
     def _json(self, payload: Any, status: int = 200, *, cookie: str | None = None) -> None:
@@ -1414,6 +1595,47 @@ class Handler(BaseHTTPRequestHandler):
             self._bytes((STATIC / "app.js").read_bytes(), "text/javascript; charset=utf-8")
         elif path == "/online-assets/style.css":
             self._bytes((STATIC / "style.css").read_bytes(), "text/css; charset=utf-8")
+        elif path == "/demo":
+            if self._require_user():
+                self._redirect("/demo/")
+        elif path.startswith("/demo/"):
+            if not self._require_user():
+                return
+            relative = path[len("/demo/") :] or "index.html"
+            candidate = (DEMO_STATIC / relative).resolve()
+            try:
+                candidate.relative_to(DEMO_STATIC.resolve())
+            except ValueError:
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            content_types = {
+                ".html": "text/html; charset=utf-8",
+                ".js": "text/javascript; charset=utf-8",
+                ".css": "text/css; charset=utf-8",
+                ".json": "application/json; charset=utf-8",
+                ".png": "image/png",
+                ".svg": "image/svg+xml; charset=utf-8",
+            }
+            if not candidate.is_file() or candidate.suffix.lower() not in content_types:
+                self.send_error(HTTPStatus.NOT_FOUND)
+                return
+            self._bytes(
+                candidate.read_bytes(),
+                content_types[candidate.suffix.lower()],
+                allow_same_origin_frame=True,
+            )
+        elif path == "/demo-studio":
+            if self._require_user():
+                self._redirect("/demo-studio/")
+        elif path.startswith("/demo-studio/"):
+            if not self._require_user():
+                return
+            try:
+                session = demo_session()
+                upstream = "/" + path[len("/demo-studio/") :]
+                self._proxy(session, upstream, read_only=True)
+            except OnlineStudioError as exc:
+                self._json({"ok": False, "error": str(exc)}, 503)
         elif path == "/api/online/health":
             self._json({"ok": True, "service": "online-paper-studio"})
         elif path == "/api/auth/session":
@@ -1501,6 +1723,9 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": True, "redirect": "/studio"}, cookie=cookie)
             except OnlineStudioError as exc:
                 self._json({"ok": False, "error": str(exc)}, 400)
+        elif path.startswith("/demo-studio/"):
+            if self._require_user():
+                self._json({"ok": False, "error": "完成态 Demo 为只读展示。"}, 405)
         else:
             user = self._require_user()
             if user:
@@ -1589,7 +1814,10 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             self._redirect("/?auth_error=google", cookies=[clear_state_cookie])
 
-    def _proxy(self, session: Session, path: str) -> None:
+    def _proxy(self, session: Session, path: str, *, read_only: bool = False) -> None:
+        if read_only and self.command not in {"GET", "HEAD"}:
+            self._json({"ok": False, "error": "完成态 Demo 为只读展示。"}, 405)
+            return
         try:
             length = int(self.headers.get("Content-Length", "0") or "0")
         except ValueError:
@@ -1663,6 +1891,9 @@ def main() -> None:
             for session in SESSIONS.values():
                 if session.process.poll() is None:
                     session.process.terminate()
+        with DEMO_SESSION_LOCK:
+            if DEMO_SESSION and DEMO_SESSION.process.poll() is None:
+                DEMO_SESSION.process.terminate()
 
 
 if __name__ == "__main__":

@@ -32,7 +32,7 @@ include = ["research_avatar*"]
 
 [tool.setuptools.package-data]
 "research_avatar.paper_studio" = ["static/*", "*.mjs", "README.md"]
-"research_avatar.online_studio" = ["static/*", "README.md"]
+"research_avatar.online_studio" = ["static/*", "demo_project/**/*", "README.md"]
 "research_avatar.research_studio" = ["static/*"]
 "research_avatar.web.demo" = ["*.html", "*.js", "*.css", "*.json", "_routes.json", "assets/**/*"]
 "research_avatar.web.functions" = ["*.js"]

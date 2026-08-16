@@ -1,0 +1,378 @@
+{
+  "schema_version": "1.0",
+  "status": "PASS",
+  "synthetic": false,
+  "dataset": {
+    "revision": "828f8093932c8fe6ca7936c3d2e52903b1c523de",
+    "path": "data/typo_basis/source/data_full.json",
+    "sha256": "36923c3705a59e08fe9c3883d8bc2dd966ef93e22cb78ac41171782a698d56e0",
+    "intents": [
+      "accept_reservations",
+      "account_blocked",
+      "alarm",
+      "application_status",
+      "apr",
+      "are_you_a_bot",
+      "balance",
+      "bill_balance",
+      "bill_due",
+      "book_flight",
+      "book_hotel",
+      "calculator",
+      "calendar",
+      "calendar_update",
+      "calories",
+      "cancel",
+      "cancel_reservation",
+      "car_rental",
+      "card_declined",
+      "carry_on"
+    ],
+    "counts": {
+      "train": 2000,
+      "val": 400,
+      "test": 600
+    }
+  },
+  "config": {
+    "schema_version": "1.0",
+    "dataset_url": "https://raw.githubusercontent.com/clinc/oos-eval/828f8093932c8fe6ca7936c3d2e52903b1c523de/data/data_full.json",
+    "dataset_revision": "828f8093932c8fe6ca7936c3d2e52903b1c523de",
+    "intent_count": 20,
+    "operators": [
+      "swap",
+      "delete",
+      "insert",
+      "keyboard"
+    ],
+    "severity": 0.45,
+    "seeds": [
+      11,
+      29,
+      47,
+      71,
+      97
+    ],
+    "footprint_epsilon": 0.01,
+    "smoothing": 1.0,
+    "augmentation_examples_per_clean_example": 1
+  },
+  "footprints": {
+    "by_seed": {
+      "11": {
+        "swap": {
+          "oov_delta": 0.1841558358115055,
+          "char_jaccard_disruption": 0.2806280683652293,
+          "mean_edit_count": 2.0825
+        },
+        "delete": {
+          "oov_delta": 0.19102958643738457,
+          "char_jaccard_disruption": 0.19833661083328522,
+          "mean_edit_count": 2.1875
+        },
+        "insert": {
+          "oov_delta": 0.1999277482815604,
+          "char_jaccard_disruption": 0.19341054133721652,
+          "mean_edit_count": 2.2375
+        },
+        "keyboard": {
+          "oov_delta": 0.19741497030661143,
+          "char_jaccard_disruption": 0.23515874178653642,
+          "mean_edit_count": 2.195
+        }
+      },
+      "29": {
+        "swap": {
+          "oov_delta": 0.16620632093010237,
+          "char_jaccard_disruption": 0.2551503789437971,
+          "mean_edit_count": 1.875
+        },
+        "delete": {
+          "oov_delta": 0.173661953672403,
+          "char_jaccard_disruption": 0.18177710855762638,
+          "mean_edit_count": 2.0075
+        },
+        "insert": {
+          "oov_delta": 0.18632986674917823,
+          "char_jaccard_disruption": 0.1803212563061083,
+          "mean_edit_count": 2.0675
+        },
+        "keyboard": {
+          "oov_delta": 0.17949852901226784,
+          "char_jaccard_disruption": 0.21370059532407137,
+          "mean_edit_count": 1.9975
+        }
+      },
+      "47": {
+        "swap": {
+          "oov_delta": 0.17513161667408983,
+          "char_jaccard_disruption": 0.26874567768432917,
+          "mean_edit_count": 1.9825
+        },
+        "delete": {
+          "oov_delta": 0.18269517861739246,
+          "char_jaccard_disruption": 0.19053389358713566,
+          "mean_edit_count": 2.1225
+        },
+        "insert": {
+          "oov_delta": 0.19752727335873643,
+          "char_jaccard_disruption": 0.19263092152674247,
+          "mean_edit_count": 2.1975
+        },
+        "keyboard": {
+          "oov_delta": 0.1968202978437115,
+          "char_jaccard_disruption": 0.2358831650662261,
+          "mean_edit_count": 2.2
+        }
+      },
+      "71": {
+        "swap": {
+          "oov_delta": 0.1789631174424134,
+          "char_jaccard_disruption": 0.27039664125572593,
+          "mean_edit_count": 1.9925
+        },
+        "delete": {
+          "oov_delta": 0.18844817817631307,
+          "char_jaccard_disruption": 0.1942138422491473,
+          "mean_edit_count": 2.145
+        },
+        "insert": {
+          "oov_delta": 0.19362270642369356,
+          "char_jaccard_disruption": 0.1901522585523183,
+          "mean_edit_count": 2.16
+        },
+        "keyboard": {
+          "oov_delta": 0.18939527391897756,
+          "char_jaccard_disruption": 0.23067823208000415,
+          "mean_edit_count": 2.12
+        }
+      },
+      "97": {
+        "swap": {
+          "oov_delta": 0.1774629529826901,
+          "char_jaccard_disruption": 0.2697158498613088,
+          "mean_edit_count": 2.0175
+        },
+        "delete": {
+          "oov_delta": 0.17979505097800402,
+          "char_jaccard_disruption": 0.18936876514956744,
+          "mean_edit_count": 2.115
+        },
+        "insert": {
+          "oov_delta": 0.19322506148821958,
+          "char_jaccard_disruption": 0.1847187916233857,
+          "mean_edit_count": 2.1425
+        },
+        "keyboard": {
+          "oov_delta": 0.1939426313925154,
+          "char_jaccard_disruption": 0.2290229073508414,
+          "mean_edit_count": 2.1625
+        }
+      }
+    },
+    "aggregate": {
+      "swap": {
+        "oov_delta": 0.17638396876816023,
+        "char_jaccard_disruption": 0.2689273232220781,
+        "mean_edit_count": 1.99
+      },
+      "delete": {
+        "oov_delta": 0.1831259895762994,
+        "char_jaccard_disruption": 0.1908460440753524,
+        "mean_edit_count": 2.1155
+      },
+      "insert": {
+        "oov_delta": 0.19412653126027765,
+        "char_jaccard_disruption": 0.18824675386915427,
+        "mean_edit_count": 2.161
+      },
+      "keyboard": {
+        "oov_delta": 0.19141434049481676,
+        "char_jaccard_disruption": 0.2288887283215359,
+        "mean_edit_count": 2.1350000000000002
+      }
+    },
+    "selected_basis": [
+      "delete",
+      "insert",
+      "swap"
+    ],
+    "epsilon": 0.01,
+    "max_hull_distance": 0.006080150332610395
+  },
+  "association": {
+    "per_seed": [
+      {
+        "seed": 11,
+        "pearson": 0.2564147323140465,
+        "partial_edit_count": 0.21674060403903242
+      },
+      {
+        "seed": 29,
+        "pearson": 0.4858066156187582,
+        "partial_edit_count": 0.4830815757084595
+      },
+      {
+        "seed": 47,
+        "pearson": 0.16796908097198257,
+        "partial_edit_count": 0.3291039721671733
+      },
+      {
+        "seed": 71,
+        "pearson": -0.04925157087692768,
+        "partial_edit_count": 0.05765283172468108
+      },
+      {
+        "seed": 97,
+        "pearson": 0.023870720019364286,
+        "partial_edit_count": -0.17018589858242433
+      }
+    ],
+    "mean_partial_correlation": 0.1832786170113844,
+    "bootstrap_95_ci": [
+      -0.001665105935290817,
+      0.3682223399580596
+    ]
+  },
+  "equivalence": {
+    "worst_gap_by_seed": [
+      0.00666666666666671,
+      -0.008333333333333415,
+      0.006666666666666599,
+      0.018333333333333313,
+      0.0
+    ],
+    "worst_gap_bootstrap_95_ci": [
+      -0.0040000000000000036,
+      0.013999999999999901
+    ],
+    "clean_loss_by_seed": [
+      -0.0033333333333332993,
+      -0.0016666666666667052,
+      -0.0016666666666667052,
+      -0.00666666666666671,
+      0.0016666666666667052
+    ],
+    "clean_loss_bootstrap_95_ci": [
+      -0.005000000000000027,
+      2.2204460492503132e-17
+    ],
+    "acceptance_margin": 0.01
+  },
+  "summary": {
+    "clean_only": {
+      "clean": 0.9516666666666667,
+      "swap": 0.872,
+      "delete": 0.8633333333333333,
+      "insert": 0.877,
+      "keyboard": 0.8736666666666666,
+      "worst_operator": 0.8633333333333333,
+      "mean_noisy": 0.8714999999999999
+    },
+    "full_mixture": {
+      "clean": 0.953,
+      "swap": 0.9026666666666666,
+      "delete": 0.901,
+      "insert": 0.875,
+      "keyboard": 0.882,
+      "worst_operator": 0.875,
+      "mean_noisy": 0.8901666666666667
+    },
+    "minimal_basis": {
+      "clean": 0.954,
+      "swap": 0.9063333333333333,
+      "delete": 0.9043333333333333,
+      "insert": 0.8773333333333333,
+      "keyboard": 0.87,
+      "worst_operator": 0.87,
+      "mean_noisy": 0.8895
+    }
+  },
+  "claims": {
+    "C1_supported": false,
+    "C2_supported": false
+  },
+  "table": {
+    "T1": {
+      "cells": {
+        "t1-00-00": 0.9516666666666667,
+        "t1-00-01": 0.8633333333333333,
+        "t1-00-02": 0.8714999999999999,
+        "t1-00-03": 0.011666666666666714,
+        "t1-01-00": 0.953,
+        "t1-01-01": 0.875,
+        "t1-01-02": 0.8901666666666667,
+        "t1-01-03": 0.0,
+        "t1-02-00": 0.954,
+        "t1-02-01": 0.87,
+        "t1-02-02": 0.8895,
+        "t1-02-03": 0.0050000000000000044
+      },
+      "studio_rows": [
+        {
+          "clean_accuracy": 0.9516666666666667,
+          "worst_operator_accuracy": 0.8633333333333333,
+          "mean_noisy_accuracy": 0.8714999999999999,
+          "gap_to_full_mixture": 0.011666666666666714
+        },
+        {
+          "clean_accuracy": 0.953,
+          "worst_operator_accuracy": 0.875,
+          "mean_noisy_accuracy": 0.8901666666666667,
+          "gap_to_full_mixture": 0.0
+        },
+        {
+          "clean_accuracy": 0.954,
+          "worst_operator_accuracy": 0.87,
+          "mean_noisy_accuracy": 0.8895,
+          "gap_to_full_mixture": 0.0050000000000000044
+        }
+      ]
+    }
+  },
+  "figure": {
+    "F2": {
+      "operator_transfer": {
+        "f2-typo_sensitivity-00-00": 0.9026666666666666,
+        "f2-typo_sensitivity-00-01": 0.9063333333333333,
+        "f2-typo_sensitivity-01-00": 0.901,
+        "f2-typo_sensitivity-01-01": 0.9043333333333333,
+        "f2-typo_sensitivity-02-00": 0.875,
+        "f2-typo_sensitivity-02-01": 0.8773333333333333,
+        "f2-typo_sensitivity-03-00": 0.882,
+        "f2-typo_sensitivity-03-01": 0.87
+      }
+    }
+  },
+  "traceable_results": {
+    "F2.typo_sensitivity": {
+      "categories": [
+        "swap",
+        "delete",
+        "insert",
+        "keyboard"
+      ],
+      "series": [
+        {
+          "name": "Balanced four-operator augmentation",
+          "values": [
+            0.9026666666666666,
+            0.901,
+            0.875,
+            0.882
+          ]
+        },
+        {
+          "name": "Minimal footprint-cover basis",
+          "values": [
+            0.9063333333333333,
+            0.9043333333333333,
+            0.8773333333333333,
+            0.87
+          ]
+        }
+      ]
+    }
+  },
+  "elapsed_seconds": 10.198287963867188
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "figures": {
+    "F2": [
+      {
+        "panel": "typo_sensitivity",
+        "fixture_key": "F2.typo_sensitivity",
+        "table_kind": "fixed_x_points",
+        "x_values": ["swap", "delete", "insert", "keyboard"],
+        "series": ["Balanced four-operator augmentation", "Minimal footprint-cover basis"],
+        "plotted_marks": 8,
+        "pending_values": 8
+      }
+    ]
+  }
+}

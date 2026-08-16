@@ -1,0 +1,7 @@
+\section{Reproducibility Details}
+The source dataset revision begins \texttt{828f8093932c8fe6}; the full pinned revision is serialized in the configuration. Each run serializes the chosen intents, operators, severity, smoothing, seeds, footprint coordinates, and tolerance. Two complete executions produced the same SHA-256 digest after removing the wall-clock duration field. The experiment requires no GPU and completed in under 11 seconds on the development machine.
+
+The hull distance is computed by projection onto each line segment and by endpoint distance for singleton sets. We enumerate operator subsets in increasing cardinality, making the selection exact for four operators. Partial correlation is computed by residualizing both footprint distance and transfer gain against edit-count distance, then correlating the residuals. Bootstrap intervals resample the five seed-level correlations with a fixed random generator.
+
+\section{Derivations and Checks}
+Residualization gives $\tilde d=d-\widehat{d}(e)$ and $\widetilde{\Delta}=\Delta-\widehat{\Delta}(e)$ from separate least-squares projections on edit-count difference; the reported partial correlation is the ordinary Pearson correlation of these residuals. For a candidate line segment with endpoints $p$ and $q$, projection uses $t=((z-p)\cdot(q-p))/\lVert q-p\rVert_2^2$ clipped to $[0,1]$, followed by distance from $z$ to $p+t(q-p)$. Numeric checks verify distance identity and symmetry and confirm that the selected basis is a strict subset of the operator set.

@@ -3,9 +3,9 @@
 Public deployment: <https://research-avatar-studio.yingtaomj.workers.dev/>
 
 This is the private, deployable entry point for the fixed Paper Studio UI. It
-accepts the exact upstream writing contract: `PROFILE.html`, an approved
-`03_EXPERIMENT_PLAN.html`, a completed `05_EXP_RESULT.html`, and a bounded evidence
-ZIP. It creates one isolated writing workspace per browser session and starts the
+accepts one bounded Research Avatar project ZIP containing the canonical profile,
+all five reports, validated results, and only the reference texts selected by the
+approved experiment plan. It creates one isolated writing workspace per browser session and starts the
 existing Paper Studio as a localhost-only worker. The approved embedded contract
 supplies the paper outline, paragraph plan, artifact bindings, venue, and title;
 the uploader never invents a generic outline or treats 03 and 05 as alternatives.
@@ -16,10 +16,12 @@ Build the evidence ZIP from the original Research Avatar project root:
 python3 -m research_avatar.online_studio.package
 ```
 
-The package command includes `results/`, `researcher-profile/publications.json`,
-and `researcher-profile/fulltext/`. When present it also includes `figures/`,
-`code/RESULTS_LEDGER.csv`, `reports/01_LIT_SURVEY.html`, and
-`reports/04_RUN_PLAN.html`. The server rejects path traversal, symlinks, unknown
+The package command includes `PROFILE.html`, `publications.json`, reports `01`–`05`,
+`results/`, the researcher-owned structure text selected by approved `03`, and the
+external mechanism text when it is locally available. It deliberately excludes the
+rest of `researcher-profile/fulltext/`; those unused papers would increase upload size
+and writing-context waste without contributing to the selected paper. When present it
+also includes `figures/` and `code/RESULTS_LEDGER.csv`. The server rejects path traversal, symlinks, unknown
 paths, more than 2,000 files, more than 32 MB compressed, or more than 128 MB
 expanded. Before creating Paper Studio data it runs the repository's expplan,
 report-structure, and result-conformance validators and requires every 03 result

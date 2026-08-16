@@ -98,6 +98,44 @@ def evidence_archive():
     return buffer.getvalue()
 
 
+def project_archive():
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        (root / "results").mkdir()
+        (root / "results/main.json").write_text(
+            json.dumps({"rows": [{"method": "Ours", "score": 91.0}]})
+        )
+        (root / "researcher-profile/fulltext/txt").mkdir(parents=True)
+        (root / "researcher-profile/PROFILE.html").write_text(PROFILE_HTML)
+        (root / "researcher-profile/publications.json").write_text("[]")
+        (root / "researcher-profile/fulltext/txt/ref.txt").write_text(
+            "Abstract structure.\n\nExperiments report a verified comparison.\n\nConclusion closes the evidence loop."
+        )
+        (root / "reports").mkdir()
+        sources = dict(pipeline_files())
+        contract = {
+            **PLAN_CONTRACT,
+            "references": {
+                "researcher_owned_structure": {
+                    "local_full_text": "researcher-profile/fulltext/txt/ref.txt"
+                }
+            },
+        }
+        sources["03_EXPERIMENT_PLAN.html"] = (
+            '<html><body><script id="experiment-plan-contract" type="application/json">'
+            + json.dumps(contract)
+            + "</script></body></html>"
+        )
+        (root / "reports/01_LIT_SURVEY.html").write_text("<html><body>Survey</body></html>")
+        (root / "reports/02_IDEA_REPORT.html").write_text("<html><body>Ideas</body></html>")
+        (root / "reports/04_RUN_PLAN.html").write_text("<html><body>Run plan</body></html>")
+        for name in ("03_EXPERIMENT_PLAN.html", "05_EXP_RESULT.html"):
+            (root / "reports" / name).write_text(sources[name])
+        output = root / "project.zip"
+        build_archive(root, output)
+        return output.read_bytes()
+
+
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, request, file_pointer, code, message, headers, new_url):
         return None
@@ -191,20 +229,49 @@ class OnlineStudioTests(unittest.TestCase):
             (root / "results").mkdir()
             (root / "results/main.json").write_text("{}")
             (root / "researcher-profile/fulltext/txt").mkdir(parents=True)
+            (root / "researcher-profile/PROFILE.html").write_text(PROFILE_HTML)
             (root / "researcher-profile/publications.json").write_text("[]")
             (root / "researcher-profile/fulltext/txt/ref.txt").write_text("reference")
+            (root / "reports").mkdir()
+            contract = {
+                **PLAN_CONTRACT,
+                "references": {
+                    "researcher_owned_structure": {
+                        "local_full_text": "researcher-profile/fulltext/txt/ref.txt"
+                    }
+                },
+            }
+            for name in (
+                "01_LIT_SURVEY.html", "02_IDEA_REPORT.html", "04_RUN_PLAN.html", "05_EXP_RESULT.html"
+            ):
+                (root / "reports" / name).write_text(f"<html><body>{name}</body></html>")
+            (root / "reports/03_EXPERIMENT_PLAN.html").write_text(
+                '<script id="experiment-plan-contract" type="application/json">'
+                + json.dumps(contract)
+                + "</script>"
+            )
             output = root / "bundle.zip"
             files = build_archive(root, output)
             self.assertEqual(
                 files,
                 [
-                    "researcher-profile/fulltext/txt/ref.txt",
+                    "project-package.json",
+                    "references/structure.txt",
+                    "reports/01_LIT_SURVEY.html",
+                    "reports/02_IDEA_REPORT.html",
+                    "reports/03_EXPERIMENT_PLAN.html",
+                    "reports/04_RUN_PLAN.html",
+                    "reports/05_EXP_RESULT.html",
+                    "researcher-profile/PROFILE.html",
                     "researcher-profile/publications.json",
                     "results/main.json",
                 ],
             )
             with zipfile.ZipFile(output) as archive:
                 self.assertEqual(sorted(archive.namelist()), files)
+                self.assertNotIn("researcher-profile/fulltext/txt/ref.txt", files)
+                manifest = json.loads(archive.read("project-package.json"))
+                self.assertEqual(manifest["schema_version"], "2.0")
 
     def test_online_latex_blocks_file_and_execution_primitives(self):
         with patch.object(paper_studio, "ONLINE_PROJECT_MODE", True):
@@ -364,6 +431,20 @@ class OnlineStudioTests(unittest.TestCase):
             self.assertEqual(config["table_order"], ["T1"])
             self.assertEqual(config["tables"]["T1"]["label"], "tab:main")
 
+    def test_scaffold_accepts_one_complete_project_zip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            validator = subprocess.CompletedProcess([], 0, stdout="ok", stderr="")
+            with patch.object(online.subprocess, "run", return_value=validator):
+                online._write_workspace(root, files=[], archive=project_archive())
+            self.assertTrue((root / "paper/paper_studio.json").is_file())
+            plan = json.loads((root / "paper/paragraph_plan.json").read_text())
+            for paragraphs in plan["sections"].values():
+                for paragraph in paragraphs:
+                    self.assertEqual(paragraph["reference_lines"][0], paragraph["reference_lines"][1])
+            reference = (root / "paper/uploaded_sources.txt").read_text()
+            self.assertNotIn("Concise, evidence-first prose", reference)
+
     def test_live_worker_hides_root_and_never_persists_api_key(self):
         key = "sk-online-test-never-write-this"
         encoded_files = [
@@ -405,10 +486,15 @@ class OnlineStudioTests(unittest.TestCase):
 
     def test_setup_page_only_asks_for_generated_html_and_openai_key(self):
         source = (online.STATIC / "index.html").read_text(encoding="utf-8")
-        self.assertIn('name="profile_file"', source)
-        self.assertIn('name="plan_file"', source)
-        self.assertIn('name="result_file"', source)
-        self.assertIn('name="evidence_archive"', source)
+        app = (online.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn('id="demo-tab"', source)
+        self.assertIn('id="use-tab"', source)
+        self.assertIn('src="/demo/"', source)
+        self.assertIn("selectProductPanel('demo-panel')", app)
+        self.assertIn('name="project_package"', source)
+        self.assertNotIn('name="profile_file"', source)
+        self.assertNotIn('name="plan_file"', source)
+        self.assertNotIn('name="result_file"', source)
         self.assertIn('name="api_key"', source)
         self.assertNotIn('name="project_name"', source)
         self.assertNotIn('name="outline"', source)

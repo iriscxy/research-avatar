@@ -1,0 +1,26 @@
+{
+  "schema_version":"1.1",
+  "source_plan":"reports/03_EXPERIMENT_PLAN.html",
+  "canonical_terms":[
+    {"id":"B1","canonical":"Clean-only word Naive Bayes","forbidden_aliases":["clean word SVM"]},
+    {"id":"B2","canonical":"Balanced four-operator augmentation","forbidden_aliases":["unbalanced full augmentation"]},
+    {"id":"B3","canonical":"single-operator augmentation","forbidden_aliases":["single typo oracle"]},
+    {"id":"M1","canonical":"Accuracy","forbidden_aliases":["exact match rate metric"]},
+    {"id":"M2","canonical":"Worst-operator Accuracy","forbidden_aliases":["average-only robustness"]},
+    {"id":"M3","canonical":"footprint distance","forbidden_aliases":["causal footprint score"]}
+  ],
+  "source_values":[
+    {"id":"D1","source_path":"results/typo_basis/main_results.json","source_locator":"/config/intent_count","expected_value":20,"manuscript_evidence":"first 20 lexicographically sorted intents"},
+    {"id":"D2","source_path":"results/typo_basis/main_results.json","source_locator":"/config/severity","expected_value":0.45,"manuscript_evidence":"probability 0.45"},
+    {"id":"D3","source_path":"results/typo_basis/main_results.json","source_locator":"/config/operators","expected_value":["swap","delete","insert","keyboard"],"manuscript_evidence":"Four character operators"},
+    {"id":"D4","source_path":"results/typo_basis/main_results.json","source_locator":"/config/seeds","expected_value":[11,29,47,71,97],"manuscript_evidence":"11,29,47,71,97"},
+    {"id":"D5","source_path":"results/typo_basis/main_results.json","source_locator":"/config/smoothing","expected_value":1.0,"manuscript_evidence":"additive smoothing 1.0"},
+    {"id":"D6","source_path":"results/typo_basis/main_results.json","source_locator":"/footprints/aggregate/swap/char_jaccard_disruption","expected_value":0.2689273232220781,"manuscript_evidence":"character-trigram disruption"},
+    {"id":"D7","source_path":"results/typo_basis/main_results.json","source_locator":"/config/footprint_epsilon","expected_value":0.01,"manuscript_evidence":"epsilon=0.01"}
+  ],
+  "formal_links":[],
+  "empirical_claims":[
+    {"id":"C1","source_path":"results/typo_basis/main_results.json","source_locator":"/claims/C1_supported","operator":"==","threshold":false,"supported_text":"C1 is therefore falsified.","not_supported_text":"C1 is supported."},
+    {"id":"C2","source_path":"results/typo_basis/main_results.json","source_locator":"/claims/C2_supported","operator":"==","threshold":false,"supported_text":"C2 remains false","not_supported_text":"C2 is supported"}
+  ]
+}
