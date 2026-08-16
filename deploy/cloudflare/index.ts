@@ -1,6 +1,7 @@
 import { Container, getContainer } from "@cloudflare/containers";
 
 const AUTH_COOKIE = "online_studio_auth";
+const GOOGLE_STATE_COOKIE = "online_studio_google_state";
 const AUTH_SECONDS = 30 * 24 * 60 * 60;
 // Cloudflare Workers Web Crypto currently caps PBKDF2 at 100,000 iterations.
 const PASSWORD_ITERATIONS = 100_000;
@@ -8,6 +9,8 @@ const PASSWORD_ITERATIONS = 100_000;
 interface Env {
   ONLINE_STUDIO: DurableObjectNamespace;
   AUTH_DB: D1Database;
+  GOOGLE_OAUTH_CLIENT_ID?: string;
+  GOOGLE_OAUTH_CLIENT_SECRET?: string;
 }
 
 interface User {
@@ -60,6 +63,24 @@ function authCookie(token: string, clear = false): string {
     "SameSite=Strict",
     clear ? "Max-Age=0" : `Max-Age=${AUTH_SECONDS}`,
   ].join("; ");
+}
+
+function googleStateCookie(state: string, clear = false): string {
+  return [
+    `${GOOGLE_STATE_COOKIE}=${clear ? "" : state}`,
+    "Path=/auth/google/callback",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax",
+    clear ? "Max-Age=0" : "Max-Age=600",
+  ].join("; ");
+}
+
+function randomToken(size = 32): string {
+  return bytesToBase64(crypto.getRandomValues(new Uint8Array(size)))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
 }
 
 function normalizeEmail(value: unknown): string {
@@ -155,11 +176,7 @@ async function currentUser(request: Request, env: Env): Promise<User | null> {
 }
 
 async function createSession(env: Env, userId: string): Promise<string> {
-  const tokenBytes = crypto.getRandomValues(new Uint8Array(48));
-  const token = bytesToBase64(tokenBytes)
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replaceAll("=", "");
+  const token = randomToken(48);
   const now = Math.floor(Date.now() / 1000);
   await env.AUTH_DB.batch([
     env.AUTH_DB.prepare(
@@ -168,6 +185,114 @@ async function createSession(env: Env, userId: string): Promise<string> {
     env.AUTH_DB.prepare("DELETE FROM auth_sessions WHERE expires_at <= ?").bind(now),
   ]);
   return token;
+}
+
+function googleConfigured(env: Env): boolean {
+  return Boolean(env.GOOGLE_OAUTH_CLIENT_ID && env.GOOGLE_OAUTH_CLIENT_SECRET);
+}
+
+async function googleStart(request: Request, env: Env): Promise<Response> {
+  if (!googleConfigured(env)) {
+    return Response.redirect(new URL("/?auth_error=google", request.url), 302);
+  }
+  const state = randomToken();
+  const nonce = randomToken();
+  const now = Math.floor(Date.now() / 1000);
+  await env.AUTH_DB.batch([
+    env.AUTH_DB.prepare(
+      "INSERT INTO google_oauth_states (state, nonce, expires_at) VALUES (?, ?, ?)",
+    ).bind(state, nonce, now + 600),
+    env.AUTH_DB.prepare("DELETE FROM google_oauth_states WHERE expires_at <= ?").bind(now),
+  ]);
+  const redirectUri = new URL("/auth/google/callback", request.url).toString();
+  const authorization = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  authorization.search = new URLSearchParams({
+    client_id: env.GOOGLE_OAUTH_CLIENT_ID!,
+    response_type: "code",
+    scope: "openid email",
+    redirect_uri: redirectUri,
+    state,
+    nonce,
+  }).toString();
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: authorization.toString(),
+      "set-cookie": googleStateCookie(state),
+      "cache-control": "no-store",
+    },
+  });
+}
+
+async function googleCallback(request: Request, env: Env): Promise<Response> {
+  const headers = new Headers({ location: "/?auth_error=google", "cache-control": "no-store" });
+  headers.append("set-cookie", googleStateCookie("", true));
+  try {
+    if (!googleConfigured(env)) throw new Error("Google OAuth is not configured");
+    const url = new URL(request.url);
+    const state = url.searchParams.get("state") || "";
+    const code = url.searchParams.get("code") || "";
+    const cookieState = cookieValue(request, GOOGLE_STATE_COOKIE) || "";
+    if (!state || !code || !cookieState || state !== cookieState) {
+      throw new Error("Google OAuth state validation failed");
+    }
+    const stored = await env.AUTH_DB.prepare(
+      "SELECT nonce, expires_at FROM google_oauth_states WHERE state = ?",
+    ).bind(state).first<{ nonce: string; expires_at: number }>();
+    await env.AUTH_DB.prepare("DELETE FROM google_oauth_states WHERE state = ?").bind(state).run();
+    if (!stored || stored.expires_at <= Math.floor(Date.now() / 1000)) {
+      throw new Error("Google OAuth state expired");
+    }
+    const redirectUri = new URL("/auth/google/callback", request.url).toString();
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code,
+        client_id: env.GOOGLE_OAUTH_CLIENT_ID!,
+        client_secret: env.GOOGLE_OAUTH_CLIENT_SECRET!,
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+      }),
+    });
+    if (!tokenResponse.ok) throw new Error("Google token exchange failed");
+    const tokenPayload = await tokenResponse.json<{ id_token?: string }>();
+    if (!tokenPayload.id_token) throw new Error("Google returned no ID token");
+    const verificationResponse = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(tokenPayload.id_token)}`,
+    );
+    if (!verificationResponse.ok) throw new Error("Google ID token verification failed");
+    const claims = await verificationResponse.json<Record<string, unknown>>();
+    if (
+      claims.aud !== env.GOOGLE_OAUTH_CLIENT_ID ||
+      claims.nonce !== stored.nonce ||
+      String(claims.email_verified) !== "true" ||
+      !claims.sub
+    ) {
+      throw new Error("Google ID token claims are invalid");
+    }
+    const email = normalizeEmail(claims.email);
+    const subject = String(claims.sub);
+    let user = await env.AUTH_DB.prepare(
+      "SELECT id, email, provider FROM users WHERE provider = 'google' AND subject = ?",
+    ).bind(subject).first<User>();
+    if (!user) {
+      user = { id: crypto.randomUUID(), email, provider: "google" };
+      await env.AUTH_DB.prepare(
+        `INSERT INTO users (id, provider, subject, email, created_at)
+         VALUES (?, 'google', ?, ?, ?)`,
+      ).bind(user.id, subject, email, Math.floor(Date.now() / 1000)).run();
+    } else if (user.email !== email) {
+      await env.AUTH_DB.prepare("UPDATE users SET email = ? WHERE id = ?")
+        .bind(email, user.id).run();
+    }
+    const token = await createSession(env, user.id);
+    headers.set("location", "/");
+    headers.append("set-cookie", authCookie(token));
+  } catch (error) {
+    console.error("Google OAuth callback failed", error);
+  }
+  return new Response(null, { status: 302, headers });
 }
 
 async function signup(request: Request, env: Env): Promise<Response> {
@@ -281,12 +406,15 @@ export default {
           ok: true,
           authenticated: user !== null,
           user: user ? { email: user.email, provider: user.provider } : null,
-          google_configured: false,
+          google_configured: googleConfigured(env),
           access_token_required: false,
         });
       }
-      if (path.startsWith("/auth/google/")) {
-        return Response.redirect(new URL("/?auth_error=google", request.url), 302);
+      if (request.method === "GET" && path === "/auth/google/start") {
+        return googleStart(request, env);
+      }
+      if (request.method === "GET" && path === "/auth/google/callback") {
+        return googleCallback(request, env);
       }
       return proxy(request, env, user);
     } catch (error) {

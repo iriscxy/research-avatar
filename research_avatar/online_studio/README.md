@@ -61,6 +61,21 @@ the temporary Paper Studio process. Copy the example config to the ignored local
 `wrangler.jsonc`, create the D1 database, apply its migrations, push the amd64
 container image to Cloudflare Registry, and run `npm run deploy`.
 
+To enable Google login on the public deployment, create a Google OAuth 2.0 Web
+application with this exact authorized redirect URI:
+
+    https://research-avatar-studio.yingtaomj.workers.dev/auth/google/callback
+
+Then store its credentials without committing them and redeploy:
+
+    npx wrangler secret put GOOGLE_OAUTH_CLIENT_ID
+    npx wrangler secret put GOOGLE_OAUTH_CLIENT_SECRET
+    npm run deploy
+
+The Worker keeps OAuth state and nonce records in D1, exchanges the authorization
+code server-side, verifies the returned Google ID token and its audience, and
+requires a verified email before creating the account.
+
 The repository includes a production-oriented container at
 `deploy/online-paper-studio/Dockerfile` and an HTTPS proxy starting point at
 `deploy/online-paper-studio/nginx.conf.example`. Build and run it with:
