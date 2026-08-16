@@ -184,8 +184,8 @@ def _password_digest(password: str, salt: bytes) -> bytes:
 def create_local_user(email_value: Any, password_value: Any) -> dict[str, str]:
     email = _normalize_email(email_value)
     password = str(password_value or "")
-    if len(password) < 12 or len(password) > 1024:
-        raise OnlineStudioError("密码必须为 12–1024 个字符。")
+    if len(password) < 6 or len(password) > 1024:
+        raise OnlineStudioError("密码必须为 6–1024 个字符。")
     salt = secrets.token_bytes(16)
     digest = _password_digest(password, salt)
     user_id = secrets.token_urlsafe(24)

@@ -81,10 +81,12 @@ class OnlineStudioTests(unittest.TestCase):
             )
 
     def test_local_signup_login_session_and_logout(self):
-        password = "correct horse battery staple"
+        password = "abc123"
         with tempfile.TemporaryDirectory() as directory, patch.object(
             online, "DATA_ROOT", Path(directory)
         ):
+            with self.assertRaisesRegex(online.OnlineStudioError, "6–1024"):
+                online.create_local_user("short@example.org", "abc12")
             user = online.create_local_user("Researcher@Example.org", password)
             self.assertEqual(user["email"], "researcher@example.org")
             logged_in = online.authenticate_local_user(

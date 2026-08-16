@@ -303,8 +303,8 @@ async function signup(request: Request, env: Env): Promise<Response> {
     const body = await readBody(request);
     const email = normalizeEmail(body.email);
     const password = String(body.password || "");
-    if (password.length < 12 || password.length > 1024) {
-      throw new Error("密码必须为 12–1024 个字符。");
+    if (password.length < 6 || password.length > 1024) {
+      throw new Error("密码必须为 6–1024 个字符。");
     }
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const digest = await passwordDigest(password, salt);
@@ -383,7 +383,7 @@ async function proxy(request: Request, env: Env, user: User | null): Promise<Res
     headers.set("x-online-user-provider", user.provider);
   }
   const forwarded = new Request(request, { headers });
-  return getContainer(env.ONLINE_STUDIO, "public-studio").fetch(forwarded);
+  return getContainer(env.ONLINE_STUDIO, "public-studio-password6-v3").fetch(forwarded);
 }
 
 export default {

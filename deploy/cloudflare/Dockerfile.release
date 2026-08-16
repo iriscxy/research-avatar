@@ -1,0 +1,9 @@
+FROM registry.cloudflare.com/b7d4d11f6a81ead606da87d4aa458ec9/research-avatar-studio-onlinestudiocontainer:worker
+
+USER root
+COPY research_avatar/online_studio/ /opt/research-avatar/research_avatar/online_studio/
+COPY research_avatar/online_studio/ /usr/local/lib/python3.12/site-packages/research_avatar/online_studio/
+RUN chown -R studio:studio \
+    /opt/research-avatar/research_avatar/online_studio \
+    /usr/local/lib/python3.12/site-packages/research_avatar/online_studio
+USER studio
