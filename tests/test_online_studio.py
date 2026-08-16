@@ -539,6 +539,8 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("paper-studio-demo-api-key-required", script)
         self.assertIn("/api/online/demo-session", script)
         self.assertIn("demoFrame.src = '/demo/?authenticated='", script)
+        self.assertIn("demo_key_required", script)
+        self.assertIn("openRequestedDemoKeyDialog();", script)
 
     def test_upload_page_names_the_default_package_output(self):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")

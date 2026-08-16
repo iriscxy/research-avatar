@@ -1350,7 +1350,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260816.4"', html)
+        self.assertIn('src="static/app.js?v=20260816.5"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1487,7 +1487,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260816.4"', html)
+        self.assertIn('src="static/app.js?v=20260816.5"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -4035,6 +4035,9 @@ args = parser.parse_args()
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn("paper-studio-demo-api-key-required", source)
         self.assertIn("window.parent.postMessage", source)
+        self.assertIn('demo_key_required: "1"', source)
+        self.assertIn("window.location.assign(`/?${params.toString()}`)", source)
+        self.assertIn('$("figure-prompt").disabled = state.demo_mode', source)
 
     def test_each_figure_has_an_independent_hidden_conversation_id(self):
         state = _default_state()

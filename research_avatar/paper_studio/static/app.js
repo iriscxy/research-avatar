@@ -414,6 +414,13 @@ async function request(path, options = {}) {
         {type: "paper-studio-demo-api-key-required"},
         window.location.origin,
       );
+    } else {
+      const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      const params = new URLSearchParams({
+        demo_key_required: "1",
+        demo_return: returnTo,
+      });
+      window.location.assign(`/?${params.toString()}`);
     }
     throw new Error("请输入 OpenAI API Key 后进入可编辑的 Demo 副本。");
   }
@@ -860,7 +867,9 @@ function updateFigureButtonStates() {
   const captionDirty = $("figure-caption").dataset.dirty === "true";
   const submittedPrompt = $("draw-prompt").value.trim();
   const promptInstruction = $("prompt-instruction").value.trim();
-  $("figure-prompt").disabled = !figure.ready || !generationReady || running || Boolean(submittedPrompt && !promptInstruction);
+  $("figure-prompt").disabled = state.demo_mode
+    ? false
+    : !figure.ready || !generationReady || running || Boolean(submittedPrompt && !promptInstruction);
   $("figure-draw").disabled = !figure.ready || !generationReady || running || !submittedPrompt;
   const promptUnchanged = Boolean(
     figure.gpt_preview_url

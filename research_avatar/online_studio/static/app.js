@@ -10,6 +10,22 @@ const demoKeyForm = document.querySelector('#demo-key-form');
 const demoKeyMessage = document.querySelector('#demo-key-message');
 const demoKeySubmit = document.querySelector('#demo-key-submit');
 
+function openDemoKeyDialog() {
+  demoKeyMessage.className = '';
+  demoKeyMessage.textContent = '';
+  if (!demoKeyDialog.open) demoKeyDialog.showModal();
+  demoKeyForm.elements.api_key.focus();
+}
+
+function openRequestedDemoKeyDialog() {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('demo_key_required') !== '1') return;
+  openDemoKeyDialog();
+  url.searchParams.delete('demo_key_required');
+  url.searchParams.delete('demo_return');
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
 function selectProductPanel(panelId) {
   document.querySelectorAll('.product-panel').forEach((panel) => {
     panel.classList.toggle('hidden', panel.id !== panelId);
@@ -40,6 +56,7 @@ async function showAuthenticated(user) {
   } catch (_) {
     document.querySelector('#session-actions').classList.add('hidden');
   }
+  openRequestedDemoKeyDialog();
 }
 
 async function initializeAuth() {
@@ -115,10 +132,7 @@ window.addEventListener('message', (event) => {
     || event.source !== demoFrame.contentWindow
     || event.data?.type !== 'paper-studio-demo-api-key-required'
   ) return;
-  demoKeyMessage.className = '';
-  demoKeyMessage.textContent = '';
-  demoKeyDialog.showModal();
-  demoKeyForm.elements.api_key.focus();
+  openDemoKeyDialog();
 });
 
 document.querySelector('#demo-key-close').addEventListener('click', () => {
