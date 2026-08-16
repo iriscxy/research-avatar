@@ -383,7 +383,7 @@ async function proxy(request: Request, env: Env, user: User | null): Promise<Res
     headers.set("x-online-user-provider", user.provider);
   }
   const forwarded = new Request(request, { headers });
-  return getContainer(env.ONLINE_STUDIO, "public-studio-contract-v1").fetch(forwarded);
+  return getContainer(env.ONLINE_STUDIO, "public-studio-demoaction1").fetch(forwarded);
 }
 
 export default {
