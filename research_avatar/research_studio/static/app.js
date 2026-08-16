@@ -86,9 +86,12 @@ function selectArtifact(key) {
   if (signature === app.previewSignature) return;
   app.previewSignature = signature;
   const isPdf = artifact.path.toLowerCase().endsWith(".pdf");
-  if (isPdf) previewFrame.removeAttribute("sandbox");
+  const isInteractive = artifact.interactive === true;
+  if (isPdf || isInteractive) previewFrame.removeAttribute("sandbox");
   else previewFrame.setAttribute("sandbox", artifactSandbox);
-  const versionedUrl = `${artifact.url}?v=${artifact.modified_ns || artifact.size}`;
+  const versionedUrl = isInteractive
+    ? artifact.url
+    : `${artifact.url}?v=${artifact.modified_ns || artifact.size}`;
   previewFrame.src = isPdf ? `${versionedUrl}#view=FitH` : versionedUrl;
   previewFrame.hidden = false; previewEmpty.hidden = true;
   document.querySelectorAll("[data-artifact-key]").forEach(button => button.classList.toggle("active", button.dataset.artifactKey === key));

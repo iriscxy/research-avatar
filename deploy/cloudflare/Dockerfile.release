@@ -3,11 +3,15 @@ FROM registry.cloudflare.com/b7d4d11f6a81ead606da87d4aa458ec9/research-avatar-st
 USER root
 COPY research_avatar/online_studio/ /opt/research-avatar/research_avatar/online_studio/
 COPY research_avatar/online_studio/ /usr/local/lib/python3.12/site-packages/research_avatar/online_studio/
+COPY research_avatar/paper_studio/ /opt/research-avatar/research_avatar/paper_studio/
+COPY research_avatar/paper_studio/ /usr/local/lib/python3.12/site-packages/research_avatar/paper_studio/
 COPY research_avatar/web/demo/ /opt/research-avatar/research_avatar/web/demo/
 COPY research_avatar/web/demo/ /usr/local/lib/python3.12/site-packages/research_avatar/web/demo/
 RUN chown -R studio:studio \
     /opt/research-avatar/research_avatar/online_studio \
+    /opt/research-avatar/research_avatar/paper_studio \
     /opt/research-avatar/research_avatar/web/demo \
     /usr/local/lib/python3.12/site-packages/research_avatar/online_studio \
+    /usr/local/lib/python3.12/site-packages/research_avatar/paper_studio \
     /usr/local/lib/python3.12/site-packages/research_avatar/web/demo
 USER studio

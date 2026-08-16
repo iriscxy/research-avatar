@@ -685,7 +685,7 @@ function renderPdf() {
         const image = document.createElement("img");
         image.alt = `论文 PDF 第 ${pageNumber} 页`;
         image.draggable = false;
-        image.src = `/paper-page/${pageNumber}.svg?v=${state.pdf.version}`;
+        image.src = studioPath(`/paper-page/${pageNumber}.svg?v=${state.pdf.version}`);
         page.appendChild(image);
         page.ondblclick = (event) => locatePdfEditTarget(event, page);
         pages.appendChild(page);
@@ -703,7 +703,7 @@ function renderPdf() {
         thumbnail.title = `转到第 ${pageNumber} 页`;
         const image = document.createElement("img");
         image.alt = `第 ${pageNumber} 页`;
-        image.src = `/paper-page/${pageNumber}.svg?v=${state.pdf.version}`;
+        image.src = studioPath(`/paper-page/${pageNumber}.svg?v=${state.pdf.version}`);
         thumbnail.appendChild(image);
         thumbnail.onclick = () => {
           const target = pages.querySelector(`[data-page="${pageNumber}"]`);

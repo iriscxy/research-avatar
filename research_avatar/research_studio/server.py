@@ -589,6 +589,17 @@ def paper_stage(root: Path) -> dict[str, Any]:
         total += len(paragraphs)
         accepted += sum(bool(item.get("accepted_text")) for item in paragraphs if isinstance(item, dict))
     project = config.get("project", {}) if isinstance(config.get("project"), dict) else {}
+    config_path = root / "paper/paper_studio.json"
+    studio_artifact = {
+        "key": "paper_studio",
+        "path": "paper/paper_studio.json",
+        "exists": bool(config),
+        "size": config_path.stat().st_size if config_path.exists() else 0,
+        "modified_ns": config_path.stat().st_mtime_ns if config_path.exists() else 0,
+        "url": PAPER_STUDIO_URL if config else "",
+        "title": "Paper Studio · 可交互论文写作",
+        "interactive": True,
+    }
     return {
         "id": "paper",
         "title": "论文写作",
@@ -600,7 +611,10 @@ def paper_stage(root: Path) -> dict[str, Any]:
             {"label": "Figures", "value": str(len(config.get("figures", {})))},
             {"label": "Tables", "value": str(len(config.get("tables", {})))},
         ],
-        "artifacts": [file_record(root, "paper_pdf")],
+        # Paper Writing is an application stage.  The compiled PDF remains
+        # available inside Paper Studio's live-output pane; using it as the
+        # stage artifact silently replaces the editing workflow with a viewer.
+        "artifacts": [studio_artifact],
         "message": "Paper Studio 逐段确认后写入 LaTeX，并保持图表与结果绑定。",
         "paper_studio": {"configured": bool(config), "url": PAPER_STUDIO_URL},
     }

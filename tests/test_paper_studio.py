@@ -1350,7 +1350,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260816.3"', html)
+        self.assertIn('src="static/app.js?v=20260816.4"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1487,7 +1487,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260816.3"', html)
+        self.assertIn('src="static/app.js?v=20260816.4"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1522,7 +1522,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertNotIn('id="pdf"', html)
         self.assertIn('page.ondblclick = (event) => locatePdfEditTarget(event, page)', source)
         self.assertIn('"/api/pdf/locate"', source)
-        self.assertIn('/paper-page/${pageNumber}.svg', source)
+        self.assertIn('studioPath(`/paper-page/${pageNumber}.svg', source)
         self.assertIn('function capturePdfPosition(pages)', source)
         self.assertIn('function restorePdfPosition(pages, position)', source)
         self.assertIn('const previousPosition = capturePdfPosition(pages)', source)

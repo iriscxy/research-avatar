@@ -29,6 +29,21 @@ class DemoSyncTests(unittest.TestCase):
         self.assertNotIn("?v=20260814-reader-copy", source)
         self.assertNotIn("writing.png", source)
 
+    def test_cloudflare_release_copies_the_matching_paper_studio(self):
+        dockerfile = (ROOT / "deploy/cloudflare/Dockerfile.release").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "COPY research_avatar/paper_studio/ "
+            "/opt/research-avatar/research_avatar/paper_studio/",
+            dockerfile,
+        )
+        self.assertIn(
+            "COPY research_avatar/paper_studio/ "
+            "/usr/local/lib/python3.12/site-packages/research_avatar/paper_studio/",
+            dockerfile,
+        )
+
     def test_demo_copy_has_a_legacy_fallback_and_plan_is_sampled(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         self.assertIn('document.execCommand("copy")', source)

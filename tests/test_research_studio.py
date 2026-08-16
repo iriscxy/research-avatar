@@ -310,6 +310,30 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertIn("请在终端运行以下命令", index_source)
         self.assertIn('previewCommand.textContent = stage.command', app_source)
 
+    def test_paper_stage_embeds_interactive_studio_instead_of_pdf(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = root / "paper" / "paper_studio.json"
+            config.parent.mkdir(parents=True)
+            config.write_text(
+                json.dumps({"project": {"id": "paper-test", "name": "Paper Test"}}),
+                encoding="utf-8",
+            )
+
+            stage = studio.paper_stage(root)
+
+        self.assertEqual(stage["artifacts"][0]["key"], "paper_studio")
+        self.assertTrue(stage["artifacts"][0]["interactive"])
+        self.assertEqual(stage["artifacts"][0]["url"], studio.PAPER_STUDIO_URL)
+        self.assertNotIn("paper_pdf", [item["key"] for item in stage["artifacts"]])
+
+        source = (
+            Path(__file__).resolve().parents[1]
+            / "research_avatar/research_studio/static/app.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn("artifact.interactive === true", source)
+        self.assertIn("if (isPdf || isInteractive)", source)
+
     def test_pipeline_tabs_use_readable_typography_and_bumped_cache(self):
         root = Path(__file__).resolve().parents[1]
         style_source = (
