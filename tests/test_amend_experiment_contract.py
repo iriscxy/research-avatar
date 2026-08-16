@@ -1,6 +1,6 @@
 import unittest
 
-from tools.amend_experiment_contract import amend, digest
+from research_avatar.tools.amend_experiment_contract import amend, digest
 
 
 class ExperimentContractAmendmentTests(unittest.TestCase):

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from tools.validate_report_structure import REPORT_STRUCTURES, validate
+from research_avatar.tools.validate_report_structure import REPORT_STRUCTURES, validate
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,7 +68,7 @@ class ReportStructureTests(unittest.TestCase):
             source = (ROOT / ".agents" / "skills" / skill / "SKILL.md").read_text(
                 encoding="utf-8"
             )
-            self.assertIn("tools/validate_report_structure.py", source)
+            self.assertIn("research_avatar/tools/validate_report_structure.py", source)
             self.assertIn(command, source)
         runplan = (ROOT / ".agents/skills/runplan/SKILL.md").read_text(encoding="utf-8")
         self.assertIn("--kind results", runplan)
@@ -81,9 +81,9 @@ class ReportStructureTests(unittest.TestCase):
         self.assertEqual(validate("profile", ROOT / "researcher-profile/PROFILE.html"), [])
 
     def test_demo_names_every_fixed_visible_slot(self):
-        source = (ROOT / "demo/app.js").read_text(encoding="utf-8")
+        source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         structures = json.loads(
-            (ROOT / "demo/report-structures.json").read_text(encoding="utf-8")
+            (ROOT / "research_avatar/web/demo/report-structures.json").read_text(encoding="utf-8")
         )
         self.assertIn("内容预览", source)
         demo_keys = {

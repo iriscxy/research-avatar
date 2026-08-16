@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
-from tools.figure_ppt import cmd_build
+from research_avatar.tools.figure_ppt import cmd_build
 
 
 class FigurePptCliTests(unittest.TestCase):

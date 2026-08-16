@@ -84,13 +84,13 @@ class Matrix:
         missing["api_key_configured"] = False
         missing["api_key_setup"] = {
             "setup_command": 'export OPENAI_API_KEY="粘贴你的 API key"',
-            "restart_command": "python3 -m paper_studio.server",
+            "restart_command": "python3 -m research_avatar.paper_studio.server",
         }
         page, errors, posts = self.page(missing)
         self.visit(page, "/?view=writing", "!document.querySelector('#api-key-setup').hidden")
         assert page.locator("#api-key-setup").is_visible()
         assert "export OPENAI_API_KEY" in page.locator("#api-key-setup-command").inner_text()
-        assert "python3 -m paper_studio.server" in page.locator("#api-key-restart-command").inner_text()
+        assert "python3 -m research_avatar.paper_studio.server" in page.locator("#api-key-restart-command").inner_text()
         assert not posts and not errors
         page.close()
 

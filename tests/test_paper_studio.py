@@ -10,9 +10,9 @@ from subprocess import CompletedProcess
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
-import paper_studio.server as studio
-from tools.figure_ppt import shape_spec_html
-from paper_studio.server import (
+import research_avatar.paper_studio.server as studio
+from research_avatar.tools.figure_ppt import shape_spec_html
+from research_avatar.paper_studio.server import (
     FIGURES,
     Handler,
     StudioError,
@@ -297,7 +297,7 @@ class PaperStudioTests(unittest.TestCase):
             missing["api_key_setup"]["environment_variable"], "OPENAI_API_KEY"
         )
         self.assertIn("export OPENAI_API_KEY", missing["api_key_setup"]["setup_command"])
-        self.assertIn("python3 -m paper_studio.server", missing["api_key_setup"]["restart_command"])
+        self.assertIn("python3 -m research_avatar.paper_studio.server", missing["api_key_setup"]["restart_command"])
 
         secret = "must-never-reach-public-state"
         with patch.dict(studio.os.environ, {"OPENAI_API_KEY": secret}):
@@ -725,7 +725,7 @@ class PaperStudioTests(unittest.TestCase):
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn('project.loaded === false', source)
         self.assertIn('id="empty-project"', html)
-        self.assertIn("python3 -m paper_studio.server --empty", html)
+        self.assertIn("python3 -m research_avatar.paper_studio.server --empty", html)
 
     def test_newer_figure_job_state_survives_an_unrelated_stale_save(self):
         with TemporaryDirectory() as directory:

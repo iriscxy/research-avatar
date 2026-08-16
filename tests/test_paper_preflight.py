@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools import paper_preflight
+from research_avatar.tools import paper_preflight
 
 
 class PaperPreflightTests(unittest.TestCase):

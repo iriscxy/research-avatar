@@ -14,7 +14,7 @@ export OPENAI_API_KEY="粘贴你的 API key"
 # DeepSeek
 export DEEPSEEK_API_KEY="粘贴你的 API key"
 
-python3 -m paper_studio.server --provider openai
+python3 -m research_avatar.paper_studio.server --provider openai
 # or: --provider deepseek
 ```
 
@@ -25,7 +25,7 @@ Paper Studio, not in chat, a repository file, or a browser field. If the server
 was already running without the selected key, stop it and restart it after the export.
 Changing the provider at startup resets incompatible conversation IDs. GPT Image remains OpenAI-only.
 
-The application under `paper_studio/` is a reusable engine. Project-specific
+The application under `research_avatar/paper_studio/` is a reusable engine. Project-specific
 identity, section order and LaTeX filenames, result bindings, Figure/Table
 definitions, artifact order, and the metrics path live in
 `paper/paper_studio.json`. A new paper keeps the same HTML/JavaScript/Python
@@ -56,7 +56,7 @@ paragraphs. This is a writing mode, not a separate paper state or a fourth tab.
 To skip the web interface entirely, run the same batch path from the terminal:
 
 ```bash
-python3 -m paper_studio.server --direct-full-draft --provider openai
+python3 -m research_avatar.paper_studio.server --direct-full-draft --provider openai
 # or: --provider deepseek
 ```
 
@@ -150,6 +150,6 @@ that the reusable Studio opens without `paper/` while all mutation controls stay
 disabled:
 
 ```bash
-python3 -m paper_studio.server --empty --port 8766
+python3 -m research_avatar.paper_studio.server --empty --port 8766
 python3 .agents/skills/paperstudio/scripts/browser_matrix.py --url http://127.0.0.1:8766
 ```

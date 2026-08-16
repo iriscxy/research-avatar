@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from tools import paper_checks, validate_ideagen_report
+from research_avatar.tools import paper_checks, validate_ideagen_report
 
 
 ROOT = Path(__file__).resolve().parents[1]

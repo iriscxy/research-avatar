@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class DemoSyncTests(unittest.TestCase):
     def test_committed_demo_snapshot_is_a_fixed_self_contained_example(self):
-        actual = json.loads((ROOT / "demo/runplan-state.json").read_text(encoding="utf-8"))
+        actual = json.loads((ROOT / "research_avatar/web/demo/runplan-state.json").read_text(encoding="utf-8"))
         self.assertTrue(actual["parts"])
         self.assertTrue(actual["goals"])
         current = actual["active_goal"] or actual["proposed_goal_id"]
@@ -17,7 +17,7 @@ class DemoSyncTests(unittest.TestCase):
         self.assertTrue(current_goals[0]["goal_command"].startswith(f"/goal Complete {current}:"))
 
     def test_paper_demo_uses_three_real_application_screenshots(self):
-        source = (ROOT / "demo/app.js").read_text(encoding="utf-8")
+        source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         self.assertNotIn("data-paper-demo-view", source)
         self.assertIn("右侧 PDF 会在内容确认后自动重新编译", source)
         self.assertIn("正文由 LLM API 写作", source)
@@ -28,12 +28,12 @@ class DemoSyncTests(unittest.TestCase):
         self.assertIn("?v=20260814-reader-copy", source)
         for filename in ("writing.png", "figures.png", "tables.png"):
             self.assertIn(filename, source)
-            image = ROOT / "demo/assets/paper-studio" / filename
+            image = ROOT / "research_avatar/web/demo/assets/paper-studio" / filename
             self.assertTrue(image.exists(), filename)
             self.assertGreater(image.stat().st_size, 10_000, filename)
 
     def test_demo_copy_has_a_legacy_fallback_and_plan_is_sampled(self):
-        source = (ROOT / "demo/app.js").read_text(encoding="utf-8")
+        source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         self.assertIn('document.execCommand("copy")', source)
         self.assertIn('representativeGoalIds = [currentId, "G2.1", "G5.1"]', source)
         self.assertNotIn("执行当前唯一 Goal", source)
@@ -41,7 +41,7 @@ class DemoSyncTests(unittest.TestCase):
         self.assertNotIn("完整计划没有丢失", source)
 
     def test_demo_headings_use_reader_facing_copy(self):
-        source = (ROOT / "demo/app.js").read_text(encoding="utf-8")
+        source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         for internal_copy in (
             "执行进度和已完成图表都在 04 Run Plan",
             "直接展示真实 Paper Studio 截图",

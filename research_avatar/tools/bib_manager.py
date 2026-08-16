@@ -14,9 +14,9 @@ selfcite  Given a draft (.tex / .md / text), list the researcher's own papers th
 
 Examples
 --------
-python3 tools/bib_manager.py export --enriched researcher-profile/publications.json --out mybank.bib
-python3 tools/bib_manager.py check paper/references.bib
-python3 tools/bib_manager.py selfcite --enriched researcher-profile/publications.json --draft paper/main.tex
+python3 research_avatar/tools/bib_manager.py export --enriched researcher-profile/publications.json --out mybank.bib
+python3 research_avatar/tools/bib_manager.py check paper/references.bib
+python3 research_avatar/tools/bib_manager.py selfcite --enriched researcher-profile/publications.json --draft paper/main.tex
 """
 
 from __future__ import annotations

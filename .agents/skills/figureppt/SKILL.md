@@ -7,7 +7,7 @@ description: "Create publication-ready model, method, and Figure-1 mechanism fig
 
 The model figure is a **schematic that conveys the mechanism through imagery** (vectors,
 geometry, arrows, icons — BioRender style), NOT a flowchart of text-filled boxes. The
-mechanism is fixed in four stages (tool: `tools/figure_ppt.py`):
+mechanism is fixed in four stages (tool: `research_avatar/tools/figure_ppt.py`):
 
 ## Stage 1 — GENPROMPT (the draw prompt is GENERATED from the paper, not hand-written)
 A fixed meta-prompt is applied to the paper's method/mechanism text via GPT (chat) to
@@ -25,7 +25,7 @@ produce a BioRender-style image prompt. The meta-prompt (verbatim, in the tool a
 > aspect ratio, safe crop, and print readability; stay evidence-faithful and return only the prompt.
 
 ```bash
-python3 tools/figure_ppt.py genprompt --paper <method.tex-or-txt> --spec spec.json [--model gpt-4o]
+python3 research_avatar/tools/figure_ppt.py genprompt --paper <method.tex-or-txt> --spec spec.json [--model gpt-4o]
 ```
 It reads the paper (feed the Method/Understanding sections, or the whole `main.tex`), calls
 GPT as that expert designer, and writes the returned BioRender prompt into `spec.draw_prompt`.
@@ -37,7 +37,7 @@ figure is faithful to the mechanism. (Read it back; re-run if it misreads the me
 
 ## Stage 2 — DRAW (image model, swappable)
 ```bash
-python3 tools/figure_ppt.py draw spec.json --provider openai   # gpt-image-1, quality=high
+python3 research_avatar/tools/figure_ppt.py draw spec.json --provider openai   # gpt-image-1, quality=high
 ```
 Draws with `spec.draw_prompt` **VERBATIM — nothing appended** (a BioRender figure keeps its own
 labels). The currently supported drawer is `openai` (`OPENAI_API_KEY`). Produces `<fig>.bg.png`, and **every draw is
@@ -57,7 +57,7 @@ cannot be enumerated in advance, so the refinement is done by **you, the calling
    a tight image prompt, not a multi-section design doc.
 3. Re-`draw` and look again. Repeat until it reads cleanly and faithfully.
 ```bash
-python3 tools/figure_ppt.py draw spec.json --provider openai   # after YOU edit spec.draw_prompt
+python3 research_avatar/tools/figure_ppt.py draw spec.json --provider openai   # after YOU edit spec.draw_prompt
 ```
 Do not delegate the rewrite to a canned instruction — you have vision, so adapt to whatever
 this round's image shows. (Image models garble baked text; if a label must be perfectly crisp,
@@ -67,8 +67,8 @@ set spec `no_text:true` and overlay it as an editable PPT box.)
 
 **`buildshapes` — required Paper Studio path.**
 ```bash
-python3 tools/figure_ppt.py buildshapes shapes.json --out <fig>.pptx   # native PPT shapes
-python3 tools/figure_ppt.py pdf         <fig>.pptx                      # soffice → PDF
+python3 research_avatar/tools/figure_ppt.py buildshapes shapes.json --out <fig>.pptx   # native PPT shapes
+python3 research_avatar/tools/figure_ppt.py pdf         <fig>.pptx                      # soffice → PDF
 ```
 Renders a **shape spec** into **native PowerPoint shapes** — every module a rounded rect, every
 flow an arrow (connector with an arrowhead), every label a text box, ovals/hexagons as needed —
@@ -97,12 +97,12 @@ PowerPoint components.
 painterly look; only the overlay labels are editable (the imagery is a flat raster). Use when the
 baked figure looks right and you only need to fix/add a few crisp labels.
 ```bash
-python3 tools/figure_ppt.py build spec.json --img <fig>.bg.png      # image bg + editable label boxes
-python3 tools/figure_ppt.py pdfimage spec.json --img <fig>.bg.png   # unattended image-backed PDF
+python3 research_avatar/tools/figure_ppt.py build spec.json --img <fig>.bg.png      # image bg + editable label boxes
+python3 research_avatar/tools/figure_ppt.py pdfimage spec.json --img <fig>.bg.png   # unattended image-backed PDF
 ```
 `pdfimage` uses headless Chrome and atomically replaces the PDF that drops into the paper; it does not require LibreOffice or PowerPoint UI automation.
 
-`python3 tools/figure_ppt.py all spec.json --paper <method>` is the legacy convenience chain
+`python3 research_avatar/tools/figure_ppt.py all spec.json --paper <method>` is the legacy convenience chain
 genprompt → draw → image-backed build → pdf. It deliberately has no scripted refinement flag:
 for a publication figure, inspect the first image, revise `spec.draw_prompt`, redraw as needed,
 then rebuild through the appropriate editable path.
@@ -153,7 +153,7 @@ then rebuild through the appropriate editable path.
 - **Drawer swappable + throwaway** — provider is a flag; regenerate until the figure reads right.
 
 ## Tool & deps
-`tools/figure_ppt.py` — `genprompt` / `draw` / `build` / `buildshapes` / `pdfimage` / `pdf` / `all` / `emit-example`
+`research_avatar/tools/figure_ppt.py` — `genprompt` / `draw` / `build` / `buildshapes` / `pdfimage` / `pdf` / `all` / `emit-example`
 (refine is agent-driven — read the image, edit `spec.draw_prompt`, re-`draw`; no CLI command).
 `buildshapes` is the fully-editable native-shapes path (Stage 4A).
 Deps in this repo: `OPENAI_API_KEY` (genprompt chat + gpt-image draw), `python-pptx` (build),

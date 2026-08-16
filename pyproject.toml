@@ -21,16 +21,16 @@ dev = [
 ]
 
 [project.scripts]
-research-avatar = "tools.research_buddy_cli:main"
+research-avatar = "research_avatar.tools.research_buddy_cli:main"
 # Compatibility alias for clones/scripts created before the project rename.
-research-buddy = "tools.research_buddy_cli:main"
+research-buddy = "research_avatar.tools.research_buddy_cli:main"
 
 [tool.setuptools.packages.find]
-include = ["tools*", "paper_studio*", "research_studio*", "demo*", "functions*"]
-namespaces = true
+include = ["research_avatar*"]
 
 [tool.setuptools.package-data]
-paper_studio = ["static/*", "*.mjs", "README.md"]
-research_studio = ["static/*"]
-demo = ["*.html", "*.js", "*.css", "*.json", "_routes.json", "assets/**/*"]
-functions = ["*.js"]
+"research_avatar.paper_studio" = ["static/*", "*.mjs", "README.md"]
+"research_avatar.research_studio" = ["static/*"]
+"research_avatar.web.demo" = ["*.html", "*.js", "*.css", "*.json", "_routes.json", "assets/**/*"]
+"research_avatar.web.functions" = ["*.js"]
+"research_avatar.web" = ["*.jsonc", "migrations/*.sql"]

@@ -28,9 +28,9 @@ partial record.
 
 Examples
 --------
-python3 tools/scholar_profile.py --from-html gs_profile.html
-python3 tools/scholar_profile.py --from-tab
-python3 tools/scholar_profile.py --auto "https://scholar.google.com/citations?user=COUnAF4AAAAJ&hl=en"
+python3 research_avatar/tools/scholar_profile.py --from-html gs_profile.html
+python3 research_avatar/tools/scholar_profile.py --from-tab
+python3 research_avatar/tools/scholar_profile.py --auto "https://scholar.google.com/citations?user=COUnAF4AAAAJ&hl=en"
 """
 
 from __future__ import annotations

@@ -25,8 +25,8 @@ are a separate, LLM-distilled artifact — see ``workflow_prefs.py``.
 
 Examples
 --------
-python3 tools/experiment_history.py --output habits.json
-python3 tools/experiment_history.py --transcripts ~/.claude/projects/my-proj --output habits.json
+python3 research_avatar/tools/experiment_history.py --output habits.json
+python3 research_avatar/tools/experiment_history.py --transcripts ~/.claude/projects/my-proj --output habits.json
 """
 
 from __future__ import annotations

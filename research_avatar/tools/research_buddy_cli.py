@@ -39,10 +39,10 @@ def main() -> int:
                 "paper_studio",
                 "research_studio",
             ],
-            ["node", "--check", str(PACKAGE_ROOT / "demo" / "app.js")],
+            ["node", "--check", str(PACKAGE_ROOT / "web" / "demo" / "app.js")],
             ["node", "--check", str(PACKAGE_ROOT / "paper_studio" / "static" / "app.js")],
             ["node", "--check", str(PACKAGE_ROOT / "research_studio" / "static" / "app.js")],
-            ["node", "--check", str(PACKAGE_ROOT / "functions" / "_middleware.js")],
+            ["node", "--check", str(PACKAGE_ROOT / "web" / "functions" / "_middleware.js")],
         ]
         if (ROOT / "paper" / "main.tex").is_file():
             commands.append(

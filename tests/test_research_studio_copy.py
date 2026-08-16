@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from tools.run_plan_progress import render_parts_and_goals
+from research_avatar.tools.run_plan_progress import render_parts_and_goals
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -9,8 +9,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ResearchStudioCopyTests(unittest.TestCase):
     def test_parent_copy_bridge_keeps_the_artifact_sandbox(self):
-        app = (ROOT / "research_studio/static/app.js").read_text(encoding="utf-8")
-        index = (ROOT / "research_studio/static/index.html").read_text(encoding="utf-8")
+        app = (ROOT / "research_avatar/research_studio/static/app.js").read_text(encoding="utf-8")
+        index = (ROOT / "research_avatar/research_studio/static/index.html").read_text(encoding="utf-8")
         self.assertIn('event.source !== previewFrame.contentWindow', app)
         self.assertIn('message.type !== "research-studio-copy-goal"', app)
         self.assertIn('value.startsWith("/goal ")', app)

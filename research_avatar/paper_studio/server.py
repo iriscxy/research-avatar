@@ -2,7 +2,7 @@
 
 Run from the repository root:
 
-    python3 -m paper_studio.server
+    python3 -m research_avatar.paper_studio.server
 
 The browser never receives an API key. Each manuscript section owns an
 independent selected-provider conversation.
@@ -78,7 +78,7 @@ API_URL += "/responses"
 API_KEY_ENVIRONMENT_VARIABLE = "OPENAI_API_KEY"
 API_KEY_SETUP_LOCATION = "启动 Paper Studio 的本机终端"
 API_KEY_SETUP_COMMAND = 'export OPENAI_API_KEY="粘贴你的 API key"'
-API_KEY_RESTART_COMMAND = "python3 -m paper_studio.server"
+API_KEY_RESTART_COMMAND = "python3 -m research_avatar.paper_studio.server"
 CHAT_HISTORY_LOCK = threading.RLock()
 CHAT_RESPONSE_HISTORIES: dict[str, list[dict[str, str]]] = {}
 STATE_LOCK = threading.RLock()
@@ -5753,7 +5753,12 @@ def parse_local_agent_answer(raw: str) -> tuple[str, str]:
 def chat_source_snapshot() -> dict[str, str]:
     """Fingerprint editable sources and researcher-visible paper artifacts."""
     snapshot: dict[str, str] = {}
-    roots = [PAPER, ROOT / "results", ROOT / "paper_studio", ROOT / ".agents" / "skills" / "paperstudio"]
+    roots = [
+        PAPER,
+        ROOT / "results",
+        Path(__file__).resolve().parent,
+        ROOT / ".agents" / "skills" / "paperstudio",
+    ]
     for base in roots:
         if not base.exists():
             continue
@@ -5770,7 +5775,12 @@ def chat_source_snapshot() -> dict[str, str]:
             stat = path.stat()
             if source and stat.st_size > 2_000_000:
                 continue
-            relative = path.relative_to(ROOT).as_posix()
+            try:
+                relative = path.relative_to(ROOT).as_posix()
+            except ValueError:
+                relative = (
+                    Path("research_avatar") / path.relative_to(PACKAGE_ROOT)
+                ).as_posix()
             if stat.st_size <= 4_000_000:
                 snapshot[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
             else:

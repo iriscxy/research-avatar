@@ -21,8 +21,8 @@ Abstracts are also merged back into the --enriched JSON in place.
 
 Examples
 --------
-python3 tools/fetch_fulltext.py --enriched researcher-profile/publications.json --keys guo2024large --limit 5
-python3 tools/fetch_fulltext.py --enriched researcher-profile/publications.json          # full run
+python3 research_avatar/tools/fetch_fulltext.py --enriched researcher-profile/publications.json --keys guo2024large --limit 5
+python3 research_avatar/tools/fetch_fulltext.py --enriched researcher-profile/publications.json          # full run
 """
 from __future__ import annotations
 

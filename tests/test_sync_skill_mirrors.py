@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from tools.sync_skill_mirrors import is_disposable
+from research_avatar.tools.sync_skill_mirrors import is_disposable
 
 
 class SkillMirrorTests(unittest.TestCase):

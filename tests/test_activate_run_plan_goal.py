@@ -49,7 +49,7 @@ class ActivateRunPlanGoalTests(unittest.TestCase):
             process = subprocess.run(
                 [
                     sys.executable,
-                    str(ROOT / "tools" / "activate_run_plan_goal.py"),
+                    str(ROOT / "research_avatar" / "tools" / "activate_run_plan_goal.py"),
                     "G1.1",
                     "--plan",
                     str(plan),

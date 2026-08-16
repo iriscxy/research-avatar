@@ -6,13 +6,13 @@ description: "Build / refresh the personalized researcher profile (PROFILE.html,
 # Profile Construct — Personalize Research Avatar from Google Scholar
 
 At the first Skill action in this Codex project session, run
-`python3 -m research_studio.server --ensure-studios` before substantive work.
+`python3 -m research_avatar.research_studio.server --ensure-studios` before substantive work.
 This idempotent project bootstrap starts or reuses Research Studio at
 `http://127.0.0.1:8780` and Paper Studio at `http://127.0.0.1:8765`, then opens
 both browser pages. Run it once per session, never launch duplicate servers, and
 surface any startup error instead of claiming that either page is available.
 
-> Restored 2026-07-03 by adapting the origin skill (`Auto-claude-code-research-in-sleep/skills/profile-builder`) to this project after the project skill tree was rebuilt. Kept Research Avatar specifics: in-repo `researcher-profile/`, the `tools/` helpers, the six-skill pipeline, and W1–Wn workflow preferences.
+> Restored 2026-07-03 by adapting the origin skill (`Auto-claude-code-research-in-sleep/skills/profile-builder`) to this project after the project skill tree was rebuilt. Kept Research Avatar specifics: in-repo `researcher-profile/`, the `research_avatar/tools/` helpers, the six-skill pipeline, and W1–Wn workflow preferences.
 
 ## Overview
 
@@ -56,15 +56,15 @@ Temporary `gs.json`, `arxiv_abs.json`, `habits.json`, `prefs_bundle.json`, and s
 
 **Phase 1 — Read Scholar** → `gs.json`
 ```bash
-python3 tools/scholar_profile.py --from-html "<exported.html>" > "researcher-profile/gs.json"
-# or: python3 tools/scholar_profile.py --from-tab > "researcher-profile/gs.json"
+python3 research_avatar/tools/scholar_profile.py --from-html "<exported.html>" > "researcher-profile/gs.json"
+# or: python3 research_avatar/tools/scholar_profile.py --from-tab > "researcher-profile/gs.json"
 ```
 Read the JSON. If `truncated` is true, surface the `warning` and stop. If `error`, surface it and stop.
 
 **Phase 2 — Enrich (abstracts + DOIs + BibTeX)** → `publications.json`
 ```bash
-python3 tools/profile_enrich.py --input "researcher-profile/gs.json" --output "researcher-profile/publications.json"
-python3 tools/fetch_fulltext.py --enriched "researcher-profile/publications.json" --outdir "researcher-profile/fulltext" --delay 2
+python3 research_avatar/tools/profile_enrich.py --input "researcher-profile/gs.json" --output "researcher-profile/publications.json"
+python3 research_avatar/tools/fetch_fulltext.py --enriched "researcher-profile/publications.json" --outdir "researcher-profile/fulltext" --delay 2
 ```
 BibTeX always builds from Scholar metadata (offline) into `publications.json`. Abstracts + full-text depend on the network.
 
@@ -111,16 +111,16 @@ Write the detailed, operational style analysis directly inside the **`PROFILE.ht
 
 **Phase 6 — Mine available coding-agent history (ONCE, here; downstream never re-mines).** Prefer `.aris/meta/events.jsonl`. Claude transcripts may also be included when present; do not assume Codex session JSON is compatible with `workflow_prefs.py`:
 ```bash
-python3 tools/experiment_history.py --events .aris/meta/events.jsonl --output "researcher-profile/habits.json"
+python3 research_avatar/tools/experiment_history.py --events .aris/meta/events.jsonl --output "researcher-profile/habits.json"
 # Optional, only when a compatible transcript path is supplied:
-python3 tools/workflow_prefs.py --transcripts "<compatible-transcript-dir-or-jsonl>" --output "researcher-profile/prefs_bundle.json"
+python3 research_avatar/tools/workflow_prefs.py --transcripts "<compatible-transcript-dir-or-jsonl>" --output "researcher-profile/prefs_bundle.json"
 ```
 - **Fold `habits.json` → *Experiment Templates*** (deterministic): habitual launcher · framework/deps · base-model backbone · GPUs · failure memory (OOM hits, top error types). **Do NOT write hyperparameter values** (lr/batch/epochs/seed) — those are task-determined, decided by `/expplan`.
 - **Fold `prefs_bundle.json` → *Workflow Preferences* W1–Wn** (LLM-distill, written directly — NO confirmation gate): cluster recurring candidates into 1-line preference statements, each with an evidence quote + why/how-to-apply; discard project-specific one-offs. **Write them straight from the mining** — Workflow Preferences are descriptive mined data, not a research decision, so this step does NOT stop to confirm them; if one is off, the researcher edits `PROFILE.html` directly. **The count is emergent — write as many W's as the mining yields, NOT a fixed 7.**
 
 **Phase 7 — Write the single profile**: write one self-contained `PROFILE.html` with inline CSS and the fixed sections below: source/coverage header · Research Identity · Research Lineage · the complete Writing Style analysis specified in Phase 4 · Experiment Templates · Workflow Preferences (W1–Wn table — as many as mined) · one short **Publication Records** pointer to `publications.json`. Never copy a per-paper Publications Index or BibTeX bank into `PROFILE.html`; `publications.json` is the sole detailed publication source. Do not generate `PROFILE.md`, `PROFILE.<lang>.html`, or another profile companion.
 
-**Phase 8 — Refresh and cleanup**: refresh `PROFILE.html` transactionally while preserving/merging Experiment Templates and Tacit Knowledge (W2/W3 — a stop mid-crawl must not destroy the existing profile). Mechanically verify that its Writing Style evidence list contains exactly 15 unique full-paper keys. Before declaring success, delete everything in `researcher-profile/` except `PROFILE.html`, `publications.json`, and `fulltext/`, mechanically verify that whitelist, and remove any obsolete Markdown or profile companion so two profile sources cannot drift. Run `python3 tools/validate_report_structure.py --kind profile --html researcher-profile/PROFILE.html` before completion.
+**Phase 8 — Refresh and cleanup**: refresh `PROFILE.html` transactionally while preserving/merging Experiment Templates and Tacit Knowledge (W2/W3 — a stop mid-crawl must not destroy the existing profile). Mechanically verify that its Writing Style evidence list contains exactly 15 unique full-paper keys. Before declaring success, delete everything in `researcher-profile/` except `PROFILE.html`, `publications.json`, and `fulltext/`, mechanically verify that whitelist, and remove any obsolete Markdown or profile companion so two profile sources cannot drift. Run `python3 research_avatar/tools/validate_report_structure.py --kind profile --html researcher-profile/PROFILE.html` before completion.
 
 ## Key rules
 - **Google Scholar decides the paper list.** S2 only enriches; never adds/drops.

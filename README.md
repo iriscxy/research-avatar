@@ -60,6 +60,30 @@ export DEEPSEEK_API_KEY="粘贴你的 API key"
 
 全部流程和生成文件可以在 **[http://127.0.0.1:8780](http://127.0.0.1:8780)** 看到。
 
+## 目录结构
+
+根目录优先展示研究者直接使用和交付的内容；这些目录会在对应 Skill 首次运行时创建：
+
+```text
+researcher-profile/   # 个性化研究者画像
+reports/              # 文献、Idea、实验计划与结果报告
+results/              # 可追溯实验结果
+code/                 # 可复现实验代码
+paper/                # LaTeX、图表、PPTX 与最终论文
+```
+
+项目实现统一归档在 `research_avatar/`：
+
+```text
+research_avatar/
+├── paper_studio/     # 论文写作工作台
+├── research_studio/  # 全流程浏览界面
+├── tools/            # CLI、校验器与科研工作流工具
+└── web/              # 在线 Demo、Cloudflare Functions 与迁移文件
+```
+
+`.agents/skills/` 是 Codex Skill 源，`.claude/skills/` 是自动同步的 Claude Code 镜像；`tests/` 保存回归测试。
+
 ---
 
 ## 具体实现

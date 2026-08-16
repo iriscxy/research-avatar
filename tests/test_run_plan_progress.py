@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from tools.run_plan_progress import goal_command, refresh, render_parts_and_goals
+from research_avatar.tools.run_plan_progress import goal_command, refresh, render_parts_and_goals
 
 
 def fixture_state(proposed="G1.1"):

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from tools import experiment_history, profile_enrich
+from research_avatar.tools import experiment_history, profile_enrich
 
 
 class ProfileToolTests(unittest.TestCase):

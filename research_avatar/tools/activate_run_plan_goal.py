@@ -9,12 +9,12 @@ import re
 from pathlib import Path
 
 try:
-    from tools.run_plan_progress import (
+    from research_avatar.tools.run_plan_progress import (
         completed_artifact_snapshots,
         render_parts_and_goals,
         replace_report_section,
     )
-except ModuleNotFoundError:  # Direct ``python tools/activate_run_plan_goal.py`` execution.
+except ModuleNotFoundError:  # Direct ``python research_avatar/tools/activate_run_plan_goal.py`` execution.
     from run_plan_progress import (  # type: ignore[no-redef]
         completed_artifact_snapshots,
         render_parts_and_goals,

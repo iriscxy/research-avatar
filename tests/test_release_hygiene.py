@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from tools.rewrite_ideagen_html import provider_settings
+from research_avatar.tools.rewrite_ideagen_html import provider_settings
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,7 +23,7 @@ class ReleaseHygieneTests(unittest.TestCase):
                     sys.executable,
                     "-c",
                     (
-                        "import json, paper_studio.server as p, research_studio.server as r; "
+                        "import json, research_avatar.paper_studio.server as p, research_avatar.research_studio.server as r; "
                         "print(json.dumps({'paper': str(p.ROOT), 'research': str(r.ROOT), "
                         "'figure_tool': p.FIGURE_TOOL.is_file(), 'demo': r.DEMO.is_dir()}))"
                     ),
@@ -75,7 +75,11 @@ class ReleaseHygieneTests(unittest.TestCase):
 
     def test_shipped_instructions_have_no_personal_absolute_paths(self):
         candidates = [ROOT / "README.md", ROOT / "Makefile"]
-        for directory in (ROOT / ".agents", ROOT / ".claude", ROOT / "tools"):
+        for directory in (
+            ROOT / ".agents",
+            ROOT / ".claude",
+            ROOT / "research_avatar" / "tools",
+        ):
             candidates.extend(path for path in directory.rglob("*") if path.is_file())
         offenders = []
         for path in candidates:

@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from tools import research_buddy_cli
+from research_avatar.tools import research_buddy_cli
 
 
 class ResearchAvatarCliTests(unittest.TestCase):
@@ -20,10 +20,10 @@ class ResearchAvatarCliTests(unittest.TestCase):
         flattened = {" ".join(command) for command, _kwargs in calls}
         self.assertTrue(any("compileall" in item and "research_studio" in item for item in flattened))
         for source in (
-            "demo/app.js",
-            "paper_studio/static/app.js",
-            "research_studio/static/app.js",
-            "functions/_middleware.js",
+            "web/demo/app.js",
+            "research_avatar/paper_studio/static/app.js",
+            "research_avatar/research_studio/static/app.js",
+            "web/functions/_middleware.js",
         ):
             self.assertTrue(any(item.endswith(source) for item in flattened))
         self.assertTrue(

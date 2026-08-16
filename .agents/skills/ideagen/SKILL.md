@@ -4,7 +4,7 @@ description: "Help the researcher find candidate research ideas through a person
 ---
 
 At the first Skill action in this Codex project session, run
-`python3 -m research_studio.server --ensure-studios` before substantive work.
+`python3 -m research_avatar.research_studio.server --ensure-studios` before substantive work.
 This idempotent project bootstrap starts or reuses Research Studio at
 `http://127.0.0.1:8780` and Paper Studio at `http://127.0.0.1:8765`, then opens
 both browser pages. Run it once per session, never launch duplicate servers, and
@@ -57,7 +57,7 @@ invocation already specifies one. Then pass every eligible visible explanatory
 text node through that LLM API by running:
 
 ```bash
-python3 tools/rewrite_ideagen_html.py \
+python3 research_avatar/tools/rewrite_ideagen_html.py \
   reports/02_IDEA_REPORT.html \
   --provider "<openai-or-deepseek-chosen-by-researcher>" \
   --model "<researcher-specified-model-if-any>"
@@ -98,7 +98,7 @@ the researcher.
 After the rewrite, run all ordinary validators **and**:
 
 ```bash
-python3 tools/validate_ideagen_readability.py reports/02_IDEA_REPORT.html
+python3 research_avatar/tools/validate_ideagen_readability.py reports/02_IDEA_REPORT.html
 ```
 
 If any subsequent edit changes visible prose, rerun the selected LLM API rewrite so the
@@ -107,7 +107,7 @@ for the fixed `Selected: I<k> — <title>` banner and row tag; changing any idea
 explanation requires a fresh API pass.
 
 ## A0 — Reference paper (only if `— ref paper:` given)
-Summarize BEFORE surveying so generation targets its gaps. Fetch (`tools/fetch_fulltext.py` / `pdftotext` / web open/fetch) and read the paper for **what they did · key results · limitations & open questions · improvement directions**. Numbers/claims trace to the paper's text; if you couldn't fetch it, say so and ask for the PDF. **Do NOT write a separate summary file** — this reading is internal grounding for idea generation. When `— ref paper:` was given, surface it as a **short "Reference Paper Notes" box at the very top of `02_IDEA_REPORT.html`** (those four bullets, condensed), so the reader sees the gap the ideas are built to attack; without `— ref paper:` there is no such box (grounding is the survey landscape only). This box is a conditional block, separate from and above the regular Literature Landscape section.
+Summarize BEFORE surveying so generation targets its gaps. Fetch (`research_avatar/tools/fetch_fulltext.py` / `pdftotext` / web open/fetch) and read the paper for **what they did · key results · limitations & open questions · improvement directions**. Numbers/claims trace to the paper's text; if you couldn't fetch it, say so and ask for the PDF. **Do NOT write a separate summary file** — this reading is internal grounding for idea generation. When `— ref paper:` was given, surface it as a **short "Reference Paper Notes" box at the very top of `02_IDEA_REPORT.html`** (those four bullets, condensed), so the reader sees the gap the ideas are built to attack; without `— ref paper:` there is no such box (grounding is the survey landscape only). This box is a conditional block, separate from and above the regular Literature Landscape section.
 
 ## A1 — Read the literature survey (from `$researchlit` — do NOT re-survey)
 **ideagen no longer runs its own survey.** The grounding is the survey `$researchlit` already produced at **`reports/01_LIT_SURVEY.html`**. Do this:
@@ -179,7 +179,7 @@ test removal, adjacent-scope replacement, and one scope-unique prediction. Class
 Relabel evaluation-only scope, move application swaps to **Needs reforge**, and keep an
 unverified scope selectable only with a concrete falsifier for `$expplan`; a failed
 falsifier narrows/relabels the claim.
-Encode each selectable card with matching `data-scope-necessity`, `data-scope-action`, and, when unverified, `data-scope-falsifier`; run `python3 tools/validate_ideagen_report.py reports/02_IDEA_REPORT.html` before the pick gate.
+Encode each selectable card with matching `data-scope-necessity`, `data-scope-action`, and, when unverified, `data-scope-falsifier`; run `python3 research_avatar/tools/validate_ideagen_report.py reports/02_IDEA_REPORT.html` before the pick gate.
 2c. If the ethics triage flagged the idea, include **Ethics risk** in the qualitative record and keep it separate from the technical `risk` field. The rightmost table cell and the card's detailed assessment must agree exactly on the level. Do not silently downgrade a risk to improve ranking.
 3. **Same-model devil's-advocate ranking:** in a clearly separated second pass, review the full set using the same model. For each idea state the strongest objection, likely failure mode, whether it passes 2a or remains an A+B mashup, its 2b scope-necessity classification and falsifier, whether the novelty evidence shows a collision or a defensible difference, and whether that difference can support a contribution. Rank qualitatively by this review, feasibility, risk, and research value—not by a numeric or weighted score—and write the objections out; never skip the pass. This pass diagnoses and ranks; an objection is not by itself an exclusion rule.
 4. **Build a tiered decision slate.** Exclude `already exists` and `[UNVERIFIED]` from pick options. Tier A contains `novel` recommendations; Tier B contains selectable `differentiable` candidates with a concrete difference, viable test, and reforge path. Tier B is never a default recommendation—even when Tier A is empty—and must be explicitly chosen as incremental/framing work. Move absorbable application swaps, unresolved mashups, and weak differences to **Needs reforge — not selectable**. If no Tier A survives, state **no high-confidence novel recommendation**; never promote Tier B to fill rank 1.
@@ -194,9 +194,9 @@ Never create a second report for the disruptive pass. Set `data-idea-branch="sta
 - With wildcard `on`, append a **Disruptive wildcard** section after all standard idea cards. If an eligible survivor exists, show exactly one `<article data-disruptive-id="D1">`, its Disruptive score, and every field required by `references/disruptive-branch.md`.
 - If no disruptive seed survives, set `data-disruptive-wildcard="shortfall"` and show the compact failed-gate audit in that same position; do not invent `D1`.
 - Keep the standard ranking table unchanged. Do not insert D1 as rank 8 and do not compare its Disruptive score to standard Novelty / qualitative ranks.
-- When the wildcard is on, run `python3 tools/validate_ideagen_wildcard.py reports/02_IDEA_REPORT.html` and fix all errors before presenting it. Ask the researcher to pick / kill / redirect by id (`I*` or `D1`). Never auto-proceed.
+- When the wildcard is on, run `python3 research_avatar/tools/validate_ideagen_wildcard.py reports/02_IDEA_REPORT.html` and fix all errors before presenting it. Ask the researcher to pick / kill / redirect by id (`I*` or `D1`). Never auto-proceed.
 
-Present a **4–6 idea decision slate when evidence supports it**; fewer is valid after the second generation pass. Use `ID | Tier | Idea | Novelty status | Scope necessity | Closest work | Concrete difference | Strongest objection | Confidence` (plus conditional ethics risk). Each selectable card carries `data-idea-id`, `data-novelty-status`, `data-idea-tier`, `data-default-pick`, and the scope attributes from 2b. Only Tier A may be default; Tier B says `needs framing`; at most one card is default. Before the gate, give a fresh-context reviewer only the cards and retrieved sources; embed its per-ID verdict, absorbability result, closest-work overlap/difference, ISO latest-search date, fresh-context run ID, and ≥2 non-placeholder direct URLs as `idea-novelty-audit` JSON. The card and audit must agree. Non-selectable survivors have no pick ID. Run the mandatory LLM API readability rewrite, then `tools/validate_ideagen_report.py`, `tools/validate_ideagen_readability.py`, and the fixed-structure validator; only the API-rewritten final HTML may be presented. Then stop for pick/kill/redirect.
+Present a **4–6 idea decision slate when evidence supports it**; fewer is valid after the second generation pass. Use `ID | Tier | Idea | Novelty status | Scope necessity | Closest work | Concrete difference | Strongest objection | Confidence` (plus conditional ethics risk). Each selectable card carries `data-idea-id`, `data-novelty-status`, `data-idea-tier`, `data-default-pick`, and the scope attributes from 2b. Only Tier A may be default; Tier B says `needs framing`; at most one card is default. Before the gate, give a fresh-context reviewer only the cards and retrieved sources; embed its per-ID verdict, absorbability result, closest-work overlap/difference, ISO latest-search date, fresh-context run ID, and ≥2 non-placeholder direct URLs as `idea-novelty-audit` JSON. The card and audit must agree. Non-selectable survivors have no pick ID. Run the mandatory LLM API readability rewrite, then `research_avatar/tools/validate_ideagen_report.py`, `research_avatar/tools/validate_ideagen_readability.py`, and the fixed-structure validator; only the API-rewritten final HTML may be presented. Then stop for pick/kill/redirect.
 
 
 If any ethics risk is `HIGH` or `CRITICAL`, the gate must state that the candidate requires explicit human ethics review before implementation, data collection, deployment, or release, as applicable. Ask only the concrete review question needed for the flagged pathway; do not show an ethics prompt for unflagged work. For `LOW` or `MEDIUM`, show the risk and safeguards in the report and let the normal idea-selection gate handle the decision.
@@ -214,4 +214,4 @@ Render `02_IDEA_REPORT.html` with an unnumbered selected-status banner when appl
 3. `3. Candidate Cards` (`candidate-cards`);
 4. `4. Human Selection` (`human-selection`).
 
-Place any opt-in `Disruptive Wildcard` inside `Candidate Cards`; it is not a fifth top-level section. Each candidate card owns its plain-language summary, novelty evidence, one mechanism, falsifier, scope necessity, feasibility, strongest objection, and conditional ethics assessment. Every top-level title must own substantive topic-specific content; an empty section, title-only slot, or placeholder-only body is invalid. Keep audits as hidden JSON, not visible sections. Do not add, rename, reorder, or omit a top-level section; workflow logs, dashboards, and tool comparisons are forbidden. Before the pick gate, run `python3 tools/validate_report_structure.py --kind ideas --html reports/02_IDEA_REPORT.html` in addition to the idea-specific validators. Research Studio adds selection controls around this report; the Live Demo must display this exact section list with filled illustrative candidates.
+Place any opt-in `Disruptive Wildcard` inside `Candidate Cards`; it is not a fifth top-level section. Each candidate card owns its plain-language summary, novelty evidence, one mechanism, falsifier, scope necessity, feasibility, strongest objection, and conditional ethics assessment. Every top-level title must own substantive topic-specific content; an empty section, title-only slot, or placeholder-only body is invalid. Keep audits as hidden JSON, not visible sections. Do not add, rename, reorder, or omit a top-level section; workflow logs, dashboards, and tool comparisons are forbidden. Before the pick gate, run `python3 research_avatar/tools/validate_report_structure.py --kind ideas --html reports/02_IDEA_REPORT.html` in addition to the idea-specific validators. Research Studio adds selection controls around this report; the Live Demo must display this exact section list with filled illustrative candidates.

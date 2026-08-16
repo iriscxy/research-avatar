@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from tools import paper_checks
+from research_avatar.tools import paper_checks
 
 
 class TexTreeTests(unittest.TestCase):

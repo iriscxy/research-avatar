@@ -21,8 +21,8 @@ Subcommands (each prints one JSON object with an `ok` bool + details):
            + caption position (figures AND tables) matches the reference (--caption-pos)
   all      run every check; exit 1 if any fails
 
-Run `python3 tools/paper_checks.py <sub> --help` for flags. Typical:
-  python3 tools/paper_checks.py all --paper-dir paper --venue-pages 8 --body-target 8
+Run `python3 research_avatar/tools/paper_checks.py <sub> --help` for flags. Typical:
+  python3 research_avatar/tools/paper_checks.py all --paper-dir paper --venue-pages 8 --body-target 8
 """
 import argparse
 import json

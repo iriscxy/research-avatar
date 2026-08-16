@@ -6,7 +6,7 @@ description: "Turn an approved EXPERIMENT_PLAN.html into a resumable, evidence-o
 # Run Plan
 
 At the first Skill action in this Codex project session, run
-`python3 -m research_studio.server --ensure-studios` before substantive work.
+`python3 -m research_avatar.research_studio.server --ensure-studios` before substantive work.
 This idempotent project bootstrap starts or reuses Research Studio at
 `http://127.0.0.1:8780` and Paper Studio at `http://127.0.0.1:8765`, then opens
 both browser pages. Run it once per session and run the same preflight when a
@@ -445,7 +445,7 @@ authorized sequential queue—owns exactly one goal. Its command and
    After provenance rendering and strict ledger/report validation, regenerate
    the visible `reports/04_RUN_PLAN.html` from its embedded state so every newly
    completed item visibly changes to `✅` before reporting completion. Run
-   `python3 tools/run_plan_progress.py reports/04_RUN_PLAN.html`; this also moves
+   `python3 research_avatar/tools/run_plan_progress.py reports/04_RUN_PLAN.html`; this also moves
    the one nested Current Goal panel to the next `proposed_goal_id` and embeds
    each paper-facing artifact exactly once under its earliest owning goal,
    updating that snapshot from `05_EXP_RESULT.html` as later goals fill it.
@@ -600,7 +600,7 @@ Render exactly two user-facing experiment artifacts. In both files, each `<secti
 2. `2. Paper Tables and Figures` (`paper-artifacts`): approved artifacts in paper order with unchanged geometry and pending states;
 3. `3. 生成过程` (`generation-process`): one collapsible provenance index containing raw path, actual command, code/config, calculation, and verification.
 
-Every title in both files must own substantive project-specific content; an empty section, title-only slot, or placeholder-only body is invalid. Do not add, rename, reorder, or omit these sections. Before presenting either file, run `python3 tools/validate_report_structure.py --kind runplan --html reports/04_RUN_PLAN.html` and `python3 tools/validate_report_structure.py --kind results --html reports/05_EXP_RESULT.html` in addition to the ledger/result validators.
+Every title in both files must own substantive project-specific content; an empty section, title-only slot, or placeholder-only body is invalid. Do not add, rename, reorder, or omit these sections. Before presenting either file, run `python3 research_avatar/tools/validate_report_structure.py --kind runplan --html reports/04_RUN_PLAN.html` and `python3 research_avatar/tools/validate_report_structure.py --kind results --html reports/05_EXP_RESULT.html` in addition to the ledger/result validators.
 
 Never expose `RESULTS_LEDGER.csv` as a user-facing tab, table, preview, or download in Research Studio or the Live Demo. It remains an internal store used to generate and validate `05_EXP_RESULT.html`. Never add a third experiment-stage tab or a visible ledger-shaped table. The Live Demo must reproduce these two structures with illustrative content and working numeric hover/focus provenance plus the full click-through jump.
 

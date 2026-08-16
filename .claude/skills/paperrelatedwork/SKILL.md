@@ -44,7 +44,7 @@ already spent 2 self-cites you may add at most 1 here; do NOT open a second inde
 Prefer the researcher's own entries (`publications.json`) before fetching new ones, BUT **cap
 self-citations at ≤3 papers total**, only the most relevant (genuine
 method/lineage/baseline overlap). Run
-`python3 tools/bib_manager.py selfcite --enriched "researcher-profile/publications.json" --draft paper/main.tex`
+`python3 research_avatar/tools/bib_manager.py selfcite --enriched "researcher-profile/publications.json" --draft paper/main.tex`
 to surface candidates; **never auto-insert a `\cite`** — rank by relevance, propose
 the top ≤3 for approval, drop the rest. Do not pad the reference list with her own papers.
 
@@ -76,7 +76,7 @@ them; verify only newly added ones.)
   metadata against the retrieved primary sources, record checked keys and unsupported clauses
   in `independent_source_audit`, and return red if any sourced sentence lacks coverage.
 - Add BibTeX to `paper/references.bib`, then `\cite` every new key. Run
-  `python3 tools/bib_manager.py check paper/references.bib` (duplicate / non-standard
+  `python3 research_avatar/tools/bib_manager.py check paper/references.bib` (duplicate / non-standard
   keys / missing fields) and recompile after.
 
 ## Mechanical nearest-neighbor coverage

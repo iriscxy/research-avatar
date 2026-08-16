@@ -2,7 +2,7 @@
 
 Run from the repository root:
 
-    python3 -m research_studio.server
+    python3 -m research_avatar.research_studio.server
 
 The server is intentionally local-only by default. It reads canonical workflow
 artifacts and never invents a second completion state.
@@ -36,7 +36,7 @@ from urllib.parse import unquote, urlparse
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("RESEARCH_AVATAR_ROOT", Path.cwd())).resolve()
 STATIC = Path(__file__).resolve().parent / "static"
-DEMO = PACKAGE_ROOT / "demo"
+DEMO = PACKAGE_ROOT / "web" / "demo"
 PAPER_STUDIO_URL = "http://127.0.0.1:8765"
 PAPER_STUDIO_LOCK = threading.Lock()
 PAPER_STUDIO_PROCESS: subprocess.Popen[bytes] | None = None
@@ -108,7 +108,7 @@ def ensure_research_studio(
     command = [
         sys.executable,
         "-m",
-        "research_studio.server",
+        "research_avatar.research_studio.server",
         "--host",
         host,
         "--port",
@@ -657,7 +657,7 @@ def start_paper_studio() -> dict[str, Any]:
             log_path = Path(tempfile.gettempdir()) / f"paper-studio-{workspace_hash}.log"
             log_handle = log_path.open("ab")
             PAPER_STUDIO_PROCESS = subprocess.Popen(
-                [sys.executable, "-m", "paper_studio.server", "--no-browser"],
+                [sys.executable, "-m", "research_avatar.paper_studio.server", "--no-browser"],
                 cwd=ROOT,
                 stdin=subprocess.DEVNULL,
                 stdout=log_handle,

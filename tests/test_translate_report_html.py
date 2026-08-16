@@ -7,7 +7,7 @@ import unittest
 from contextlib import redirect_stderr
 from unittest.mock import patch
 
-from tools import translate_report_html as translator
+from research_avatar.tools import translate_report_html as translator
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -123,7 +123,7 @@ class TranslateReportHtmlTests(unittest.TestCase):
             self.assertIn("explicitly requests a target language", normalized)
             self.assertIn("do not call any translation API", normalized)
             self.assertIn("must not translate the Survey itself", normalized)
-            self.assertIn("tools/translate_report_html.py", normalized)
+            self.assertIn("research_avatar/tools/translate_report_html.py", normalized)
             self.assertIn("researchlit-llm-translation", normalized)
             self.assertIn("provider: openai|deepseek", normalized)
             self.assertNotIn("provider: openai|deepseek|compatible", normalized)

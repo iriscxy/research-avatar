@@ -6,7 +6,7 @@ description: "Standalone literature survey — cover a topic with many parallel 
 # Research Literature Survey (Research Avatar edition)
 
 At the first Skill action in this Codex project session, run
-`python3 -m research_studio.server --ensure-studios` before substantive work.
+`python3 -m research_avatar.research_studio.server --ensure-studios` before substantive work.
 This idempotent project bootstrap starts or reuses Research Studio at
 `http://127.0.0.1:8780` and Paper Studio at `http://127.0.0.1:8765`, then opens
 both browser pages. Run it once per session, never launch duplicate servers, and
@@ -62,7 +62,7 @@ volume for its own sake. Do NOT do one or two searches.
      fabricate** an id/DOI/title. Drop unverifiable leads rather than list them.
 3. **Sandbox note:** sandboxed Bash throttles the S2/arXiv **API** (HTTP 429).
    Prefer direct `arxiv.org/abs/<id>` / `arxiv.org/pdf/<id>` + web open/fetch, or the
-   `tools/` helpers, over hammering the API. (See project memory.)
+   `research_avatar/tools/` helpers, over hammering the API. (See project memory.)
 4. **Merge + de-duplicate** across angles by arXiv id (fallback: normalized
    title). Keep one canonical row per paper; note which angle(s) surfaced it.
    Preserve the cross-checked publication metadata and distinguish a formally
@@ -139,7 +139,7 @@ After the evidence-locked English HTML is complete, first run the fixed report
 structure validator on that canonical English file, then run:
 
 ```bash
-python3 tools/translate_report_html.py reports/01_LIT_SURVEY.html \
+python3 research_avatar/tools/translate_report_html.py reports/01_LIT_SURVEY.html \
   --target-language "<requested language>" \
   --provider "<openai-or-deepseek-chosen-by-researcher>"
 ```
@@ -202,4 +202,4 @@ Render `01_LIT_SURVEY.html` with one unnumbered hero, one sticky contents bar, a
 5. `5. Trends and Structural Gaps` (`trends-gaps`);
 6. `6. Verified References` (`verified-references`).
 
-Vary evidence and cards inside these six slots, not the top-level structure. Every title must own substantive topic-specific content; an empty section, title-only slot, or placeholder-only body is invalid. The sticky contents links to these exact section IDs in this exact order. Do not add, rename, reorder, or omit a top-level section; workflow logs, agent traces, approval controls, tool comparisons, and arbitrary appendices are forbidden. Run `python3 tools/validate_report_structure.py --kind literature --html reports/01_LIT_SURVEY.html` on the completed canonical English file: immediately before the API translation step when one was explicitly requested, otherwise immediately before returning. The translation script preserves HTML tags and attributes while translating visible text and must finish with its verified receipt. The Live Demo must display this exact section list and filled illustrative content from the same slots.
+Vary evidence and cards inside these six slots, not the top-level structure. Every title must own substantive topic-specific content; an empty section, title-only slot, or placeholder-only body is invalid. The sticky contents links to these exact section IDs in this exact order. Do not add, rename, reorder, or omit a top-level section; workflow logs, agent traces, approval controls, tool comparisons, and arbitrary appendices are forbidden. Run `python3 research_avatar/tools/validate_report_structure.py --kind literature --html reports/01_LIT_SURVEY.html` on the completed canonical English file: immediately before the API translation step when one was explicitly requested, otherwise immediately before returning. The translation script preserves HTML tags and attributes while translating visible text and must finish with its verified receipt. The Live Demo must display this exact section list and filled illustrative content from the same slots.

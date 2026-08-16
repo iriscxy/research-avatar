@@ -8,7 +8,7 @@ test:
 	python3 -m unittest discover -s tests
 
 validate:
-	python3 -m tools.research_buddy_cli validate
+	python3 -m research_avatar.tools.research_buddy_cli validate
 
 paper:
-	python3 -m tools.research_buddy_cli paper
+	python3 -m research_avatar.tools.research_buddy_cli paper

@@ -5,8 +5,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, call, patch
 
-import research_studio.server as studio
-from research_studio.server import (
+import research_avatar.research_studio.server as studio
+from research_avatar.research_studio.server import (
     Handler,
     build_state,
     ensure_project_studios,
@@ -45,8 +45,8 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertEqual(progress["percent"], 100)
         self.assertEqual(progress["current_phase"], 8)
 
-    @patch("research_studio.server.subprocess.Popen")
-    @patch("research_studio.server.paper_studio_status")
+    @patch("research_avatar.research_studio.server.subprocess.Popen")
+    @patch("research_avatar.research_studio.server.paper_studio_status")
     def test_paper_studio_rejects_a_different_workspace_on_the_port(self, status, popen):
         status.return_value = {
             "running": True,
@@ -81,8 +81,8 @@ class ResearchStudioTests(unittest.TestCase):
         handler.write_body(b"preview")
         self.assertTrue(handler.close_connection)
 
-    @patch("research_studio.server.subprocess.Popen")
-    @patch("research_studio.server.research_studio_status")
+    @patch("research_avatar.research_studio.server.subprocess.Popen")
+    @patch("research_avatar.research_studio.server.research_studio_status")
     def test_ensure_reuses_existing_workspace_server(self, status, popen):
         status.return_value = {
             "running": True,
@@ -93,9 +93,9 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertFalse(result["started"])
         popen.assert_not_called()
 
-    @patch("research_studio.server.time.sleep")
-    @patch("research_studio.server.subprocess.Popen")
-    @patch("research_studio.server.research_studio_status")
+    @patch("research_avatar.research_studio.server.time.sleep")
+    @patch("research_avatar.research_studio.server.subprocess.Popen")
+    @patch("research_avatar.research_studio.server.research_studio_status")
     def test_ensure_starts_detached_server_once(self, status, popen, _sleep):
         status.side_effect = [
             {"running": False, "same_workspace": False, "url": "http://127.0.0.1:8780"},
@@ -109,8 +109,8 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertEqual(result["pid"], 321)
         self.assertTrue(popen.call_args.kwargs["start_new_session"])
 
-    @patch("research_studio.server.subprocess.Popen")
-    @patch("research_studio.server.research_studio_status")
+    @patch("research_avatar.research_studio.server.subprocess.Popen")
+    @patch("research_avatar.research_studio.server.research_studio_status")
     def test_ensure_rejects_a_different_workspace_on_the_port(self, status, popen):
         status.return_value = {
             "running": True,
@@ -121,9 +121,9 @@ class ResearchStudioTests(unittest.TestCase):
             ensure_research_studio()
         popen.assert_not_called()
 
-    @patch("research_studio.server.webbrowser.open")
-    @patch("research_studio.server.start_paper_studio")
-    @patch("research_studio.server.ensure_research_studio")
+    @patch("research_avatar.research_studio.server.webbrowser.open")
+    @patch("research_avatar.research_studio.server.start_paper_studio")
+    @patch("research_avatar.research_studio.server.ensure_research_studio")
     def test_ensure_project_studios_reuses_both_and_opens_pages(
         self, ensure_research, start_paper, open_browser
     ):
@@ -148,9 +148,9 @@ class ResearchStudioTests(unittest.TestCase):
             [call("http://127.0.0.1:8780"), call("http://127.0.0.1:8765")],
         )
 
-    @patch("research_studio.server.webbrowser.open")
-    @patch("research_studio.server.start_paper_studio")
-    @patch("research_studio.server.ensure_research_studio")
+    @patch("research_avatar.research_studio.server.webbrowser.open")
+    @patch("research_avatar.research_studio.server.start_paper_studio")
+    @patch("research_avatar.research_studio.server.ensure_research_studio")
     def test_ensure_project_studios_can_skip_browser(
         self, ensure_research, start_paper, open_browser
     ):
@@ -163,11 +163,13 @@ class ResearchStudioTests(unittest.TestCase):
 
     def test_six_stage_shell_is_a_minimal_direct_preview(self):
         root = Path(__file__).resolve().parents[1]
-        app_source = (root / "research_studio" / "static" / "app.js").read_text(
+        app_source = (
+            root / "research_avatar" / "research_studio" / "static" / "app.js"
+        ).read_text(
             encoding="utf-8"
         )
         index_source = (
-            root / "research_studio" / "static" / "index.html"
+            root / "research_avatar" / "research_studio" / "static" / "index.html"
         ).read_text(encoding="utf-8")
         self.assertNotIn('id="sidebar-command"', index_source)
         self.assertNotIn('class="project-sidebar"', index_source)
@@ -197,10 +199,10 @@ class ResearchStudioTests(unittest.TestCase):
     def test_pipeline_tabs_use_readable_typography_and_bumped_cache(self):
         root = Path(__file__).resolve().parents[1]
         style_source = (
-            root / "research_studio" / "static" / "style.css"
+            root / "research_avatar" / "research_studio" / "static" / "style.css"
         ).read_text(encoding="utf-8")
         index_source = (
-            root / "research_studio" / "static" / "index.html"
+            root / "research_avatar" / "research_studio" / "static" / "index.html"
         ).read_text(encoding="utf-8")
         self.assertIn(".pipeline-button strong{font-size:14px", style_source)
         self.assertIn("font:750 10px var(--serif)", style_source)
@@ -208,8 +210,12 @@ class ResearchStudioTests(unittest.TestCase):
 
     def test_live_demo_matches_the_local_six_stage_navigation(self):
         root = Path(__file__).resolve().parents[1]
-        demo_source = (root / "demo" / "app.js").read_text(encoding="utf-8")
-        demo_style = (root / "demo" / "style.css").read_text(encoding="utf-8")
+        demo_source = (
+            root / "research_avatar" / "web" / "demo" / "app.js"
+        ).read_text(encoding="utf-8")
+        demo_style = (
+            root / "research_avatar" / "web" / "demo" / "style.css"
+        ).read_text(encoding="utf-8")
         stage_positions = [
             demo_source.index(f'id: "{stage_id}"')
             for stage_id in ("profile", "literature", "ideas", "expplan", "runplan", "paper")

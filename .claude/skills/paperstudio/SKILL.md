@@ -1,28 +1,28 @@
 ---
 name: paperstudio
-description: Internally maintain, debug, or regression-test this repository's fixed Paper Studio web application, including browser state transitions, API transactions, background jobs, PDF/PPTX composition, reset safety, and UI behavior. Use for reproducible bugs or product changes in paper_studio/, not for deciding how a paper should be written; paperwrite owns writing policy and project data.
+description: Internally maintain, debug, or regression-test this repository's fixed Paper Studio web application, including browser state transitions, API transactions, background jobs, PDF/PPTX composition, reset safety, and UI behavior. Use for reproducible bugs or product changes in research_avatar/paper_studio/, not for deciding how a paper should be written; paperwrite owns writing policy and project data.
 ---
 
 # Paper Studio
 
 At the first Skill action in this Codex project session, run
-`python3 -m research_studio.server --ensure-studios` before substantive work.
+`python3 -m research_avatar.research_studio.server --ensure-studios` before substantive work.
 This idempotent bootstrap starts or reuses both local Studio servers and opens
 Research Studio (`http://127.0.0.1:8780`) plus Paper Studio
 (`http://127.0.0.1:8765`). Run it once per session, never launch duplicates,
 and surface any startup error.
 
-Maintain the local research-paper editor as an evidence-preserving browser workflow. Read [references/web-regressions.md](references/web-regressions.md) before changing `paper_studio/`; it is the product contract accumulated from researcher feedback.
+Maintain the local research-paper editor as an evidence-preserving browser workflow. Read [references/web-regressions.md](references/web-regressions.md) before changing `research_avatar/paper_studio/`; it is the product contract accumulated from researcher feedback.
 
 ## Authority boundary
 
 Treat this as an internal product-engineering skill, not a paper-writing skill. `/paperwrite` owns narrative order, title/framing decisions, evidence and citation policy, artifact roles, paragraph bindings, and single- versus two-column choices. Paper Studio reads those decisions from `paper/paper_studio.json` and `paper/paragraph_plan.json`, exposes them in the browser, and enforces them transactionally. Never invent or override a writing decision in reusable web code. Keep only the minimal cross-boundary invariant needed to implement or test the UI; link back to project data instead of copying writing guidance here.
 
-Paper Studio is a permanent, paper-independent shell. It must start even when `paper/` or `paper/paper_studio.json` does not exist and show an explicit empty-project state. Start that shell with `python3 -m paper_studio.server --empty`; ordinary startup also falls back to the empty shell when no project config exists. `/paperwrite` populates `paper/` project data and never generates, copies, forks, or edits the web application.
+Paper Studio is a permanent, paper-independent shell. It must start even when `paper/` or `paper/paper_studio.json` does not exist and show an explicit empty-project state. Start that shell with `python3 -m research_avatar.paper_studio.server --empty`; ordinary startup also falls back to the empty shell when no project config exists. `/paperwrite` populates `paper/` project data and never generates, copies, forks, or edits the web application.
 
 ## Workflow
 
-1. Inspect `paper_studio/server.py`, `paper_studio/static/`, `paper/paragraph_plan.json`, the relevant `results/` data, and existing tests before editing.
+1. Inspect `research_avatar/paper_studio/server.py`, `research_avatar/paper_studio/static/`, `paper/paragraph_plan.json`, the relevant `results/` data, and existing tests before editing.
 2. Treat each researcher-visible transition as a state machine. Distinguish pending, running, candidate-ready, composed, and approved states; never infer readiness merely from a file left on disk.
    - Lock every foreground action synchronously before its first asynchronous request. Rapid double-clicks, Enter plus click, or two controls targeting the same artifact must produce at most one in-flight mutation; restore controls after both success and failure. Keep cancellation available only for an already-running cancellable background job.
    - When a ready data figure is first displayed without candidates, automatically generate all pending panels sequentially in configured order. Start only one panel Agent at a time, never auto-retry a failed panel, and keep final multi-panel composition manual.
@@ -83,7 +83,7 @@ Paper Studio is a permanent, paper-independent shell. It must start even when `p
     action. The engine must not infer a scientific writing order from section
     names; `/paperwrite` owns and writes that order into project data.
     The same job must also be available as
-    `python3 -m paper_studio.server --direct-full-draft --provider <openai|deepseek>`, which runs synchronously
+    `python3 -m research_avatar.paper_studio.server --direct-full-draft --provider <openai|deepseek>`, which runs synchronously
     and exits without starting the HTTP server or opening a browser. CLI and UI
     must share the exact state and worker; do not maintain a second batch writer.
     Require the terminal workflow to ask the researcher which of the two APIs to
@@ -113,9 +113,9 @@ Paper Studio is a permanent, paper-independent shell. It must start even when `p
 
 ## Workspace data map
 
-- `paper_studio/` is the fixed reusable web engine: server, frontend assets, empty-project shell, and PDF/PPTX composition implementation. It exists and starts independently of any paper. Do not regenerate or fork it for each paper, and do not put project-specific section, figure, table, branding, or result definitions there.
+- `research_avatar/paper_studio/` is the fixed reusable web engine: server, frontend assets, empty-project shell, and PDF/PPTX composition implementation. It exists and starts independently of any paper. Do not regenerate or fork it for each paper, and do not put project-specific section, figure, table, branding, or result definitions there.
 - `paper/paper_studio.json` is the single project configuration: stable project ID, identity/venue, ordered sections and LaTeX filenames, project-owned `batch_writing_order`, result bindings, Figure/Table definitions and order, typed data-grid mappings, mechanism shape-spec paths, and explicit `paths.main`, `paths.reference`, and `paths.metrics`. Starting another paper means supplying a new config and project data—not rewriting the web application. Change `project.id` for a genuinely different paper so persisted runtime state cannot leak across projects; preserve it for ordinary config revisions within the same paper.
-- The fixed `paper_studio/` product must contain no paper title, method name, benchmark name, metric path, or project-specific mechanism fallback. Generic placeholders and config-driven fallback shapes are allowed; every paper-specific label, plotting program, or shape specification belongs under `paper/` or `results/`.
+- The fixed `research_avatar/paper_studio/` product must contain no paper title, method name, benchmark name, metric path, or project-specific mechanism fallback. Generic placeholders and config-driven fallback shapes are allowed; every paper-specific label, plotting program, or shape specification belongs under `paper/` or `results/`.
 - `paper/paragraph_plan.json` is the canonical paragraph/subsection and artifact-binding plan. `paper/working_abstract.txt`, `paper/reference_stylization_jailbreak.txt`, and `paper/references.bib` are writing/reference inputs.
 - `paper/sections/*.tex` contains accepted rendered manuscript text; `paper/main.tex` and `paper/main.pdf` are the manuscript entry point and compiled output.
 - `paper/.paper_studio/state.json` contains persisted browser/workflow state; its sibling preview/page directories are generated caches. Only Paper Studio server workflows may mutate this state—local Agents must never edit it directly.
@@ -123,17 +123,17 @@ Paper Studio is a permanent, paper-independent shell. It must start even when `p
 - `paper/fig/` contains final figure PDF/PPTX artifacts. `paper/figsrc/` contains panel PDFs, plotting-agent sources, editable shape specifications, layout prompts, and composition metadata.
 - `tests/test_paper_studio.py` contains deterministic regression coverage for these state transitions; browser behavior additionally requires a real headless-browser check.
 
-Before opening a browser, run `python3 -m paper_studio.server --validate-project`. It must validate `paper/paper_studio.json` against `paper/paragraph_plan.json`: section sets, artifact IDs, dependencies, labels, panel IDs, project-local main/reference/metrics paths, typed `records` or `benchmark_rows` data grids, two-integer increasing `reference_lines`, exact `reference_file` agreement, and configured shape files. A red preflight blocks launch. Keep paper-specific plotting programs and mechanism shape specifications under `paper/figsrc/`. Modify `paper_studio/` only when adding or fixing a reusable product capability.
+Before opening a browser, run `python3 -m research_avatar.paper_studio.server --validate-project`. It must validate `paper/paper_studio.json` against `paper/paragraph_plan.json`: section sets, artifact IDs, dependencies, labels, panel IDs, project-local main/reference/metrics paths, typed `records` or `benchmark_rows` data grids, two-integer increasing `reference_lines`, exact `reference_file` agreement, and configured shape files. A red preflight blocks launch. Keep paper-specific plotting programs and mechanism shape specifications under `paper/figsrc/`. Modify `research_avatar/paper_studio/` only when adding or fixing a reusable product capability.
 
-For a clean `/paperwrite` retest, stop the project-backed server and archive or remove only `paper/` after explicit confirmation. Preserve `paper_studio/`, skills, tools, `reports/`, `results/`, and `researcher-profile/`. The empty Paper Studio shell remains available while `paper/` is absent; the next `/paperwrite` scaffold only recreates paper-local config/content and then restarts the fixed engine in project-backed mode.
+For a clean `/paperwrite` retest, stop the project-backed server and archive or remove only `paper/` after explicit confirmation. Preserve `research_avatar/paper_studio/`, skills, tools, `reports/`, `results/`, and `researcher-profile/`. The empty Paper Studio shell remains available while `paper/` is absent; the next `/paperwrite` scaffold only recreates paper-local config/content and then restarts the fixed engine in project-backed mode.
 
 ## Required validation
 
 Run at minimum:
 
 ```bash
-node --check paper_studio/static/app.js
-python3 -m py_compile paper_studio/server.py
+node --check research_avatar/paper_studio/static/app.js
+python3 -m py_compile research_avatar/paper_studio/server.py
 python3 -m unittest tests.test_paper_studio
 ```
 
@@ -142,7 +142,7 @@ Use a headless Chrome/Playwright pass for layout, visibility, click, focus, ifra
 Run the reusable non-mutating baseline matrix against the live project-backed server:
 
 ```bash
-python3 -m pip install -r paper_studio/requirements-dev.txt
+python3 -m pip install -r research_avatar/paper_studio/requirements-dev.txt
 python3 -m playwright install chromium
 python3 .claude/skills/paperstudio/scripts/browser_matrix.py --url http://127.0.0.1:8765
 python3 .claude/skills/paperstudio/scripts/browser_matrix.py --url http://127.0.0.1:8766

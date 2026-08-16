@@ -9,8 +9,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import paper_studio.server as studio
-from tools import paper_checks, validate_ideagen_report
+import research_avatar.paper_studio.server as studio
+from research_avatar.tools import paper_checks, validate_ideagen_report
 
 
 ROOT = Path(__file__).resolve().parents[1]

@@ -18,8 +18,8 @@ every candidate), and the LLM's job is precision (keep the real, recurring ones)
 
 Examples
 --------
-python3 tools/workflow_prefs.py --transcripts ~/.claude/projects/* --output prefs_bundle.json
-python3 tools/workflow_prefs.py --transcripts ~/.claude/projects/my-proj --max-snippets 300
+python3 research_avatar/tools/workflow_prefs.py --transcripts ~/.claude/projects/* --output prefs_bundle.json
+python3 research_avatar/tools/workflow_prefs.py --transcripts ~/.claude/projects/my-proj --max-snippets 300
 """
 
 from __future__ import annotations

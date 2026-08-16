@@ -21,9 +21,9 @@ Rules
 
 Examples
 --------
-python3 tools/scholar_profile.py --from-html gs.html > gs.json
-python3 tools/profile_enrich.py --input gs.json --output publications.json
-python3 tools/profile_enrich.py --input gs.json --output publications.json --no-network
+python3 research_avatar/tools/scholar_profile.py --from-html gs.html > gs.json
+python3 research_avatar/tools/profile_enrich.py --input gs.json --output publications.json
+python3 research_avatar/tools/profile_enrich.py --input gs.json --output publications.json --no-network
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ def _resolve_s2_fetcher() -> str | None:
     candidates = [
         here / "semantic_scholar_fetch.py",
         Path(".aris/tools/semantic_scholar_fetch.py"),
-        Path("tools/semantic_scholar_fetch.py"),
+        Path("research_avatar/tools/semantic_scholar_fetch.py"),
     ]
     for c in candidates:
         if c.is_file():

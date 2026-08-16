@@ -8,8 +8,8 @@ import json
 from pathlib import Path
 
 try:
-    from tools.run_plan_progress import STATE_RE
-except ModuleNotFoundError:  # Direct execution sets sys.path[0] to tools/.
+    from research_avatar.tools.run_plan_progress import STATE_RE
+except ModuleNotFoundError:  # Direct execution sets sys.path[0] to research_avatar/tools/.
     from run_plan_progress import STATE_RE
 
 
@@ -55,7 +55,11 @@ def export(source: Path, destination: Path) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, default=Path("reports/04_RUN_PLAN.html"))
-    parser.add_argument("--output", type=Path, default=Path("demo/runplan-state.json"))
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("research_avatar/web/demo/runplan-state.json"),
+    )
     args = parser.parse_args()
     snapshot = export(args.source, args.output)
     current = snapshot.get("active_goal") or snapshot.get("proposed_goal_id") or "none"

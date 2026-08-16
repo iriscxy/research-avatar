@@ -1627,7 +1627,7 @@ function render() {
   $("api-key-setup").hidden = apiKeyReady;
   $("api-key-setup-command").textContent = apiKeySetup.setup_command || 'export OPENAI_API_KEY="粘贴你的 API key"';
   $("api-key-setup-description").textContent = `${apiKeySetup.provider_label || "当前"} API 尚未配置。请在启动 Paper Studio 的本机终端设置；密钥不会进入网页。GPT Image 仍单独使用 OpenAI。`;
-  $("api-key-restart-command").textContent = apiKeySetup.restart_command || "python3 -m paper_studio.server";
+  $("api-key-restart-command").textContent = apiKeySetup.restart_command || "python3 -m research_avatar.paper_studio.server";
   document.querySelector(".workspace").classList.toggle("api-key-missing", !apiKeyReady);
   $("project-eyebrow").textContent = project.eyebrow || project.name || "PAPER PROJECT";
   $("studio-title").textContent = project.studio_title || "Paper Studio";
