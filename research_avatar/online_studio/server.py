@@ -615,8 +615,11 @@ def _archive_path_allowed(path: Path) -> bool:
     return (
         value.startswith("results/")
         or value.startswith("figures/")
+        or value.startswith("paper/fig/")
+        or value.startswith("paper/figsrc/")
         or value.startswith("references/")
         or value.startswith("researcher-profile/fulltext/")
+        or (value.startswith("reports/sources/") and path.suffix.lower() == ".txt")
         or value in {
             "project-package.json",
             "researcher-profile/PROFILE.html",
@@ -1434,6 +1437,55 @@ def demo_session() -> Session:
         return DEMO_SESSION
 
 
+def create_demo_copy_session(payload: dict[str, Any], *, user_id: str) -> Session:
+    """Create a private writable copy of the completed demo after key entry."""
+    with SESSIONS_LOCK:
+        active_sessions = sum(
+            session.process.poll() is None for session in SESSIONS.values()
+        )
+    if active_sessions >= MAX_ACTIVE_SESSIONS:
+        raise OnlineStudioError("当前在线写作会话已满，请稍后重试。")
+    api_key = str(payload.get("api_key") or "").strip()
+    if len(api_key) < 8 or len(api_key) > 512 or any(character.isspace() for character in api_key):
+        raise OnlineStudioError("API key 格式无效。")
+    if not (DEMO_PROJECT / "paper/paper_studio.json").is_file():
+        raise OnlineStudioError("完成态 Demo 论文项目尚未安装。")
+    session_id = secrets.token_urlsafe(32)
+    root = (
+        DATA_ROOT
+        / "projects"
+        / hashlib.sha256(user_id.encode("utf-8")).hexdigest()
+        / hashlib.sha256(session_id.encode("utf-8")).hexdigest()
+    )
+    root.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copytree(DEMO_PROJECT, root)
+        process, port = _start_worker(
+            root,
+            "openai",
+            "gpt-5-nano",
+            api_key,
+            demo_mode=False,
+        )
+    except Exception:
+        if root.exists():
+            shutil.rmtree(root)
+        raise
+    session = Session(
+        session_id,
+        user_id,
+        root,
+        "openai",
+        "gpt-5-nano",
+        process,
+        port,
+        kind="demo-copy",
+    )
+    with SESSIONS_LOCK:
+        SESSIONS[session_id] = session
+    return session
+
+
 def _session_from_cookie(header: str | None, *, user_id: str) -> Session | None:
     session_id = _cookie_value(header, COOKIE_NAME)
     if session_id is None:
@@ -1705,6 +1757,21 @@ class Handler(BaseHTTPRequestHandler):
                     },
                     cookie=_auth_cookie(token),
                 )
+            except OnlineStudioError as exc:
+                self._json({"ok": False, "error": str(exc)}, 400)
+        elif path == "/api/online/demo-session":
+            user = self._require_user()
+            if not user:
+                return
+            try:
+                session = create_demo_copy_session(
+                    self._read_json(), user_id=user["id"]
+                )
+                cookie = (
+                    f"{COOKIE_NAME}={session.session_id}; Path=/; HttpOnly; SameSite=Strict"
+                    + ("; Secure" if _secure_cookies() else "")
+                )
+                self._json({"ok": True, "redirect": "/studio"}, cookie=cookie)
             except OnlineStudioError as exc:
                 self._json({"ok": False, "error": str(exc)}, 400)
         elif path == "/api/auth/logout":

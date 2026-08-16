@@ -28,9 +28,16 @@ class ResearchStudioTests(unittest.TestCase):
 
     @patch.object(studio.LOCAL_URL_OPENER, "open")
     def test_paper_studio_status_uses_state_independent_health_endpoint(self, open_url):
+        expected = json.loads(
+            (studio.ROOT / "paper/paper_studio.json").read_text(encoding="utf-8")
+        )["project"]["id"]
         response = MagicMock()
         response.read.return_value = json.dumps(
-            {"ok": True, "project": {"root": str(studio.ROOT)}}
+            {
+                "ok": True,
+                "project": {"root": str(studio.ROOT), "id": expected},
+                "pid": 123,
+            }
         ).encode("utf-8")
         open_url.return_value.__enter__.return_value = response
 
@@ -38,6 +45,7 @@ class ResearchStudioTests(unittest.TestCase):
 
         self.assertTrue(status["running"])
         self.assertTrue(status["same_workspace"])
+        self.assertTrue(status["same_project"])
         open_url.assert_called_once_with(
             f"{studio.PAPER_STUDIO_URL}/api/health", timeout=1.2
         )
@@ -81,7 +89,12 @@ class ResearchStudioTests(unittest.TestCase):
         status.side_effect = [
             {"running": False, "same_workspace": False, "url": studio.PAPER_STUDIO_URL},
             {"running": False, "same_workspace": False, "url": studio.PAPER_STUDIO_URL},
-            {"running": True, "same_workspace": True, "url": studio.PAPER_STUDIO_URL},
+            {
+                "running": True,
+                "same_workspace": True,
+                "same_project": True,
+                "url": studio.PAPER_STUDIO_URL,
+            },
         ]
         process = MagicMock()
         process.poll.return_value = None
@@ -93,6 +106,50 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertFalse(result["already_running"])
         sleep.assert_called_once_with(0.15)
+
+    @patch("research_avatar.research_studio.server.time.sleep")
+    @patch("research_avatar.research_studio.server.os.kill")
+    @patch("research_avatar.research_studio.server.subprocess.Popen")
+    @patch("research_avatar.research_studio.server.paper_studio_status")
+    def test_paper_studio_replaces_stale_project_from_same_workspace(
+        self, status, popen, kill, sleep
+    ):
+        stopped = {
+            "running": False,
+            "same_workspace": False,
+            "same_project": False,
+            "url": studio.PAPER_STUDIO_URL,
+        }
+        status.side_effect = [
+            {
+                "running": True,
+                "same_workspace": True,
+                "same_project": False,
+                "project_id": "__paper_studio_empty__",
+                "pid": 777,
+                "url": studio.PAPER_STUDIO_URL,
+            },
+            stopped,
+            stopped,
+            stopped,
+            {
+                "running": True,
+                "same_workspace": True,
+                "same_project": True,
+                "url": studio.PAPER_STUDIO_URL,
+            },
+        ]
+        process = MagicMock(pid=778)
+        process.poll.return_value = None
+        popen.return_value = process
+
+        with patch.object(studio, "PAPER_STUDIO_PROCESS", None):
+            result = start_paper_studio()
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["already_running"])
+        kill.assert_called_once_with(777, studio.signal.SIGTERM)
+        popen.assert_called_once()
 
     @patch("research_avatar.research_studio.server.time.sleep")
     @patch("research_avatar.research_studio.server.subprocess.Popen")

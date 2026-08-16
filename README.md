@@ -65,7 +65,9 @@ export DEEPSEEK_API_KEY="粘贴你的 API key"
 一个 Research Avatar 项目 ZIP 和自己的 OpenAI API key 即可开始写作。在原项目根目录用
 `python3 -m research_avatar.online_studio.package` 生成项目 ZIP；其中包含 `PROFILE.html`、
 01–05 报告、可追溯的 `results/`、出版记录，以及 `03` 已确认的结构参考论文文本，
-不会打包其余无关 fulltext。邮箱账户与登录
+默认输出到 `outputs/paper-studio-evidence.zip`，不会把上传包散放在项目根目录，也
+只会额外带上 `03` 契约明确引用的绘图源码、schema、fixture 和预览，不会打包其余
+无关 fulltext 或旧实验结果。邮箱账户与登录
 会话持久保存在 Cloudflare D1；写作工作区和 API key 都是临时会话数据，请及时导出项目 ZIP。
 
 也可以在本地启动同一入口：
@@ -84,10 +86,13 @@ python3 -m research_avatar.online_studio --port 8876
 
 ```text
 researcher-profile/   # 个性化研究者画像
+inputs/               # 用户导入的 Scholar HTML 等私有原始输入（本地忽略）
+data/                 # 实验固定的原始数据与下载缓存
 reports/              # 文献、Idea、实验计划与结果报告
 results/              # 可追溯实验结果
 code/                 # 可复现实验代码
 paper/                # LaTeX、图表、PPTX 与最终论文
+outputs/              # 上传 ZIP 等可再生成的导出物（本地忽略）
 ```
 
 项目实现统一归档在 `research_avatar/`：

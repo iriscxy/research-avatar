@@ -18,6 +18,7 @@ import html
 import json
 import os
 import re
+import signal
 import shutil
 import subprocess
 import sys
@@ -627,6 +628,11 @@ def build_state(root: Path = ROOT) -> dict[str, Any]:
 
 
 def paper_studio_status() -> dict[str, Any]:
+    config = load_json(ROOT / "paper/paper_studio.json")
+    configured_project = config.get("project", {}) if isinstance(config, dict) else {}
+    expected_project_id = (
+        str(configured_project.get("id", "")).strip() or "__paper_studio_empty__"
+    )
     for endpoint in ("/api/health", "/api/state"):
         try:
             with LOCAL_URL_OPENER.open(f"{PAPER_STUDIO_URL}{endpoint}", timeout=1.2) as response:
@@ -634,14 +640,42 @@ def paper_studio_status() -> dict[str, Any]:
         except urllib.error.HTTPError as error:
             if endpoint == "/api/health" and error.code == HTTPStatus.NOT_FOUND:
                 continue
-            return {"running": False, "same_workspace": False, "url": PAPER_STUDIO_URL}
+            return {
+                "running": False,
+                "same_workspace": False,
+                "same_project": False,
+                "url": PAPER_STUDIO_URL,
+            }
         except (urllib.error.URLError, OSError, ValueError, json.JSONDecodeError):
-            return {"running": False, "same_workspace": False, "url": PAPER_STUDIO_URL}
+            return {
+                "running": False,
+                "same_workspace": False,
+                "same_project": False,
+                "url": PAPER_STUDIO_URL,
+            }
         project = payload.get("project", {}) if isinstance(payload, dict) else {}
         root = str(project.get("root", "")).strip()
         same_workspace = bool(root) and Path(root).resolve() == ROOT.resolve()
-        return {"running": True, "same_workspace": same_workspace, "url": PAPER_STUDIO_URL}
-    return {"running": False, "same_workspace": False, "url": PAPER_STUDIO_URL}
+        served_project_id = str(
+            project.get("id") or payload.get("project_id") or ""
+        ).strip()
+        same_project = bool(expected_project_id) and served_project_id == expected_project_id
+        return {
+            "running": True,
+            "same_workspace": same_workspace,
+            "same_project": same_project,
+            "project_id": served_project_id,
+            "expected_project_id": expected_project_id,
+            "empty_project": bool(payload.get("empty_project", False)),
+            "pid": payload.get("pid"),
+            "url": PAPER_STUDIO_URL,
+        }
+    return {
+        "running": False,
+        "same_workspace": False,
+        "same_project": False,
+        "url": PAPER_STUDIO_URL,
+    }
 
 
 def paper_studio_alive() -> bool:
@@ -657,6 +691,27 @@ def start_paper_studio() -> dict[str, Any]:
                 "ok": False,
                 "error": f"{PAPER_STUDIO_URL} is already serving a different workspace.",
             }
+        if initial["running"] and not initial.get("same_project", False):
+            stale_pid = initial.get("pid")
+            if not isinstance(stale_pid, int) or stale_pid <= 1 or stale_pid == os.getpid():
+                return {
+                    "ok": False,
+                    "error": (
+                        f"{PAPER_STUDIO_URL} is serving stale Paper Studio project "
+                        f"{initial.get('project_id') or '(unknown)'} and did not expose a safe PID."
+                    ),
+                }
+            os.kill(stale_pid, signal.SIGTERM)
+            deadline = time.monotonic() + 3.0
+            while time.monotonic() < deadline and paper_studio_status()["running"]:
+                time.sleep(0.05)
+            if paper_studio_status()["running"]:
+                return {
+                    "ok": False,
+                    "error": f"Stale Paper Studio process {stale_pid} did not stop.",
+                }
+            PAPER_STUDIO_PROCESS = None
+            initial = paper_studio_status()
         if initial["running"]:
             return {"ok": True, "url": PAPER_STUDIO_URL, "already_running": True}
         workspace_hash = hashlib.sha256(str(ROOT).encode("utf-8")).hexdigest()[:12]

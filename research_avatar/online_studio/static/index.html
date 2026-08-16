@@ -58,11 +58,12 @@
         <form id="setup-form" class="card">
       <div class="setup-heading">
         <p class="step-index">01</p>
-        <div><h2>上传 Research Avatar 项目包</h2><p>一个 ZIP 包含 PROFILE、01–05 reports、results、出版记录和 03 选定的结构参考论文；不会打包整套 full text。</p></div>
+        <div><h2>上传 Research Avatar 项目包</h2><p>一个 ZIP 包含 PROFILE、01–05 reports、契约选中的 results 与绘图源文件、出版记录和 03 选定的结构参考论文；不会打包整套 full text 或旧实验结果。</p></div>
       </div>
       <label class="upload-field project-package-field">完整项目 ZIP
         <input id="project-package" name="project_package" type="file" accept=".zip,application/zip" required>
         <small>在项目根目录运行 <code>python3 -m research_avatar.online_studio.package</code> 生成；最多 32 MB。系统会逐项核验 03 approval、05 完整度与 results provenance。</small>
+        <strong class="package-output-hint">生成位置：<code>outputs/paper-studio-evidence.zip</code>。点击上方选择框上传这个文件。</strong>
       </label>
 
       <div class="setup-heading key-heading">
@@ -78,6 +79,18 @@
       </section>
     </div>
   </main>
-  <script src="/online-assets/app.js" defer></script>
+  <dialog id="demo-key-dialog" class="demo-key-dialog">
+    <form id="demo-key-form" method="dialog">
+      <button id="demo-key-close" class="dialog-close" type="button" aria-label="关闭">×</button>
+      <p class="eyebrow">CONTINUE WITH THE DEMO</p>
+      <h2>输入 OpenAI API Key</h2>
+      <p>当前展示的是完整只读项目。输入 Key 后会创建你的私有可编辑副本，保留全部正文、图表和 Prompt。</p>
+      <label>OpenAI API key<input name="api_key" type="password" required autocomplete="off" spellcheck="false" placeholder="sk-…"></label>
+      <p id="demo-key-message" role="status" aria-live="polite"></p>
+      <button id="demo-key-submit" type="submit">进入可编辑 Paper Studio →</button>
+      <p class="security">Key 只进入当前隔离会话的服务器内存，不写入浏览器存储或导出文件。</p>
+    </form>
+  </dialog>
+  <script src="/online-assets/app.js?v=20260816.3" defer></script>
 </body>
 </html>

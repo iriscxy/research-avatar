@@ -321,6 +321,18 @@ nav.addEventListener("click", event => {
 
 window.addEventListener("popstate", syncStageFromLocation);
 window.addEventListener("hashchange", syncStageFromLocation);
+window.addEventListener("message", event => {
+  if (event.origin !== window.location.origin) return;
+  const paperFrame = document.querySelector('.paper-studio-live iframe[src="/demo-studio/"]');
+  if (
+    !paperFrame
+    || event.source !== paperFrame.contentWindow
+    || event.data?.type !== "paper-studio-demo-api-key-required"
+  ) return;
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage(event.data, window.location.origin);
+  }
+});
 
 document.addEventListener("click", async event => {
   const button = event.target.closest("[data-copy]");

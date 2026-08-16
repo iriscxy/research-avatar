@@ -24,9 +24,11 @@ researcher-profile/
 reports/
 results/
 code/
+data/
 tmp/
 
 # Generated presentations and process artifacts stay local.
 outputs/
+inputs/
 .paper_preflight/
 .online-paper-studio/

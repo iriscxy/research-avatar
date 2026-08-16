@@ -63,6 +63,11 @@ ONLINE_PROJECT_MODE = os.environ.get("PAPER_STUDIO_ONLINE", "").lower() in {
     "true",
     "yes",
 }
+DEMO_MODE = os.environ.get("PAPER_STUDIO_DEMO_MODE", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 if DEFAULT_PROVIDER not in {"openai", "deepseek"}:
     DEFAULT_PROVIDER = "openai"
 PROVIDER_DEFAULT_MODELS = {
@@ -383,6 +388,62 @@ def default_table_prompt(table_id: str) -> str:
             f"最优值: {prompt.get('best_values', 'none')}",
         ]
     )
+
+
+def recovered_mechanism_prompt(figure_id: str) -> str:
+    """Rebuild an honest editable brief when a completed figure lost its prompt."""
+    definition = FIGURES[figure_id]
+    configured = str(definition.get("design_prompt", "")).strip()
+    if configured:
+        return configured
+    canvas = definition.get("canvas_in") or []
+    canvas_text = " × ".join(str(value) for value in canvas) + " in" if canvas else "project-configured"
+    return "\n".join(
+        [
+            "[恢复的设计说明｜原始生成 Prompt 未归档]",
+            f"Create an editable academic mechanism figure titled: {definition['title']}.",
+            f"Required content: {definition['description']}",
+            f"Rhetorical role: {definition.get('rhetorical_role', 'mechanism')}.",
+            f"Canvas: {canvas_text}; layout: {definition.get('width', 'single-column')}.",
+            f"Caption contract: {definition['caption']}",
+            "Use a pure white background, restrained paper colors, readable labels, and native editable shapes.",
+            "Preserve the meaning and visual organization of the currently approved figure.",
+        ]
+    )
+
+
+def recovered_data_panel_prompt(figure_id: str, panel_id: str) -> str:
+    """Rebuild the plot brief for an already materialized data panel."""
+    definition = FIGURES[figure_id]
+    panel = next(item for item in definition.get("panels", []) if item["id"] == panel_id)
+    configured = str(panel.get("agent_prompt", "")).strip()
+    if configured:
+        return configured
+    result_keys = ", ".join(str(key) for key in panel.get("result_keys", [])) or "none"
+    return "\n".join(
+        [
+            "[恢复的绘图说明｜原始 Agent Prompt 未归档]",
+            f"Create the data panel '{panel['title']}' for figure {figure_id}: {definition['title']}.",
+            f"Goal: {panel['goal']}",
+            f"Use only traceable result keys: {result_keys}.",
+            f"Figure description: {definition['description']}",
+            f"Caption contract: {definition['caption']}",
+            "Keep labels readable at the configured paper width and export an editable vector PDF/PPTX result.",
+            "Preserve the data and visual organization of the currently approved figure.",
+        ]
+    )
+
+
+def outline_is_confirmed() -> bool:
+    """Recognize both the marker and the canonical paperwrite approval record."""
+    if (PAPER / ".outline-approved").exists():
+        return True
+    approval = PAPER / "outline_approval.json"
+    try:
+        payload = json.loads(approval.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return str(payload.get("status", "")).strip().lower() == "approved"
 
 
 def artifact_metadata(artifact_id: str) -> dict[str, str] | None:
@@ -1255,6 +1316,26 @@ def load_state() -> dict[str, Any]:
                 )
                 for field, value in panel_state.items():
                     current_panel.setdefault(field, value)
+                panel_paths = data_panel_paths(figure_id, panel_id)
+                recovered_panel_exists = panel_paths["pdf"].exists() or (
+                    len(figure_state.get("panels", {})) == 1
+                    and figure_paths(figure_id)["pdf"].exists()
+                )
+                if (
+                    recovered_panel_exists
+                    and current_panel.get("status") in {"built", "approved"}
+                    and not str(current_panel.get("agent_prompt", "")).strip()
+                ):
+                    current_panel["agent_prompt"] = recovered_data_panel_prompt(
+                        figure_id, panel_id
+                    )
+            if (
+                FIGURES[figure_id]["kind"] == "mechanism"
+                and figure_paths(figure_id)["pdf"].exists()
+                and current_figure.get("status") in {"built", "approved"}
+                and not str(current_figure.get("draw_prompt", "")).strip()
+            ):
+                current_figure["draw_prompt"] = recovered_mechanism_prompt(figure_id)
             if (
                 FIGURES[figure_id]["kind"] == "data"
                 and not current_figure.get("composed_at")
@@ -6901,6 +6982,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
                 "page_height_pt": 792.0,
             },
             "outline_confirmed": False,
+            "demo_mode": DEMO_MODE,
             "api_key_configured": api_key_configured,
             "api_key_setup": api_key_setup,
             "api_usage": usage_summary(API_USAGE_FILE),
@@ -6930,7 +7012,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         for section in state.get("sections", {}).values()
     )
     pending_paragraphs = len(full_draft_targets(state))
-    outline_confirmed = (PAPER / ".outline-approved").exists()
+    outline_confirmed = outline_is_confirmed()
     result["full_draft"] = {
         "available": outline_confirmed and api_key_configured,
         "pending_paragraphs": pending_paragraphs,
@@ -7001,6 +7083,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         **pdf_metadata,
     }
     result["outline_confirmed"] = outline_confirmed
+    result["demo_mode"] = DEMO_MODE
     result["llm_provider"] = provider
     result["llm_provider_options"] = provider_options
     result["llm_model_options"] = model_options
@@ -7200,7 +7283,8 @@ class Handler(BaseHTTPRequestHandler):
                 {
                     "ok": True,
                     "project": {
-                        "root": "" if ONLINE_PROJECT_MODE else str(ROOT.resolve())
+                        "root": "" if ONLINE_PROJECT_MODE else str(ROOT.resolve()),
+                        "id": PROJECT_ID,
                     },
                     "empty_project": EMPTY_PROJECT_MODE or not project_files_ready(),
                     "pid": os.getpid(),

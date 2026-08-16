@@ -5,6 +5,10 @@ const authCard = document.querySelector('#auth-card');
 const authForm = document.querySelector('#auth-form');
 const authMessage = document.querySelector('#auth-message');
 const workspaceShell = document.querySelector('#workspace-shell');
+const demoKeyDialog = document.querySelector('#demo-key-dialog');
+const demoKeyForm = document.querySelector('#demo-key-form');
+const demoKeyMessage = document.querySelector('#demo-key-message');
+const demoKeySubmit = document.querySelector('#demo-key-submit');
 
 function selectProductPanel(panelId) {
   document.querySelectorAll('.product-panel').forEach((panel) => {
@@ -25,6 +29,8 @@ async function showAuthenticated(user) {
   authCard.classList.add('hidden');
   workspaceShell.classList.remove('hidden');
   selectProductPanel('demo-panel');
+  const demoFrame = document.querySelector('#demo-frame');
+  demoFrame.src = '/demo/?authenticated=' + Date.now();
   document.querySelector('#account-label').textContent =
     user.email + ' · ' + (user.provider === 'google' ? 'Google' : '邮箱账户');
   try {
@@ -101,6 +107,46 @@ document.querySelector('#logout').addEventListener('click', async () => {
 });
 
 initializeAuth();
+
+window.addEventListener('message', (event) => {
+  const demoFrame = document.querySelector('#demo-frame');
+  if (
+    event.origin !== window.location.origin
+    || event.source !== demoFrame.contentWindow
+    || event.data?.type !== 'paper-studio-demo-api-key-required'
+  ) return;
+  demoKeyMessage.className = '';
+  demoKeyMessage.textContent = '';
+  demoKeyDialog.showModal();
+  demoKeyForm.elements.api_key.focus();
+});
+
+document.querySelector('#demo-key-close').addEventListener('click', () => {
+  demoKeyForm.elements.api_key.value = '';
+  demoKeyDialog.close();
+});
+
+demoKeyForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  demoKeyMessage.className = '';
+  demoKeyMessage.textContent = '正在创建你的可编辑 Demo 副本…';
+  demoKeySubmit.disabled = true;
+  try {
+    const response = await fetch('/api/online/demo-session', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({api_key: demoKeyForm.elements.api_key.value}),
+    });
+    demoKeyForm.elements.api_key.value = '';
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || '创建 Demo 副本失败。');
+    window.location.assign(result.redirect);
+  } catch (error) {
+    demoKeyMessage.className = 'error';
+    demoKeyMessage.textContent = error.message;
+    demoKeySubmit.disabled = false;
+  }
+});
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();

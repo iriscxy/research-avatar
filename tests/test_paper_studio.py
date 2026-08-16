@@ -1350,7 +1350,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260816.2"', html)
+        self.assertIn('src="static/app.js?v=20260816.3"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1487,7 +1487,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260816.2"', html)
+        self.assertIn('src="static/app.js?v=20260816.3"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -4009,6 +4009,32 @@ args = parser.parse_args()
         self.assertEqual(figure["status"], "prompt_generating")
         self.assertEqual(figure["progress"], 45)
         self.assertEqual(figure["progress_message"], "GPT is composing the prompt.")
+
+    def test_recovered_completed_figures_have_honest_nonempty_prompts(self):
+        mechanism = studio.recovered_mechanism_prompt("F1")
+        data = studio.recovered_data_panel_prompt("F2", "a")
+
+        self.assertIn("原始生成 Prompt 未归档", mechanism)
+        self.assertIn(studio.FIGURES["F1"]["title"], mechanism)
+        self.assertIn("原始 Agent Prompt 未归档", data)
+        self.assertIn(studio.FIGURES["F2"]["panels"][0]["goal"], data)
+
+    def test_outline_confirmation_recovers_from_canonical_approval_record(self):
+        with TemporaryDirectory() as directory:
+            paper = Path(directory)
+            (paper / "outline_approval.json").write_text(
+                json.dumps({"status": "approved"}), encoding="utf-8"
+            )
+            with patch.object(studio, "PAPER", paper):
+                self.assertTrue(studio.outline_is_confirmed())
+
+    def test_demo_mode_is_public_but_never_exposes_a_key(self):
+        with patch.object(studio, "DEMO_MODE", True):
+            visible = public_state(_default_state())
+        self.assertTrue(visible["demo_mode"])
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn("paper-studio-demo-api-key-required", source)
+        self.assertIn("window.parent.postMessage", source)
 
     def test_each_figure_has_an_independent_hidden_conversation_id(self):
         state = _default_state()

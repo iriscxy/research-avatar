@@ -24,6 +24,8 @@ class DemoSyncTests(unittest.TestCase):
         self.assertIn("完成态 Demo · 只读", source)
         self.assertIn("不会产生 API 费用", source)
         self.assertIn("正文调用 LLM API（不是 Code Agent）逐段生成", source)
+        self.assertIn("paper-studio-demo-api-key-required", source)
+        self.assertIn("window.parent.postMessage", source)
         self.assertNotIn("?v=20260814-reader-copy", source)
         self.assertNotIn("writing.png", source)
 

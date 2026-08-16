@@ -407,6 +407,16 @@ function uniqueArtifacts(artifacts = []) {
 }
 
 async function request(path, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
+  if (state && state.demo_mode && !["GET", "HEAD"].includes(method)) {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage(
+        {type: "paper-studio-demo-api-key-required"},
+        window.location.origin,
+      );
+    }
+    throw new Error("请输入 OpenAI API Key 后进入可编辑的 Demo 副本。");
+  }
   const response = await fetch(studioPath(path), {
     headers: {"Content-Type": "application/json"},
     ...options,

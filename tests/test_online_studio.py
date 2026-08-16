@@ -12,7 +12,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import research_avatar.online_studio.server as online
 from research_avatar.online_studio.package import build_archive
@@ -263,15 +263,69 @@ class OnlineStudioTests(unittest.TestCase):
                     "reports/04_RUN_PLAN.html",
                     "reports/05_EXP_RESULT.html",
                     "researcher-profile/PROFILE.html",
+                    "researcher-profile/fulltext/txt/ref.txt",
                     "researcher-profile/publications.json",
                     "results/main.json",
                 ],
             )
             with zipfile.ZipFile(output) as archive:
                 self.assertEqual(sorted(archive.namelist()), files)
-                self.assertNotIn("researcher-profile/fulltext/txt/ref.txt", files)
+                self.assertIn("researcher-profile/fulltext/txt/ref.txt", files)
                 manifest = json.loads(archive.read("project-package.json"))
                 self.assertEqual(manifest["schema_version"], "2.0")
+
+    def test_evidence_packager_includes_only_contract_selected_plotting_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "results").mkdir()
+            (root / "results/main.json").write_text("{}")
+            (root / "results/stale.json").write_text("{}")
+            (root / "paper/figsrc/example").mkdir(parents=True)
+            (root / "paper/fig").mkdir(parents=True)
+            for relative, content in {
+                "paper/fig/make_figs.py": "--schema --figure --panel --metrics --pdf --png matplotlib.use(\"Agg\") validate_rendered_marks",
+                "paper/figsrc/example/schema.json": "{}",
+                "paper/figsrc/example/make_fixture.py": "print('fixture')",
+                "paper/figsrc/example/fixture.json": "{}",
+                "paper/figsrc/example/F2.pdf": "%PDF-test",
+                "paper/figsrc/example/F2.png": "png",
+            }.items():
+                (root / relative).write_text(content)
+            (root / "researcher-profile/fulltext/txt").mkdir(parents=True)
+            (root / "researcher-profile/PROFILE.html").write_text(PROFILE_HTML)
+            (root / "researcher-profile/publications.json").write_text("[]")
+            (root / "researcher-profile/fulltext/txt/ref.txt").write_text("reference")
+            (root / "reports").mkdir()
+            plotting = {
+                "source": "paper/fig/make_figs.py",
+                "schema": "paper/figsrc/example/schema.json",
+                "fixture_generator": "paper/figsrc/example/make_fixture.py",
+                "fixture": "paper/figsrc/example/fixture.json",
+                "pdf": "paper/figsrc/example/F2.pdf",
+                "png": "paper/figsrc/example/F2.png",
+                "panels": {},
+            }
+            contract = {
+                **PLAN_CONTRACT,
+                "references": {"researcher_owned_structure": {"local_full_text": "researcher-profile/fulltext/txt/ref.txt"}},
+                "paper_artifacts": [
+                    *PLAN_CONTRACT["paper_artifacts"],
+                    {"id": "F2", "kind": "figure", "shell": {"plotting": plotting}},
+                ],
+            }
+            for name in ("01_LIT_SURVEY.html", "02_IDEA_REPORT.html", "04_RUN_PLAN.html", "05_EXP_RESULT.html"):
+                (root / "reports" / name).write_text(f"<html><body>{name}</body></html>")
+            (root / "reports/03_EXPERIMENT_PLAN.html").write_text(
+                '<script id="experiment-plan-contract" type="application/json">'
+                + json.dumps(contract)
+                + "</script>"
+            )
+            output = root / "bundle.zip"
+            files = build_archive(root, output)
+            self.assertIn("paper/fig/make_figs.py", files)
+            self.assertIn("paper/figsrc/example/schema.json", files)
+            self.assertIn("results/main.json", files)
+            self.assertNotIn("results/stale.json", files)
 
     def test_online_latex_blocks_file_and_execution_primitives(self):
         with patch.object(paper_studio, "ONLINE_PROJECT_MODE", True):
@@ -444,6 +498,52 @@ class OnlineStudioTests(unittest.TestCase):
                     self.assertEqual(paragraph["reference_lines"][0], paragraph["reference_lines"][1])
             reference = (root / "paper/uploaded_sources.txt").read_text()
             self.assertNotIn("Concise, evidence-first prose", reference)
+
+    def test_demo_interaction_creates_private_writable_copy_after_key_entry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            demo = base / "demo-project"
+            (demo / "paper").mkdir(parents=True)
+            (demo / "paper/paper_studio.json").write_text(
+                json.dumps({"project": {"id": "demo-paper"}}), encoding="utf-8"
+            )
+            process = MagicMock()
+            process.poll.return_value = None
+            with (
+                patch.object(online, "DATA_ROOT", base / "runtime"),
+                patch.object(online, "DEMO_PROJECT", demo),
+                patch.object(
+                    online,
+                    "_start_worker",
+                    return_value=(process, 39001),
+                ) as start,
+                patch.dict(online.SESSIONS, {}, clear=True),
+            ):
+                session = online.create_demo_copy_session(
+                    {"api_key": "sk-test-demo-copy"}, user_id="demo-user"
+                )
+                self.assertEqual(session.kind, "demo-copy")
+                self.assertTrue((session.root / "paper/paper_studio.json").is_file())
+                start.assert_called_once_with(
+                    session.root,
+                    "openai",
+                    "gpt-5-nano",
+                    "sk-test-demo-copy",
+                    demo_mode=False,
+                )
+
+    def test_online_shell_defers_demo_key_prompt_until_interaction(self):
+        html = (online.STATIC / "index.html").read_text(encoding="utf-8")
+        script = (online.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn('id="demo-key-dialog"', html)
+        self.assertIn("paper-studio-demo-api-key-required", script)
+        self.assertIn("/api/online/demo-session", script)
+        self.assertIn("demoFrame.src = '/demo/?authenticated='", script)
+
+    def test_upload_page_names_the_default_package_output(self):
+        html = (online.STATIC / "index.html").read_text(encoding="utf-8")
+        self.assertIn("outputs/paper-studio-evidence.zip", html)
+        self.assertIn("点击上方选择框上传这个文件", html)
 
     def test_live_worker_hides_root_and_never_persists_api_key(self):
         key = "sk-online-test-never-write-this"
