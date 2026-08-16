@@ -38,6 +38,7 @@ ROOT = Path(os.environ.get("RESEARCH_AVATAR_ROOT", Path.cwd())).resolve()
 STATIC = Path(__file__).resolve().parent / "static"
 DEMO = PACKAGE_ROOT / "web" / "demo"
 PAPER_STUDIO_URL = "http://127.0.0.1:8765"
+PAPER_STUDIO_STARTUP_TIMEOUT_SECONDS = 15.0
 PAPER_STUDIO_LOCK = threading.Lock()
 PAPER_STUDIO_PROCESS: subprocess.Popen[bytes] | None = None
 PROFILE_JOB_LOCK = threading.RLock()
@@ -626,15 +627,21 @@ def build_state(root: Path = ROOT) -> dict[str, Any]:
 
 
 def paper_studio_status() -> dict[str, Any]:
-    try:
-        with LOCAL_URL_OPENER.open(f"{PAPER_STUDIO_URL}/api/state", timeout=1.2) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, OSError, ValueError, json.JSONDecodeError):
-        return {"running": False, "same_workspace": False, "url": PAPER_STUDIO_URL}
-    project = payload.get("project", {}) if isinstance(payload, dict) else {}
-    root = str(project.get("root", "")).strip()
-    same_workspace = bool(root) and Path(root).resolve() == ROOT.resolve()
-    return {"running": True, "same_workspace": same_workspace, "url": PAPER_STUDIO_URL}
+    for endpoint in ("/api/health", "/api/state"):
+        try:
+            with LOCAL_URL_OPENER.open(f"{PAPER_STUDIO_URL}{endpoint}", timeout=1.2) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as error:
+            if endpoint == "/api/health" and error.code == HTTPStatus.NOT_FOUND:
+                continue
+            return {"running": False, "same_workspace": False, "url": PAPER_STUDIO_URL}
+        except (urllib.error.URLError, OSError, ValueError, json.JSONDecodeError):
+            return {"running": False, "same_workspace": False, "url": PAPER_STUDIO_URL}
+        project = payload.get("project", {}) if isinstance(payload, dict) else {}
+        root = str(project.get("root", "")).strip()
+        same_workspace = bool(root) and Path(root).resolve() == ROOT.resolve()
+        return {"running": True, "same_workspace": same_workspace, "url": PAPER_STUDIO_URL}
+    return {"running": False, "same_workspace": False, "url": PAPER_STUDIO_URL}
 
 
 def paper_studio_alive() -> bool:
@@ -652,9 +659,9 @@ def start_paper_studio() -> dict[str, Any]:
             }
         if initial["running"]:
             return {"ok": True, "url": PAPER_STUDIO_URL, "already_running": True}
+        workspace_hash = hashlib.sha256(str(ROOT).encode("utf-8")).hexdigest()[:12]
+        log_path = Path(tempfile.gettempdir()) / f"paper-studio-{workspace_hash}.log"
         if PAPER_STUDIO_PROCESS is None or PAPER_STUDIO_PROCESS.poll() is not None:
-            workspace_hash = hashlib.sha256(str(ROOT).encode("utf-8")).hexdigest()[:12]
-            log_path = Path(tempfile.gettempdir()) / f"paper-studio-{workspace_hash}.log"
             log_handle = log_path.open("ab")
             PAPER_STUDIO_PROCESS = subprocess.Popen(
                 [sys.executable, "-m", "research_avatar.paper_studio.server", "--no-browser"],
@@ -666,8 +673,8 @@ def start_paper_studio() -> dict[str, Any]:
                 close_fds=True,
             )
             log_handle.close()
-        deadline = time.time() + 4
-        while time.time() < deadline:
+        deadline = time.monotonic() + PAPER_STUDIO_STARTUP_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
             status = paper_studio_status()
             if status["running"] and status["same_workspace"]:
                 return {"ok": True, "url": PAPER_STUDIO_URL, "already_running": False}
@@ -676,8 +683,19 @@ def start_paper_studio() -> dict[str, Any]:
                     "ok": False,
                     "error": f"{PAPER_STUDIO_URL} was claimed by a different workspace.",
                 }
+            if PAPER_STUDIO_PROCESS is not None and PAPER_STUDIO_PROCESS.poll() is not None:
+                return {
+                    "ok": False,
+                    "error": f"Paper Studio exited during startup. See {log_path}.",
+                }
             time.sleep(0.15)
-    return {"ok": False, "error": "Paper Studio did not become ready within 4 seconds."}
+    return {
+        "ok": False,
+        "error": (
+            "Paper Studio did not become ready within "
+            f"{PAPER_STUDIO_STARTUP_TIMEOUT_SECONDS:g} seconds. See {log_path}."
+        ),
+    }
 
 
 def ensure_project_studios(

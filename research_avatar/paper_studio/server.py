@@ -289,6 +289,11 @@ def load_project_config(
 EMPTY_PROJECT_MODE = "--empty" in sys.argv or not PROJECT_CONFIG_FILE.exists()
 
 
+def project_files_ready() -> bool:
+    """Return whether a loaded project still has its two canonical control files."""
+    return PROJECT_CONFIG_FILE.is_file() and PARAGRAPH_PLAN_FILE.is_file()
+
+
 def empty_project_config() -> dict[str, Any]:
     """Built-in shell configuration; it contains no paper-specific content."""
     return {
@@ -914,7 +919,7 @@ def validate_project_workspace() -> None:
 
 
 def planned_paragraphs(section: str) -> list[dict[str, Any]]:
-    if EMPTY_PROJECT_MODE:
+    if EMPTY_PROJECT_MODE or not project_files_ready():
         return []
     specs = paragraph_plan().get("sections", {}).get(section, [])
     return [
@@ -6648,12 +6653,12 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         for candidate in ("openai", "deepseek")
     ]
     model_options = model_options_for_provider(provider, str(state.get("model") or ""))
-    if EMPTY_PROJECT_MODE:
+    if EMPTY_PROJECT_MODE or not project_files_ready():
         return {
             "schema_version": state.get("schema_version", "1.2"),
-            "project_id": PROJECT_ID,
+            "project_id": "__paper_studio_empty__",
             "project": {
-                "id": PROJECT_ID,
+                "id": "__paper_studio_empty__",
                 "name": "",
                 "eyebrow": "PAPER STUDIO",
                 "studio_title": "Paper Studio",
@@ -6970,6 +6975,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send_file(STATIC / "app.js", "text/javascript; charset=utf-8", cache=False)
         elif path == "/static/style.css":
             self.send_file(STATIC / "style.css", "text/css; charset=utf-8", cache=False)
+        elif path == "/api/health":
+            self.send_json(
+                {
+                    "ok": True,
+                    "project": {"root": str(ROOT.resolve())},
+                    "empty_project": EMPTY_PROJECT_MODE or not project_files_ready(),
+                    "pid": os.getpid(),
+                }
+            )
         elif path == "/api/state":
             self.send_json(public_state(load_state()))
         elif path == "/paper.pdf":

@@ -727,6 +727,40 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('id="empty-project"', html)
         self.assertIn("python3 -m research_avatar.paper_studio.server --empty", html)
 
+    def test_removed_project_files_fall_back_to_empty_shell(self):
+        with (
+            patch.object(studio, "EMPTY_PROJECT_MODE", False),
+            patch.object(
+                studio,
+                "PROJECT_CONFIG_FILE",
+                studio.ROOT / "paper" / "missing-paper-studio-for-test.json",
+            ),
+            patch.object(
+                studio,
+                "PARAGRAPH_PLAN_FILE",
+                studio.ROOT / "paper" / "missing-paragraph-plan-for-test.json",
+            ),
+        ):
+            visible = public_state(_default_state())
+
+        self.assertFalse(visible["project"]["loaded"])
+        self.assertEqual(visible["project_id"], "__paper_studio_empty__")
+        self.assertEqual(visible["sections"], {})
+
+    def test_health_endpoint_does_not_load_paper_state(self):
+        handler = object.__new__(Handler)
+        handler.path = "/api/health"
+        response = {}
+        handler.send_json = lambda payload, status=200: response.update(payload)
+
+        with patch.object(studio, "project_files_ready", return_value=False):
+            handler.do_GET()
+
+        self.assertTrue(response["ok"])
+        self.assertEqual(Path(response["project"]["root"]), studio.ROOT)
+        self.assertTrue(response["empty_project"])
+        self.assertIsInstance(response["pid"], int)
+
     def test_newer_figure_job_state_survives_an_unrelated_stale_save(self):
         with TemporaryDirectory() as directory:
             state_dir = Path(directory)

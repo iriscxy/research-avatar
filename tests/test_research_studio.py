@@ -26,6 +26,22 @@ class ResearchStudioTests(unittest.TestCase):
     def test_http_server_accepts_browser_asset_bursts(self):
         self.assertGreaterEqual(studio.StudioHTTPServer.request_queue_size, 32)
 
+    @patch.object(studio.LOCAL_URL_OPENER, "open")
+    def test_paper_studio_status_uses_state_independent_health_endpoint(self, open_url):
+        response = MagicMock()
+        response.read.return_value = json.dumps(
+            {"ok": True, "project": {"root": str(studio.ROOT)}}
+        ).encode("utf-8")
+        open_url.return_value.__enter__.return_value = response
+
+        status = studio.paper_studio_status()
+
+        self.assertTrue(status["running"])
+        self.assertTrue(status["same_workspace"])
+        open_url.assert_called_once_with(
+            f"{studio.PAPER_STUDIO_URL}/api/health", timeout=1.2
+        )
+
     def test_profile_job_state_is_initialized_and_uses_profile_html_only(self):
         source = Path(studio.__file__).read_text(encoding="utf-8")
         self.assertNotIn("researcher-profile/profile.md", source.lower())
@@ -57,6 +73,47 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertFalse(result["ok"])
         self.assertIn("different workspace", result["error"])
         popen.assert_not_called()
+
+    @patch("research_avatar.research_studio.server.time.sleep")
+    @patch("research_avatar.research_studio.server.subprocess.Popen")
+    @patch("research_avatar.research_studio.server.paper_studio_status")
+    def test_paper_studio_waits_for_delayed_readiness(self, status, popen, sleep):
+        status.side_effect = [
+            {"running": False, "same_workspace": False, "url": studio.PAPER_STUDIO_URL},
+            {"running": False, "same_workspace": False, "url": studio.PAPER_STUDIO_URL},
+            {"running": True, "same_workspace": True, "url": studio.PAPER_STUDIO_URL},
+        ]
+        process = MagicMock()
+        process.poll.return_value = None
+        popen.return_value = process
+
+        with patch.object(studio, "PAPER_STUDIO_PROCESS", None):
+            result = start_paper_studio()
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["already_running"])
+        sleep.assert_called_once_with(0.15)
+
+    @patch("research_avatar.research_studio.server.time.sleep")
+    @patch("research_avatar.research_studio.server.subprocess.Popen")
+    @patch("research_avatar.research_studio.server.paper_studio_status")
+    def test_paper_studio_reports_log_when_process_exits(self, status, popen, sleep):
+        status.return_value = {
+            "running": False,
+            "same_workspace": False,
+            "url": studio.PAPER_STUDIO_URL,
+        }
+        process = MagicMock()
+        process.poll.return_value = 1
+        popen.return_value = process
+
+        with patch.object(studio, "PAPER_STUDIO_PROCESS", None):
+            result = start_paper_studio()
+
+        self.assertFalse(result["ok"])
+        self.assertIn("exited during startup", result["error"])
+        self.assertIn("paper-studio-", result["error"])
+        sleep.assert_not_called()
 
     def test_request_body_rejects_arrays_and_oversized_payloads(self):
         handler = object.__new__(Handler)
