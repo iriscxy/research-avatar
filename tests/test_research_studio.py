@@ -334,6 +334,26 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertIn("artifact.interactive === true", source)
         self.assertIn("if (isPdf || isInteractive)", source)
 
+    def test_paper_stage_is_complete_only_when_all_synced_outputs_are_complete(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            paper = root / "paper"
+            (paper / ".paper_studio").mkdir(parents=True)
+            (paper / "paper_studio.json").write_text(json.dumps({
+                "project": {"id": "complete", "name": "Complete"},
+                "figures": {"F1": {}}, "tables": {"T1": {}},
+            }), encoding="utf-8")
+            (paper / ".paper_studio/state.json").write_text(json.dumps({
+                "sections": {"abstract": {"paragraphs": [{"accepted_text": "done"}]}},
+                "figures": {"F1": {"status": "approved"}},
+                "tables": {"T1": {"status": "approved"}},
+                "compile": {"status": "completed"},
+            }), encoding="utf-8")
+
+            stage = studio.paper_stage(root)
+
+        self.assertEqual(stage["status"], "complete")
+
     def test_pipeline_tabs_use_readable_typography_and_bumped_cache(self):
         root = Path(__file__).resolve().parents[1]
         style_source = (
@@ -382,9 +402,10 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertNotIn('reportDocument("results"', demo_source)
         self.assertNotIn('reportDocument("paper-studio"', demo_source)
         self.assertIn("experimentPlanDemo()", demo_source)
-        self.assertIn("研究目标与参考依据", demo_source)
-        self.assertIn("代表性图表 · 轨迹首次偏离", demo_source)
-        self.assertIn("代表性结果表", demo_source)
+        self.assertIn("Margin-Targeted Typo Augmentation", demo_source)
+        self.assertIn("F2 · 六设置确认图", demo_source)
+        self.assertIn("50-intent 主比较", demo_source)
+        self.assertNotIn("First-Divergence Repair", demo_source)
         self.assertNotIn("F3A · Only the first-exit layer", demo_source)
         self.assertNotIn("F4 · Safety–utility sensitivity", demo_source)
         self.assertIn("provenance-number", demo_source)

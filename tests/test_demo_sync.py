@@ -7,14 +7,39 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DemoSyncTests(unittest.TestCase):
+    def test_committed_paper_demo_is_the_positive_mta_project(self):
+        project = ROOT / "research_avatar/online_studio/demo_project"
+        config = json.loads((project / "paper/paper_studio.json").read_text(encoding="utf-8"))
+        state = json.loads((project / "paper/.paper_studio/state.json").read_text(encoding="utf-8"))
+        project_id = "margin-targeted-typo-coling-short-20260817"
+        self.assertEqual(config["project"]["id"], project_id)
+        self.assertEqual(state["project_id"], project_id)
+        self.assertEqual(config["figure_order"], ["F1", "F2", "F3"])
+        self.assertEqual(config["table_order"], ["T1", "T2"])
+        for figure_id in config["figure_order"]:
+            figure = state["figures"][figure_id]
+            self.assertEqual(figure["status"], "approved")
+            self.assertTrue(figure["draw_prompt"].strip())
+        for table_id in config["table_order"]:
+            self.assertEqual(state["tables"][table_id]["status"], "approved")
+            self.assertTrue(state["tables"][table_id]["latex"].strip())
+        self.assertTrue((project / "paper/main.pdf").is_file())
+        self.assertTrue((project / "paper/fig/typo_margin/F1_motivation.pptx").is_file())
+        self.assertTrue((project / "paper/fig/typo_margin/actual/F2_confirmation.png").is_file())
+        self.assertTrue((project / "paper/fig/typo_margin/actual/F3_budget.png").is_file())
+        stale = [path for path in project.rglob("*") if "typo_basis" in path.as_posix() or "micro_typo_intent" in path.as_posix()]
+        self.assertEqual(stale, [])
+
     def test_committed_demo_snapshot_is_a_fixed_self_contained_example(self):
         actual = json.loads((ROOT / "research_avatar/web/demo/runplan-state.json").read_text(encoding="utf-8"))
         self.assertTrue(actual["parts"])
         self.assertTrue(actual["goals"])
-        current = actual["active_goal"] or actual["proposed_goal_id"]
-        current_goals = [goal for goal in actual["goals"] if goal["id"] == current]
-        self.assertEqual(len(current_goals), 1)
-        self.assertTrue(current_goals[0]["goal_command"].startswith(f"/goal Complete {current}:"))
+        self.assertEqual(actual["state"], "completed")
+        self.assertIsNone(actual["active_goal"])
+        self.assertIsNone(actual["proposed_goal_id"])
+        self.assertEqual([goal["id"] for goal in actual["goals"]], ["G1.1", "G2.1"])
+        self.assertTrue(all(goal["status"] == "completed" for goal in actual["goals"]))
+        self.assertEqual(actual["approved_artifact_ids"], ["F1", "T1", "F2", "T2", "F3"])
 
     def test_paper_demo_mounts_the_real_completed_application(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
@@ -47,7 +72,7 @@ class DemoSyncTests(unittest.TestCase):
     def test_demo_copy_has_a_legacy_fallback_and_plan_is_sampled(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         self.assertIn('document.execCommand("copy")', source)
-        self.assertIn('representativeGoalIds = [currentId, "G2.1", "G5.1"]', source)
+        self.assertIn('representativeGoalIds = [currentId, "G1.1", "G2.1"]', source)
         self.assertNotIn("执行当前唯一 Goal", source)
         self.assertNotIn("命令与真实 Run Plan 的 Current Goal 完全一致", source)
         self.assertNotIn("完整计划没有丢失", source)

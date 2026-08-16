@@ -1,0 +1,1291 @@
+                               An Empirical Survey of Data Augmentation
+                                   for Limited Data Learning in NLP
+
+             Jiaao Chen∗ Derek Tam†∗                             Colin Raffel†              Mohit Bansal†                Diyi Yang
+                          
+                              Georgia Institute of Technology, USA † UNC Chapel Hill, USA
+                                        {jchen896, dyang888}@gatech.edu
+                                 {dtredsox, craffel, mbansal}@cs.unc.edu
+
+
+                              Abstract                                          every example whenever new data comes in. This
+        NLP has achieved great progress in the past                             highlights a need for learning algorithms that can
+        decade through the use of neural models and                             be trained with a limited amount of labeled data.
+        large labeled datasets. The dependence on                                  There has been a substantial amount of research
+        abundant data prevents NLP models from be-                              towards learning with limited labeled data for
+        ing applied to low-resource settings or novel                           various tasks in the NLP community. One com-
+        tasks where significant time, money, or ex-
+        pertise is required to label massive amounts
+                                                                                mon approach for mitigating the need for labeled
+        of textual data. Recently, data augmentation                            data is data augmentation. Data augmentation
+        methods have been explored as a means                                   (Feng et al., 2021) generates new data by modi-
+        of improving data efficiency in NLP. To                                 fying existing data points through transformations
+        date, there has been no systematic empiri-                              that are designed based on prior knowledge about
+        cal overview of data augmentation for NLP                               the problem’s structure (Yang, 2015; Wei and
+        in the limited labeled data setting, making it                          Zou, 2019). This augmented data can be generated
+        difficult to understand which methods work
+                                                                                from labeled data, and then directly used in super-
+        in which settings. In this paper, we pro-
+        vide an empirical survey of recent progress                             vised learning (Wei and Zou, 2019), or in semi-
+        on data augmentation for NLP in the lim-                                supervised learning for unlabeled data through
+        ited labeled data setting, summarizing the                              consistency regularization (Xie et al., 2020) (‘‘con-
+        landscape of methods (including token-level                             sistency training’’). While various approaches
+        augmentations, sentence-level augmentations,                            have been proposed to tackle learning with limited
+        adversarial augmentations, and hidden-space                             labeled data—including unsupervised pre-training
+        augmentations) and carrying out experiments                             (Peters et al., 2018; Devlin et al., 2019; Raffel
+        on 11 datasets covering topics/news classifica-
+        tion, inference tasks, paraphrasing tasks, and
+                                                                                et al., 2020), multi-task learning (Glorot et al.,
+        single-sentence tasks. Based on the results, we                         2011; Liu et al., 2017; Augenstein et al., 2018),
+        draw several conclusions to help practitioners                          semi-supervised learning (Zhu, 2005; Chapelle
+        choose appropriate augmentations in different                           et al., 2009; Miyato et al., 2017; Xie et al., 2020),
+        settings and discuss the current challenges and                         and few-shot learning (Deng et al., 2019)—in
+        future directions for limited data learning in                          this work, we focus on and compare different
+        NLP.                                                                    data augmentation methods and their application
+                                                                                to supervised and semi-supervised learning.
+1       Introduction
+                                                                                   In this empirical survey, we comprehensively
+Deep learning methods have achieved strong per-                                 review and perform experiments on recent data
+formance on a wide range of supervised learn-                                   augmentation techniques developed for various
+ing tasks (Sutskever et al., 2014; Deng et al.,                                 NLP tasks. Our contributions are three-fold: (1)
+2013; Minaee et al., 2021). Traditionally, these re-                            summarize and categorize recent methods in tex-
+sults were attained through the use of large, well-                             tual data augmentation; (2) compare different
+labeled datasets. This make them challenging to                                 data augmentation methods through experiments
+apply in settings where collecting a large amount                               with limited labeled data in supervised and semi-
+of high-quality labeled data for training is expen-                             supervised settings on 11 NLP tasks, and (3)
+sive. Moreover, given the fast-changing nature of                               discuss current challenges and future directions
+real-world applications, it is infeasible to relabel                            of data augmentation, as well as learning with
+    ∗
+        Equal contribution.                                                     limited data in NLP more broadly.
+                                                                          191
+
+              Transactions of the Association for Computational Linguistics, vol. 11, pp. 191–211, 2023. https://doi.org/10.1162/tacl a 00542
+                            Action Editor: Emily Pitler. Submission batch: 8/2022; Revision batch: 10/2022; Published 3/2023.
+                                c 2023 Association for Computational Linguistics. Distributed under a CC-BY 4.0 license.
+  Our experimental results allow us to conclude             2 Data Augmentation for NLP
+that:
+                                                            Data augmentation increases both the amount (the
+  • Token-level augmentations and specifically              number of data points) and the diversity (the va-
+    word replacement and random swapping                    riety of data) of a given dataset (Cubuk et al.,
+    consistently improve performance the most               2019). Limited labeled data often leads to over-
+    for supervised learning while sentence-level            fitting on the training set and data augmentation
+    augmentation and specifically roundtrip                 works to alleviate this issue by manipulating data
+    translation improve performance the most                either automatically or manually to create addi-
+    for semi-supervised learning.                           tional augmented data. Such techniques have been
+                                                            widely explored in the computer vision field, with
+  • Token-level augmentations improve perfor-               methods like geometric/color space transforma-
+    mance more for simpler classification tasks             tions (Simard et al., 2003; Krizhevsky et al., 2012;
+    and surprisingly hurt performance for harder            Taylor and Nitschke, 2018), mixup (Zhang et al.,
+    tasks where the baseline performance is                 2018), and random erasing (Zhong et al., 2020;
+    pretty low.                                             DeVries and Taylor, 2017). Although the discrete
+  • Token-level augmentations and sentence-                 nature of textual data and its complex syntactic and
+    level augmentations are generally more                  semantic structures make finding label-preserving
+    reliable compared to hidden-level augmenta-             transformation more difficult, there nevertheless
+    tions in both supervised and semi-supervised            exists a wide range of methods for augmenting text
+    settings.                                               data that in practice preserve labels. In the follow-
+                                                            ing subsections, we describe four broad classes of
+  • The best augmentation method depends on                 data augmentation methods.
+    the dataset and setting (either supervised or
+    semi-supervised).                                       2.1 Token-Level Augmentation
+                                                            Token-level augmentations manipulate words and
+Related Surveys. Recently, several surveys also             phrases in a sentence to generate augmented text
+explore the data augmentation techniques for NLP            while ideally retaining the semantic meaning and
+(Hedderich et al., 2020; Feng et al., 2021; Şahin,         labels of the original text.
+2022). Hedderich et al. (2020) provide a broad
+overview of techniques for NLP in low resource              Designed Replacement. Intuitively, the seman-
+scenarios and briefly cover data augmentation as            tic meaning of a sentence remains unchanged if
+one of several techniques. In contrast, we focus            some of its tokens are replaced with other tokens
+on data augmentation and provide a more com-                that have the same meaning. A simple approach
+prehensive review on recent data augmentation               is to fetch synonyms as words for substitutions
+methods in this work. Şahin (2022) focuses on              (Kolomiyets et al., 2011; Yang, 2015; Zhang et al.,
+syntax, token, and character level augmentations            2015a; Wei and Zou, 2019; Miao et al., 2020). The
+for part-of-speech tagging, dependency parsing,             synonyms are discovered based on pre-defined
+and semantic role labeling. While Feng et al.               dictionaries such as WordNet (Kolomiyets et al.,
+(2021) also survey task-specific data augmenta-             2011), or similarities in word embedding space
+tion approaches for NLP, our work summarizes                (Yang, 2015). However, improvements from this
+recent data augmentation methods in a more fine-            technique are usually minimal (Kolomiyets et al.,
+grained categorization. We also focus on their              2011), and in some cases, performance may even
+application to learning from limited data by                degrade (Zhang et al., 2015a). A major drawback
+providing an empirical study of over differ-                stems from the lack of contextual information
+ent augmentation methods on various benchmark               when fetching synonyms—especially for words
+datasets in both supervised and semi-supervised             with multiple meanings and few synonyms. To re-
+settings, doing an empirical comparison of dif-             solve this, language models (LMs) have been used
+ferent types of augmentation methods on over 11             to replace the sampled words given their context
+datasets covering various tasks. In doing so, we            (Kolomiyets et al., 2011; Fadaee et al., 2017;
+hope to shed light on data augmentation selections          Kobayashi, 2018; Kumar et al., 2020). Other work
+for future research.                                        preserves the labels of the text by conditioning
+
+                                                      192
+on the label when generating the LMs’ predictions          out-of-distribution data, compositional augmen-
+(Kobayashi, 2018; Wu et al., 2019a). In addition,          tation has been utilized in sequence labeling (Guo
+different sampling strategies for word replacement         et al., 2020), semantic parsing (Andreas, 2020;
+have been explored. For example, instead of sam-           Nye et al., 2020; Furrer et al., 2020), language
+pling one specific word from candidates by LMs,            modeling (Andreas, 2020; Shaw et al., 2021), and
+Gao et al. (2019) propose to compute a weighted            text generation (Feng et al., 2020).
+average over embeddings of possible words pre-
+dicted by LMs as the replaced input since the
+                                                           2.2 Sentence-Level Augmentation
+averaged representations could augment text with
+richer information.                                        Instead of modifying tokens, sentence-level aug-
+                                                           mentation modifies the entire sentence at once.
+Random Insertion, Replacement, Deletion, and
+                                                           Paraphrasing. Paraphrasing has been widely
+Swapping. While well-designed local modifi-
+                                                           adopted as a data augmentation technique in
+cations can preserve the syntax and semantic
+                                                           various NLP tasks (Yu et al., 2018; Xie et al.,
+meaning of a sentence (Niu and Bansal, 2018),
+                                                           2020; Kumar et al., 2019; He et al., 2020; Chen
+random local modifications such as deleting cer-
+                                                           et al., 2020b,c; Cai et al., 2020), as it generally
+tain tokens (Iyyer et al., 2015; Wei and Zou,
+                                                           provides more diverse augmented text with dif-
+2019; Miao et al., 2020), inserting random tokens
+                                                           ferent word choices and sentence structures while
+(Wei and Zou, 2019; Miao et al., 2020), replacing
+                                                           preserving the meaning of the original text. The
+non-important tokens with random tokens (Xie
+                                                           most popular is round-trip translation (Sennrich
+et al., 2017, 2020; Niu and Bansal, 2018), or ran-
+                                                           et al., 2015; Edunov et al., 2018), a pipeline which
+domly swapping tokens in one sentence (Artetxe
+                                                           first translates sentences into certain intermediate
+et al., 2018; Lample et al., 2018; Wei and Zou,
+                                                           languages and then translates them back to gener-
+2019; Miao et al., 2020) can preserve the mean-
+                                                           ate paraphrases. Translating through intermediate
+ing in practice. Different kinds of operations
+                                                           languages with different vocabulary and linguis-
+can be further combined (Wei and Zou, 2019),
+                                                           tic structures can generate useful paraphrases. To
+where each example is randomly augmented with
+                                                           ensure the diversity of augmented data, sampling
+one of insertion, deletion, and swapping. These
+                                                           and noisy beam search can also be adopted during
+noise-injection methods can efficiently be applied
+                                                           the decoding stage (Edunov et al., 2018). Other
+to training, and show improvements when they
+                                                           work focuses on directly training end-to-end mod-
+augment simple models trained on small train-
+                                                           els to generate paraphrases (Prakash et al., 2016),
+ing sets. However, the improvements might be
+                                                           and further augments the decoding phase with
+unstable due to the possibility that random per-
+                                                           syntactic information (Iyyer et al., 2018; Chen
+turbations change the meanings of sentences (Niu
+                                                           et al., 2019), latent variables (Gupta et al., 2017),
+and Bansal, 2018). Also, finetuning large pre-
+                                                           and sub-modular objectives (Kumar et al., 2019).
+trained models on specific tasks might attenuate
+improvements due to preexisting generalization             Conditional Generation. Conditional genera-
+abilities of the model (Shleifer, 2019).                   tion methods generate additional text from a
+                                                           language model, conditioned on the label. Af-
+Compositional Augmentation. To increase the                ter training the model to generate the original text
+compositional generalization abilities of models,          given the label, the model can generate new text
+recent efforts have also focused on compositional          (Anaby-Tavor et al., 2020; Zhang and Bansal,
+augmentations (Jia and Liang, 2016; Andreas,               2019; Kumar et al., 2020; Yang et al., 2020).
+2020) where different fragments from different             An extra filtering process is often used to en-
+sentences are re-combined to create augmented              sure high-quality augmented data. For example,
+examples. Compared with random swapping,                   in text classification, Anaby-Tavor et al. (2020)
+compositional augmentation often requires more             first fine-tune GPT-2 (Radford et al., 2019) with
+carefully designed rules such as lexical overlap           the original examples prepended with their labels,
+(Andreas, 2020), neural-symbolic stack machines            and then generate augmented examples by feeding
+(Chen et al., 2020e), and neural program syn-              the fine-tuned model certain labels. Only confi-
+thesis (Nye et al., 2020). With the potential to           dent examples as judged by a baseline classifier
+greatly improve the generalization abilities to            trained on the original data are kept. Similarly,
+
+                                                     193
+new answers are generated on the basis of given                      Black-Box Methods. These are usually model-
+questions in question answering and are filtered                     agnostic since they do not require information
+by customized metrics like question answering                        from a model or its parameters and usually focus
+probability (Zhang and Bansal, 2019) and n-gram                      on task-specific heuristics for creating adver-
+diversity (Yang et al., 2020). Given the recent suc-                 sarial examples. For example, by enumerating
+cess of pre-trained language models, Ye et al.                       feasible substitutions on the basis of word simi-
+(2022) and Wang et al. (2021) generate data                          larity and language models, Ren et al. (2019) and
+from zero-shot models. Generative models used in                     Garg and Ramakrishnan (2020) select adversar-
+this setting have been based on conditional VAE                      ial word replacements which severely influence
+(Bowman et al., 2016; Hu et al., 2017; Guu et al.,                   the predictions from the text classification model.
+2017; Malandrakis et al., 2019), GAN Iyyer et al.,                   To attack reading comprehension systems, Jia
+2018; (Xu et al., 2018), or pre-trained language                     and Liang (2017) and Wang and Bansal (2018)
+models like GPT-2 (Anaby-Tavor et al., 2020;                         insert distracting but meaningless sentences at
+Kumar et al., 2020). Overall, these conditional                      different locations in paragraphs and Ribeiro
+generation methods can create novel and diverse                      et al. (2018) leverage rule-based paraphrasing
+data that might be unseen in the original dataset,                   to produce semantically equivalent adversarial
+but require significant training effort.                             examples. Likewise, for multi-hop question an-
+                                                                     swering, Jiang and Bansal (2019) insert shortcut
+2.3 Adversarial Data Augmentation                                    reasoning sentences and Trivedi et al. (2020)
+                                                                     constructed disconnected reasoning example by
+Adversarial methods create augmented examples                        removing certain supporting facts. For NLI, Mitra
+by adding adversarial perturbations to the origi-                    et al. (2020) use VerbNet and other Semantic Role
+nal data, which dramatically influences the mod-                     Labeling resources to generate pair of sentences
+el’s predictions and confidence without changing                     containing same set of words but have different
+human judgments. These adversarial examples                          meaning. For machine translation, Belinkov and
+(Morris et al., 2020; Zeng et al., 2020) could                       Bisk (2017) attack character-based models by nat-
+be leveraged in adversarial training (Goodfellow                     ural or synthesized typos and Tan et al. (2020)
+et al., 2015) to increase neural models’ robust-                     further adopt subword morphology level attacks.
+ness, and can also be utilized as data augmenta-                     Similar attacks also help dialogue generation
+tion to increase the models’ generalization ability                  (Niu and Bansal, 2019) and text summarization
+(Miyato et al., 2017; Cheng et al., 2019).1                          (Cheng et al., 2020a; Fan et al., 2018). Other
+                                                                     methods do not rely in editing input text directly;
+White-Box Methods. These rely on model ar-                           Iyyer et al. (2018) leverage round-trip translation
+chitecture and parameters being accessible and                       to generate paraphrases in given syntactic tem-
+create adversarial examples directly using a                         plates and Zhao et al. (2017) search for adversar-
+model’s gradients. Unlike image pixel values that                    ial examples in underlying semantic space with
+are continuous, textual tokens are discrete and                      GANs (Goodfellow et al., 2014). Some of these
+cannot be directly modified based on gradients.                      heuristics could be further refined to obtain sim-
+To this end, adversarial perturbations are added                     ple adversarial data augmentation approaches. For
+directly to token embeddings or sentence hidden                      example, McCoy et al. (2019) craft adversarial
+representations (Miyato et al., 2017; Zhu et al.,                    examples for natural language inference using so-
+2020; Jiang et al., 2019; Chen et al., 2020d) which                  phisticated templates which create lexical overlap
+creates ‘‘virtual adversarial examples’’. Other                      between the premise and the hypothesis to fool the
+approaches vectorize modification operations as                      model. Min et al. (2020) propose two simple yet
+the difference of one-hot vectors (Ebrahimi et al.,                  effective adversarial transformations that reverse
+2018a,b), or find real word neighbors in a model’s                   the position of subject and object or the position
+hidden representations via its gradients (Cheng                      of premise and hypothesis.
+et al., 2019).
+                                                                     2.4 Hidden-Space Augmentation
+   1
+     For more detailed discussion on textual adversarial ex-
+amples, please refer to recent comprehensive surveys (Zhang          This line of work generates augmented data by
+et al., 2020b; Huq and Pervin, 2020; Goel et al., 2021).             manipulating the hidden representations through
+
+                                                               194
+perturbations such as adding noise or perform-               tion to unlabeled examples drawn from the same
+ing interpolations with other data points. Hidden-           distribution. Currently, one of the most com-
+space perturbations augment existing data by                 mon methods for performing SSL with deep
+adding perturbations to the hidden representa-               neural networks is ‘‘consistency regularization’’
+tions of tokens (Miyato et al., 2017; Zhu et al.,            (Bachman et al., 2014; Tarvainen and Valpola,
+2020; Jiang et al., 2019; Chen et al., 2020d;                2017). Consistency regularization-based SSL (or
+Shen et al., 2020; Chen et al., 2021) or sentences           ‘‘consistency training’’ for short) regularizes a
+(Hsu et al., 2017, 2018; Wu et al., 2019b;                   model by enforcing that its output doesn’t change
+Malandrakis et al., 2019).                                   significantly when the input is perturbed. In prac-
+                                                             tice, the input is perturbed by applying data
+Interpolation-Based Methods. Interpolation-                  augmentation, and consistency is enforced through
+based methods create new examples and labels by              a loss term that measures the difference between
+linear combinations of existing data-label pairs.            the model’s predictions on a clean input and a
+Given two data-label pairs, virtual data-label pairs         corresponding perturbed version of the same input.
+are created through linear interpolations of the                 Formally, let fθ be a model with parameters θ,
+pair of data points. Such interpolation-based meth-          fθ̂ be a fixed copy of the model where no gradients
+ods can generate infinite augmented data in the              are allowed to flow, xl be a labeled datapoint with
+‘‘virtual vicinity’’ of the original data space,             label y , xu be an unlabeled datapoint, and α(x) be
+thus improving the generalization performance                a data augmentation method. Then, a typical loss
+of models. Interpolation-based methods were first            function for consistency training is
+explored in computer vision (Zhang et al., 2018),
+and have more recently been generalized to the
+                                                                CE(fθ (xl ), y ) + λu CE(fθ̂ (xu ), fθ (α(xu )))
+text domain (Miao et al., 2020; Chen et al., 2020c;
+Cheng et al., 2020b; Chen et al., 2020a) by per-
+forming interpolation between original data and              where CE is the cross entropy loss and λu is
+token-level augmented data in the output space               a tunable hyperparameter that determines the
+(Miao et al., 2020), between original data and ad-           weight of the consistency regularization term. In
+versarial data in embedding space (Cheng et al.,             practice, various other measures have been used
+2020b), or between different training examples in            to minimize the difference between fθ̂ (xu ) and
+general hidden space (Chen et al., 2020c). Differ-           fθ (α(xu )), such as the KL divergence (Miyato
+ent strategies to select samples to mix have also            et al., 2018; Xie et al., 2020) and the mean-squared
+been explored (Chen et al., 2020a; Guo et al., 2020;         error (Tarvainen and Valpola, 2017; Laine and
+Zhang et al., 2020a) such as k -nearest-neighbors            Aila 2017; Berthelot et al., 2019). Because gra-
+(Chen et al., 2020a) or sentence composition                 dients are not allowed to flow through the model
+(Guo et al., 2020).                                          when it was fed the clean unlabeled input xu , this
+   We summarize the preceding overview of re-                objective can be viewed as using the clean unla-
+cent widely used data augmentation methods in                beled datapoint to generate a synthetic target dis-
+Table 1, characterizing them with respect to aug-            tribution for the augmented unlabeled datapoint.
+mentation levels, the diversity of generated data,              Xie et al. (2020) showed that consistency train-
+and their applicable tasks.                                  ing can be effectively applied to semi-supervised
+                                                             learning for NLP. To achieve stronger results,
+3   Consistency Training with DA                             they introduce several other tricks including confi-
+                                                             dence thresholding, training signal annealing, and
+While data augmentation (DA) can be applied                  entropy minimization. Confidence thresholding
+in the supervised setting to produce better results          applies the unsupervised loss only when the model
+when only a small labeled training dataset is avail-         assigns a class probability above a pre-defined
+able, data augmentation is also commonly used in             threshold. Training signal annealing prevents the
+semi-supervised learning (SSL). SSL is an alter-             model from overfitting on easy examples by ap-
+native approach for learning from limited data that          plying the supervised loss only when the model
+provides a framework for taking advantage of un-             is less confident about predictions. Entropy min-
+labeled data. Specifically, SSL assumes that our             imization trains the model to output low-entropy
+training set comprises labeled examples in addi-             (highly-confident) predictions when fed unlabeled
+
+                                                       195
+Methods                Level     Diversity           Tasks                            Related Work
+
+                                                                      Kolomiyets et al. (2011), Zhang et al. (2015a),
+Synonym                                      Text classification
+                      Token      Low         Sequence labeling        Yang (2015), Miao et al. (2020),
+replacement
+                                                                      Wei and Zou (2019)
+                                             Text classification      Kolomiyets et al. (2011), Gao et al. (2019)
+Word replacement
+                      Token      Medium      Sequence labeling        Kobayashi (2018), Wu et al. (2019a)
+via LM
+                                             Machine translation      Fadaee et al. (2017)
+                                             Text classification
+                                                                      Iyyer et al. (2015), Xie et al. (2017)
+Random insertion,                            Sequence labeling
+                      Token      Low                                  Artetxe et al. (2018), Lample et al. (2018)
+deletion, swapping                           Machine translation
+                                                                      Xie et al. (2020), Wei and Zou (2019)
+                                             Dialogue generation
+                                             Semantic Parsing
+                                                                      Jia and Liang (2016), Andreas (2020)
+Compositional                                Sequence labeling
+                      Token      High                                 Nye et al. (2020), Feng et al. (2020)
+augmentation                                 Language modeling
+                                                                      Furrer et al. (2020), Guo et al. (2020)
+                                             Text generation
+
+                                             Text classification
+                                                                      Yu et al. (2018), Xie et al. (2020)
+                                             Machine translation
+                                                                      Chen et al. (2019), He et al. (2020)
+Paraphrasing          Sentence   High        Question answering       Chen et al. (2020c), Cai et al. (2020)
+                                             Dialogue generation
+                                             Text summarization
+Conditional                                  Text classification      Anaby-Tavor et al. (2020), Kumar et al. (2020)
+generation            Sentence   High
+                                             Question answering       Zhang and Bansal (2019), Yang et al. (2020)
+
+                                             Text classification      Miyato et al. (2017), Ebrahimi et al. (2018b)
+White-box             Token or
+attack                Sentence   Medium      Sequence labeling        Ebrahimi et al. (2018a), Cheng et al. (2019),
+                                             Machine translation      Chen et al. (2020d)
+                                             Text classification
+                                             Sequence labeling        Jia and Liang (2017)
+Black-box             Token or               Machine translation      Belinkov and Bisk (2017), Zhao et al. (2017)
+attack                Sentence   Medium
+                                             Textual entailment       Ribeiro et al. (2018), McCoy et al. (2019)
+                                             Dialogue generation      Min et al. (2020), Tan et al. (2020)
+                                             Text Summarization
+
+                                             Text classification      Hsu et al. (2017), Hsu et al. (2018)
+Hidden-space          Token or
+                      Sentence   High        Sequence labeling        Wu et al. (2019b), Chen et al. (2021)
+perturbation
+                                             Speech recognition       Malandrakis et al. (2019), Shen et al. (2020)
+                                             Text classification      Miao et al. (2020), Chen et al. (2020c)
+Interpolation         Token      High        Sequence labeling        Cheng et al. (2020b), Chen et al. (2020a)
+                                             Machine translation      Guo et al. (2020)
+
+Table 1: Overview of different data augmentation techniques in NLP. Diversity refers to the difference
+of augmented data from existing data and the amount of different augmented data could be generated.
+
+
+data. We refer the reader to Xie et al. (2020) for         2011; Yang, 2015), Word Replacement based on
+more details on these tricks.                              Language Model (LM) (Kumar et al., 2020),
+                                                           Random Insertion (RI) (Wei and Zou, 2019;
+4    Empirical Experiments                                 Miao et al., 2020), Random Deletion (RD)
+                                                           (Wei and Zou, 2019), Random Swapping (RS)
+4.1 Datasets and Experiment Setup                          (Wei and Zou, 2019), and Word Replacement
+To provide a quantitative comparison of the DA             (WR) based on TF-IDF in Vocabulary Set (Xie
+methods we have surveyed, we experiment with               et al., 2020); (ii) Sentence-level augmentation:
+10 of the most commonly used and model-agnostic            Roundtrip Translation (RT) (Xie et al., 2020;
+augmentation techniques from different levels in           Chen et al., 2020c), Generation from Few-shot
+Table 1, including: (i) Token-level augmentation:          Models (GF) (Ye et al., 2022; Wang et al., 2021);
+Synonym Replacement (SR) (Kolomiyets et al.,               and (iii) Hidden-space augmentation: Adversarial
+
+                                                     196
+training (ADV) (Goodfellow et al., 2015), Cutoff                   We use a learning rate of 2e−5 , batch size of
+(Shen et al., 2020), and Mixup in the embedding                    16, ratio of unlabeled to labeled data of 3, and
+space (Zhang et al., 2018). Most aforementioned                    dropout ratio of 0.1 for different augmentation
+techniques are not label-dependent (except mixup                   methods.
+and Generation from Few-shot), thus can be ap-
+plied directly to unlabeled data. For generation
+from few-shot models, we use in-context learning                   4.2 Results with 10 Labeled Examples
+with a few examples and a given label to generate                      Per Class
+the input, following Wang et al. (2021). Since                     News/Topic Classification Tasks. The results
+we use BERT-base as our main model, we use                         are shown in Table 2. We observe that in su-
+a similar size model for in-context learning and                   pervised settings, token-level augmentations work
+choose GPT2.                                                       the best. Specifically, word replacement works
+   We test them on different types of benchmark                    well, getting the highest or second highest score
+datasets including: (i) news classification tasks                  every time. On the other hand, Generating from
+including AG News (Zhang et al., 2015b) and 20                     Few-shot models performs very poorly. This is not
+Newsgroup (Joachims, 1997); (ii) topic classifica-                 surprising since the model used for in-context
+tion tasks including Yahoo Answers (Chang et al.,                  learning is GPT2, which is not that good at in-
+2008) and PubMed news classification (Zhang et al.,                context learning and the inputs necessary for
+2015b); (iii) inference tasks including MNLI,                      news/topic classification is much more compli-
+QNLI, and RTE (Wang et al., 2018); (iv) similarity                 cated. In the semi-supervised settings, sentence
+and paraphrase tasks including QQP and MRPC                        level augmentations (round-trip translation) work
+(Wang et al., 2018); and (v) single-sentence tasks                 the best, getting the highest or second highest score
+including SST-2 and CoLA (Wang et al., 2018).                      every time. This makes sense since for many clas-
+   For all datasets, we experiment with 10 labeled                 sification tasks, multiple words indicate the label,
+data points per class2 in a supervised setup, and                  and so dropping several words will not affect the
+an additional 5000 unlabeled data points per class                 label.
+in the semi-supervised setup. We use BERT base
+                                                                   Inference Tasks. As shown in Table 3, we ob-
+(Devlin et al., 2019) as the base language model
+                                                                   serve that token-level augmentations work the best
+and use the same hyperparameters across all
+                                                                   overall (e.g., random insertion, random deletion,
+datasets/methods. We utilize accuracy as the eval-
+                                                                   and word replacement) for both supervised and
+uation metric for all datasets except for CoLA
+                                                                   semi-supervised settings. This is a bit surprising
+(which uses Matthews correlation) and PubMed
+                                                                   since the inference tasks usually heavily depend
+(which uses accuracy and Macro-F1 score). Be-
+                                                                   on several words, and changing these words can
+cause the performance can be heavily dependent
+                                                                   easily change the label for inferene tasks.
+on the specific datapoints chosen (Sohn et al.,
+2020), for each dataset, we sample labeled data                    Similarity and Paraphrase Tasks. From
+from the original dataset with 3 different seeds to                Table 3, in the supervised settings, we observe that
+form different training sets, and report the average               token-level augmentations (random swapping)
+result. For every setup, we fine-tune the model                    achieve the best performances, while hidden space
+with the same seed as the dataset seed (in con-                    augmentations work well in semi-supervised
+trast to many works which report the max across                    settings, with cutoff performing the best on
+different seeds).                                                  average. This makes sense since for paraphrasing
+   We train our models on NVIDIA 2080ti and                        tasks, augmenting the text usually consists of
+NVIDIA V-100 GPUs. Supervised experiments                          paraphrases, and so can easily change whether
+take 20 minutes, and semi-supervised experi-                       two texts are paraphrases of each other.
+ments take two hours. The BERT-base model
+                                                                   Single Sentence Tasks. Based on the single-
+has 100M parameters. We use the same hyperpa-
+                                                                   sentence tasks results in Table 3, hidden space
+rameter across all datasets, and so only use the
+                                                                   augmentations (cutoff) provides the biggest boost
+validation set to find the best model checkpoint.
+                                                                   in performance in supervised settings, while in
+   2
+     We also did experiments with 100 labeled examples per         semi-supervised settings, sentence level augmen-
+class and found the results consistent.                            tations (roundtrip translation) work best. We note
+
+                                                             197
+                                             News Classification                      Topic Classification
+                   Methods      Types
+                                          AG News     20 Newsgroup          Yahoo Answers              PubMed
+                   None           –      78.8(8.9)      65.2(4.8)              56.6(9.4)        63.7(6.1)/49.3(3.9)
+                   SR                    79.4(5.9)      66.1(2.5)              56.0(10.1)       62.4(5.7)/48.3(3.9)
+                   LM                    76.8(5.1)      60.0(14.4)             56.2(8.4)        60.9(3.0)/47.4(2.5)
+
+
+
+Supervised
+                   RI                    79.5(4.9)      66.6(0.6)              57.3(12.0)       63.7(4.2)/49.4(2.1)
+                              Token
+                   RD                    79.6(5.0)      66.8(3.0)              58.0(8.3)        63.4(5.0)/49.3(1.5)
+                   RS                    79.5(5.3)      64.8(10.8)             57.1(10.3)       63.8(7.4)/49.5(3.3)
+                   WR                    79.7(2.0)      67.5(4.2)              59.3(8.9)        64.9(4.9)/49.4(2.5)
+                   RT         Sentence   80.1(4.3)      65.1(7.9)              57.1(9.6)        60.2(5.1)/46.3(6.4)
+                   GF         Sentence   25.3(0.7)       5.2(0.1)              27.4(3.5)        33.0(0.0)/9.9(0.0)
+                   ADV                   78.2(5.3)      65.5(1.6)              53.8(4.89)       37.4(2.6)/19.9(10.6)
+                   Cutoff     Hidden     79.3(5.0)      66.6(1.4)              57.3(9.3)        60.5(8.3)/46.6(9.4)
+                   Mixup                 80.0(6.52)     65.9(3.1)              57.8(4.19)       51.4(19.3)/39.8(3.2)
+                   SR                    69.6(29.3)     65.7(1.8)              51.4(9.4)        59.3(5.9)/43.1(11.9)
+
+
+
+
+Semi Supervised
+                   LM                    68.5(13.7)     68.3(2.1)              53.2(6.3)        61.5(6.6)/46.4(4.4)
+                   RI         Token      65.8(5.5)      66.7(1.1)              50.5(3.2)        61.4(11.3)/44.4(17.4)
+                   RD                    73.2(14.0)     66.1(3.3)              51.5(7.5)        59.3(7.1)/46.0(3.8)
+                   RS                    71.6(16.6)     65.0(2.0)              51.1(7.1)        64.2(12.1)/46.7(11.5)
+                   WR                    74.1(12.3)     69.3(2.5)              55.6(5.9)        60.4(7.5)/43.7(14.2)
+                   RT         Sentence   82.1(8.2)      68.8(2.4)              59.8(3.9)        64.3(1.2)/49.8(1.9)
+                   ADV                   82.3(2.33)     66.8(5.9)              55.9(3.89)       62.2(10.8)/46.2(9.8)
+                              Hidden
+                   Cutoff                79.9(5.5)      67.9(0.8)              60.1(1.0)        62.7(9.0)/48.1(3.2)
+
+Table 2: Topic Classification and News Classification results with 10 examples. We report the average
+results across 3 different random seeds with the 95% confidence interval and bold the best results. For
+PubMed, we report the accuracy and F1 score.
+
+
+most augmentation methods hurt performance on                           • In general, word replacement and random
+CoLA, a task for judging grammatical acceptabil-                          swapping work the best for supervised learn-
+ity. This could be caused by the fact that most of                        ing while roundtrip translation works the
+the augmentation methods try to preserve meaning                          best for semi-supervised learning.
+and not grammatical correctness.
+                                                                        • Token-level augmentation methods work
+                                                                          better for easier classification tasks and sur-
+Token Level Methods Overall, we see that
+                                                                          prisingly hurt performance for harder tasks
+word replacement works the best for news and
+                                                                          when the baseline performance is low.
+topic classification tasks and random swapping
+perform the best among token level methods for                          • Token-level and sentence-level augmenta-
+inference, paraphrase, and single sentence tasks.                         tions are most robust than hidden-level
+                                                                          augmentation in the supervised and semi-
+4.3 Summary of Findings                                                   supervised settings.
+
+Based on the results on 10 labeled examples we                        5 Other Limited Data Learning Methods
+conclude that:
+                                                                      This work mainly focuses on data augmentation
+                  • Overall, the best augmentation method de-         and semi-supervised learning (consistency reg-
+                    pends on the dataset and whether we have          ularization) in NLP; However, there are other
+                    unlabeled data or not.                            orthogonal directions for tackling the problem of
+
+                                                                198
+                                                   Inference                       Paraphrase                Single Sentence
+                  Methods    Types
+                                        MNLI        QNLI         RTE            QQP         MRPC          SST-2         CoLA
+                  None         –       35.2(0.7)   51.8(7.0)   49.8(3.1)      63.9(9.1)    61.8(21.2)   60.5(13.1)    12.9(6.32)
+                  SR                   35.1(2.3)   51.4(7.2)   51.5(3.4)      61.3(9.7)    59.7(26.3)   62.1(17.4)     7.2(11.6)
+                  LM                   35.3(0.8)   51.0(8.0)   49.0(1.4)      62.4(11)     61.0(24.3)   62.8(9.8)      6.8(15.8)
+                  RI                   34.9(2.6)   51.5(8.4)   51.5(1.4)      60.6(10.9)   60.6(25.0)   63.3(12.2)     7.8(7.42)
+
+
+Supervised
+                            Token
+                  RD                   35.5(2.1)   51.1(8.4)   50.9(2.4)      62.4(11.3)   61.2(22.0)   59.7(18.4)     7.1(16.6)
+                  RS                   35.1(1.1)   51.5(7.0)   50.9(5.0)      62.6(6.7)    63.2(22.5)   61.2(10.8)     5.2(17.0)
+                  WR                   34.5(2.6)   52.0(3.8)   50.0(0.9)      60.6(10.2)   61.0(25.3)   61.8(12.5)     7.0(10.6)
+                  RT        Sentence   35.3(0.5)   51.1(9.6)   50.8(4.4)      60.5(17.8)   61.8(23.7)   62.0(1.99)    8.37(8.35)
+                  GF        Sentence   33.8(1.7)   50.5(2.3)   47.6(3.2)      59.4(6.6)    56.6(1.7)    53.5(4.1)     3.89 (7.2)
+                  ADV                  33.3(4.7)   49.7(1.8)   48.3(12.1)     57.5(24.7)   61.5(21.5)   53.3(13.07)    1.37(4.66)
+                  Cutoff    Hidden     35.1(2.3)   51.4(8.3)   52.2(3.6)      62.6(8.8)    61.0(21.2)   63.5(8.45)    12.4(9.58)
+                  Mixup                32.6(3.5)   49.9(1.4)   49.8(9.2)      63.0(0.3)    62.1(19.8)   62.3(12.3)     4.03(8.68)
+
+                  SR                   35.6(1.0)   52.1(4.5)   52.9(5.4)      53.5(10.7)   68.1(4.0)    61.8(37.9)    6.65(5.69)
+
+
+
+
+Semi-Supervised
+                  LM                   35.0(3.3)   52.5(4.2)   50.2(6.5)      47.9(34.1)   68.4(3.8)    57.3(14.2)    6.38(6.3)
+                  RI                   35.8(1.7)   52.1(4.1)   50.7(1.4)      59.6(5.1)    64.9(8.9)    58.3(14.8)    6.55(0.91)
+                            Token
+                  RD                   35.2(0.5)   52.1(5.2)   52.6(4.9)      56.1(16.0)   62.4(30.6)   55.7(16.4)    4.33(10.9)
+                  RS                   34.6(2.5)   52.1(6.2)   51.5(3.7)      49.8(7.9)    63.2(22.5)   55.2(15.3)    7.77(11.77)
+                  WR                   34.8(2.5)   52.1(4.1)   50.9(1.8)      51.8(16.0)   63.1(23.5)   54.8(13.8)    5.43(17.8)
+                  RT        Sentence   35.3(2.7)   52.7(4.8)   51.6(4.1)      63.9(7.5)    62.2(12.5)   61.9(20.8)    11.6(14.5)
+                  ADV                  36.2(8.9)   50.6(1.9)   50.9(6.8)      59.1(14.7)   63.9(9.1)    53.1(5.0)     7.64(25.1)
+                            Hidden
+                  Cutoff               35.3(2.8)   52.5(4.3)   51.7(6.5)      62.9(9.9)    68.6(4.4)    54.3(9.8)     4.11(11.8)
+
+Table 3: GLUE results with 10 labeled examples per class. We report the average results across 3
+different random seeds with the 95% confidence interval and bold the best results.
+
+learning with limited data. For completeness, we                           the dependency on labeled data and enhance the
+summarize this related work below.                                         models when there is only limited labeled data
+                                                                           available. These methods use large amounts of
+Low-Resourced Languages. Most languages                                    unlabeled data in the training process, as unla-
+lack large monolingual or parallel corpora, or                             beled data is usually cheap and easy to obtain
+sufficient manually crafted linguistic resources                           compared to labeled data. In this paper, we fo-
+for building statistical NLP applications (Garrette                        cus on consistency regularization, while there are
+and Baldridge, 2013). Researchers have therefore                           also other widely used methods for NLP including
+developed a variety of methods for improving                               self-training (Yarowsky, 1995; Zhang and Zong,
+performance on low-resource languages, includ-                             2016; He et al., 2020; Lin et al., 2020), genera-
+ing cross-lingual transfer learning, which trans-                          tive methods (Xu et al., 2017; Yang et al., 2017;
+fers models from resource-rich to resource-poor                            Kingma et al., 2014; Cheng et al., 2016), and co-
+languages (Do and Gaspers, 2019; Lee and Lee,                              training (Blum and Mitchell, 1998; Clark et al.,
+2019; Schuster et al., 2019), few/zero-shot learn-                         2018; Cai and Lapata, 2019).
+ing (Johnson et al., 2017; Blissett and Ji, 2019;
+Pham et al., 2019; Abad et al., 2020), which uses                          Few-shot Learning. Few-shot learning is a
+only a few examples from the low-resource do-                              broad technique for dealing with tasks with less
+main to adapt models trained in another domain,                            labeled data based on prior knowledge. Compared
+and polyglot learning (Cotterell and Heigold,                              to semi-supervised learning, which utilizes un-
+2017; Tsvetkov et al., 2016; Mulcaire et al., 2019;                        labeled data as additional information, few-shot
+Lample and Conneau, 2019), which combines                                  learning leverages various kinds of prior knowl-
+resource-rich and resource-poor learning using an                          edge such as pre-trained models or supervised
+universal language representation.                                         data from other domains and modalities (Wang
+                                                                           et al., 2020). While most work on few-shot fo-
+Other Methods for Semi-Supervised Learning.                                cuses on computer vision, few-shot learning has
+Semi-supervised learning methods further reduce                            recently seen increasing adoption in NLP (Han
+
+                                                                    199
+et al., 2018; Rios and Kavuluru, 2018; Hu et al.,               policy for given datasets/tasks/models could en-
+2018; Herbelot and Baroni, 2017). To better lever-              hance the generalizability of data augmentation
+age pre-trained models, PET (Schick and Schütze,               techniques (Maharana and Bansal, 2020; Hu et al.,
+2021a,b) converts the text and label in an exam-                2019).
+ple into a fluent sentence, and then uses the prob-
+ability of generating the label text as the class               Acknowledgments
+logit, outperforming GPT3 for few shot learning
+(Brown et al., 2020). How to better model and                   We would like to thank the members of Georgia
+incorporate prior knowledge to handle few-shot                  Tech SALT and UNC-NLP groups for their
+learning for NLP remains an open challenge and                  feedback. This work is supported by grants from
+has the potential to significantly improve model                Amazon and Salesforce, ONR grant N00014-
+performance with less labeled data.                             18-1-2871, DARPA YFA17-D17AP00022.
+
+6   Discussion and Future Directions
+                                                                References
+In this work, we empirically surveyed data aug-
+                                                                Alberto Abad, Peter Bell, Andrea Carmantini,
+mentation methods for limited-data learning in
+                                                                  and Steve Renais. 2020. Cross lingual transfer
+NLP and compared them on 11 different NLP
+                                                                  learning for zero-resource domain adaptation.
+tasks. Despite the success, there are still certain
+                                                                  ICASSP 2020 - 2020 IEEE International Con-
+challenges that need to be tackled to improve
+                                                                  ference on Acoustics, Speech and Signal Pro-
+their performance. This section highlights some
+                                                                  cessing (ICASSP). https://doi.org/10
+of these challenges and discusses future research
+                                                                  .1109/ICASSP40776.2020.9054468
+directions.
+                                                                Ateret Anaby-Tavor, Boaz Carmeli, Esther
+Theoretical Guarantees and Data Distribution                      Goldbraich, Amir Kantor, George Kour,
+Shift. Current data augmentation methods for                      Segev Shlomov, Naama Tepper, and Naama
+text typically assume that they are label-preserving              Zwerdling. 2020. Do not have enough data?
+and will not change the data distribution. However,               Deep learning to the rescue! In The Thirty-
+these assumptions are often not true in practice,                 Fourth AAAI Conference on Artificial In-
+which can result in noisy labels or a shift in the data           telligence, AAAI 2020, The Thirty-Second
+distribution and consequently a decrease in per-                  Innovative Applications of Artificial Intelli-
+formance or generalization (e.g., QQP in Table 3).                gence Conference, IAAI 2020, The Tenth AAAI
+Thus, providing theoretical guarantees that aug-                  Symposium on Educational Advances in Arti-
+mentations are label- and distribution-preserving                 ficial Intelligence, EAAI 2020, New York, NY,
+under certain conditions would ensure the qual-                   USA, February 7-12, 2020, pages 7383–7390.
+ity of augmented data and further accelerate the                  AAAI Press. https://doi.org/10.1609
+progress of this field.                                           /aaai.v34i05.6233
+Automatic Data Augmentation. Despite being                      Jacob Andreas. 2020. Good-enough composi-
+effective, current data augmentation methods are                  tional data augmentation. In Proceedings of
+generally manually designed. Methods for auto-                    the 58th Annual Meeting of the Association for
+matically selecting the appropriate types of data                 Computational Linguistics, pages 7556–7566,
+augmentation still remain under-investigated. Al-                 Online. Association for Computational Linguis-
+though certain augmentation techniques have been                  tics. https://doi.org/10.18653/v1
+shown effective for a particular task or dataset,                 /2020.acl-main.676
+they often do not transfer well to other datasets
+                                                                Mikel Artetxe, Gorka Labaka, Eneko Agirre, and
+or tasks (Cubuk et al., 2019), as shown in Table 3.
+                                                                 Kyunghyun Cho. 2018. Unsupervised neural
+For example, paraphrasing works well for general
+                                                                 machine translation. In International Confer-
+text classification tasks, but may fail for some
+                                                                 ence on Learning Representations. https://
+subtle scenarios like classifying bias because para-
+                                                                 doi.org/10.18653/v1/D18-1399
+phrasing might change the label in this setting.
+Automatically learning data augmentation strate-                Isabelle Augenstein, Sebastian Ruder, and Anders
+gies or searching for an optimal augmentation                      Søgaard. 2018. Multi-task learning of pairwise
+
+                                                          200
+  sequence classification tasks over disparate la-           Tom Henighan, Rewon Child, Aditya Ramesh,
+  bel spaces. In Proceedings of the 2018 Con-                Daniel Ziegler, Jeffrey Wu, Clemens Winter,
+  ference of the North American Chapter of the               Chris Hesse, Mark Chen, Eric Sigler, Mateusz
+  Association for Computational Linguistics: Hu-             Litwin, Scott Gray, Benjamin Chess, Jack
+  man Language Technologies, Volume 1 (Long                  Clark, Christopher Berner, Sam McCandlish,
+  Papers). https://doi.org/10.18653                          Alec Radford, Ilya Sutskever, and Dario Amodei.
+  /v1/N18-1172                                               2020. Language models are few-shot learners.
+                                                             In Advances in Neural Information Processing
+Philip Bachman, Ouais Alsharif, and Doina
+                                                             Systems, volume 33, pages 1877–1901. Curran
+  Precup. 2014. Learning with pseudo-ensembles.
+                                                             Associates, Inc.
+  In Advances in Neural Information Processing
+  Systems, volume 27. Curran Associates, Inc.              Hengyi Cai, Hongshen Chen, Yonghao Song,
+                                                             Cheng Zhang, Xiaofang Zhao, and Dawei Yin.
+Yonatan Belinkov and Yonatan Bisk. 2017. Syn-                2020. Data manipulation: Towards effective
+  thetic and natural noise both break neural ma-             instance learning for neural dialogue gener-
+  chine translation. In International Conference             ation via learning to augment and reweight.
+  on Learning Representations.                               In Proceedings of the 58th Annual Meeting
+David Berthelot, Nicholas Carlini, Ian                       of the Association for Computational Linguis-
+  Goodfellow, Nicolas Papernot, Avital Oliver,               tics, pages 6334–6343, Online. Association for
+  and Colin A. Raffel. 2019. Mixmatch: A ho-                 Computational Linguistics.
+  listic approach to semi-supervised learning. In          Rui Cai and Mirella Lapata. 2019. Semi-
+  Advances in Neural Information Processing                  supervised semantic role labeling with cross-
+  Systems, pages 5050–5060.                                  view training. In Proceedings of the 2019
+Kevin Blissett and Heng Ji. 2019. Zero-shot                  Conference on Empirical Methods in Natural
+  cross-lingual name retrieval for low-resource              Language Processing and the 9th International
+  languages. In Proceedings of the 2nd Work-                 Joint Conference on Natural Language Pro-
+  shop on Deep Learning Approaches for Low-                  cessing (EMNLP-IJCNLP), pages 1018–1027,
+  Resource NLP (DeepLo 2019), pages 275–280,                 Hong Kong, China. Association for Computa-
+  Hong Kong, China. Association for Computa-                 tional Linguistics. https://doi.org/10
+  tional Linguistics.                                        .18653/v1/D19-1094
+
+Avrim Blum and Tom Mitchell. 1998. Combining               Ming-Wei Chang, Lev Ratinov, Dan Roth, and
+  labeled and unlabeled data with co-training.              Vivek Srikumar. 2008. Importance of semantic
+  In Proceedings of the Eleventh Annual                     representation: Dataless classification. In Pro-
+  Conference on Computational Learning The-                 ceedings of the 23rd National Conference on
+  ory, pages 92–100. https://doi.org/10                     Artificial Intelligence - Volume 2, AAAI’08,
+  .1145/279943.279962                                       pages 830–835. AAAI Press.
+
+Samuel R. Bowman, Luke Vilnis, Oriol Vinyals,              O. Chapelle, B. Scholkopf, and Eds A. Zien.
+  Andrew Dai, Rafal Jozefowicz, and Samy                     2009. Semi-supervised learning. IEEE Trans-
+  Bengio. 2016. Generating sentences from a                  actions on Neural Networks, 20(3):542–542.
+  continuous space. In Proceedings of The                    https://doi.org/10.1109/TNN.2009
+  20th SIGNLL Conference on Computational                    .2015974
+  Natural Language Learning, pages 10–21,                  Jiaao Chen, Dinghan Shen, Weizhu Chen,
+  Berlin, Germany. Association for Computa-                   and Diyi Yang. 2021. Hiddencut: Simple
+  tional Linguistics. https://doi.org/10                      data augmentation for natural language un-
+  .18653/v1/K16-1002                                          derstanding with better generalization. In
+                                                              ACL. https://doi.org/10.18653/v1
+Tom Brown, Benjamin Mann, Nick Ryder,
+                                                              /2021.acl-long.338
+  Melanie Subbiah, Jared D. Kaplan, Prafulla
+  Dhariwal, Arvind Neelakantan, Pranav Shyam,              Jiaao Chen, Zhenghui Wang, Ran Tian, Zichao
+  Girish Sastry, Amanda Askell, Sandhini                      Yang, and Diyi Yang. 2020a. Local additivity
+  Agarwal, Ariel Herbert-Voss, Gretchen Krueger,              based data augmentation for semi-supervised
+
+                                                     201
+  NER. In Proceedings of the 2020 Conference                  doubly adversarial inputs. Proceedings of the
+  on Empirical Methods in Natural Language                    57th Annual Meeting of the Association for
+  Processing (EMNLP), pages 1241–1251, On-                    Computational Linguistics. https://doi
+  line. Association for Computational Linguis-                .org/10.18653/v1/P19-1425
+  tics. https://doi.org/10.18653/v1
+                                                            Yong Cheng, Lu Jiang, Wolfgang Macherey,
+  /2020.emnlp-main.95
+                                                              and Jacob Eisenstein. 2020b. AdvAug: Ro-
+Jiaao Chen, Yuwei Wu, and Diyi Yang. 2020b.                   bust adversarial augmentation for neural
+   Semi-supervised models via data augmentation               machine translation. In Proceedings of the
+   for classifying interactive affective responses.           58th Annual Meeting of the Association for
+   In AffCon@ AAAI.                                           Computational Linguistics, pages 5961–5970,
+                                                              Online. Association for Computational Linguis-
+Jiaao Chen, Zichao Yang, and Diyi Yang.                       tics. https://doi.org/10.18653/v1
+   2020c. MixText: Linguistically-informed inter-             /2020.acl-main.529
+   polation of hidden space for semi-supervised
+   text classification. In Proceedings of the               Yong Cheng, Wei Xu, Zhongjun He, Wei He,
+   58th Annual Meeting of the Association for                 Hua Wu, Maosong Sun, and Yang Liu. 2016.
+   Computational Linguistics, pages 2147–2157,                Semi-supervised learning for neural machine
+   Online. Association for Computational Linguis-             translation. In Proceedings of the 54th Annual
+   tics. https://doi.org/10.18653/v1                          Meeting of the Association for Computational
+   /2020.acl-main.194                                         Linguistics (Volume 1: Long Papers). https://
+                                                              doi.org/10.18653/v1/P16-1185
+Luoxin Chen, Weitong Ruan, Xinyue Liu,
+  and Jianhua Lu. 2020d. SeqVAT: Virtual                    Kevin Clark, Minh-Thang Luong, Christopher D.
+  adversarial training for semi-supervised se-                Manning, and Quoc Le. 2018. Semi-supervised
+  quence labeling. In Proceedings of the                      sequence modeling with cross-view training. In
+  58th Annual Meeting of the Association for                  Proceedings of the 2018 Conference on Empir-
+  Computational Linguistics, pages 8801–8811,                 ical Methods in Natural Language Processing,
+  Online. Association for Computational Linguis-              pages 1914–1925, Brussels, Belgium. Associ-
+  tics. https://doi.org/10.18653/v1                           ation for Computational Linguistics. https://
+  /2020.acl-main.777                                          doi.org/10.18653/v1/D18-1217
+
+Mingda Chen, Qingming Tang, Sam Wiseman,                    Ryan Cotterell and Georg Heigold. 2017.
+ and Kevin Gimpel. 2019. Controllable para-                   Cross-lingual character-level neural morpho-
+ phrase generation with a syntactic exemplar.                 logical tagging. In Proceedings of the 2017
+ In Proceedings of the 57th Annual Meeting of                 Conference on Empirical Methods in Nat-
+ the Association for Computational Linguistics,               ural Language Processing, pages 748–759,
+ pages 5972–5984.                                             Copenhagen, Denmark. Association for Com-
+                                                              putational Linguistics. https://doi.org
+Xinyun Chen, Chen Liang, Adams Wei Yu,                        /10.18653/v1/D17-1078
+  Dawn Song, and Denny Zhou. 2020e. Composi-
+  tional generalization via neural-symbolic stack           Ekin D. Cubuk, Barret Zoph, Dandelion Mane,
+  machines. Advances in Neural Information                    Vijay Vasudevan, and Quoc V. Le. 2019.
+  Processing Systems, 33.                                     Autoaugment: Learning augmentation strate-
+                                                              gies from data. In Proceedings of the IEEE
+Minhao Cheng, Jinfeng Yi, Pin-Yu Chen, Huan                   Conference on Computer Vision and Pattern
+ Zhang, and Cho-Jui Hsieh. 2020a. Seq2sick:                   Recognition, pages 113–123. https://doi
+ Evaluating the robustness of sequence-to-                    .org/10.1109/CVPR.2019.00020
+ sequence models with adversarial examples.
+                                                            Li Deng, Jinyu Li, Jui-Ting Huang, Kaisheng
+ Proceedings of the AAAI Conference on Artifi-
+                                                              Yao, Dong Yu, Frank Seide, Mike Seltzer,
+ cial Intelligence, 34(04):3601–3608. https://
+                                                              Geoff Zweig, Xiaodong He, Jason Williams,
+ doi.org/10.1609/aaai.v34i04.5767
+                                                              Yifan Gong, and Alex Acero. 2013. Recent
+Yong Cheng, Lu Jiang, and Wolfgang Macherey.                  advances in deep learning for speech re-
+  2019. Robust neural machine translation with                search at microsoft. In IEEE International
+
+                                                      202
+  Conference on Acoustics, Speech, and Signal                in Natural Language Processing. https://
+  Processing (ICASSP). https://doi.org                       doi.org/10.18653/v1/D18-1045
+  /10.1109/ICASSP.2013.6639345
+                                                           Marzieh Fadaee, Arianna Bisazza, and
+Shumin Deng, Ningyu Zhang, Zhanlin Sun,                     Christof Monz. 2017. Data augmentation for
+  Jiaoyan Chen, and Huajun Chen. 2019. When                 low-resource neural machine translation. In
+  low resource nlp meets unsupervised language              Proceedings of the 55th Annual Meeting of
+  model: Meta-pretraining then meta-learning for            the Association for Computational Linguistics
+  few-shot text classification. In Proceedings              (Volume 2: Short Papers), pages 567–573,
+  of the AAAI Conference on Artificial In-                  Vancouver, Canada. Association for Compu-
+  telligence. https://doi.org/10.1609                       tational Linguistics. https://doi.org/10
+  /aaai.v34i10.7158                                         .18653/v1/P17-2090
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and              Lisa Fan, Dong Yu, and L. Wang. 2018. Ro-
+  Kristina Toutanova. 2019. BERT: Pre-training               bust neural abstractive summarization systems
+  of deep bidirectional transformers for language            and evaluation against adversarial informa-
+  understanding. In Proceedings of the 2019                  tion. Interpretability and Robustness for Audio,
+  Conference of the North American Chapter                   Speech and Language Workshop at Neurips
+  of the Association for Computational Linguis-              2018. https://doi.org/10.18653/v1
+  tics: Human Language Technologies, Volume 1                /W18-2706
+  (Long and Short Papers), pages 4171–4186,
+                                                           Steven Y. Feng, Varun Gangal, Dongyeop Kang,
+  Minneapolis, Minnesota. Association for Com-
+                                                             Teruko Mitamura, and Eduard Hovy. 2020.
+  putational Linguistics.
+                                                             Genaug: Data augmentation for finetuning text
+Terrance DeVries and Graham W. Taylor.                       generators. In Proceedings of Deep Learning
+  2017. Improved regularization of convolutional             Inside Out (DeeLIO): The First Workshop on
+  neural networks with cutout.                               Knowledge Extraction and Integration for Deep
+                                                             Learning Architectures, pages 29–42.
+Quynh Do and Judith Gaspers. 2019.
+  Cross-lingual transfer learning with data se-            Steven Y. Feng, Varun Gangal, Jason Wei,
+  lection for large-scale spoken language un-                Chandar Sarath, Soroush Vosoughi, Teruko
+  derstanding. In Proceedings of the 2019                    Mitamura, and Eduard Hovy. 2021. A survey
+  Conference on Empirical Methods in Natural                 of data augmentation approaches for NLP.
+  Language Processing and the 9th International              In Association for Computational Linguistics
+  Joint Conference on Natural Language Pro-                  Findings.
+  cessing (EMNLP-IJCNLP), pages 1455–1460,
+                                                           Daniel Furrer, Marc van Zee, Nathan Scales, and
+  Hong Kong, China. Association for Computa-
+                                                             Nathanael Schärli. 2020. Compositional gener-
+  tional Linguistics.
+                                                             alization in semantic parsing: Pre-training vs.
+Javid Ebrahimi, Daniel Lowd, and Dejing                      specialized architectures.
+  Dou. 2018a. On adversarial examples for
+                                                           Fei Gao, Jinhua Zhu, Lijun Wu, Yingce Xia,
+  character-level neural machine translation.
+                                                             Tao Qin, Xueqi Cheng, Wengang Zhou, and
+Javid Ebrahimi, Anyi Rao, Daniel Lowd, and                   Tie-Yan Liu. 2019. Soft contextual data aug-
+  Dejing Dou. 2018b. Hotflip: White-box                      mentation for neural machine translation. In
+  adversarial examples for text classification. In           Proceedings of the 57th Annual Meeting of
+  Proceedings of the 56th Annual Meeting of                  the Association for Computational Linguistics,
+  the Association for Computational Linguistics              pages 5539–5544. https://doi.org/10
+  (Volume 2: Short Papers), pages 31–36.                     .18653/v1/P19-1555
+  https://doi.org/10.18653/v1/P18
+                                                           Siddhant Garg and Goutham Ramakrishnan.
+  -2006
+                                                             2020. BAE: BERT-based adversarial exam-
+Sergey Edunov, Myle Ott, Michael Auli,                       ples for text classification. In Proceedings of
+  and David Grangier. 2018. Understanding                    the 2020 Conference on Empirical Methods
+  back-translation at scale. In Proceedings of               in Natural Language Processing (EMNLP),
+  the 2018 Conference on Empirical Methods                   pages 6174–6181, Online. Association for
+
+                                                     203
+  Computational Linguistics. https://doi.org                Association for the Advancement of Arti-
+  /10.18653/v1/2020.emnlp-main.498                          ficial Intelligence. https://doi.org/10
+                                                            .1609/aaai.v32i1.11956
+Dan Garrette and Jason Baldridge. 2013. Learning
+  a part-of-speech tagger from two hours of anno-         Kelvin Guu, Tatsunori B. Hashimoto, Yonatan
+  tation. In Proceedings of the 2013 Conference             Oren, and Percy Liang. 2017. Generating sen-
+  of the North American Chapter of the Asso-                tences by editing prototypes. In Transactions of
+  ciation for Computational Linguistics: Human              the Association for Computational Linguistics,
+  Language Technologies, pages 138–147, At-                 Volume 6. https://doi.org/10.1162
+  lanta, Georgia. Association for Computational             /tacl_a_00030
+  Linguistics.
+                                                          Xu Han, Hao Zhu, Pengfei Yu, Ziyun Wang, Yuan
+Xavier Glorot, Antoine Bordes, and Yoshua                   Yao, Zhiyuan Liu, and Maosong Sun. 2018.
+  Bengio. 2011. Domain adaptation for large-                FewRel: A large-scale supervised few-shot re-
+  scale sentiment classification: A deep learn-             lation classification dataset with state-of-the-art
+  ing approach. In International Conference of              evaluation. In Proceedings of the 2018 Confer-
+  Machine Learning.                                         ence on Empirical Methods in Natural Lan-
+                                                            guage Processing, pages 4803–4809, Brussels,
+Karan Goel, Nazneen Fatema Rajani, Jesse
+                                                            Belgium. Association for Computational Lin-
+  Vig, Zachary Taschdjian, Mohit Bansal, and
+                                                            guistics. https://doi.org/10.18653/v1
+  Christopher Ré. 2021. Robustness gym: Uni-
+                                                            /D18-1514
+  fying the NLP evaluation landscape. In Pro-
+  ceedings of the 2021 Conference of the North            Junxian He, Jiatao Gu, Jiajun Shen, and
+  American Chapter of the Association for                   Marc’Aurelio Ranzato. 2020. Revisiting
+  Computational Linguistics: Human Language                 self-training for neural sequence generation.
+  Technologies: Demonstrations, pages 42–55,                In International Conference on Learning
+  Online. Association for Computational Lin-                Representations.
+  guistics. https://doi.org/10.18653/v1
+                                                          Michael A. Hedderich, Lukas Lange, Heike
+  /2021.naacl-demos.6
+                                                           Adel, Jannik Strötgen, and Dietrich Klakow.
+Ian Goodfellow, Jean Pouget-Abadie, Mehdi                  2020. A survey on recent approaches for nat-
+  Mirza, Bing Xu, David Warde-Farley, Sherjil              ural language processing in low-resource sce-
+  Ozair, Aaron Courville, and Yoshua Bengio.               narios. CoRR, abs/2010.12309. https://doi
+  2014. Generative adversarial nets. In Z.                 .org/10.18653/v1/2021.naacl-main.201
+  Ghahramani, M. Welling, C. Cortes, N. D.
+                                                          Aurélie Herbelot and Marco Baroni. 2017.
+  Lawrence, and K. Q. Weinberger, editors,
+                                                            High-risk learning: Acquiring new word vec-
+  Advances in Neural Information Processing
+                                                            tors from tiny data. In Proceedings of the
+  Systems 27, pages 2672–2680. Curran Asso-
+                                                            2017 Conference on Empirical Methods in
+  ciates, Inc.
+                                                            Natural Language Processing, pages 304–309,
+Ian J. Goodfellow, Jonathon Shlens, and                     Copenhagen, Denmark. Association for Com-
+  Christian Szegedy. 2015. Explaining and har-              putational Linguistics. https://doi.org
+  nessing adversarial examples. stat, 1050:20.              /10.18653/v1/D17-1030
+Demi Guo, Yoon Kim, and Alexander Rush. 2020.             Wei-Ning Hsu, Hao Tang, and James Glass.
+  Sequence-level mixed sample data augmenta-               2018. Unsupervised adaptation with inter-
+  tion. In Proceedings of the 2020 Conference              pretable disentangled representations for distant
+  on Empirical Methods in Natural Language                 conversational speech recognition. Interspeech
+  Processing (EMNLP), pages 5547–5552, On-                 2018.
+  line. Association for Computational Linguis-
+                                                          Wei-Ning Hsu, Yu Zhang, and James Glass. 2017.
+  tics. https://doi.org/10.18653/v1
+                                                           Unsupervised domain adaptation for robust
+  /2020.emnlp-main.447
+                                                           speech recognition via variational autoencoder-
+Ankush Gupta, Arvind Agarwal, Prawaan Singh,               based data augmentation. 2017 IEEE Auto-
+  and Piyush Rai. 2017. A deep genera-                     matic Speech Recognition and Understanding
+  tive framework for paraphrase generation. In             Workshop (ASRU).
+
+                                                    204
+Zhiting Hu, Bowen Tan, Russ R. Salakhutdinov,                guistics. https://doi.org/10.18653/v1
+  Tom M. Mitchell, and Eric P. Xing. 2019.                   /P16-1002
+  Learning data manipulation for augmentation
+                                                           Robin Jia and Percy Liang. 2017. Adversarial
+  and weighting. Advances in Neural Informa-
+                                                             examples for evaluating reading comprehen-
+  tion Processing Systems, 32:15764–15775.
+                                                             sion systems. In Proceedings of the 2017
+Zhiting Hu, Zichao Yang, Xiaodan Liang, Ruslan               Conference on Empirical Methods in Natu-
+  Salakhutdinov, and Eric P. Xing. 2017. Toward              ral Language Processing, pages 2021–2031,
+  controlled generation of text. In Proceedings              Copenhagen, Denmark. Association for Com-
+  of the 34th International Conference on Ma-                putational Linguistics. https://doi.org
+  chine Learning, volume 70 of Proceedings of                /10.18653/v1/D17-1215
+  Machine Learning Research, pages 1587–1596.              Haoming Jiang, Pengcheng He, Weizhu Chen,
+  PMLR.                                                      Xiaodong Liu, Jianfeng Gao, and Tuo Zhao.
+Zikun Hu, Xiang Li, Cunchao Tu, Zhiyuan Liu,                 2019. Smart: Robust and efficient fine-tuning
+  and Maosong Sun. 2018. Few-shot charge                     for pre-trained natural language models through
+  prediction with discriminative legal attributes.           principled regularized optimization. In Pro-
+  In Proceedings of the 27th International                   ceedings of the 58th Annual Meeting of the
+  Conference on Computational Linguistics,                   Association for Computational Linguistics.
+  pages 487–498, Santa Fe, New Mexico, USA.                  https://doi.org/10.18653/v1/2020
+  Association for Computational Linguistics.                 .acl-main.197
+                                                           Yichen Jiang and Mohit Bansal. 2019. Avoid-
+Aminul Huq and Mst. Tasnim Pervin. 2020.
+                                                             ing reasoning shortcuts: Adversarial evaluation,
+ Adversarial attacks and defense on texts: A
+                                                             training, and model development for multi-hop
+ survey.
+                                                             QA. In Proceedings of the 57th Annual Meeting
+Mohit Iyyer, Varun Manjunatha, Jordan                        of the Association for Computational Linguis-
+ Boyd-Graber, and Hal Daumé III. 2015. Deep                 tics, pages 2726–2736, Florence, Italy. Associa-
+ unordered composition rivals syntactic meth-                tion for Computational Linguistics. https://
+ ods for text classification. In Proceedings of              doi.org/10.18653/v1/P19-1262
+ the 53rd Annual Meeting of the Association                Thorsten Joachims. 1997. A probabilistic analysis
+ for Computational Linguistics and the 7th                   of the rocchio algorithm with tfidf for text cat-
+ International Joint Conference on Natural Lan-              egorization. In Proceedings of the Fourteenth
+ guage Processing (Volume 1: Long Papers),                   International Conference on Machine Learn-
+ pages 1681–1691, Beijing, China. Association                ing, ICML ’97, pages 143–151, San Francisco,
+ for Computational Linguistics. https://doi                  CA, USA. Morgan Kaufmann Publishers Inc.
+ .org/10.3115/v1/P15-1162
+                                                           Melvin Johnson, Mike Schuster, Quoc V.
+Mohit Iyyer, John Wieting, Kevin Gimpel, and                Le, Maxim Krikun, Yonghui Wu, Zhifeng
+ Luke Zettlemoyer. 2018. Adversarial example                Chen, Nikhil Thorat, Fernanda Viégas, Martin
+ generation with syntactically controlled para-             Wattenberg, Greg Corrado, Macduff Hughes,
+ phrase networks. In Proceedings of the 2018                and Jeffrey Dean. 2017. Google’s multi-
+ Conference of the North American Chapter                   lingual neural machine translation system:
+ of the Association for Computational Linguis-              Enabling zero-shot translation. Transactions of
+ tics: Human Language Technologies, Volume 1                the Association for Computational Linguistics,
+ (Long Papers), pages 1875–1885. https://                   5:339–351. https://doi.org/10.1162
+ doi.org/10.18653/v1/N18-1170                               /tacl_a_00065
+Robin Jia and Percy Liang. 2016. Data recom-               Durk P. Kingma, Shakir Mohamed, Danilo
+  bination for neural semantic parsing. In Pro-              Jimenez Rezende, and Max Welling. 2014.
+  ceedings of the 54th Annual Meeting of                     Semi-supervised learning with deep generative
+  the Association for Computational Linguistics              models. In Advances in Neural Information
+  (Volume 1: Long Papers), pages 12–22, Berlin,              Processing Systems, volume 27. Curran Asso-
+  Germany. Association for Computational Lin-                ciates, Inc.
+
+                                                     205
+Sosuke Kobayashi. 2018. Contextual augmen-                 Advances in Neural Information Processing
+  tation: Data augmentation by words with                  Systems 32 (NeurIPS 2019).
+  paradigmatic relations. In Proceedings of the
+  2018 Conference of the North American Chap-            Guillaume Lample, Alexis Conneau, Ludovic
+  ter of the Association for Computational                 Denoyer, and Marc’Aurelio Ranzato. 2018.
+  Linguistics: Human Language Technologies,                Unsupervised machine translation using mono-
+  Volume 2 (Short Papers), pages 452–457, New              lingual corpora only. In International Confer-
+  Orleans, Louisiana. Association for Computa-             ence on Learning Representations.
+  tional Linguistics. https://doi.org/10                 Chia-Hsuan Lee and Hung-Yi Lee. 2019.
+  .18653/v1/N18-2072                                       Cross-lingual transfer learning for question
+Oleksandr Kolomiyets, Steven Bethard, and                  answering. In arXiv.
+  Marie-Francine Moens. 2011. Model-portability
+  experiments for textual temporal analysis. In          Bill Yuchen Lin, Dong-Ho Lee, Ming Shen, Ryan
+  Proceedings of the 49th Annual Meeting of the            Moreno, Xiao Huang, Prashant Shiralkar, and
+  Association for Computational Linguistics: Hu-           Xiang Ren. 2020. TriggerNER: Learning with
+  man Language Technologies, pages 271–276,                entity triggers as explanations for named en-
+  Portland, Oregon, USA. Association for Com-              tity recognition. In Proceedings of the 58th
+  putational Linguistics.                                  Annual Meeting of the Association for Compu-
+                                                           tational Linguistics, pages 8503–8511, Online.
+Alex Krizhevsky, I. Sutskever, and G. Hinton.              Association for Computational Linguistics.
+  2012. Imagenet classification with deep convo-
+  lutional neural networks. Advances in Neural           Pengfei Liu, Xipeng Qiu, and Xuanjing Huang.
+  Information Processing Systems, 25(2).                   2017. Adversarial multi-task learning for text
+                                                           classification. In Proceedings of the 55th
+Ashutosh Kumar, Satwik Bhattamishra, Manik                 Annual Meeting of the Association for Compu-
+  Bhandari, and Partha Talukdar. 2019. Submod-             tational Linguistics (Volume 1: Long Papers),
+  ular optimization-based diverse paraphrasing             pages 1–10, Vancouver, Canada. Association
+  and its effectiveness in data augmentation.              for Computational Linguistics.
+  In Proceedings of the 2019 Conference of
+  the North American Chapter of the Associ-              Adyasha Maharana and Mohit Bansal. 2020.
+  ation for Computational Linguistics: Human               Adversarial augmentation policy search for
+  Language Technologies, Volume 1 (Long and                domain and cross-lingual generalization in
+  Short Papers), pages 3609–3619, Minneapo-                reading comprehension. In Proceedings of
+  lis, Minnesota. Association for Computa-                 the 2020 Conference on Empirical Methods
+  tional Linguistics. https://doi.org/10                   in Natural Language Processing (EMNLP),
+  .18653/v1/N19-1363                                       Online. Association for Computational Linguis-
+                                                           tics. https://doi.org/10.18653/v1
+Varun Kumar, Ashutosh Choudhary, and Eunah
+                                                           /2020.findings-emnlp.333
+  Cho. 2020. Data augmentation using pre-
+  trained transformer models. In Proceedings             Nikolaos Malandrakis, Minmin Shen, Anuj Goyal,
+  of the 2nd Workshop on Life-long Learning                Shuyang Gao, Abhishek Sethi, and Angeliki
+  for Spoken Language Systems, pages 18–26,                Metallinou. 2019. Controlled text generation
+  Suzhou, China. Association for Computational             for data augmentation in intelligent artificial
+  Linguistics.                                             agents. In Proceedings of the 3rd Work-
+Samuli Laine and Timo Aila. 2017. Temporal en-             shop on Neural Generation and Translation,
+  sembling for semi-supervised learning. In 5th            pages 90–98, Hong Kong. Association for
+  International Conference on Learning Repre-              Computational Linguistics. https://doi
+  sentations, ICLR 2017, Toulon, France, April             .org/10.18653/v1/D19-5609
+  24-26, 2017, Conference Track Proceedings.
+                                                         R. Thomas McCoy, Ellie Pavlick, and Tal
+  OpenReview.net.
+                                                           Linzen. 2019. Right for the wrong reasons:
+Guillaume Lample and Alexis Conneau. 2019.                 Diagnosing syntactic heuristics in natural lan-
+  Cross-lingual language model pretraining. In             guage inference. In Proceedings of the 57th
+
+                                                   206
+  Annual Meeting of the Association for Com-                 pages 119–126, Online. Association for Com-
+  putational Linguistics. https://doi.org                    putational Linguistics. https://doi.org
+  /10.18653/v1/P19-1334                                      /10.18653/v1/2020.emnlp-demos.16
+Zhengjie Miao, Yuliang Li, Xiaolan Wang,                   Phoebe Mulcaire, Jungo Kasai, and Noah A.
+  and Wang-Chiew Tan. 2020. Snippext:                        Smith. 2019. Low-resource parsing with
+  Semi-supervised opinion mining with aug-                   crosslingual contextualized representations. In
+  mented data. In Proceedings of The Web Con-                Proceedings of the 23rd Conference on Compu-
+  ference 2020, pages 617–628. https://doi                   tational Natural Language Learning (CoNLL),
+  .org/10.1145/3366423.3380144                               pages 304–315, Hong Kong, China. Associa-
+                                                             tion for Computational Linguistics. https://
+Junghyun Min, R. Thomas McCoy, Dipanjan
+                                                             doi.org/10.18653/v1/K19-1029
+  Das, Emily Pitler, and Tal Linzen. 2020. Syn-
+  tactic data augmentation increases robustness            Tong Niu and Mohit Bansal. 2018. Adversar-
+  to inference heuristics. In Proceedings of the             ial over-sensitivity and over-stability strategies
+  58th Annual Meeting of the Association for                 for dialogue models. In The SIGNLL Con-
+  Computational Linguistics.                                 ference on Computational Natural Language
+                                                             Learning (CoNLL). https://doi.org/10
+Shervin Minaee, Nal Kalchbrenner, Erik
+                                                             .18653/v1/K18-1047
+  Cambria, Narjes Nikzad, Meysam Chenaghlu,
+  and Jianfeng Gao. 2021. Deep learning based              Tong Niu and Mohit Bansal. 2019. Automati-
+  text classification: A comprehensive review.               cally learning data augmentation policies for
+  In ACM Comptuing Survey. https://doi                       dialogue tasks. In Proceedings of the 2019
+  .org/10.1145/3439726                                       Conference on Empirical Methods in Natural
+                                                             Language Processing and the 9th International
+Arindam Mitra, Ishan Shrivastava, and Chitta                 Joint Conference on Natural Language Pro-
+  Baral. 2020. Enhancing natural language in-                cessing (EMNLP-IJCNLP), pages 1317–1323,
+  ference using new and expanded training                    Hong Kong, China. Association for Computa-
+  data sets and new learning models. In                      tional Linguistics. https://doi.org/10
+  Proceedings of the AAAI Conference on Ar-                  .18653/v1/D19-1132
+  tificial Intelligence. https://doi.org/10
+  .1609/aaai.v34i05.6371                                   Maxwell I. Nye, Armando Solar-Lezama,
+                                                            Joshua B. Tenenbaum, and Brenden M. Lake.
+Takeru Miyato, Andrew M. Dai, and Ian                       2020. Learning compositional rules via neu-
+  Goodfellow. 2017. Adversarial training meth-              ral program synthesis. Advances in Neural
+  ods for semi-supervised text classification.              Information Processing Systems, 33.
+  International Conference on Learning Repre-
+  sentations (ICLR).                                       Matthew Peters, Mark Neumann, Mohit Iyyer,
+                                                            Matt Gardner, Christopher Clark, Kenton
+Takeru Miyato, Shin-ichi Maeda, Masanori                    Lee, and Luke Zettlemoyer. 2018. Deep
+  Koyama, and Shin Ishii. 2018. Virtual adver-              contextualized word representations. In Pro-
+  sarial training: A regularization method for su-          ceedings of the 2018 Conference of the
+  pervised and semi-supervised learning. IEEE               North American Chapter of the Association
+  Transactions on Pattern Analysis and Machine              for Computational Linguistics: Human Lan-
+  Intelligence, 41(8):1979–1993. https://doi                guage Technologies, Volume 1 (Long Papers),
+  .org/10.1109/TPAMI.2018.2858821,                          pages 2227–2237. https://doi.org/10
+  PubMed: 30040630                                          .18653/v1/N18-1202
+John Morris, Eli Lifland, Jin Yong Yoo, Jake               Ngoc-Quan Pham, Jan Niehues, Thanh-Le Ha, and
+  Grigsby, Di Jin, and Yanjun Qi. 2020. Text-                Alexander Waibel. 2019. Improving zero-shot
+  Attack: A framework for adversarial attacks,               translation with language-independent con-
+  data augmentation, and adversarial training                straints. In Proceedings of the Fourth Con-
+  in NLP. In Proceedings of the 2020 Con-                    ference on Machine Translation (Volume 1:
+  ference on Empirical Methods in Natural                    Research Papers), pages 13–23, Florence, Italy.
+  Language Processing: System Demonstrations,                Association for Computational Linguistics.
+
+                                                     207
+Aaditya Prakash, Sadid A. Hasan, Kathy Lee,                Timo Schick and Hinrich Schütze. 2021b. It’s
+  Vivek Datla, Ashequl Qadir, Joey Liu, and                  not just size that matters: Small language
+  Oladimeji Farri. 2016. Neural paraphrase gen-              models are also few-shot learners. In Pro-
+  eration with stacked residual lstm networks.               ceedings of the 2021 Conference of the
+  In Proceedings of COLING 2016, the 26th                    North American Chapter of the Associa-
+  International Conference on Computational                  tion for Computational Linguistics: Human
+  Linguistics: Technical Papers.                             Language Technologies, pages 2339–2352,
+                                                             Online. Association for Computational Lin-
+Alec Radford, Jeffrey Wu, Rewon Child, David
+                                                             guistics. https://doi.org/10.18653
+  Luan, Dario Amodei, and Ilya Sutskever.
+                                                             /v1/2021.naacl-main.185
+  2019. Language models are unsupervised mul-
+  titask learners. OpenAI Blog, 1(8):9.                    Sebastian Schuster, Sonal Gupta, Rushin Shah,
+Colin Raffel, Noam Shazeer, Adam Roberts,                    and Mike Lewis. 2019. Cross-lingual trans-
+  Katherine Lee, Sharan Narang, Michael                      fer learning for multilingual task oriented
+  Matena, Yanqi Zhou, Wei Li, and Peter J. Liu.              dialog. In Proceedings of the 2019 Con-
+  2020. Exploring the limits of transfer learning            ference of the North American Chapter of
+  with a unified text-to-text transformer. Journal           the Association for Computational Linguis-
+  of Machine Learning Research, 21(140):1–67.                tics: Human Language Technologies, Volume 1
+                                                             (Long and Short Papers), pages 3795–3805,
+Shuhuai Ren, Yihe Deng, Kun He, and Wanxiang                 Minneapolis, Minnesota. Association for
+  Che. 2019. Generating natural language adver-              Computational Linguistics. https://doi
+  sarial examples through probability weighted               .org/10.18653/v1/N19-1380
+  word saliency. In Proceedings of the 57th
+  Annual Meeting of the Association for Com-               Rico Sennrich, Barry Haddow, and Alexandra
+  putational Linguistics, pages 1085–1097.                   Birch. 2015. Improving neural machine trans-
+                                                             lation models with monolingual data. Com-
+Marco Tulio Ribeiro, Sameer Singh, and Carlos                puter Science. https://doi.org/10.18653
+ Guestrin. 2018. Semantically equivalent ad-                 /v1/P16-1009
+ versarial rules for debugging NLP models.
+ In Proceedings of the 56th Annual Meeting                 Peter Shaw, Ming-Wei Chang, Panupong Pasupat,
+ of the Association for Computational Linguis-               and Kristina Toutanova. 2021. Compositional
+ tics (Volume 1: Long Papers), pages 856–865,                generalization and natural language variation:
+ Melbourne, Australia. Association for Compu-                Can a semantic parsing approach handle both?
+ tational Linguistics. https://doi.org/10                    In Proceedings of the 59th Annual Meeting
+ .18653/v1/P18-1079                                          of the Association for Computational Linguis-
+                                                             tics and the 11th International Joint Conference
+Anthony Rios and Ramakanth Kavuluru. 2018.
+                                                             on Natural Language Processing (Volume 1:
+  Few-shot and zero-shot multi-label learning for
+                                                             Long Papers), pages 922–938, Online. Associ-
+  structured label spaces. In Proceedings of the
+                                                             ation for Computational Linguistics. https://
+  2018 Conference on Empirical Methods in Nat-
+                                                             doi.org/10.18653/v1/2021.acl-long.75
+  ural Language Processing, pages 3132–3142,
+  Brussels, Belgium. Association for Compu-                Dinghan Shen, Mingzhi Zheng, Yelong Shen,
+  tational Linguistics. https://doi.org/10                   Yanru Qu, and Weizhu Chen. 2020. A
+  .18653/v1/D18-1352, PubMed: 30775726                       simple but tough-to-beat data augmentation ap-
+Timo Schick and Hinrich Schütze. 2021a. Ex-                 proach for natural language understanding and
+  ploiting cloze-questions for few-shot text                 generation. arXiv preprint arXiv:2009.13818.
+  classification and natural language inference.           Sam Shleifer. 2019. Low resource text classifica-
+  In Proceedings of the 16th Conference of                   tion with ulmfit and backtranslation.
+  the European Chapter of the Association
+  for Computational Linguistics: Main Volume,              Patrice Y. Simard, David Steinkraus, and John C.
+  pages 255–269, Online. Association for Com-                Platt. 2003. Best practices for convolutional
+  putational Linguistics. https://doi.org                    neural networks applied to visual document
+  /10.18653/v1/2021.eacl-main.20                             analysis. Seventh International Conference on
+
+                                                     208
+  Document Analysis and Recognition, 2003.                   representation learning. In Proceedings of
+  Proceedings. pages 958–963.                                the 2016 Conference of the North American
+                                                             Chapter of the Association for Computational
+Kihyuk Sohn, David Berthelot, Nicholas Carlini,
+                                                             Linguistics: Human Language Technologies,
+  Zizhao Zhang, Han Zhang, Colin A. Raffel,
+                                                             pages 1357–1366, San Diego, California.
+  Ekin Dogus Cubuk, Alexey Kurakin, and
+                                                             Association for Computational Linguistics.
+  Chun-Liang Li. 2020. Fixmatch: Simplifying
+                                                             https://doi.org/10.18653/v1/N16
+  semi-supervised learning with consistency and
+                                                             -1161
+  confidence. Advances in Neural Information
+  Processing Systems, 33.                                  Alex Wang, Amanpreet Singh, Julian Michael,
+                                                             Felix Hill, Omer Levy, and Samuel Bowman.
+Ilya Sutskever, Oriol Vinyals, and Quoc V.                   2018. GLUE: A multi-task benchmark and
+   Le. 2014. Sequence to sequence learning                   analysis platform for natural language un-
+   with neural networks. In Proceedings of                   derstanding. In Proceedings of the 2018
+   the 27th International Conference on Neu-                 EMNLP Workshop BlackboxNLP: Analyzing
+   ral Information Processing Systems-Volume 2,              and Interpreting Neural Networks for NLP,
+   pages 3104–3112.                                          pages 353–355, Brussels, Belgium. Associa-
+Samson Tan, Shafiq Joty, Min-Yen Kan, and                    tion for Computational Linguistics. https://
+  Richard Socher. 2020. It’s morphin’ time! Com-             doi.org/10.18653/v1/W18-5446
+  bating linguistic discrimination with inflec-            Yaqing Wang, Quanming Yao, James T. Kwok,
+  tional perturbations. In Proceedings of the 58th           and Lionel M. Ni. 2020. Generalizing from
+  Annual Meeting of the Association for Compu-               a few examples. ACM Computing Surveys,
+  tational Linguistics, pages 2920–2935, Online.             53(3):1–34. https://doi.org/10.1145
+  Association for Computational Linguistics.                 /3386252
+Antti Tarvainen and Harri Valpola. 2017.                   Yicheng Wang and Mohit Bansal. 2018. Robust
+  Mean teachers are better role models: Weight-              machine comprehension models via adver-
+  averaged consistency targets improve semi-                 sarial training. In Proceedings of the 2018
+  supervised deep learning results. In Advances              Conference of the North American Chap-
+  in Neural Information Processing Systems,                  ter of the Association for Computational
+  pages 1195–1204.                                           Linguistics: Human Language Technologies,
+Luke Taylor and Geoff Nitschke. 2018. Im-                    Volume 2 (Short Papers), pages 575–581, New
+  proving deep learning with generic data                    Orleans, Louisiana. Association for Computa-
+  augmentation. In 2018 IEEE Symposium Se-                   tional Linguistics. https://doi.org/10
+  ries on Computational Intelligence (SSCI),                 .18653/v1/N18-2091
+  pages 1542–1547. https://doi.org/10                      Zirui Wang, Adams Wei Yu, Orhan Firat, and
+  .1109/SSCI.2018.8628742                                    Yuan Cao. 2021. Towards zero-label language
+Harsh Trivedi, Niranjan Balasubramanian, Tushar              learning. arXiv preprint arXiv:2109.09193.
+  Khot, and Ashish Sabharwal. 2020. Is multihop            Jason Wei and Kai Zou. 2019. EDA: Easy
+  QA in DiRe condition? Measuring and reduc-                 data augmentation techniques for boosting
+  ing disconnected reasoning. In Proceedings                 performance on text classification tasks. In
+  of the 2020 Conference on Empirical Meth-                  Proceedings of the 2019 Conference on Empir-
+  ods in Natural Language Processing (EMNLP),                ical Methods in Natural Language Processing
+  pages 8846–8863, Online. Association for                   and the 9th International Joint Conference
+  Computational Linguistics. https://doi.org                 on Natural Language Processing (EMNLP-
+  /10.18653/v1/2020.emnlp-main.712                           IJCNLP), pages 6382–6388, Hong Kong,
+                                                             China. Association for Computational Lin-
+Yulia Tsvetkov, Sunayana Sitaram, Manaal
+                                                             guistics. https://doi.org/10.18653/v1
+  Faruqui, Guillaume Lample, Patrick Littell,
+                                                             /D19-1670
+  David Mortensen, Alan W. Black, Lori Levin,
+  and Chris Dyer. 2016. Polyglot neural language           Xing Wu, Shangwen Lv, Liangjun Zang, Jizhong
+  models: A case study in cross-lingual phonetic             Han, and Songlin Hu. 2019a. Conditional
+
+                                                     209
+  BERT contextual augmentation. In Interna-               Zichao Yang, Zhiting Hu, Ruslan Salakhutdinov,
+  tional Conference on Computational Science,               and Taylor Berg-Kirkpatrick. 2017. Improved
+  pages 84–95. Springer. https://doi.org                    variational autoencoders for text modeling
+  /10.1007/978-3-030-22747-0_7                              using dilated convolutions. In Proceedings
+                                                            of the 34th International Conference on
+Zhanghao Wu, Shuai Wang, Yanmin Qian,                       Machine Learning - Volume 70, ICML’17,
+  and Kai Yu. 2019b. Data augmentation us-                  pages 3881–3890. JMLR.org.
+  ing variational autoencoder for embedding
+  based speaker verification. In Proceedings of           David Yarowsky. 1995. Unsupervised word
+  Interspeech 2019, pages 1163–1167.                        sense disambiguation rivaling supervised
+                                                            methods. In 33rd Annual Meeting of the
+Qizhe Xie, Zihang Dai, Eduard Hovy, Thang                   Association for Computational Linguistics,
+  Luong, and Quoc V. Le. 2020. Unsupervised                 pages 189–196. https://doi.org/10
+  data augmentation for consistency training.               .3115/981658.981684
+  Advances in Neural Information Processing
+                                                          Jiacheng Ye, Jiahui Gao, Qintong Li, Hang Xu,
+  Systems, 33.
+                                                             Jiangtao Feng, Zhiyong Wu, Tao Yu, and
+Ziang Xie, Sida I. Wang, Jiwei Li, Daniel                    Lingpeng Kong. 2022. Zerogen: Efficient
+  Lévy, Aiming Nie, Dan Jurafsky, and                       zero-shot learning via dataset generation. arXiv
+  Andrew Y. Ng. 2017. Data noising as smooth-                preprint arXiv:2202.07922.
+  ing in neural network language models. CoRR,            Adams Wei Yu, David Dohan, Minh-Thang
+  abs/1703.02573.                                           Luong, Rui Zhao, Kai Chen, Mohammad
+                                                            Norouzi, and Quoc V. Le. 2018. Qanet: Com-
+Jingjing Xu, Xuancheng Ren, Junyang Lin, and
+                                                            bining local convolution with global self-
+   Xu Sun. 2018. Dp-gan: Diversity-promoting
+                                                            attention for reading comprehension. CoRR,
+   generative adversarial network for generating
+                                                            abs/1804.09541.
+   informative and diversified text. In CoRR.
+                                                          Guoyang Zeng, Fanchao Qi, Qianrui Zhou,
+Weidi Xu, Haoze Sun, Chao Deng, and                         Tingji Zhang, Bairu Hou, Yuan Zang,
+ Ying Tan. 2017. Variational autoencoder for                Zhiyuan Liu, and Maosong Sun. 2020. Open-
+ semi-supervised text classification. In Proceed-           attack: An open-source textual adversarial
+ ings of the AAAI Conference on Artificial                  attack toolkit. https://doi.org/10.18653
+ Intelligence, volume 31. https://doi.org                   /v1/2021.acl-demo.43
+ /10.1609/aaai.v31i1.10966
+                                                          Hongyi Zhang, Moustapha Cisse, Yann N.
+Diyi Yang, and William Yang Wang. 2015. That’s              Dauphin, and David Lopez-Paz. 2018. mixup:
+  so annoying!!!: A lexical and frame-semantic              Beyond empirical risk minimization. In Inter-
+  embedding based data augmentation approach                national Conference on Learning Representa-
+  to automatic categorization of annoying behav-            tions.
+  iors using #petpeeve tweets. In Proceedings             Jiajun Zhang and Chengqing Zong. 2016. Ex-
+  of the 2015 Conference on Empirical Methods                ploiting source-side monolingual data in neural
+  in Natural Language Processing. https://                   machine translation. In Proceedings of the 2016
+  doi.org/10.18653/v1/D15-1306                               Conference on Empirical Methods in Natu-
+                                                             ral Language Processing, pages 1535–1545,
+Yiben Yang, Chaitanya Malaviya, Jared
+                                                             Austin, Texas. Association for Computa-
+  Fernandez, Swabha Swayamdipta, Ronan
+                                                             tional Linguistics. https://doi.org/10
+  Le Bras, Ji-Ping Wang, Chandra Bhagavatula,
+                                                             .18653/v1/D16-1160
+  Yejin Choi, and Doug Downey. 2020. Gen-
+  erative data augmentation for commonsense               Rongzhi Zhang, Yue Yu, and Chao Zhang.
+  reasoning. In Findings of the Association                 2020a. SeqMix: Augmenting active sequence
+  for Computational Linguistics: EMNLP 2020,                labeling via sequence mixup. In Proceedings
+  pages 1008–1025, Online. Association for                  of the 2020 Conference on Empirical Meth-
+  Computational Linguistics. https://doi.org                ods in Natural Language Processing (EMNLP),
+  /10.18653/v1/2020.findings-emnlp.90                       pages 8566–8579, Online. Association for
+
+                                                    210
+  Computational Linguistics. https://doi.org             Xiang Zhang, Junbo Zhao, and Yann LeCun.
+  /10.18653/v1/2020.emnlp-main.691                         2015b. Character-level convolutional networks
+                                                           for text classification. Advances in Neural
+Shiyue Zhang and Mohit Bansal. 2019. Address-
+                                                           Information Processing Systems, 28:649–657.
+  ing semantic drift in question generation for
+  semi-supervised question answering. In Pro-            Zhengli Zhao, Dheeru Dua, and Sameer Singh.
+  ceedings of the 2019 Conference on Empirical             2017. Generating natural adversarial exam-
+  Methods in Natural Language Processing and               ples. In International Conference on Learning
+  the 9th International Joint Conference on Nat-           Representations.
+  ural Language Processing (EMNLP-IJCNLP),               Zhun Zhong, Liang Zheng, Guoliang Kang,
+  pages 2495–2509, Hong Kong, China. Associ-               Shaozi Li, and Yi Yang. 2020. Random eras-
+  ation for Computational Linguistics. https://            ing data augmentation. In Proceedings of the
+  doi.org/10.18653/v1/D19-1253                             AAAI Conference on Artificial Intelligence, vol-
+                                                           ume 34, pages 13001–13008. https://doi
+Xiang Zhang, Junbo Zhao, and Yann LeCun.
+                                                           .org/10.1609/aaai.v34i07.7000
+  2015a. Character-level convolutional networks
+  for text classification. In Proceedings of the         Chen Zhu, Yu Cheng, Zhe Gan, Siqi Sun, Tom
+  28th International Conference on Neural In-              Goldstein, and Jingjing Liu. 2020. Freelb: En-
+  formation Processing Systems - Volume 1,                 hanced adversarial training for natural language
+  NIPS’15, page 649–657. Cambridge, MA,                    understanding. In ICLR.
+  USA. MIT Press.                                        Xiaojin Jerry Zhu. 2005. Semi-supervised learn-
+Wei Emma Zhang, Quan Z. Sheng, Ahoud                       ing literature survey, University of Wisconsin-
+ Alhazmi, and Chenliang Li. 2020b. Adversar-               Madison Department of Computer Sciences.
+ ial attacks on deep-learning models in natural          Gözde Gül Şahin. 2022. To augment or not
+ language processing: A survey. ACM Transac-               to augment? A comparative study on text
+ tions on Intelligent Systems and Technology               augmentation techniques for low-resource
+ (TIST), 11(3):1–41. https://doi.org/10                    NLP. Computational Linguistics, 48(1):5–42.
+ .1145/3374217                                             https://doi.org/10.1162/coli a 00425
+
+
+
+
+                                                   211
+

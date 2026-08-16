@@ -1,28 +1,249 @@
 {
-  "schema_version":"1.1",
-  "citation_obligations":[
-    {"name":"Pruthi et al.","kind":"prior finding","section":"introduction","citation_key":"pruthi2019combating","supported_clause":"Misspelling attacks can sharply damage word-dependent classifiers","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"Combating Adversarial Misspellings with Robust Word Recognition"},
-    {"name":"Sengupta et al.","kind":"prior finding","section":"introduction","citation_key":"sengupta2021robustness","supported_clause":"aggregate noise augmentation recovers part of the loss in intent systems","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"On the Robustness of Intent Classification and Slot Labeling in Goal-oriented Dialog Systems to Real-world Noise"},
-    {"name":"Sengupta et al.","kind":"nearest neighbor","section":"related work","citation_key":"sengupta2021robustness","supported_clause":"Realistic perturbations substantially reduce intent and slot performance, while multi-noise augmentation recovers part of the loss","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"On the Robustness of Intent Classification and Slot Labeling in Goal-oriented Dialog Systems to Real-world Noise"},
-    {"name":"Karpukhin et al.","kind":"nearest neighbor","section":"related work","citation_key":"karpukhin2019training","supported_clause":"Balanced mixtures of insertion, deletion, substitution, and swap noise have also been tested against natural noise in translation","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"Training on Synthetic Noise Improves Robustness to Natural Noise in Machine Translation"},
-    {"name":"Liu et al.","kind":"benchmark","section":"related work","citation_key":"liu2021laug","supported_clause":"LAUG broadens robustness tests to word perturbations, paraphrases, disfluencies, and speech phenomena","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"Robustness Testing of Language Understanding in Task-Oriented Dialog"},
-    {"name":"Arora et al.","kind":"deployment evidence","section":"related work","citation_key":"arora2020hint3","supported_clause":"strong in-distribution intent accuracy does not imply robustness in the wild","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"HINT3: Raising the bar for Intent Detection in the Wild"},
-    {"name":"Khosla and Gangadharaiah","kind":"shift evidence","section":"related work","citation_key":"khosla2022covariate","supported_clause":"strong in-distribution intent accuracy does not imply robustness in the wild","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"Benchmarking the Covariate Shift Robustness of Open-world Intent Classification Approaches"},
-    {"name":"Pruthi et al.","kind":"representation evidence","section":"related work","citation_key":"pruthi2019combating","supported_clause":"Character edits can sharply degrade neural text classifiers, motivating word-recognition front ends, stable discrete encodings, and noise-aware embeddings","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"Combating Adversarial Misspellings with Robust Word Recognition"},
-    {"name":"Jones et al.","kind":"representation evidence","section":"related work","citation_key":"jones2020robust","supported_clause":"Character edits can sharply degrade neural text classifiers, motivating word-recognition front ends, stable discrete encodings, and noise-aware embeddings","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"Robust Encodings: A Framework for Combating Adversarial Typos"},
-    {"name":"Piktus et al.","kind":"representation evidence","section":"related work","citation_key":"piktus2019misspelling","supported_clause":"Character edits can sharply degrade neural text classifiers, motivating word-recognition front ends, stable discrete encodings, and noise-aware embeddings","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"Misspelling Oblivious Word Embeddings"},
-    {"name":"Sankar et al.","kind":"representation evidence","section":"related work","citation_key":"sankar2021projection","supported_clause":"Projection-based representations can also lose less accuracy than subword transformers under misspelling attacks","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"On-Device Text Representations Robust To Misspellings via Projections"},
-    {"name":"Wang et al.","kind":"owned structural motivation","section":"related work","citation_key":"wang2025word","supported_clause":"word form matters to semantic reconstruction","source_evidence_path":"researcher-profile/publications.json","source_evidence_excerpt":"Word Form Matters: LLMs' Semantic Reconstruction under Typoglycemia"},
-    {"name":"Larson et al.","kind":"dataset","section":"experiments","citation_key":"larson2019clinc","supported_clause":"official frozen CLINC150 train, validation, and test partitions","source_evidence_path":"reports/01_LIT_SURVEY.html","source_evidence_excerpt":"An Evaluation Dataset for Intent Classification and Out-of-Scope Prediction"}
+  "schema_version": "1.1",
+  "citation_obligations": [
+    {
+      "name": "Pruthi et al.",
+      "kind": "prior finding",
+      "section": "introduction",
+      "citation_key": "pruthi2019combating",
+      "supported_clause": "Character edits can sharply reduce classifier accuracy",
+      "source_evidence_path": "paper/sources/pruthi2019combating.txt",
+      "source_evidence_excerpt": "Combating Adversarial Misspellings with Robust Word Recognition"
+    },
+    {
+      "name": "Sengupta et al.",
+      "kind": "nearest neighbor",
+      "section": "introduction",
+      "citation_key": "sengupta2021robustness",
+      "supported_clause": "mixed-noise training can recover part of this loss in goal-oriented dialogue",
+      "source_evidence_path": "paper/sources/sengupta2021robustness.txt",
+      "source_evidence_excerpt": "On the Robustness of Intent Classification and Slot Labeling in"
+    },
+    {
+      "name": "Sengupta et al.",
+      "kind": "nearest neighbor",
+      "section": "related work",
+      "citation_key": "sengupta2021robustness",
+      "supported_clause": "Realistic input variation reduces both intent and slot performance, while aggregate augmentation improves average robustness",
+      "source_evidence_path": "paper/sources/sengupta2021robustness.txt",
+      "source_evidence_excerpt": "On the Robustness of Intent Classification and Slot Labeling in"
+    },
+    {
+      "name": "Liu et al.",
+      "kind": "benchmark",
+      "section": "related work",
+      "citation_key": "liu2021laug",
+      "supported_clause": "LAUG expands task-oriented dialogue stress tests to word perturbations, paraphrases, disfluencies, and speech phenomena",
+      "source_evidence_path": "paper/sources/liu2021laug.txt",
+      "source_evidence_excerpt": "Robustness Testing of Language Understanding in Task-Oriented Dialog"
+    },
+    {
+      "name": "Arora et al.",
+      "kind": "deployment benchmark",
+      "section": "related work",
+      "citation_key": "arora2020hint3",
+      "supported_clause": "HINT3 and covariate-shift benchmarks further show that clean in-distribution scores do not establish deployment robustness",
+      "source_evidence_path": "paper/sources/arora2020hint3.txt",
+      "source_evidence_excerpt": "HINT3: Raising the bar for Intent Detection in the Wild"
+    },
+    {
+      "name": "Khosla and Gangadharaiah",
+      "kind": "covariate-shift benchmark",
+      "section": "related work",
+      "citation_key": "khosla2022covariate",
+      "supported_clause": "HINT3 and covariate-shift benchmarks further show that clean in-distribution scores do not establish deployment robustness",
+      "source_evidence_path": "paper/sources/khosla2022covariate.txt",
+      "source_evidence_excerpt": "Benchmarking the Covariate Shift Robustness of Open-world Intent"
+    },
+    {
+      "name": "Karpukhin et al.",
+      "kind": "nearest neighbor",
+      "section": "related work",
+      "citation_key": "karpukhin2019training",
+      "supported_clause": "Balanced insertion, deletion, substitution, and swap mixtures can transfer from synthetic to naturally occurring noise",
+      "source_evidence_path": "paper/sources/karpukhin2019training.txt",
+      "source_evidence_excerpt": "Training on Synthetic Noise"
+    },
+    {
+      "name": "Belinkov and Bisk",
+      "kind": "robustness evidence",
+      "section": "related work",
+      "citation_key": "belinkov2018synthetic",
+      "supported_clause": "character processing alone is not automatically robust",
+      "source_evidence_path": "paper/sources/belinkov2018synthetic.txt",
+      "source_evidence_excerpt": "Yonatan Belinkov"
+    },
+    {
+      "name": "Jones et al.",
+      "kind": "representation",
+      "section": "related work",
+      "citation_key": "jones2020robust",
+      "supported_clause": "Stable encodings, misspelling-aware embeddings, and compact projections attack the representation problem directly",
+      "source_evidence_path": "paper/sources/jones2020robust.txt",
+      "source_evidence_excerpt": "Robust Encodings: A Framework for Combating Adversarial Typos"
+    },
+    {
+      "name": "Piktus et al.",
+      "kind": "representation",
+      "section": "related work",
+      "citation_key": "piktus2019misspelling",
+      "supported_clause": "Stable encodings, misspelling-aware embeddings, and compact projections attack the representation problem directly",
+      "source_evidence_path": "paper/sources/piktus2019misspelling.txt",
+      "source_evidence_excerpt": "Misspelling Oblivious Word Embeddings"
+    },
+    {
+      "name": "Sankar et al.",
+      "kind": "representation",
+      "section": "related work",
+      "citation_key": "sankar2021projection",
+      "supported_clause": "Stable encodings, misspelling-aware embeddings, and compact projections attack the representation problem directly",
+      "source_evidence_path": "paper/sources/sankar2021projection.txt",
+      "source_evidence_excerpt": "On-Device Text Representations Robust To Misspellings via Projections"
+    },
+    {
+      "name": "Chen et al.",
+      "kind": "augmentation survey",
+      "section": "related work",
+      "citation_key": "chen2023survey",
+      "supported_clause": "Broader augmentation surveys and controlled utterance-classification studies document substantial variation among transformations",
+      "source_evidence_path": "paper/sources/chen2023survey.txt",
+      "source_evidence_excerpt": "Empirical Survey of Data Augmentation"
+    },
+    {
+      "name": "Xu et al.",
+      "kind": "utterance augmentation",
+      "section": "related work",
+      "citation_key": "xu2020augmentation",
+      "supported_clause": "Broader augmentation surveys and controlled utterance-classification studies document substantial variation among transformations",
+      "source_evidence_path": "paper/sources/xu2020augmentation.txt",
+      "source_evidence_excerpt": "Data Augmentation for Multiclass Utterance"
+    },
+    {
+      "name": "Tong and Koller",
+      "kind": "decision-boundary sampling",
+      "section": "related work",
+      "citation_key": "tong2001svm",
+      "supported_clause": "Decision-boundary sampling selects unlabeled text for annotation",
+      "source_evidence_path": "paper/sources/tong2001svm.txt",
+      "source_evidence_excerpt": "Support Vector Machine Active Learning"
+    },
+    {
+      "name": "Quteineh et al.",
+      "kind": "uncertainty-guided augmentation",
+      "section": "related work",
+      "citation_key": "quteineh2020textual",
+      "supported_clause": "uncertainty-guided generation has been studied for efficient active learning",
+      "source_evidence_path": "paper/sources/quteineh2020textual.txt",
+      "source_evidence_excerpt": "Textual Data Augmentation for Efficient Active Learning on Tiny Datasets"
+    },
+    {
+      "name": "Wang et al.",
+      "kind": "owned structural motivation",
+      "section": "related work",
+      "citation_key": "wang2025word",
+      "supported_clause": "Word-form variation can alter lexical evidence",
+      "source_evidence_path": "paper/sources/wang2025word.txt",
+      "source_evidence_excerpt": "Word Form Matters"
+    },
+    {
+      "name": "Larson et al.",
+      "kind": "dataset",
+      "section": "experiments",
+      "citation_key": "larson2019clinc",
+      "supported_clause": "official CLINC150 train, validation, and test partitions",
+      "source_evidence_path": "paper/sources/larson2019clinc.txt",
+      "source_evidence_excerpt": "An Evaluation Dataset for Intent Classification"
+    }
   ],
-  "nearest_neighbor_coverage":[
-    {"contribution_id":"C1","claim":"Footprint distance predicts strict cross-operator transfer","nearest_neighbors":[{"citation_key":"sengupta2021robustness","overlap":"cross-noise augmentation matrix","independent_difference":"no label-free footprint geometry or strict distance association","source_url":"https://aclanthology.org/2021.nlp4convai-1.7/"},{"citation_key":"sankar2021projection","overlap":"representation-dependent misspelling robustness","independent_difference":"no operator-set selection from measured footprint coverage","source_url":"https://aclanthology.org/2021.eacl-main.250/"}]},
-    {"contribution_id":"C2","claim":"Minimal footprint basis retains worst-operator accuracy","nearest_neighbors":[{"citation_key":"sengupta2021robustness","overlap":"aggregate noise augmentation","independent_difference":"does not select a minimum operator basis geometrically","source_url":"https://aclanthology.org/2021.nlp4convai-1.7/"},{"citation_key":"karpukhin2019training","overlap":"balanced four-edit mixture","independent_difference":"does not test convex-hull minimality under a matched budget","source_url":"https://aclanthology.org/D19-5506/"}]}
+  "nearest_neighbor_coverage": [
+    {
+      "contribution_id": "C1",
+      "claim": "Class-balanced margin targeting improves matched-budget noisy accuracy",
+      "nearest_neighbors": [
+        {
+          "citation_key": "tong2001svm",
+          "source_url": "https://www.jmlr.org/papers/v2/tong01a.html",
+          "overlap": "uses proximity to a text classifier decision boundary for sample selection",
+          "independent_difference": "selects unlabeled examples for annotation rather than labeled synthetic typos under class quotas"
+        },
+        {
+          "citation_key": "quteineh2020textual",
+          "source_url": "https://aclanthology.org/2020.emnlp-main.600/",
+          "overlap": "uses model uncertainty to optimize generated text for active learning",
+          "independent_difference": "uses entropy and additional annotation rather than a class-balanced true-label score gap"
+        }
+      ]
+    },
+    {
+      "contribution_id": "C2",
+      "claim": "MTA stays within one point of a four-times-larger mixture in the primary setting",
+      "nearest_neighbors": [
+        {
+          "citation_key": "karpukhin2019training",
+          "source_url": "https://aclanthology.org/D19-5506/",
+          "overlap": "balanced four-edit synthetic-noise mixture",
+          "independent_difference": "does not evaluate non-inferiority under a quarter-sized selected example set"
+        },
+        {
+          "citation_key": "xu2020augmentation",
+          "source_url": "https://aclanthology.org/2020.coling-main.479/",
+          "overlap": "controlled augmentation for utterance classification",
+          "independent_difference": "does not test paired non-inferiority for a low-score-gap typo selector"
+        }
+      ]
+    }
   ],
-  "setup_entities":[
-    {"name":"CLINC150","kind":"dataset","section":"experiments","description_evidence":"official frozen CLINC150 train, validation, and test partitions","rationale_evidence":"restricted before experimentation to the first 20 lexicographically sorted intents","claim_ids":["C1","C2"],"citation_key":"larson2019clinc"},
-    {"name":"Multinomial Naive Bayes","kind":"classifier","section":"experiments","description_evidence":"multinomial Naive Bayes model over word counts with additive smoothing 1.0","rationale_evidence":"all augmented methods receive the same number of examples","claim_ids":["C1","C2"],"citation_key":"sengupta2021robustness"},
-    {"name":"Four typo operators","kind":"conditions","section":"experiments","description_evidence":"adjacent internal swaps, deletions, insertions, or QWERTY-neighbor substitutions","rationale_evidence":"The footprint tolerance is","claim_ids":["C1","C2"],"citation_key":"pruthi2019combating"}
+  "setup_entities": [
+    {
+      "name": "CLINC150",
+      "kind": "dataset",
+      "section": "experiments",
+      "description_evidence": "official CLINC150 train, validation, and test partitions",
+      "rationale_evidence": "intent labels make true-label margin and class quotas observable",
+      "claim_ids": [
+        "C1",
+        "C2",
+        "C3"
+      ],
+      "citation_key": "larson2019clinc"
+    },
+    {
+      "name": "Four typo operators",
+      "kind": "conditions",
+      "section": "experiments",
+      "description_evidence": "adjacent swap, deletion, insertion, and keyboard-neighbor substitution",
+      "rationale_evidence": "tests whether the selection gain spans distinct character edits",
+      "claim_ids": [
+        "C1",
+        "C3"
+      ],
+      "citation_key": "pruthi2019combating"
+    }
   ],
-  "independent_source_audit":{"verdict":"pass","reviewed_at":"2026-08-16","metadata_verified":true,"checked_keys":["pruthi2019combating","sengupta2021robustness","karpukhin2019training","liu2021laug","arora2020hint3","khosla2022covariate","jones2020robust","piktus2019misspelling","sankar2021projection","wang2025word","larson2019clinc"],"unsupported_clauses":[],"reviewer":"fresh paper_related_audit"}
+  "independent_source_audit": {
+    "verdict": "pass",
+    "reviewed_at": "2026-08-17",
+    "metadata_verified": true,
+    "checked_keys": [
+      "pruthi2019combating",
+      "sengupta2021robustness",
+      "sengupta2021robustness",
+      "liu2021laug",
+      "arora2020hint3",
+      "khosla2022covariate",
+      "karpukhin2019training",
+      "belinkov2018synthetic",
+      "jones2020robust",
+      "piktus2019misspelling",
+      "sankar2021projection",
+      "chen2023survey",
+      "xu2020augmentation",
+      "tong2001svm",
+      "quteineh2020textual",
+      "wang2025word",
+      "larson2019clinc"
+    ],
+    "unsupported_clauses": [],
+    "reviewer": "fresh source-grounding audit against retrieved primary records"
+  }
 }

@@ -1,0 +1,163 @@
+{
+  "table": {
+    "T1": {
+      "studio_rows": [
+        {
+          "method": "Clean only",
+          "clean_accuracy": 0.9133333333333333,
+          "mean_noisy_accuracy": 0.7947500000000001,
+          "worst_operator_accuracy": 0.7889166666666667,
+          "augmented_examples": 0
+        },
+        {
+          "method": "Random budget",
+          "clean_accuracy": 0.909,
+          "mean_noisy_accuracy": 0.8014166666666667,
+          "worst_operator_accuracy": 0.7918333333333333,
+          "augmented_examples": 1250
+        },
+        {
+          "method": "MTA",
+          "clean_accuracy": 0.9238333333333333,
+          "mean_noisy_accuracy": 0.8181666666666667,
+          "worst_operator_accuracy": 0.80175,
+          "augmented_examples": 1250
+        },
+        {
+          "method": "Full mixture",
+          "clean_accuracy": 0.9130833333333334,
+          "mean_noisy_accuracy": 0.82175,
+          "worst_operator_accuracy": 0.7958333333333334,
+          "augmented_examples": 5000
+        }
+      ]
+    },
+    "T2": {
+      "studio_rows": [
+        {
+          "method": "Random budget",
+          "swap": 0.8114166666666667,
+          "delete": 0.80525,
+          "insert": 0.7921666666666667,
+          "keyboard": 0.7968333333333333
+        },
+        {
+          "method": "MTA",
+          "swap": 0.83275,
+          "delete": 0.8275,
+          "insert": 0.80175,
+          "keyboard": 0.8106666666666666
+        },
+        {
+          "method": "Full mixture",
+          "swap": 0.8436666666666667,
+          "delete": 0.83625,
+          "insert": 0.7958333333333334,
+          "keyboard": 0.81125
+        }
+      ]
+    }
+  },
+  "figure": {
+    "F2": {
+      "confirmation_matrix": {
+        "categories": [
+          "50 intents",
+          "20 intents",
+          "severity .30",
+          "severity .60",
+          "budget 10%",
+          "budget 50%"
+        ],
+        "series": [
+          {
+            "name": "Margin minus random",
+            "values": [
+              0.01675,
+              0.01307291666666667,
+              0.007447916666666679,
+              0.01640625000000004,
+              0.0068229166666666785,
+              0.01739583333333332
+            ],
+            "ci_low": [
+              0.013166666666666688,
+              0.008020833333333338,
+              0.005468750000000008,
+              0.010156250000000061,
+              0.003437499999999996,
+              0.013593749999999974
+            ],
+            "ci_high": [
+              0.020791666666666653,
+              0.016875,
+              0.00942708333333335,
+              0.02171875000000005,
+              0.010729166666666692,
+              0.021197916666666664
+            ]
+          }
+        ]
+      }
+    },
+    "F3": {
+      "budget_curve": {
+        "categories": [
+          "10%",
+          "25%",
+          "50%"
+        ],
+        "series": [
+          {
+            "name": "Random",
+            "values": [
+              0.88484375,
+              0.8834895833333333,
+              0.8857812500000001
+            ]
+          },
+          {
+            "name": "Margin-targeted",
+            "values": [
+              0.8916666666666667,
+              0.8965625,
+              0.9031770833333334
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "claims": {
+    "margin_vs_random_noisy_mean": {
+      "estimate": 0.01675,
+      "bootstrap_95_ci": [
+        0.013166666666666688,
+        0.020791666666666653
+      ]
+    },
+    "margin_vs_full_noisy_mean": {
+      "estimate": -0.0035833333333333134,
+      "bootstrap_95_ci": [
+        -0.005583333333333288,
+        -0.0016874999999999668
+      ]
+    },
+    "margin_vs_clean_clean_accuracy": {
+      "estimate": 0.010499999999999995,
+      "bootstrap_95_ci": [
+        0.009166666666666656,
+        0.01183333333333332
+      ]
+    },
+    "margin_noisy_mean": 0.8181666666666667,
+    "random_noisy_mean": 0.8014166666666667,
+    "full_noisy_mean": 0.82175,
+    "augmentation_examples": {
+      "selected_per_seed": 1250,
+      "all_candidates_per_seed": 20000,
+      "full_mixture_per_seed": 5000,
+      "selection_balance": "equal per intent class"
+    }
+  }
+}

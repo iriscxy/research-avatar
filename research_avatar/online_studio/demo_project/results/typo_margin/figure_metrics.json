@@ -1,0 +1,71 @@
+{
+  "synthetic": false,
+  "source_schema": "paper/figsrc/typo_margin/figure_schema.json",
+  "source_results": "results/typo_margin/confirmatory_results.json",
+  "traceable_results": {
+    "F2.confirmation_matrix": {
+      "categories": [
+        "50 intents",
+        "20 intents",
+        "severity .30",
+        "severity .60",
+        "budget 10%",
+        "budget 50%"
+      ],
+      "series": [
+        {
+          "name": "Margin minus random",
+          "values": [
+            0.01675,
+            0.01307291666666667,
+            0.007447916666666679,
+            0.01640625000000004,
+            0.0068229166666666785,
+            0.01739583333333332
+          ],
+          "ci_low": [
+            0.013166666666666688,
+            0.008020833333333338,
+            0.005468750000000008,
+            0.010156250000000061,
+            0.003437499999999996,
+            0.013593749999999974
+          ],
+          "ci_high": [
+            0.020791666666666653,
+            0.016875,
+            0.00942708333333335,
+            0.02171875000000005,
+            0.010729166666666692,
+            0.021197916666666664
+          ]
+        }
+      ]
+    },
+    "F3.budget_curve": {
+      "categories": [
+        "10%",
+        "25%",
+        "50%"
+      ],
+      "series": [
+        {
+          "name": "Random",
+          "values": [
+            0.88484375,
+            0.8834895833333333,
+            0.8857812500000001
+          ]
+        },
+        {
+          "name": "Margin-targeted",
+          "values": [
+            0.8916666666666667,
+            0.8965625,
+            0.9031770833333334
+          ]
+        }
+      ]
+    }
+  }
+}

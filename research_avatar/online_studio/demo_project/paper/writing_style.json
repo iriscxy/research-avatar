@@ -1,1 +1,8 @@
-{"structural_reference":"wang2025word","self_citation_budget":1,"caption_position":"below","tone":"bounded empirical NLP short paper","execution_mode":"direct_full_draft","mode_selected_by":"researcher delegated all automatic choices"}
+{
+  "structural_reference": "wang2025word",
+  "self_citation_budget": 1,
+  "caption_position": "below",
+  "tone": "bounded empirical NLP short paper",
+  "execution_mode": "direct_full_draft",
+  "mode_selected_by": "researcher standing instruction to make all choices automatically"
+}

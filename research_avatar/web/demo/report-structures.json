@@ -1,86 +1,54 @@
 {
-  "profile": {
-    "artifact": "研究者画像",
-    "note": "集中呈现研究方向、方法偏好、写作风格和实验习惯",
-    "sections": [
-      {"number": "H", "title": "Source and Coverage", "content": "数据来自完整展开的 Google Scholar 页面与本地工作记录；示例画像覆盖 126 篇论文、15 篇全文写作样本，并标明生成日期与缺失项。", "details": ["Scholar 概览：6,037 次引用 · h-index 32 · i10-index 79", "全文覆盖：126 篇摘要 · 15 篇代表性论文全文", "生成记录：来源、日期、未获取全文项目均显式标注"]},
-      {"number": "1", "title": "Research Identity", "content": "研究主线是 Trustworthy AI 与 LLM safety，擅长把评测现象转化为可解释、可验证的表示机制问题。", "details": ["研究重点：LLM safety · representation analysis · trustworthy evaluation", "主要方法：诊断失败模式，再设计对应机制与验证", "代表性特点：评测、机制分析与安全干预形成闭环"]},
-      {"number": "2", "title": "Research Lineage", "content": "研究路径由任务建模与鲁棒评测，发展到安全防御，再推进到表示层机制与可证伪分析。", "details": ["早期方向：结构化建模与关注用户的生成方法", "研究演进：忠实性、鲁棒评测与安全防御", "当前前沿：表示机制、因果检验与可证伪分析"]},
-      {"number": "3", "title": "Writing Style", "content": "摘要遵循问题 → 空白 → 方法 → 证据；引言先界定失败模式，再提出机制，最后以可核验证据列贡献。", "details": ["摘要结构：问题 → 空白 → 命名方法 → 证据", "主张表达：使用谨慎、可验证措辞，观察与解释分开", "篇章结构：章节与图表节奏匹配目标会议和自有参考论文"]},
-      {"number": "4", "title": "Experiment Templates", "content": "默认 4×A100；先做单模型小规模通路测试，再冻结配置扩展模型与数据集；缓存响应、评测器输出和随机种子。", "details": ["启动顺序：通路测试 → 合理性检查 → 冻结配置 → 完整实验", "资源模板：4×A100，先估算显存与运行时间", "可恢复性：缓存模型响应、评测器输出、配置与随机种子"]},
-      {"number": "5", "title": "Workflow Preferences", "content": "优先低成本证伪实验；每个数字必须回到原始输出与命令；选题、实验设计和论文结构均保留研究者确认门。", "details": ["证据优先：先运行成本最低、最能推翻假设的实验", "结果可追溯：数字链接到原始文件、命令与计算方式", "研究者确认：方向、实验设计和论文结构均需确认"]},
-      {"number": "6", "title": "Publication Records", "content": "完整出版记录单独保存；画像页重点展示研究覆盖、代表作和可检索的论文入口。", "details": ["共整理 133 条 Scholar 论文记录", "记录标题、会议、年份、引用、摘要和任务类型", "BibTeX、全文与获取状态均可继续追溯"]}
-    ]
-  },
-  "literature": {
-    "artifact": "文献调研报告",
-    "note": "从研究范围、主题地图、争议和空白四个层面组织相关工作",
-    "sections": [
-      {"number": "1", "title": "Scope and Taxonomy", "content": "范围限定为语言风格诱导的 jailbreak；按 persona、narrative、register、encoding 四类攻击和行为、表示、因果三层证据组织。"},
-      {"number": "2", "title": "Theme Map", "content": "地图连接 style transformation、harmful-intent recognition、representation drift 与 utility-preserving defense，标出各主题的依赖和交叉区域。"},
-      {"number": "3", "title": "Landscape Comparison", "content": "逐项比较论文的问题设定、模型、数据集、指标、机制证据与开放资源；示例统计为 25 篇攻击、18 篇机制、11 篇防御工作。"},
-      {"number": "4", "title": "Live Debates", "content": "核心争论是攻击成功来自纯风格变化，还是伴随语义与语用改变；现有证据尚不能排除 evaluator bias 与长度混杂。"},
-      {"number": "5", "title": "Trends and Structural Gaps", "content": "趋势从 prompt-level 攻击转向内部机制；结构性空白是缺少 matched controls、跨模型因果干预和保留正常创作效用的防御。"},
-      {"number": "6", "title": "Verified References", "content": "仅列实际打开并核验的论文；每条包含作者、正式 venue、年份、DOI/arXiv 直链以及它支持的具体综述判断。"}
-    ]
-  },
-  "ideas": {
-    "artifact": "研究方向评估",
-    "note": "比较候选方向的新颖性、可证伪性、可行性和研究价值",
-    "sections": [
-      {"number": "1", "title": "Literature Landscape", "content": "把 Survey 的拥挤区、正在形成的方向与未解决空白压缩为选题边界，并列出最近并行工作对新颖性的约束。"},
-      {"number": "2", "title": "Ranked Decision Slate", "content": "两轮新颖性审计后只保留 I1 与 I4 为可选方向；其余候选因已存在或可被最近工作直接吸收而退出。"},
-      {"number": "3", "title": "Candidate Cards", "content": "I1 的唯一机制是：匹配意图的风格改写在网络深度上产生首次安全轨迹偏离，并且只修这一层应永久恢复后续轨迹。"},
-      {"number": "4", "title": "Human Selection", "content": "研究者选择 I1 First-Divergence Repair；若首次偏离跨 paraphrase、seed 或模型不稳定，或错误层同样有效，就放弃单一因果起点主张。"}
-    ]
-  },
-  "expplan": {
-    "artifact": "实验设计",
-    "note": "从论文主张出发，提前确定实验、图表、预算和判断标准",
-    "sections": [
-      {"number": "1", "title": "Target Conference and Reference Papers", "content": "目标为 ACL 2027；外部机制参考提供 representation intervention 设计，研究者自有 ACL 论文只提供章节比例与图表节奏。"},
-      {"number": "2", "title": "Projected Paper", "content": "论文围绕首次 safety-tube exit 的因果修复点组织；19 个段落逐一对应主张、失败条件和待填图表。"},
-      {"number": "3", "title": "Approval", "content": "研究者已确认 3 个主张、7 个正文图表、5 个本地重跑基线、144 个待测结果和约 428 GPU 小时的完整实验方案。"}
-    ]
-  },
-  "projected-paper": {
-    "artifact": "论文结构与证据规划",
-    "note": "标题、段落、图表、实现方案和预算在实验开始前统一规划",
-    "sections": [
-      {"number": "2.1", "title": "Projected Title and Abstract", "content": "工作标题为 First-Divergence Repair: Causal Single-Layer Recovery from Style-Induced Jailbreaks；摘要不预写任何实验数字。"},
-      {"number": "2.2", "title": "Figure/Table Count", "content": "计划生成 4 张图和 3 张表，每张图表都承担明确的论证任务，并与参考论文的整体节奏一致。"},
-      {"number": "2.3", "title": "Paragraph Blueprint and Evidence Shells", "content": "Introduction、Related Work、Observation、Method、Experiments 和 Conclusion 共规划 19 个段落；4 张图和 3 张表对应 144 个待测结果。"},
-      {"number": "2.4", "title": "Claim–Falsifier–Evidence", "content": "C2 要求首次退出层修复唯一恢复下游轨迹与 DSR；随机层、ABD 层、最后退出层或重复修复若并列，主张被弱化或证伪。"},
-      {"number": "2.5", "title": "Implementation Plan", "content": "所有基线和新方法都接入相同的模型、数据、轨迹、生成与评测框架；有官方实现时通过本地适配器接入，其余方法按论文描述实现。"},
-      {"number": "2.6", "title": "Budget and Decision Criteria", "content": "预算为 4×A100、约 428 GPU 小时；先验证首次偏离现象，再冻结阈值和修复强度，最终数据不再用于调参。"}
-    ]
-  },
-  "runplan": {
-    "artifact": "实验执行计划",
-    "note": "把完整实验拆成可验证的 Goals，可一次确认全部 Goals 自动执行，也可逐个查看并确认",
-    "sections": [
-      {"number": "1", "title": "Execution Estimate", "content": "完整实验分为 12 个任务和 8 个阶段；预计使用 4×A100、约 428 GPU 小时，也可以使用单张 GPU 延长运行时间完成。"},
-      {"number": "2", "title": "Implementation Sources", "content": "所有基线和新方法都运行在同一个本地框架中；有官方实现时通过适配器接入，其余方法按论文描述实现。"},
-      {"number": "3", "title": "Figure/Table Coverage", "content": "每张图和每张表都对应明确的执行任务；任务完成后，核验过的数据会直接填入相应图表。"},
-      {"number": "4", "title": "Parts and Goals", "content": "执行顺序依次覆盖基础设施、现象验证、方法可行性、开发调参、主结果、因果消融、鲁棒性和成本分析。全部 Goals 展示后进入确认门：研究者可以一次确认全部 Goals 自动执行，也可以逐个查看并确认。", "details": ["每个 Goal 都独立保存、核验并更新图表；自动执行会在失败或需要研究判断时停止。"]}
-    ]
-  },
-  "results": {
-    "artifact": "实验结果与证据",
-    "note": "集中展示论文图表，并让每个数字都能追溯到原始记录和计算过程",
-    "sections": [
-      {"number": "1", "title": "Artifact Completion", "content": "当前尚未完成实验任务，也没有论文结果数字；第一个任务只负责验证最小执行通路。"},
-      {"number": "2", "title": "Paper Tables and Figures", "content": "论文图表会在对应任务完成后逐项填入。本页另提供完成效果示例，用于展示数据表与图形如何联动。"},
-      {"number": "3", "title": "生成过程", "content": "数字填入后，鼠标悬停或键盘聚焦即可查看原始记录、筛选条件、运行命令、计算公式和验证状态。"}
-    ]
-  },
-  "paper-studio": {
-    "artifact": "论文写作工作区",
-    "note": "正文、图片和表格在同一环境中编辑，确认内容后自动更新右侧论文 PDF",
-    "sections": [
-      {"number": "正文", "title": "Title → Paragraph → Accept to LaTeX", "content": "写作由 Responses API 生成候选；先确认标题，再按 section 与 paragraph 导航。缺 key 时页面明确显示终端 export 与服务重启命令；参考上下文、候选正文和修改意见同屏，接受后才写入 LaTeX 并编译。"},
-      {"number": "图", "title": "Sequence → Editable Build → Caption → Approval", "content": "按首次引用顺序处理图；机制图保留 GPT 构图参考，同时交付由原生 PowerPoint 对象构成的 PPTX/PDF。"},
-      {"number": "表", "title": "Evidence → LaTeX → Placement → Approval", "content": "表格只读取已核验结果；可编辑 LaTeX、预览列宽与 placement，确认后写入正文并刷新 Live PDF。"}
-    ]
-  }
+  "profile":{"artifact":"研究者画像","note":"集中呈现研究方向、方法偏好、写作风格和实验习惯","sections":[
+    {"number":"H","title":"Source and Coverage","content":"画像来自展开的 Scholar 页面、出版记录和本地写作样本；所有来源、生成时间和缺失项均显式记录。","details":["Scholar 页面快照","本地出版记录","写作与实验样本"]},
+    {"number":"1","title":"Research Identity","content":"研究主线为 Trustworthy AI、LLM safety 与可核验评测；习惯把失败现象转化为受控、可证伪的实验问题。","details":["Trustworthy AI","LLM safety","可核验评测"]},
+    {"number":"2","title":"Research Lineage","content":"研究路径从任务建模与鲁棒评测延伸到安全干预、表示机制和证据契约。","details":["任务建模","鲁棒评测","安全干预"]},
+    {"number":"3","title":"Writing Style","content":"摘要采用问题、空白、方法、证据的闭环；观察、机制解释和适用范围明确分开。","details":["问题先行","证据闭环","范围克制"]},
+    {"number":"4","title":"Experiment Templates","content":"先运行低成本证伪测试，固定数据、配置和随机性，再进入确认实验；结果必须能够由保存的操作数重算。","details":["先证伪","冻结配置","结果可重算"]},
+    {"number":"5","title":"Workflow Preferences","content":"每个论文数字链接到结果路径、计算方式和命令；方向、实验设计和论文结构保留明确确认记录。","details":["数字可追踪","命令可复现","决策有记录"]},
+    {"number":"6","title":"Publication Records","content":"出版记录单独保存并可检索；写作时最多使用三篇相关自引，并以最接近目标 venue 的本人论文校准结构。","details":["出版记录可检索","自引不超过三篇","按 venue 校准结构"]}
+  ]},
+  "literature":{"artifact":"文献调研报告","note":"30 篇已核验论文覆盖 intent noise、表示粒度、typo benchmark 与低成本增强","sections":[
+    {"number":"1","title":"Scope and Taxonomy","content":"范围限定为轻量 intent classification 的拼写鲁棒性，连接真实对话噪声、字符编辑、表示粒度和 noise-aware training。"},
+    {"number":"2","title":"Theme Map","content":"从干净 utterance 经 swap、delete、insert、keyboard 扰动，比较 word、character、subword、byte 表示和训练策略。"},
+    {"number":"3","title":"Landscape Comparison","content":"逐项核验论文的任务、扰动类型、模型、指标和资源；直接 intent 证据与通用 typo robustness 证据分开组织。"},
+    {"number":"4","title":"Live Debates","content":"字符输入不自动等于鲁棒；合成噪声与自然噪声回答不同问题；平均准确率不能代替最差操作符表现。"},
+    {"number":"5","title":"Trends and Structural Gaps","content":"已有研究证明 noise-aware training 有效，但固定增强预算下如何选择候选仍缺少受控证据，这构成 MTA 的具体问题。"},
+    {"number":"6","title":"Verified References","content":"只列实际打开并核验的论文；作者、venue、年份和链接均回到 ACL Anthology、JMLR、ICLR 或 arXiv 原始记录。"}
+  ]},
+  "ideas":{"artifact":"研究方向评估","note":"在用户拒绝负结果方向后，选择可执行的正向干预并固定成功条件","sections":[
+    {"number":"1","title":"Literature Landscape","content":"已有工作证明 typo 会损害 intent classification，也证明聚合增强有效；未解决点是严格同预算条件下的候选选择。"},
+    {"number":"2","title":"Ranked Decision Slate","content":"I7 Margin-Targeted Typo Augmentation 被选中；旧的二维无标签足迹方向因确认区间不支持而归档。"},
+    {"number":"3","title":"Candidate Cards","content":"MTA 生成四类候选，用干净模型真实标签分数差排序，在每个 intent 内选择最低分数差样本并从头重训练。"},
+    {"number":"4","title":"Human Selection","content":"正向成功条件固定为相对同预算随机选择的配对 bootstrap 区间下界高于零；不通过就报告失败，不能改写阈值。"}
+  ]},
+  "expplan":{"artifact":"实验设计","note":"从论文主张出发，提前确定图表、阈值、对照和证据边界","sections":[
+    {"number":"1","title":"Target Conference and Reference Papers","content":"目标为 COLING 2027 Short；研究者自己的 Word Form Matters 仅用于校准段落功能、章节比例和图表节奏。"},
+    {"number":"2","title":"Projected Paper","content":"论文围绕固定 refit budget 的候选选择组织，包含 3 张图、2 张表和 40 个确定性数据单元。"},
+    {"number":"3","title":"Approval","content":"方案固定 CLINC150、四类 typo、共享分类器、六个设置、同一组 8 个 held-out seeds，以及 C1/C2/C3 的失败条件。"}
+  ]},
+  "projected-paper":{"artifact":"论文结构与证据规划","note":"标题、段落、图表、实现方案和决策规则在确认运行前统一规划","sections":[
+    {"number":"2.1","title":"Projected Title and Abstract","content":"工作标题为 Spend Typo Budget Where the Classifier Is Unsure；投影摘要不预写实验数字。"},
+    {"number":"2.2","title":"Figure/Table Count","content":"F1 解释同预算选择问题；T1/F2/T2/F3 分别承担主比较、六设置确认、操作符分析和固定范围预算曲线。"},
+    {"number":"2.3","title":"Paragraph Blueprint and Evidence Shells","content":"每个正文段落有一句功能说明；所有实证图表先建立空壳和字段契约，运行后只能由台账填充。"},
+    {"number":"2.4","title":"Claim–Falsifier–Evidence","content":"C1 要求六个 MTA−随机区间下界均高于零；C2 要求主设置 MTA−完整混合下界高于 −0.01。"},
+    {"number":"2.5","title":"Implementation Plan","content":"四种方法共享候选、类别配额、模型、seed 和 evaluator，只改变最终 refit 接收哪些候选。"},
+    {"number":"2.6","title":"Budget and Decision Criteria","content":"确认运行使用本地 CPU、0 GPU 小时；全部阈值固定在确认脚本中，结果失败时收窄主张。"}
+  ]},
+  "runplan":{"artifact":"实验执行计划","note":"两个完成的 Goal 覆盖可复现通路和全部正结果证据","sections":[
+    {"number":"1","title":"Execution Estimate","content":"完整研究仅需本地 CPU；Goal G1.1 固定数据与执行通路，G2.1 完成六设置确认。"},
+    {"number":"2","title":"Implementation Sources","content":"所有方法都在同一个本地 word-count 分类、扰动、选择与评测框架中实现。"},
+    {"number":"3","title":"Figure/Table Coverage","content":"F1 是计数型动机图；G2.1 从真实确认结果填充 T1、F2、T2 和 F3 的全部 40 个单元。"},
+    {"number":"4","title":"Parts and Goals","content":"两个 Goal 均已完成；每项结果保存、验证并回填 04/05 报告和 Paper Studio。"}
+  ]},
+  "results":{"artifact":"实验结果与证据","note":"40/40 数据目标为 REAL / VERIFIED，并可从保存的种子级操作数重算","sections":[
+    {"number":"1","title":"Artifact Completion","content":"全部五个论文图表已完成；MTA 在六个设置中的 MTA−随机配对区间下界均高于零。"},
+    {"number":"2","title":"Paper Tables and Figures","content":"主设置中 MTA 比同预算随机选择高 0.0168，95% CI 为 [0.0132, 0.0208]；相对完整混合的区间满足预先固定的一点非劣边界。"},
+    {"number":"3","title":"生成过程","content":"每个数字链接到 acquisition ID、result ID、原始 JSON locator、派生操作数和验证状态；F2/F3 由同一数据表直接生成。"}
+  ]},
+  "paper-studio":{"artifact":"论文写作工作区","note":"完成态正结果论文的正文、图、表、Prompt、LaTeX 与 PDF 保持同步","sections":[
+    {"number":"正文","title":"Paragraph → Accept to LaTeX","content":"9 个 section 的 19 个段落均已接受；仍可逐段对话修改，接受后写入 LaTeX 并重新编译。"},
+    {"number":"图","title":"Prompt → Editable Build → Approval","content":"F1、F2、F3 均显示非空绘图 Prompt 和预览；F1 同时提供由原生 PowerPoint 对象组成的可编辑 PPTX。"},
+    {"number":"表","title":"Evidence → LaTeX → Preview","content":"T1、T2 只读取已核验结果，LaTeX 与预览均已同步；模型操作发生时才请求用户输入 API Key。"}
+  ]}
 }

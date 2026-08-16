@@ -1,25 +1,302 @@
 {
   "schema_version": "1.0",
-  "project": {"id": "typo-basis-coling-short-20260816", "name": "Typo Footprint Falsification", "initial_title": "Do Label-Free Typo Footprints Predict Augmentation Transfer?", "venue": "COLING 2027 Short"},
+  "project": {
+    "id": "margin-targeted-typo-coling-short-20260817",
+    "name": "Margin-Targeted Typo Augmentation",
+    "initial_title": "Spend Typo Budget Where the Classifier Is Unsure: Class-Balanced Margin-Targeted Augmentation",
+    "venue": "COLING 2027 Short"
+  },
   "sections": [
-    {"id":"abstract","title":"Abstract","file":"abstract.tex","render":"abstract","result_keys":["association","summary"]},
-    {"id":"introduction","title":"Introduction","file":"introduction.tex","latex_title":"Introduction","result_keys":["claims"]},
-    {"id":"related_work","title":"Related Work","file":"related_work.tex","latex_title":"Related Work","result_keys":[]},
-    {"id":"method","title":"Footprint-Cover Basis","file":"method.tex","latex_title":"Footprint-Cover Basis","result_keys":["footprints"]},
-    {"id":"experiments","title":"Experiments","file":"experiments.tex","latex_title":"Experiments","result_keys":["summary","association","table.T1","figure.F2"]},
-    {"id":"discussion","title":"Discussion","file":"discussion.tex","latex_title":"Discussion","result_keys":["claims"]},
-    {"id":"conclusion","title":"Conclusion","file":"conclusion.tex","latex_title":"Conclusion","end_label":"paper:endconclusion","result_keys":["claims"]},
-    {"id":"appendix","title":"Appendix","file":"appendix.tex","latex_title":"Reproducibility Details","result_keys":["footprints","elapsed_seconds"]}
+    {
+      "id": "abstract",
+      "title": "Abstract",
+      "file": "abstract.tex",
+      "result_keys": [
+        "claims"
+      ],
+      "render": "abstract"
+    },
+    {
+      "id": "introduction",
+      "title": "Introduction",
+      "file": "introduction.tex",
+      "result_keys": [
+        "claims"
+      ],
+      "latex_title": "Introduction"
+    },
+    {
+      "id": "related_work",
+      "title": "Related Work",
+      "file": "related_work.tex",
+      "result_keys": [],
+      "latex_title": "Related Work"
+    },
+    {
+      "id": "method",
+      "title": "Margin-Targeted Augmentation",
+      "file": "method.tex",
+      "result_keys": [],
+      "latex_title": "Margin-Targeted Augmentation"
+    },
+    {
+      "id": "experiments",
+      "title": "Experiments",
+      "file": "experiments.tex",
+      "result_keys": [],
+      "latex_title": "Experiments"
+    },
+    {
+      "id": "discussion",
+      "title": "Discussion",
+      "file": "discussion.tex",
+      "result_keys": [
+        "claims"
+      ],
+      "latex_title": "Discussion"
+    },
+    {
+      "id": "conclusion",
+      "title": "Conclusion",
+      "file": "conclusion.tex",
+      "result_keys": [
+        "claims"
+      ],
+      "latex_title": "Conclusion",
+      "end_label": "paper:endconclusion"
+    },
+    {
+      "id": "limitations",
+      "title": "Limitations",
+      "file": "limitations.tex",
+      "result_keys": [],
+      "latex_title": "Limitations"
+    },
+    {
+      "id": "appendix",
+      "title": "Reproducibility and Derivations",
+      "file": "appendix.tex",
+      "result_keys": [],
+      "latex_title": "Reproducibility and Derivations"
+    }
   ],
-  "batch_writing_order": ["method","experiments","discussion","related_work","introduction","conclusion","abstract","appendix"],
-  "figure_order": ["F1","F2"],
+  "batch_writing_order": [
+    "method",
+    "experiments",
+    "discussion",
+    "related_work",
+    "introduction",
+    "conclusion",
+    "abstract",
+    "limitations",
+    "appendix"
+  ],
+  "figure_order": [
+    "F1",
+    "F2",
+    "F3"
+  ],
   "figures": {
-    "F1": {"title":"Intent-preserving spelling shift","label":"fig:motivation","kind":"mechanism","width":"single-column","canvas_in":[3.25,2.1],"rhetorical_role":"motivation","source_sections":["introduction"],"description":"Contrast a clean utterance and internal swap while holding intent fixed.","caption":"A clean utterance and its internal-swap variant preserve intent but expose different word features.","phase":1,"result_keys":[],"panels":[],"deliverable_stem":"motivation","depends_on_paragraphs":{"introduction":["I1"]},"generation_requires_paragraphs":{"introduction":["I1"]}},
-    "F2": {"title":"Held-out operator transfer","label":"fig:typo-sensitivity","kind":"data","width":"single-column","canvas_in":[3.25,2.45],"rhetorical_role":"result","source_sections":["experiments"],"description":"Compare full-mixture and minimal-basis accuracy by held-out operator.","caption":"Held-out noisy accuracy across swap, delete, insert, and keyboard operators.","phase":2,"result_keys":["figure.F2.operator_transfer"],"panels":[{"id":"typo_sensitivity","title":"Typo sensitivity","goal":"Show accuracy for each held-out operator and augmentation policy.","result_keys":["figure.F2.operator_transfer"]}],"depends_on_paragraphs":{"experiments":["E4"]},"deliverable_stem":"typo_basis/results/F2_operator_transfer"}
+    "F1": {
+      "title": "Spend the same budget on informative typos",
+      "label": "fig:motivation",
+      "kind": "mechanism",
+      "width": "single-column",
+      "canvas_in": [
+        3.32,
+        2.8
+      ],
+      "rhetorical_role": "motivation",
+      "source_sections": [
+        "introduction"
+      ],
+      "description": "Contrast class-balanced random sampling with true-label-score-gap targeting under the same final-refit example count.",
+      "caption": "Random and margin-targeted selection use the same class-balanced refit count; MTA retains candidates with the lowest true-label score gaps.",
+      "phase": 1,
+      "result_keys": [],
+      "panels": [],
+      "deliverable_stem": "typo_margin/F1_motivation",
+      "depends_on_paragraphs": {
+        "introduction": [
+          "I1"
+        ]
+      },
+      "generation_requires_paragraphs": {
+        "introduction": [
+          "I1"
+        ]
+      }
+    },
+    "F2": {
+      "title": "Held-out-seed confirmation matrix",
+      "label": "fig:confirmation",
+      "kind": "data",
+      "width": "single-column",
+      "canvas_in": [
+        3.32,
+        2.45
+      ],
+      "rhetorical_role": "result",
+      "source_sections": [
+        "experiments"
+      ],
+      "description": "Plot MTA minus random mean noisy accuracy and paired intervals for every fixed confirmation setting.",
+      "caption": "Confirmation-setting accuracy differences and paired 95% intervals; every lower bound exceeds zero.",
+      "phase": 2,
+      "result_keys": [
+        "figure.F2.confirmation_matrix"
+      ],
+      "panels": [
+        {
+          "id": "confirmation_matrix",
+          "title": "Confirmation matrix",
+          "goal": "Show the estimate and interval across all six settings.",
+          "result_keys": [
+            "figure.F2.confirmation_matrix"
+          ]
+        }
+      ],
+      "depends_on_paragraphs": {
+        "experiments": [
+          "E3"
+        ]
+      },
+      "deliverable_stem": "typo_margin/actual/F2_confirmation"
+    },
+    "F3": {
+      "title": "Budget sensitivity",
+      "label": "fig:budget",
+      "kind": "data",
+      "width": "single-column",
+      "canvas_in": [
+        3.32,
+        2.45
+      ],
+      "rhetorical_role": "result",
+      "source_sections": [
+        "experiments"
+      ],
+      "description": "Compare random and margin-targeted mean noisy accuracy at 10%, 25%, and 50% budgets in one fixed 20-intent scope.",
+      "caption": "Budget-by-method mean noisy accuracy in the 20-intent scope across eight held-out seeds.",
+      "phase": 2,
+      "result_keys": [
+        "figure.F3.budget_curve"
+      ],
+      "panels": [
+        {
+          "id": "budget_curve",
+          "title": "Budget curve",
+          "goal": "Show that the positive effect persists across fixed example budgets without changing label scope.",
+          "result_keys": [
+            "figure.F3.budget_curve"
+          ]
+        }
+      ],
+      "depends_on_paragraphs": {
+        "experiments": [
+          "E5"
+        ]
+      },
+      "deliverable_stem": "typo_margin/actual/F3_budget"
+    }
   },
-  "table_order": ["T1"],
+  "table_order": [
+    "T1",
+    "T2"
+  ],
   "tables": {
-    "T1": {"title":"Main comparison","label":"tab:micro-main","kind":"table","width":"two-column","source_sections":["experiments"],"description":"Clean and worst-operator comparison under a matched augmentation budget.","caption":"Clean and worst-operator comparison under a matched augmentation budget.","related_paragraphs":{"experiments":["E3"]},"data_grid":{"type":"records","path":"table.T1.studio_rows","columns":[{"key":"clean_accuracy","label":"Clean Accuracy ↑"},{"key":"worst_operator_accuracy","label":"Worst-operator Accuracy ↑"},{"key":"mean_noisy_accuracy","label":"Mean noisy Accuracy ↑"},{"key":"gap_to_full_mixture","label":"Gap to full mixture ↓"}]},"prompt":{"columns":"Clean Accuracy ↑ | Worst-operator Accuracy ↑ | Mean noisy Accuracy ↑ | Gap to full mixture ↓","rows":"source","font_size":"small","best_values":"highest accuracy and lowest gap"}}
+    "T1": {
+      "title": "Primary comparison",
+      "label": "tab:main",
+      "kind": "table",
+      "width": "two-column",
+      "source_sections": [
+        "experiments"
+      ],
+      "description": "Primary method-by-metric comparison under matched and full augmentation counts.",
+      "caption": "Primary CLINC150 50-intent comparison across eight seeds held out from exploration.",
+      "related_paragraphs": {
+        "experiments": [
+          "E2"
+        ]
+      },
+      "data_grid": {
+        "type": "records",
+        "path": "table.T1.studio_rows",
+        "columns": [
+          {
+            "key": "clean_accuracy",
+            "label": "Clean accuracy"
+          },
+          {
+            "key": "mean_noisy_accuracy",
+            "label": "Mean noisy accuracy"
+          },
+          {
+            "key": "worst_operator_accuracy",
+            "label": "Worst-operator accuracy"
+          },
+          {
+            "key": "augmented_examples",
+            "label": "Augmented examples"
+          }
+        ]
+      },
+      "prompt": {
+        "columns": "Clean accuracy | Mean noisy accuracy | Worst-operator accuracy | Augmented examples",
+        "rows": "source",
+        "font_size": "small",
+        "best_values": "highest accuracy and lowest count"
+      }
+    },
+    "T2": {
+      "title": "Operator analysis",
+      "label": "tab:operators",
+      "kind": "table",
+      "width": "single-column",
+      "source_sections": [
+        "experiments"
+      ],
+      "description": "Primary-setting method-by-operator accuracy.",
+      "caption": "Primary-setting accuracy by held-out typo operator.",
+      "related_paragraphs": {
+        "experiments": [
+          "E4"
+        ]
+      },
+      "data_grid": {
+        "type": "records",
+        "path": "table.T2.studio_rows",
+        "columns": [
+          {
+            "key": "swap",
+            "label": "Swap"
+          },
+          {
+            "key": "delete",
+            "label": "Delete"
+          },
+          {
+            "key": "insert",
+            "label": "Insert"
+          },
+          {
+            "key": "keyboard",
+            "label": "Keyboard"
+          }
+        ]
+      },
+      "prompt": {
+        "columns": "Swap | Delete | Insert | Keyboard",
+        "rows": "source",
+        "font_size": "small",
+        "best_values": "highest accuracy"
+      }
+    }
   },
-  "paths": {"metrics":"results/typo_basis/main_results.json","main":"paper/main.tex","reference":"paper/reference_wang2025word.txt"}
+  "paths": {
+    "metrics": "results/typo_margin/studio_metrics.json",
+    "main": "paper/main.tex",
+    "reference": "paper/reference_wang2025word.txt"
+  }
 }

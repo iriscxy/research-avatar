@@ -1,0 +1,51 @@
+{
+  "figure_id": "F1_motivation",
+  "canvas_in": [3.32, 2.8],
+  "shapes": [
+    {"kind":"textbox","x":0.04,"y":0.025,"w":0.92,"h":0.07,"text":"SAME POOL  ·  EQUAL QUOTAS  ·  SAME COUNT","font_size":7.2,"bold":true,"font_color":"#263A42","align":"center"},
+    {"kind":"rounded_rect","x":0.06,"y":0.12,"w":0.26,"h":0.12,"fill":"#E7ECEB","line":"#263A42","line_w":1.0,"text":"clean utterance","font_size":7.4,"bold":true,"font_color":"#263A42","align":"center"},
+    {"kind":"arrow","x1":0.33,"y1":0.18,"x2":0.43,"y2":0.18,"color":"#263A42","weight":1.1},
+    {"kind":"rounded_rect","x":0.45,"y":0.105,"w":0.10,"h":0.08,"fill":"#DCEFED","line":"#087F74","line_w":1.0,"text":"S","font_size":8.0,"bold":true,"font_color":"#087F74","align":"center"},
+    {"kind":"rounded_rect","x":0.57,"y":0.105,"w":0.10,"h":0.08,"fill":"#F7E5D8","line":"#C06A32","line_w":1.0,"text":"D","font_size":8.0,"bold":true,"font_color":"#9A4E28","align":"center"},
+    {"kind":"rounded_rect","x":0.69,"y":0.105,"w":0.10,"h":0.08,"fill":"#E4E8F3","line":"#506AA8","line_w":1.0,"text":"I","font_size":8.0,"bold":true,"font_color":"#405688","align":"center"},
+    {"kind":"hexagon","x":0.81,"y":0.10,"w":0.11,"h":0.09,"fill":"#F0F2F1","line":"#263A42","line_w":1.0,"text":"K","font_size":8.0,"bold":true,"font_color":"#263A42","align":"center"},
+    {"kind":"textbox","x":0.45,"y":0.195,"w":0.47,"h":0.05,"text":"swap     delete     insert     keyboard","font_size":7.0,"bold":false,"font_color":"#52636A","align":"center"},
+
+    {"kind":"textbox","x":0.06,"y":0.31,"w":0.23,"h":0.06,"text":"true-label margin","font_size":7.2,"bold":true,"font_color":"#263A42","align":"center"},
+    {"kind":"line","x1":0.18,"y1":0.39,"x2":0.18,"y2":0.67,"color":"#263A42","weight":1.3},
+    {"kind":"textbox","x":0.03,"y":0.36,"w":0.10,"h":0.05,"text":"high","font_size":7.0,"bold":false,"font_color":"#52636A","align":"center"},
+    {"kind":"textbox","x":0.03,"y":0.65,"w":0.10,"h":0.05,"text":"low","font_size":7.0,"bold":false,"font_color":"#52636A","align":"center"},
+    {"kind":"oval","x":0.145,"y":0.405,"w":0.07,"h":0.06,"fill":"#DCEFED","line":"#087F74","line_w":1.0,"text":"S","font_size":7.0,"bold":true,"font_color":"#087F74","align":"center"},
+    {"kind":"oval","x":0.145,"y":0.48,"w":0.07,"h":0.06,"fill":"#F0F2F1","line":"#263A42","line_w":1.0,"text":"K","font_size":7.0,"bold":true,"font_color":"#263A42","align":"center"},
+    {"kind":"oval","x":0.145,"y":0.555,"w":0.07,"h":0.06,"fill":"#E4E8F3","line":"#506AA8","line_w":1.0,"text":"I","font_size":7.0,"bold":true,"font_color":"#405688","align":"center"},
+    {"kind":"oval","x":0.145,"y":0.63,"w":0.07,"h":0.06,"fill":"#F7E5D8","line":"#C06A32","line_w":1.0,"text":"D","font_size":7.0,"bold":true,"font_color":"#9A4E28","align":"center"},
+    {"kind":"arrow","x1":0.25,"y1":0.58,"x2":0.42,"y2":0.58,"color":"#C06A32","weight":1.4},
+    {"kind":"textbox","x":0.29,"y":0.51,"w":0.17,"h":0.05,"text":"rank within intent","font_size":7.0,"bold":false,"font_color":"#9A4E28","align":"center"},
+
+    {"kind":"rounded_rect","x":0.47,"y":0.31,"w":0.22,"h":0.37,"fill":"#F3FAF8","line":"#087F74","line_w":1.2,"text":"","font_size":7,"bold":false,"font_color":"#263A42","align":"center"},
+    {"kind":"textbox","x":0.49,"y":0.33,"w":0.18,"h":0.12,"text":"MTA\nlowest margins","font_size":7.3,"bold":true,"font_color":"#087F74","align":"center"},
+    {"kind":"oval","x":0.505,"y":0.455,"w":0.055,"h":0.05,"fill":"#F7E5D8","line":"#C06A32","line_w":0.8,"text":"","font_size":7,"bold":false,"font_color":"#263A42","align":"center"},
+    {"kind":"oval","x":0.595,"y":0.455,"w":0.055,"h":0.05,"fill":"#E4E8F3","line":"#506AA8","line_w":0.8,"text":"","font_size":7,"bold":false,"font_color":"#263A42","align":"center"},
+    {"kind":"oval","x":0.505,"y":0.525,"w":0.055,"h":0.05,"fill":"#F7E5D8","line":"#C06A32","line_w":0.8,"text":"","font_size":7,"bold":false,"font_color":"#263A42","align":"center"},
+    {"kind":"oval","x":0.595,"y":0.525,"w":0.055,"h":0.05,"fill":"#DCEFED","line":"#087F74","line_w":0.8,"text":"","font_size":7,"bold":false,"font_color":"#263A42","align":"center"},
+    {"kind":"textbox","x":0.49,"y":0.59,"w":0.18,"h":0.06,"text":"equal class quotas","font_size":7.0,"bold":false,"font_color":"#52636A","align":"center"},
+
+    {"kind":"rounded_rect","x":0.73,"y":0.31,"w":0.22,"h":0.37,"fill":"#F7F8F8","line":"#65777D","line_w":1.2,"text":"","font_size":7,"bold":false,"font_color":"#263A42","align":"center"},
+    {"kind":"textbox","x":0.75,"y":0.33,"w":0.18,"h":0.12,"text":"Random\nmixed margins","font_size":7.3,"bold":true,"font_color":"#52636A","align":"center"},
+    {"kind":"oval","x":0.765,"y":0.455,"w":0.055,"h":0.05,"fill":"#DCEFED","line":"#087F74","line_w":0.8,"text":"","font_size":7,"bold":false,"font_color":"#263A42","align":"center"},
+    {"kind":"oval","x":0.855,"y":0.455,"w":0.055,"h":0.05,"fill":"#F0F2F1","line":"#263A42","line_w":0.8,"text":"","font_size":7,"bold":false,"font_color":"#263A42","align":"center"},
+    {"kind":"oval","x":0.765,"y":0.525,"w":0.055,"h":0.05,"fill":"#E4E8F3","line":"#506AA8","line_w":0.8,"text":"","font_size":7,"bold":false,"font_color":"#263A42","align":"center"},
+    {"kind":"oval","x":0.855,"y":0.525,"w":0.055,"h":0.05,"fill":"#F7E5D8","line":"#C06A32","line_w":0.8,"text":"","font_size":7,"bold":false,"font_color":"#263A42","align":"center"},
+    {"kind":"textbox","x":0.75,"y":0.59,"w":0.18,"h":0.06,"text":"equal class quotas","font_size":7.0,"bold":false,"font_color":"#52636A","align":"center"},
+
+    {"kind":"arrow","x1":0.58,"y1":0.71,"x2":0.58,"y2":0.82,"color":"#087F74","weight":1.3},
+    {"kind":"arrow","x1":0.84,"y1":0.71,"x2":0.84,"y2":0.82,"color":"#65777D","weight":1.3},
+    {"kind":"rounded_rect","x":0.46,"y":0.84,"w":0.50,"h":0.11,"fill":"#E7ECEB","line":"#263A42","line_w":1.0,"text":"same model  ·  same evaluator","font_size":7.3,"bold":true,"font_color":"#263A42","align":"center"}
+  ],
+  "print_readability": {
+    "final_font_floor_pt": 7.0,
+    "non_color_encoding": "direct labels, glyph letters, marker position, and outline shapes",
+    "grayscale_result": "distinct through labels, position, and shape after grayscale rendering",
+    "density_decision": "three compact regions with 5 percent safe margins"
+  }
+}

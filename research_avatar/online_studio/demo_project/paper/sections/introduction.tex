@@ -1,18 +1,14 @@
-\section{Introduction}
-Intent classifiers often encounter spelling variation after deployment. A label-preserving adjacent swap can leave a request obvious to a person while changing the lexical evidence available to a word-based classifier. Figure~\ref{fig:motivation} isolates this mismatch: the semantic intent is fixed, yet the observed feature footprint moves. Misspelling attacks can sharply damage word-dependent classifiers \citep{pruthi2019combating}, while aggregate noise augmentation recovers part of the loss in intent systems \citep{sengupta2021robustness}. The unresolved practical choice is which perturbations should populate a limited augmentation budget.
+\section{Introduction}\label{sec:introduction}
 
-\begin{figure}[tb]
+Intent classifiers receive spelling variants that preserve intent but alter lexical evidence. Character edits can sharply reduce classifier accuracy \citep{pruthi2019combating}, and mixed-noise training can recover part of this loss in goal-oriented dialogue \citep{sengupta2021robustness}. Which generated examples deserve a limited budget? Here, budget means records admitted to the final refit, not candidate generation and scoring. Figure~\ref{fig:motivation} contrasts uniform selection with spending the same class-balanced refit count on the lowest true-label score gaps.
+
+\begin{figure}[t]
 \centering
-\fbox{\begin{minipage}{0.92\columnwidth}\small
-\textcolor{blue!65!black}{\textbf{clean utterance}}: ``transfer money today''\\[2pt]
-$\downarrow$ \textit{internal swap}\\[2pt]
-\textcolor{red!65!black}{\textbf{perturbed form}}: ``trasnfer money today''\\[2pt]
-$\Rightarrow$ \textbf{unchanged intent}: money transfer
-\end{minipage}}
-\caption{A clean utterance and its internal-swap variant preserve the intent but expose different word features. The unchanged intent motivates measuring operator footprints before allocating augmentation.}
+\includegraphics[width=\columnwidth]{fig/typo_margin/F1_motivation.pdf}
+\caption{Random and margin-targeted selection use the same class-balanced refit count; MTA retains candidates with the lowest true-label score gaps.}
 \label{fig:motivation}
 \end{figure}
 
-We ask whether label-free feature footprints predict cross-operator transfer and whether they can define a smaller augmentation basis without sacrificing worst-case accuracy. Our footprint uses two observable coordinates: the increase in training-vocabulary misses and the disruption of character trigrams. We treat average edit count as a control, preventing a mechanically larger corruption from masquerading as a novel operator. We then cover the four operator footprints with the smallest epsilon-expanded convex hull and train on that basis under a fixed example budget. Here, ``minimal'' means fewer augmentation operator types, not fewer augmented examples or demonstrated training-time savings.
+Uniform sampling treats easy and label-confusing edits alike. We propose Margin-Targeted Typo Augmentation (MTA): generate one candidate per operator, score its true-label margin under a clean model, and retain the lowest-margin items under equal per-intent quotas. Only selection changes; the pool, model, example count, and evaluator stay fixed.
 
-The study makes two bounded contributions. First, it supplies a falsification-aware, reproducible test of the relation between footprint distance and transfer rather than assuming all typos form one homogeneous noise class. Second, it distinguishes a favorable observed point gap from the stronger uncertainty-aware claim needed to accept a minimal basis. Both proposed claims fail their declared checks. Reported artifact values are backed by deterministic raw JSON cells and a five-seed rerun; the narrow scope is a feature of the experiment rather than evidence for broad deployment readiness.
+Across six prespecified settings sharing eight seeds held out from exploration, all paired bootstrap 95\% intervals for MTA over random are positive. The primary 50-intent gain is 1.68 points [1.32, 2.08], and MTA stays within one point of an operator-balanced 5,000-example mixture while refitting on 1,250 examples. The claim is limited to CLINC150, a word-count classifier, English, and four synthetic edits. Section~\ref{sec:method} defines MTA, Section~\ref{sec:experiments} tests it, and Section~\ref{sec:discussion} bounds mechanism and cost claims.

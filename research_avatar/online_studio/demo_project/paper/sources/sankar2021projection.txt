@@ -1,0 +1,381 @@
+     On-Device Text Representations Robust To Misspellings via Projections
+
+    Chinnadhurai Sankar                            Sujith Ravi                        Zornitsa Kozareva
+  Mila, Université de Montréal∗                Amazon Alexa†                              Google
+    Montreal, QC, Canada                       Sunnyvale, CA, USA                   Mountain View, CA, USA
+ chinnadhurai@gmail.com                        sravi@sravi.org                    zornitsa@kozareva.com
+
+
+
+
+                        Abstract                                and compute resources, it becomes challenging to
+                                                                deploy them to on-device due to their huge size.
+      Recently, there has been a strong interest
+      in developing natural language applications
+      that live on personal devices such as mobile
+      phones, watches and IoT with the objective
+      to preserve user privacy and have low mem-
+      ory. Advances in Locality-Sensitive Hashing
+      (LSH)-based projection networks have demon-
+      strated state-of-the-art performance in various
+      classification tasks without explicit word (or
+      word-piece) embedding lookup tables by com-
+      puting on-the-fly text representations.
+      In this paper, we show that the projection                Figure 1: One-hot word embedding look-up vectors
+      based neural classifiers are inherently robust            vs linear combination of LSH projection based vectors
+      to misspellings and perturbations of the input            (Ravi, 2017) representing the same word.
+      text. We empirically demonstrate that the LSH
+      projection based classifiers are more robust
+      to common misspellings compared to BiL-                      This led to interesting research by (Ravi and
+      STMs (with both word-piece & word-only to-                Kozareva, 2018; Sankar et al., 2019), who showed
+      kenization) and fine-tuned BERT based meth-               that word embeddings can be replaced with
+      ods. When subject to misspelling attacks, LSH             lightweight binary Locality-Sensitive Hashing
+      projection based classifiers had a small av-              (LSH) based projections learned on-the-fly. The
+      erage accuracy drop of 2.94% across multi-
+                                                                projection approach surmounts the need to store
+      ple classifications tasks, while the fine-tuned
+      BERT model accuracy had a significant drop                any embedding matrices, since the projections are
+      of 11.44%.                                                dynamically computed. This further enables user
+                                                                privacy by performing inference directly on device
+ 1    Introduction                                              without sending user data (e.g., personal informa-
+                                                                tion) to the server. The embedding memory size
+ At the core of Natural Language Processing (NLP)               is reduced from O(V ) to O(K), where V is the
+ neural models are pre-trained word embeddings                  token vocabulary size and K << V , is the binary
+ like Word2Vec (Mikolov et al., 2013), GloVe (Pen-              LSH projection size. The projection representa-
+ nington et al., 2014a) and ELMo (Peters et al.,                tions can operate on either word or character level,
+ 2018). They help initialize the neural models,                 and can be used to represent a sentence or a word
+ lead to faster convergence and have improved per-              depending on the NLP application. For instance,
+ formance for numerous application such as Ques-                recently the Projection Sequence Networks (ProS-
+ tion Answering (Liu et al., 2018), Summarization               eqo) (Kozareva and Ravi, 2019) used BiLSTMs
+ (Cheng and Lapata, 2016), Sentiment Analysis (Yu               over word-level projection representations to repre-
+ et al., 2017). While word embeddings are powerful              sent long sentences and achieved close to state-of-
+ in unlimited constraints such as computation power             the-art results in both short and long text classifica-
+      ∗
+      Work done during internship at Google                     tion tasks with varying amounts of supervision and
+      †
+      Work done while at Google AI                              vocabulary sizes.
+
+                                                           2871
+Proceedings of the 16th Conference of the European Chapter of the Association for Computational Linguistics, pages 2871–2876
+                            April 19 - 23, 2021. ©2021 Association for Computational Linguistics
+                                                        Figure 3: Binary Locality-Sensitive Hashing (LSH)
+Figure 2: Memory for V look-up vectors for each token   projection representation for text.
+vs storing K(<< V ) vectors and linearly combining
+them for token representation. We consider K = 1120
+following (Ravi and Kozareva, 2018) in this paper.      2    Binary LSH projections for text
+                                                             representations
+                                                        The dependency on vocabulary size V , is one of
+   Despite being successful, there are no existing
+                                                        the primary reasons for the huge memory footprint
+systematic research efforts focusing on evaluating
+                                                        of embedding matrices. It is common to represent a
+the capabilities of the LSH based projection for text
+                                                        token, x by one-hot representation, Y(x) ∈ [0, 1]V
+representations. To that end, we empirically ana-
+                                                        and a distributed representation of the token is ob-
+lyze the effectiveness and robustness of the LSH
+                                                        tained by multiplying the one-hot representation
+projection approach for text representation by con-
+                                                        with the embedding matrix, WV ∈ Rd×V as in
+ducting two types of studies in this paper.
+                                                                     UV (x) = WV ∗ Y(x)> ∈ Rd
+
+  1. Classification with perturbed inputs, where           One way to remove the dependency on the vocab-
+     we show that Projection based networks             ulary size is to learn a smaller matrix, WK ∈ Rd×K
+     1) Projection Sequence Networks (ProSeqo)          (K << V ), as shown in Figure 2. For instance,
+     (Kozareva and Ravi, 2019) and 2) Self-             300-dimensional Glove embeddings, WV (Pen-
+     Governing Neural Networks (SGNN) mod-              nington et al., 2014b) with 400k vocabulary size
+     els (Ravi and Kozareva, 2019) evaluated with       occupies > 1 GB while the WK occupies only ≈
+     perturbed LSH projections are robust to mis-       1.2 MB for K = 1000 yielding a 1000× reduc-
+     spellings and transformation attacks, while we     tion in size. Instead of learning a unique vector for
+     observe significant drop in performance for        each token in the vocabulary, we can think of the
+     BiLSTMs and fine-tuned BERT classifiers.           columns of this WK matrix as a set of basis vec-
+                                                        tors and each token can be represented as a linear
+                                                        combination of basis vectors in WK as in Figure
+  2. Perturbation Analysis, where we test the ro-       1. We select the basis vectors from WK for each
+     bustness of the projection approach by directly    token with a fixed K-bit binary vector instead of a
+     analyzing the changes in representations when      V -bit one-hot vector.
+     the input words are subject to the char mis-          The LSH Projection function, P (Figure 3)(Ravi,
+     spellings. The purpose of this study is to         2017, 2019) used in SGNN (Ravi and Kozareva,
+     examine if the words or sentences with mis-        2018) and ProSeqo (Kozareva and Ravi, 2019) does
+     spelling are nearby in the projection space        exactly this as it dynamically generates a fixed bi-
+     instead of frequently colliding with the pro-      nary projection representation, P(x) ∈ [0, 1]K for
+     jection representations of other valid words.      any token, x by extracting morphological input
+                                                        features like char (or token) n-gram & skip-gram
+                                                        features, parts of speech tags etc. from x and a
+   Overall, our studies showcase the robustness of      modified Locality-Sensitive Hashing (LSH) based
+LSH projection representations and resistance to        transformation, L as in
+misspellings. Due to their effectiveness, we believe
+that in the future, text representations using LSH              x−
+                                                                    F
+                                                                                      → P(x) ∈ [0, 1]K
+                                                                 → [f1 , · · · , fn ] −
+                                                                                        L
+
+projections can go beyond memory constrained
+settings and even be exploited in large scale models    where F extracts n-grams (or skip-grams),
+like Transformers (Vaswani et al., 2017).               [f1 , · · · , fn ] from the input text. Here, [f1 , · · · , fn ]
+
+                                                    2872
+could refer to either character level or token level     (with word-piece tokenization) (Devlin et al., 2018)
+n-grams(or skip-grams) features. Given the LSH           and train two-layer BiLSTMs (with both word-only
+projection representation, P(x), the distributed rep-    and word-piece tokenization) for comparable accu-
+resentation of the token, x is represented as in         racies with respect to the projection based models
+                                                         for a fair comparison. By word-only tokenization,
+          UW (x) = WK ∗ P(x)> ∈ Rd                       we mean that models encode input words using a
+                                                         lookup table for each word. In our setup, we test the
+. It is worth noting that projection operation, P can
+                                                         robustness of the neural classifiers by subjecting
+also be used map an entire sentence directly to the
+                                                         the corresponding test sets to common misspellings
+[0, 1]K space.
+                                                         and omissions. We consider the following pertur-
+   As for the projection based classifiers, the ProS-
+                                                         bation operations: randomly dropping, inserting,
+eqo model (Kozareva and Ravi, 2019) runs a BiL-
+                                                         and swapping internal characters within words of
+STM over word-level binary LSH projection rep-
+                                                         the input sentences (Gao et al., 2018; Pruthi et al.,
+resentations to predict the correct classes, while
+                                                         2019) 1 . We decide to perturb each word in a sen-
+the SGNN model (Ravi and Kozareva, 2018) com-
+                                                         tence with a fixed probability, Pperturb . Following
+putes a binary LSH projection representation for
+                                                         (Ravi and Kozareva, 2018), we fix the projection
+the entire input text, followed by a 2-layer MLP
+                                                         dimension to K = 1120.
+and a softmax layer on top of it for class prediction.
+SGNN was designed for short text, while ProSeqo          3.1      Datasets
+is also suitable for long text classification tasks.     For evaluation purposes, we use the following text
+   There have been a number of research efforts          classification datasets for dialog act classification
+(Sakaguchi et al., 2016; Edizel et al., 2019; Pruthi     MRDA (Shriberg et al., 2004) and SWDA (God-
+et al., 2019) to improve the robustness of neural        frey et al., 1992; Jurafsky et al., 1997), for intent
+classifiers to misspelling attacks and other text        prediction ATIS (Tür et al., 2010) and long text
+transformations. Recently, Pruthi et al. (2019) ob-      classification Amazon Reviews (Zhang et al., 2015)
+serve that fine-tuned BERT and BiLSTM based              and Yahoo! Answers (Zhang et al., 2015). Table 1
+models are very brittle (for e.g., accuracy drops        shows the characteristics of each dataset.
+from 90.3% to 45.8% in the SST (Socher et al.,
+                                                           Tasks                            # Classes   Avg-len   Train    Test
+2013) classification task) to adversarial misspelling      ATIS (Dialog act)                   21         11       4.4k   0.89k
+attacks. Contrary to intuition, they observe that          MRDA (Dialog act)                    6          8        78k    15k
+                                                           SWDA (Intent Prediction)            42         7        193k     5k
+word-piece and character-level models are more             YAHOO (Answers Categorization)      10        108      1400k    60k
+susceptible to spelling attacks compared to the            AMAZON (Review Prediction)           5         92      3000k   650k
+
+word-level models.                                               Table 1: Classification Dataset Characteristics
+   The LSH projection operation, P, is a function
+of n-grams (and skip-grams) of the input text x and
+usually the fraction of n-grams affected by spelling            Accuracy drop (%) ± std-deviation (over 5 runs)
+                                                           Datasets →   MRDA        ATIS       YAHOO AMAZON
+attacks tend to be minimal resulting in insignifi-         Models ↓
+cant changes to the projection representation, P(x).       BERT-base    8.25±3.4 15.57±1.2 9.06±5.4        12.88±3.8
+                                                           BiLSTM-wp 8.91±3.9 20.11±3.1 11.32±4.5           9.46±1.3
+Therefore, we hypothesize that the projection based        BiLSTM-w    15.14±4.3 16.23±2.6 9.32±2.3         8.88±2.4
+models like ProSeqo, SGNN, etc. are inherently ro-         SGNN        1.91±0.5 2.80±0.3           -            -
+bust to commonly occurring spelling attacks. In the        ProSeqo      2.11±0.4   2.84±0.6 3.11±0.3        3.91±0.5
+
+following sections, we investigate the robustness        Table 2: Each entry in the table denotes the average
+of projection based classifiers by subjecting them       drop in accuracy(%) when classifiers are subject to test
+to common misspellings, followed by an analysis          inputs with misspellings, Pperturb = 0.2. ATIS and
+of changes in the binary LSH projections of input        MRDA are smaller datasets, while Yahoo! Answers
+text under such transformations.                         and Amazon reviews are larger. BERT-base refers to
+                                                         the BERT-base (Devlin et al., 2018) word-piece model
+3   Effect of Misspellings on Text                       fine-tuned to individual tasks and it converged to state-
+    Classification                                       of-the-art for all tasks.
+
+We study the robustness of two types of projection           1
+                                                             Further details on the perturbation operations and train-
+based models – ProSeqo and SGNN. On the other            ing details necessary for reproducibility are presented in the
+hand, we fine-tune the pretrained BERT-base model        supplementary material
+
+                                                    2873
+                                          Accuracy(%) (Averaged over 5 runs)
+     Datasets                 MRDA                                       ATIS                                    SWDA
+    Perturb(%)   BiLSTM-wp    BiLSTM-w      SGNN       BiLSTM-wp BiLSTM-w             SGNN        BiLSTM-wp      BiLSTM-w          SGNN
+         0          79.23       78.14       87.22          91.73           92.04      93.51          72.92         72.94           76.21
+                                               Perturbation operation: drop
+         20       69.46±1.1   74.96±0.7   85.43±0.3      81.95±2.2       80.15±2.0   91.05±0.2     65.05±4.2      64.95±4.1       70.76±1.1
+         40       72.34±2.9   55.17±3.1   84.62±0.22     71.69±2.9       65.88±2.1   91.86±0.3     61.24±4.1      64.95±5.2       67.79±1.2
+         60       69.81±4.7   42.25±4.2   83.27±0.25     59.16±4.8       56.25±3.9   90.12±0.4     57.48±5.7      58.77±5.8       63.21±1.3
+                                               Perturbation operation: swap
+         20       78.25±1.1   71.34±2.2   86.74±0.1      86.12±1.7       85.05±1.8   92.05±0.3     66.27±3.3      64.52±2.1       70.84±0.3
+         40       75.91±3.9   69.22±2.1   86.39±0.2      82.06±2.7       78.04±2.9   91.15±0.2     62.67±5.8      54.93±2.4       67.22±0.3
+         60       69.22±3.8   66.91±4.0   85.99±0.2      72.34±3.3       68.54±4.1   91.27±0.3     59.20±4.8      47.93±4.3       64.48±0.3
+                                                Perturbation operation: all
+         20       72.96±1.3   73.39±2.3   86.71±0.4      80.40±1.7       83.55±2.1   92.83±0.2     60.49±4.3      64.28±3.3       68.96±0.2
+         40       70.32±3.4   63.04±4.3   85.31±0.5      71.62±3.1       75.81±2.6   90.71±0.3     54.96±4.1      59.46±4.6       65.44±0.4
+         60       67.64±5.7   55.50±5.3   84.21±0.5      61.10±6.1       66.58±5.6   88.35±0.3     49.62±6.7      51.85±6.3       64.97±0.5
+
+Table 3: Comparison of projection based models vs BiLSTMs subject to various types and amounts of perturba-
+tions. BiLSTM-wp and BiLSTM-w refer to models with word-piece and word-only tokenization respectively.
+
+                                                                                     LSH Proj.Dim (K)   Character Perturbations
+3.2      Experiments and Results                                                                         5%          10%
+                                                                                           840          10.08       24.33
+Table 2 reports the average classifier accuracy drops                                      980          15.48       31.24
+                                                                                           1120         18.83       33.65
+when all the models are subject to all types of per-                                       1260         19.71       39.01
+turbations (swap, drop, & add) on multiple classifi-
+cation tasks (two short text and two long text). We                  Table 4: Avg. changes in word projections (bits) for
+see that the accuracy drop for the projection based                  different Char Perturbation % in enwik9 corpus.
+models is significantly lower across all datasets. It
+is also worth noting that the standard deviations                    following observations from our experiments:
+across the 5 runs are also minimal for the projec-
+tion based models further showcasing the stability                       1. Average Hamming distance between LSH pro-
+of projection representations.                                              jections of words is ≈ K/2, where K is the
+   In another experiment shown in Table 3, we sub-                          projection dimension which implies that the
+ject different models to varying types and amounts                          words are more or less uniformly spread out
+of perturbations. Similarly, we see that the accu-                          from each other indicating that there are no
+racy drop for the projection based models is the                            bias issues in the [0, 1]K representation space.
+smallest across all datasets and amounts of per-
+                                                                         2. Assuming Pperturb = 0.2, we observe that
+turbation. Compared to the word-only models, we
+                                                                            LSH projection changes only by ≈ 11% w.r.t
+observe that the word-piece models are also compa-
+                                                                            the average Hamming distance between the
+rably susceptible to character perturbations which
+                                                                            words in the corpus when subject to mis-
+agrees with the findings in (Pruthi et al., 2019).
+                                                                            spellings. For instance, if the average Ham-
+                                                                            ming distance between LSH projections of
+4       Perturbation Analysis
+                                                                            words is 100 bits, misspellings change the
+Apart from the classification experiments, we also                          projections by only 11 bits on average. Intu-
+directly analyze the changes in the binary LSH pro-                         itively, this suggests that neural layers on top
+jection representations by subjecting input text to                         of the LSH projection tend to rarely confuse a
+different types and amount of perturbations. To that                        misspelled word for another valid word.
+end, we take a large corpus enwik92 (vocabulary
+                                                                     Also from Table 4, we found that the changes in
+size of 500k and 129M words) to analyze the aver-
+                                                                     the LSH-projection, ∆P(x) due to perturbations
+age Hamming distance between LSH projections of
+                                                                     is directly proportional to LSH projection dimen-
+the words in the corpus. Next, we compute the av-
+                                                                     sion, K and perturbation probability, Pperturb as in,
+erage changes in the projection representations by
+                                                                     ∆P(x) ∝ K · Pperturb .
+subjecting them to the character perturbations from
+Section 3. Table 4 shows the results. We make the                    5     Conclusion
+    2
+     enwik9 is a byte-level dataset consisting of the
+first 109 bytes of the English Wikipedia XML dump,                   In this work, we perform a detailed study analyz-
+http://mattmahoney.net/dc/textdata.html.                             ing the robustness of recent LSH-based projection
+
+                                                               2874
+neural networks for memory-efficient text represen-           1694–1704. Association for Computational Linguis-
+tations. Based on multiple text classification tasks          tics.
+and perturbation studies, we find projection-based          Tomas Mikolov, Kai Chen, Greg Corrado, and Jeffrey
+neural models to be robust to text transformations            Dean. 2013. Efficient estimation of word represen-
+compared to BERT or BiLSTMs with embedding                    tations in vector space. In International Conference
+lookup tables for words and word-pieces.                      on Learning Representations, Workshop Track.
+                                                            Jeffrey Pennington, Richard Socher, and Christopher
+                                                               Manning. 2014a. Glove: Global vectors for word
+References                                                     representation. In Proceedings of the 2014 Confer-
+                                                               ence on Empirical Methods in Natural Language
+Jianpeng Cheng and Mirella Lapata. 2016. Neural sum-
+                                                               Processing (EMNLP), pages 1532–1543. Associa-
+   marization by extracting sentences and words. In
+                                                               tion for Computational Linguistics.
+   Proceedings of the 54th Annual Meeting of the As-
+   sociation for Computational Linguistics (Volume 1:       Jeffrey Pennington, Richard Socher, and Christopher D.
+   Long Papers), pages 484–494. Association for Com-           Manning. 2014b. Glove: Global vectors for word
+   putational Linguistics.                                     representation. In Empirical Methods in Natural
+                                                               Language Processing (EMNLP), pages 1532–1543.
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and
+   Kristina Toutanova. 2018. BERT: pre-training of          Matthew Peters, Mark Neumann, Mohit Iyyer, Matt
+   deep bidirectional transformers for language under-       Gardner, Christopher Clark, Kenton Lee, and Luke
+   standing. CoRR, abs/1810.04805.                           Zettlemoyer. 2018. Deep contextualized word repre-
+                                                             sentations. In Proceedings of the 2018 Conference
+Bora Edizel, Aleksandra Piktus, Piotr Bojanowski,
+                                                             of the North American Chapter of the Association
+  Rui Ferreira, Edouard Grave, and Fabrizio Silvestri.
+                                                             for Computational Linguistics: Human Language
+  2019. Misspelling oblivious word embeddings.
+                                                             Technologies, Volume 1 (Long Papers), pages 2227–
+  CoRR, abs/1905.09755.
+                                                             2237. Association for Computational Linguistics.
+Ji Gao, Jack Lanchantin, Mary Lou Soffa, and Yan-           Danish Pruthi, Bhuwan Dhingra, and Zachary C. Lip-
+   jun Qi. 2018. Black-box generation of adversar-            ton. 2019. Combating adversarial misspellings with
+   ial text sequences to evade deep learning classifiers.     robust word recognition. CoRR, abs/1905.11268.
+   In 2018 IEEE Security and Privacy Workshops, SP
+   Workshops 2018, San Francisco, CA, USA, May 24,          Sujith Ravi. 2017. Projectionnet: Learning efficient
+   2018, pages 50–56.                                         on-device deep networks using neural projections.
+                                                              CoRR, abs/1708.00630.
+John J. Godfrey, Edward C. Holliman, and Jane Mc-
+  Daniel. 1992. Switchboard: Telephone speech cor-          Sujith Ravi. 2019. Efficient on-device models using
+  pus for research and development. In Proceed-               neural projections. In Proceedings of the 36th In-
+  ings of the 1992 IEEE International Conference on           ternational Conference on Machine Learning, vol-
+  Acoustics, Speech and Signal Processing - Volume 1,         ume 97 of Proceedings of Machine Learning Re-
+  ICASSP’92, pages 517–520. IEEE Computer Soci-               search, pages 5370–5379.
+  ety.
+                                                            Sujith Ravi and Zornitsa Kozareva. 2018.        Self-
+Daniel Jurafsky, Rebecca Bates, Rachel Martin                 governing neural networks for on-device short text
+  Noah Coccaro, Marie Meteer, Klaus Ries, Elizabeth           classification. In Proceedings of the 2018 Confer-
+  Shriberg, Audreas Stolcke, Paul Taylor, and Van Ess-        ence on Empirical Methods in Natural Language
+  Dykema. 1997. Automatic detection of discourse              Processing, Brussels, Belgium, October 31 - Novem-
+  structure for speech recognition and understanding.         ber 4, 2018, pages 804–810.
+  In Proceedings of IEEE Workshop on Automatic
+  Speech Recognition and Understanding, pages 88–           Sujith Ravi and Zornitsa Kozareva. 2019. On-device
+  95.                                                         structured and context partitioned projection net-
+                                                              works. In Proceedings of the 57th Annual Meet-
+Zornitsa Kozareva and Sujith Ravi. 2019. ProSeqo:             ing of the Association for Computational Linguis-
+  Projection sequence networks for on-device text             tics, pages 3784–3793, Florence, Italy. Association
+  classification. In Proceedings of the 2019 Confer-          for Computational Linguistics.
+  ence on Empirical Methods in Natural Language
+  Processing and the 9th International Joint Confer-        Keisuke Sakaguchi, Kevin Duh, Matt Post, and Ben-
+  ence on Natural Language Processing (EMNLP-                 jamin Van Durme. 2016. Robsut wrod reocginiton
+  IJCNLP), pages 3892–3901.                                   via semi-character recurrent neural network. CoRR,
+                                                              abs/1608.02214.
+Xiaodong Liu, Yelong Shen, Kevin Duh, and Jianfeng
+  Gao. 2018. Stochastic answer networks for ma-             Chinnadhurai Sankar, Sujith Ravi, and Zornitsa
+  chine reading comprehension. In Proceedings of the          Kozareva. 2019. Transferable neural projection rep-
+  56th Annual Meeting of the Association for Compu-           resentations. In Proceedings of the 2019 Conference
+  tational Linguistics (Volume 1: Long Papers), pages         of the North American Chapter of the Association
+
+                                                       2875
+  for Computational Linguistics: Human Language
+  Technologies, Volume 1 (Long and Short Papers),
+  pages 3355–3360, Minneapolis, Minnesota. Associ-
+  ation for Computational Linguistics.
+Elizabeth Shriberg, Rajdip Dhillon, Sonali Bhagat,
+   Jeremy Ang, and Hannah Carvey. 2004. The ICSI
+   meeting recorder dialog act (MRDA) corpus. In Pro-
+   ceedings of the SIGDIAL 2004 Workshop, The 5th
+   Annual Meeting of the Special Interest Group on Dis-
+   course and Dialogue, April 30 - May 1, 2004, Cam-
+   bridge, Massachusetts, USA, pages 97–100.
+Richard Socher, Alex Perelygin, Jean Y Wu, Jason
+  Chuang, Christopher D Manning, Andrew Y Ng,
+  Christopher Potts, et al. 2013. Recursive deep
+  models for semantic compositionality over a senti-
+  ment treebank. In Proceedings of the conference on
+  empirical methods in natural language processing
+  (EMNLP), volume 1631, page 1642.
+
+Gökhan Tür, Dilek Hakkani-Tür, and Larry P. Heck.
+  2010. What is left to be understood in atis? In
+  Proceedings of 2010 IEEE Spoken Language Tech-
+  nology Workshop (SLT), pages 19–24.
+
+Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob
+  Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz
+  Kaiser, and Illia Polosukhin. 2017. Attention is all
+  you need. In Advances in Neural Information Pro-
+  cessing Systems, pages 5998–6008.
+
+Liang-Chih Yu, Jin Wang, K. Robert Lai, and Xuejie
+  Zhang. 2017. Refining word embeddings for sen-
+  timent analysis. In Proceedings of the 2017 Con-
+  ference on Empirical Methods in Natural Language
+  Processing, pages 534–539. Association for Compu-
+  tational Linguistics.
+Xiang Zhang, Junbo Zhao, and Yann LeCun. 2015.
+  Character-level convolutional networks for text clas-
+  sification. In Advances in Neural Information Pro-
+  cessing Systems, pages 649–657.
+
+
+
+
+                                                     2876
+

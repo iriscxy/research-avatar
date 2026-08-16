@@ -1,3 +1,3 @@
-# Footprint framing
+# Formal spine
 
-The paper uses one central object, the two-coordinate operator footprint. The distance, partial association, and epsilon-expanded convex-hull cover are operational definitions rather than universal theoretical guarantees. `verify.py` checks the elementary metric invariants used by the implementation.
+The central object is the true-label candidate margin. The body defines deterministic candidates, margins, class-balanced quotas, constrained selection, and the paired non-inferiority rule. The appendix proves that selecting the lowest margins is the classwise minimizer and that quotas preserve the exact budget. `verify.py` mechanically checks the empirical premises used by the formal statements.

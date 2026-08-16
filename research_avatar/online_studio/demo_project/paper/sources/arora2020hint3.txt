@@ -1,0 +1,372 @@
+             HINT3: Raising the bar for Intent Detection in the Wild
+                    Gaurav Arora                                           Chirag Jain
+                      Jio Haptik                                            Jio Haptik
+                 gaurav@haptik.ai                                    chirag.jain@haptik.ai
+
+              Manas Chaturvedi                                            Krupal Modi
+                  Jio Haptik                                                Jio Haptik
+        manas.chaturvedi@haptik.ai                                     krupal@haptik.ai
+
+
+                     Abstract                                 background of domain experts involved in defining
+                                                              the classes make this task more challenging. Dur-
+    Intent Detection systems in the real world
+                                                              ing inference, these systems may be deployed to
+    are exposed to complexities of imbalanced
+    datasets containing varying perception of in-
+                                                              users with diverse cultural backgrounds who might
+    tent, unintended correlations and domain-                 frame their queries differently even when commu-
+    specific aberrations. To facilitate benchmark-            nicating in the same language. Furthermore, during
+    ing which can reflect near real-world scenar-             inference, apart from correctly identifying in-scope
+    ios, we introduce 3 new datasets created from             queries, the system is expected to accurately reject
+    live chatbots in diverse domains. Unlike                  out-of-scope (Larson et al., 2019) queries, adding
+    most existing datasets that are crowdsourced,             on to the challenge.
+    our datasets contain real user queries received
+    by the chatbots and facilitates penalising un-               Most existing datasets for intent detection are
+    wanted correlations grasped during the train-             generated using crowdsourcing services. To accu-
+    ing process. We evaluate 4 NLU platforms                  rately benchmark in real-world settings, we release
+    and a BERT based classifier and find that per-            3 new single-domain datasets, each spanning mul-
+    formance saturates at inadequate levels on test           tiple coarse and fine grain intents, with the test sets
+    sets because all systems latch on to unintended           being drawn entirely from actual user queries on
+    patterns in training data.
+                                                              the live systems at scale instead of being crowd-
+                                                              sourced. On these datasets, we find that the perfor-
+1   Introduction
+                                                              mance of existing systems saturates at unsatisfac-
+Over the last few years, task-oriented dialogue sys-          tory levels because they end up learning spurious
+tems have gained increasing traction for applica-             patterns from the training dataset instead of gener-
+tions like personal assistants, automated customer            alising to the perceived meanings of intents.
+support agents, etc. This has led to the availability            We evaluate 4 NLU platforms - Dialogflow1 ,
+of several commercialised and/or open conversa-               LUIS2 , Rasa NLU3 , Haptik45 and a BERT (De-
+tional bot building platforms. Most popular sys-              vlin et al., 2019) based classifier on all 3 datasets
+tems today involve intent detection as a vital part           and highlight gaps in language understanding. We
+of their Natural Language Understanding (NLU)                 further probe into queries where all the current
+pipeline. Recent advances in transfer learning                systems fail and question the efficacy of the cur-
+(Howard and Ruder, 2018; Peters et al., 2018; De-             rent approach of learning. Additionally, we repeat
+vlin et al., 2019) has enabled systems that perform           all our experiments on the subset of training data
+quite well on existing benchmarking datasets (Lar-            and show a performance drop in all the systems
+son et al., 2019; Casanueva et al., 2020).                    despite retaining relevant and sufficient utterances
+   Definitions of intent often vary across users,             in the training subset. We’ve made our datasets
+tasks and domains. Perception of intent could range           and code freely accessible on GitHub to promote
+from a generic abstraction such as “Ordering a
+product” to extreme granularity such as “Enquiring               1
+                                                                   https://cloud.google.com/dialogflow
+                                                                 2
+for a discount on a specific product if ordered us-                https://www.luis.ai/
+                                                                 3
+                                                                   https://github.com/RasaHQ/rasa/
+ing a specific card”. Additionally, factors such as              4
+                                                                   https://haptik.ai
+imbalanced data distribution in the training set, as-            5
+                                                                   Access requests for signup on Haptik are processed via
+sumptions during training data generation, diverse            contact form at https://haptik.ai/contact-us/
+
+                                                        100
+              Proceedings of the First Workshop on Insights from Negative Results in NLP, pages 100–105
+                   Online, November 19, 2020. c 2020 Association for Computational Linguistics
+                                              ISBN 978-1-952148-66-8
+                       Example Intents                                   Example Queries
+    Dataset                                             Train                                     Test
+                    Type           Label
+                                                                                  In-scope                Out-of-Scope
+                                                      What are the
+                                                                                                       If I order now do
+                  Generic        OFFERS            available offers            Any other offers
+  SOF                                                                                                 i get 20% discount
+                                                Give me some discount
+ Mattress                                                                                            in lockdown period
+                                                      What is the
+                               100 NIGHT                                        Free 100 days
+                  Specific                          100-night offer
+                              TRIAL OFFER                                            trial
+                                                     Trial offer on
+                                                                                                            I need try
+                                                     customisation
+                                                   Sir I want to fast          I need Beginners             Role of
+                              RECOMMEND               gain weight.             hair multivitamin     electrolytes powder
+ Curekart         Generic
+                                PRODUCT              i’m beginner                 Which is the           Is it help for
+                                                         in gym                best whey protein         sperm count
+                                                    For biceps and                  Can i get
+                                                                                                           Can diabetic
+                                                     tricep muscle              rivamal 120 ml
+                                                                                                          patient have it
+                                                 growth supplements                at my home
+                                                     Connect with             chat with customer
+                                                                                                     Application is not
+                                                          agent                  service agent
+    Power                     CHAT WITH                                                              responding during
+                  Generic                           My transaction               PowerPlay11
+    play11                     AN AGENT                                                                 team joining
+                                                      is incorrect                rummy issue
+                                                      My sign up               Suddenly balance
+                                                                                                         Why my current
+                                                  bonus is incorrect                   gone
+                                                                                                         basketball teams
+                                                   Did not receive            Why it is showing
+                                                                                                          being shown??
+                                                      my amount                 wrong balance
+
+                   Table 1: Few examples of Intents and Queries in Train and Test set in HINT3 dataset
+
+
+transparency and reproducibility6 .                                 Dataset      #Intent             #Queries
+                                                                                               Train          Test
+                                                                                           Full Subset in-scope oos
+2        Prior Work                                              SOFMattress     21        328 180       231       166
+                                                                 Curekart        28        600 413       452       539
+Despite intent detection being an important compo-               Powerplay11     59        471 261       275       708
+nent of most dialogue systems, very few datasets
+have been collected from real users. Web Apps,                       Table 2: Statistics of the 3 datasets in HINT3
+Ask Ubuntu and Chatbot datasets from (Braun
+et al., 2017) contain a limited number of intents               BANKING77 offer relatively large and well bal-
+(<10), oversimplifying the task. More recent                    anced training set which might not be always feasi-
+datasets like HWU64 from (Liu et al., 2019) and                 ble to collect for every new domain. For all datasets
+CLINC150 from (Larson et al., 2019) span a large                mentioned so far, recent works have reported a
+number of intents in multiple domains but are gen-              reasonably high performance (>90% average) for
+erated using crowd sourcing services hence are                  in-scope queries. Despite this, gaps in language un-
+limited in diversity in user expressions which arise            derstanding become apparent when such systems
+from but not limited to domain specific presump-                are deployed. Datasets introduced in this paper
+tions, context from how and where the bot is made               and further analysis of results attempts to recognise
+available, paraphrases emerging from cultural and               critical gaps in language understanding and calls
+ethnic diversity of user base, conversational slang,            for further research into more robust methods.
+etc. Our work has some similarity with CLINC150,
+in that they also highlight the problem of out-of-              3   Datasets
+scope intent detection and with BANKING77 from
+(Casanueva et al., 2020) that focuses on a single               We introduce HINT3, a collection of datasets
+domain. However, all three - HWU64, CLINC150,                   shown in Table 2 - SOFMattress, Curekart and
+                                                                Powerplay11 each containing diverse set of intents
+     6
+         https://github.com/hellohaptik/HINT3                   in a single domain - mattress products retail, fitness
+
+                                                          101
+              Figure 1: Matthew’s Correlation Coefficient and Accuracy across all datasets and platforms
+
+
+supplements retail and online gaming respectively.                 rest, discarding a query if it has an entailment score
+Table 1 shows few example intents of varying gran-                 (Bowman et al., 2015) greater than 0.6 in both di-
+ularity in HINT3 dataset, along with examples of                   rections with any of the queries retained so far i.e.
+training queries created by domain experts and                     the subset version has the following property
+in-scope, out-of-scope queries received from real
+users.
+                                                                            E(xa , xb ) ≤ 0.6 ∧ E(xb , xa ) ≤ 0.6;
+3.1      Training Data Collection
+                                                                              a 6= b, a ∈ [1, |X̂i |], b ∈ [1, |X̂i |] ∀ I
+Training data is prepared by a team of domain ex-
+perts trying to emulate real users after in-depth re-
+search of historical user queries. The experts do not                 where I is the set of all intents, X̂i is the set
+create an explicit set of out of scope queries primar-             of queries retained for class i, E(h, p) is the en-
+ily because the universe of such queries is infinitely             tailment scoring function with h as hypothesis and
+big. Training datasets show class imbalance, oc-                   p as premise. We use ELMo model trained on
+currence of domain specific words, acronyms7 . All                 SNLI (Peters et al., 2018; Parikh et al., 2016) 8
+training data queries are in English.                              for E(h, p). These are intended to evaluate perfor-
+                                                                   mance with only semantically different sentences
+Dataset Variants
+                                                                   in the training set as ideally systems should already
+In addition to Full training sets, we create Sub-                  understand semantically similar queries to the ones
+set versions for each training set. For each class,                present in the training set.
+after retaining the first query we iterate over the
+   7                                                                  8
+       github.com/hellohaptik/HINT3/tree/master/data exploration          https://demo.allennlp.org/textual-entailment
+
+                                                             102
+                                      SOFMattress           Curekart             Powerplay11
+                                      Full Subset         Full Subset            Full Subset
+                      Dialogflow      73.1  65.3          75.0   71.2            59.6  55.6
+                        RASA          69.2  56.2          84.0   80.5            49.0  38.5
+                        LUIS          59.3  49.3          72.5   71.6            48.0  44.0
+                       Haptik         72.2  64.0          80.3   79.8            66.5  59.2
+                        BERT          73.5  57.1          83.6   82.3            58.5  53.0
+
+                Table 3: Inscope Accuracy at low threshold=0.1 for Full and Subset data variants
+
+
+3.2    Test Data Collection and Annotation                  4.2       Metrics
+Our test sets contain the first message received by        We consider Accuracy and Matthew’s Correlation
+live systems from real users over a period of 15           Coefficient9 as overall performance metrics for the
+days. Inter-annotator agreement was 75.8%, 80.0%           systems. We use OOS recall (Larson et al., 2019) to
+and 73.4% for SOFMattress, Curekart and Power-             evaluate performance on OOS queries and accuracy
+play11 respectively and conflicts were resolved by         of in-scope queries to evaluate performance on in-
+domain experts. One major reason for low inter-            scope queries.
+annotator agreement was unclear criteria for defin-
+ing an intent which sometimes lead to overlapping           5       Results
+intents of different levels of granularity, even after
+                                                           Figure 1 presents results for all systems, for both
+we had made sure to manually merge any conflict-
+                                                           Full and Subset variations of the dataset. Best Ac-
+ing or highly similar intents in the training data.
+                                                           curacy on all the datasets is in the early 70s. Best
+   Directly coming from real users our test set
+                                                           MCC for the datasets varies from 0.4 to 0.6, sug-
+queries also contain messaging slangs, acronyms,
+                                                           gesting the systems are far from perfectly under-
+spelling mistakes, grammatical mistakes and usage
+                                                           standing natural language.
+of code-mixed languages7 . Queries in non-Latin
+                                                              In Table 3, we consider in-scope accuracy at a
+script or code-mixed languages were marked as
+                                                           very low threshold of 0.1, to see if false positives
+out of scope (labelled as NO NODES DETECTED).
+                                                           on OOS queries would not have mattered, what’s
+Since live chat systems don’t cater all the queries
+                                                           the maximum in-scope accuracy that current sys-
+related to a brand, our test set contains relevant out-
+                                                           tems are able to achieve. Our results show that even
+of-scope queries received from users about that do-
+                                                           with such a low threshold, the maximum in-scope
+main. Any identifiable information of users, brands
+                                                           accuracy which systems are able to achieve on Full
+was replaced with made-up values in both train and
+                                                           Training set is pretty low, unlike the 90+ in-scope
+test sets.
+                                                           accuracies of these systems which have been re-
+                                                           ported on other public datasets like CLINC150 in
+4     Benchmark Evaluation                                 (Larson et al., 2019). And, the in-scope accuracy
+We evaluated the performance of our datasets on            is even worse for the Subset of the training data.
+platforms like Dialogflow, LUIS, RASA and Hap-                Table 5 shows percentage drop in in-scope accu-
+tik in addition to evaluating performance on BERT.         racy on subset data across all systems as compared
+All layers of BERT were fine-tuned with a learning         to in-scope accuracy on full data. The drop varies
+rate of 4e-5 for up to 50 epochs with a warmup             from 0.6% to 22.3% across datasets and platforms.
+period of 0.1 and early stopping.                          In an ideal world, this drop should be close to 0
+                                                           across all datasets, as if the system understands the
+4.1    Out-Of-Scope (OOS) prediction                       meaning of queries in training data, its performance
+                                                           should not get affected at all by removing queries
+We use thresholds on the model’s probability es-           in training data which are semantically similar to
+timate for the task of predicting whether a query          the ones already present.
+is OOS. We show performance on thresholds rang-               Analyzing few example queries which failed on
+ing from 0.1 to 0.9 at an interval of 0.1 to show          all platforms in Table 4 suggests that these models
+the maximum performance a model can achieve
+                                                                9
+irrespective of how we choose the threshold.                        https://scikit-learn.org/stable/modules/model evaluation
+
+                                                      103
+Test query                                         True label              Top predicted label             Sample training queries for True label         Sample training queries for predicted label
+                                                                                                           • Price of mattress                            • Features of Ergo mattress
+Ergo 7272 inches price?                            MATTRESS COST           L,H,D,R: ERGO FEATURES
+                                                                                                           • Custom size cost                             • Tell me about SOF Ergo mattress
+                                                                           L,H,D: COD                      • Trial details                                • Can I get COD option?
+Trail option are there                             100 NIGHT TRIAL OFFER
+                                                                           R: EMI                          • How to enroll for trial                      • Can it deliver by COD
+                                                                           L: DISTRIBUTORS                 • Will I get an option to Customise the size   • Want to know the custom size chart
+I require 75 inch 57 inch. Is it available?        SIZE CUSTOMIZATION
+                                                                           H,D,R: WHAT SIZE TO ORDER       • How can I order a custom sized mattress      • Show me all available sizes
+                                                                                                           • Want to know the discount                    • You guys provide EMI option?
+20 % discount available on emi                     OFFERS                  L,H,D,R: EMI
+                                                                                                           • Tell me about the latest offers              • No cost EMI is available?
+How will u deliver with this LockDown in place ?   NO NODES DETECTED       L,H,D,R: CHECK PINCODE                                                         • Do you deliver to my pincode
+                                                                                                           -
+Covid19 how can you deliver                        NO NODES DETECTED       L,H,D,R: CHECK PINCODE                                                         • Will you be able to deliver here
+
+
+
+Table 4: Few examples of test queries in SOFMattress which failed on all platforms, L: LUIS, H: Haptik, D:
+Dialogflow, R: Rasa. NO NODES DETECTED is the out-of-scope label.
+
+
+                                    SOF                                    Power                  there’s a significant gap in performance on crowd-
+                                                        Curekart
+                                   Mattress                                play11                 sourced datasets vs in a real world setup. NLU
+    Dialogflow                      10.6                        5.0          6.7                  systems don’t seem to be actually “understanding”
+      RASA                          18.7                        4.1         10.5                  language or capturing “meaning”. We believe our
+      LUIS                          16.8                        1.2          8.3                  analysis and dataset will lead to developing better,
+     Haptik                         11.3                        0.6         10.9                  more robust dialogue systems.
+      BERT                          22.3                        1.5          9.4
+                                                                                                  Acknowledgments
+Table 5: Percentage drop in Inscope Accuracy at low
+threshold=0.1 in Subset data as compared to Full                                                 We are grateful to Bot Analysts at Haptik, espe-
+                                                                                                 cially Aaron Dsouza10 , who helped us open-source
+                                                                                                 HINT3 datasets. We also want to thank clients of
+                                                                                                 Haptik who allowed us to share queries received
+                                                                                                 on their bots with the research community.
+
+
+                                                                                                  References
+                                                                                                  Emily M. Bender and Alexander Koller. 2020. Climb-
+                                                                                                    ing towards NLU: On meaning, form, and under-
+                                                                                                    standing in the age of data. In Proceedings of the
+                                                                                                    58th Annual Meeting of the Association for Compu-
+                                                                                                    tational Linguistics, pages 5185–5198, Online. As-
+Figure 2: Out-of-Scope (OOS) Recall at the cost of In-                                              sociation for Computational Linguistics.
+scope Accuracy for SOFMattress Full dataset
+                                                                                                  Samuel R. Bowman, Gabor Angeli, Christopher Potts,
+                                                                                                    and Christopher D. Manning. 2015. A large anno-
+                                                                                                    tated corpus for learning natural language inference.
+aren’t actually “understanding” language or captur-                                                 In Proceedings of the 2015 Conference on Empiri-
+ing “meaning”, instead capturing spurious patterns                                                  cal Methods in Natural Language Processing, pages
+in training data, as was also pointed in (Bender and                                                632–642, Lisbon, Portugal. Association for Compu-
+Koller, 2020). Predicting based on these spurious                                                   tational Linguistics.
+patterns, which models latch on to during training,                                               Daniel Braun, Adrian Hernandez Mendez, Florian
+leads to models having high confidence even on                                                      Matthes, and Manfred Langen. 2017. Evaluating
+OOS queries. Figure 2 shows this behaviour on                                                       natural language understanding services for conver-
+                                                                                                    sational question answering systems. In Proceed-
+SOFMattress Full dataset, as significant percentage                                                 ings of the 18th Annual SIGdial Meeting on Dis-
+of OOS queries have high confidence scores on all                                                   course and Dialogue, pages 174–185, Saarbrücken,
+systems, except LUIS, for which it is at the cost of                                                Germany. Association for Computational Linguis-
+in-scope accuracy.                                                                                  tics.
+                                                                                                  Iñigo Casanueva, Tadas Temčinas, Daniela Gerz,
+6        Conclusion                                                                                   Matthew Henderson, and Ivan Vulić. 2020. Efficient
+                                                                                                      intent detection with dual sentence encoders. In Pro-
+This paper analyzed intent detection on 3 new                                                         ceedings of the 2nd Workshop on Natural Language
+datasets consisting of both in-scope and out-of-                                                      Processing for Conversational AI, pages 38–45, On-
+scope queries received on 3 live chat bots over                                                       line. Association for Computational Linguistics.
+                                                                                                    10
+a period of 15 days. Our findings indicate that                                                          Reachable at aaron.dsouza@haptik.ai
+
+                                                                                            104
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and
+   Kristina Toutanova. 2019. BERT: Pre-training of
+   deep bidirectional transformers for language under-
+   standing. In Proceedings of the 2019 Conference
+   of the North American Chapter of the Association
+   for Computational Linguistics: Human Language
+  Technologies, Volume 1 (Long and Short Papers),
+   pages 4171–4186, Minneapolis, Minnesota. Associ-
+   ation for Computational Linguistics.
+Jeremy Howard and Sebastian Ruder. 2018. Universal
+   language model fine-tuning for text classification. In
+   Proceedings of the 56th Annual Meeting of the As-
+   sociation for Computational Linguistics (Volume 1:
+   Long Papers), pages 328–339, Melbourne, Australia.
+   Association for Computational Linguistics.
+
+Stefan Larson, Anish Mahendran, Joseph J. Peper,
+   Christopher Clarke, Andrew Lee, Parker Hill,
+   Jonathan K. Kummerfeld, Kevin Leach, Michael A.
+   Laurenzano, Lingjia Tang, and Jason Mars. 2019.
+   An evaluation dataset for intent classification and
+   out-of-scope prediction. In Proceedings of the
+   2019 Conference on Empirical Methods in Natu-
+   ral Language Processing and the 9th International
+  Joint Conference on Natural Language Processing
+  (EMNLP-IJCNLP), pages 1311–1316, Hong Kong,
+   China. Association for Computational Linguistics.
+Xingkun Liu, Arash Eshghi, Pawel Swietojanski, and
+  Verena Rieser. 2019. Benchmarking natural lan-
+  guage understanding services for building conversa-
+  tional agents. In Proceedings of the Tenth Interna-
+  tional Workshop on Spoken Dialogue Systems Tech-
+  nology (IWSDS), pages xxx–xxx, Ortigia, Siracusa
+  (SR), Italy. Springer.
+
+Ankur Parikh, Oscar Täckström, Dipanjan Das, and
+  Jakob Uszkoreit. 2016. A decomposable attention
+  model for natural language inference. In Proceed-
+  ings of the 2016 Conference on Empirical Methods
+  in Natural Language Processing, pages 2249–2255,
+  Austin, Texas. Association for Computational Lin-
+  guistics.
+Matthew Peters, Mark Neumann, Mohit Iyyer, Matt
+ Gardner, Christopher Clark, Kenton Lee, and Luke
+ Zettlemoyer. 2018. Deep contextualized word rep-
+ resentations. In Proceedings of the 2018 Confer-
+ ence of the North American Chapter of the Associ-
+ ation for Computational Linguistics: Human Lan-
+ guage Technologies, Volume 1 (Long Papers), pages
+ 2227–2237, New Orleans, Louisiana. Association
+ for Computational Linguistics.
+
+
+
+
+                                                        105
+

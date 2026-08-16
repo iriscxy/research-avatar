@@ -589,6 +589,21 @@ def paper_stage(root: Path) -> dict[str, Any]:
         total += len(paragraphs)
         accepted += sum(bool(item.get("accepted_text")) for item in paragraphs if isinstance(item, dict))
     project = config.get("project", {}) if isinstance(config.get("project"), dict) else {}
+    figures = runtime.get("figures", {}) if isinstance(runtime.get("figures"), dict) else {}
+    tables = runtime.get("tables", {}) if isinstance(runtime.get("tables"), dict) else {}
+    compile_state = runtime.get("compile", {}) if isinstance(runtime.get("compile"), dict) else {}
+    configured_figures = config.get("figures", {}) if isinstance(config.get("figures"), dict) else {}
+    configured_tables = config.get("tables", {}) if isinstance(config.get("tables"), dict) else {}
+    all_content_complete = bool(total) and accepted == total
+    all_figures_complete = all(
+        figures.get(figure_id, {}).get("status") == "approved"
+        for figure_id in configured_figures
+    )
+    all_tables_complete = all(
+        tables.get(table_id, {}).get("status") == "approved"
+        for table_id in configured_tables
+    )
+    project_complete = bool(config) and all_content_complete and all_figures_complete and all_tables_complete and compile_state.get("status") == "completed"
     config_path = root / "paper/paper_studio.json"
     studio_artifact = {
         "key": "paper_studio",
@@ -603,7 +618,7 @@ def paper_stage(root: Path) -> dict[str, Any]:
     return {
         "id": "paper",
         "title": "论文写作",
-        "status": "in_progress" if config else "not_started",
+        "status": "complete" if project_complete else ("in_progress" if config else "not_started"),
         "command": "$paperwrite",
         "metrics": [
             {"label": "Project", "value": project.get("name", "—")},

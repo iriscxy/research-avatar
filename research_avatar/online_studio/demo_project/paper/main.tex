@@ -1,25 +1,34 @@
-\documentclass[10pt,twocolumn]{article}
-\usepackage[a4paper,margin=0.72in,columnsep=0.25in]{geometry}
-\usepackage{times,microtype,graphicx,booktabs,amsmath,amssymb,url,xcolor}
-\usepackage[font=small,labelfont=bf]{caption}
-\usepackage[sort&compress,numbers]{natbib}
-\setlength{\parindent}{1em}
-\setlength{\parskip}{0pt}
+% Reference Conformance Block
+% Reference: Wang et al. (2025), Word Form Matters, Findings of ACL.
+% Ordered body: Introduction; Related Work; Problem Formulation; Dataset; metric definition/validation; word-form/context analysis; attention analysis; Conclusion; Limitations.
+% Reference body: 8 pages (Conclusion on p.8; references begin p.9). Target is an approved 4-page COLING short, so section cadence and figure order are mirrored within the official shorter limit.
+% Main figures: 4. Fig.1 validation curve in metric section; Fig.2 multi-panel main analysis; Fig.3 layer analysis; Fig.4 heatmap mechanism analysis. Tables: 0.
+% This paper: F1 motivation in Introduction; T1 primary comparison; F2 confirmation matrix; T2 operator analysis; F3 budget curve in Experiments. The approved five-artifact contract requires two tables in addition to three figures.
+% Figure style: lowercase panel labels where needed; semi-self-contained sentence captions below figures/tables; serif 9pt figure text; restrained teal/orange/blue colorblind-safe palette.
+\documentclass[11pt]{article}
+\usepackage{acl}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{amsmath,amssymb,booktabs,graphicx,microtype,flafter}
+\usepackage{xurl}
+\usepackage[T1]{fontenc}
+\renewcommand{\UrlFont}{\ttfamily\small}
 \widowpenalty=10000
 \clubpenalty=10000
-\title{Do Label-Free Typo Footprints Predict Augmentation Transfer?}
-\author{Anonymous submission}
-\date{}
+\title{Spend Typo Budget Where the Classifier Is Unsure: Class-Balanced Margin-Targeted Augmentation}
+\author{Anonymous COLING submission}
 \begin{document}
 \maketitle
-\begin{abstract}\input{sections/abstract}\end{abstract}
+\begin{abstract}
+\input{sections/abstract}
+\end{abstract}
 \input{sections/introduction}
 \input{sections/related_work}
 \input{sections/method}
 \input{sections/experiments}
 \input{sections/discussion}
 \input{sections/conclusion}
-\bibliographystyle{plainnat}
+\input{sections/limitations}
 \bibliography{references}
 \appendix
 \input{sections/appendix}

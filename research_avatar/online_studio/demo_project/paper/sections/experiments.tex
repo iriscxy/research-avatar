@@ -1,61 +1,56 @@
-\section{Experiments}
+\section{Experiments}\label{sec:experiments}
+
 \subsection{Protocol}
-We use the official frozen CLINC150 train, validation, and test partitions \citep{larson2019clinc}, restricted before experimentation to the first 20 lexicographically sorted intents. The classifier is a multinomial Naive Bayes model over word counts with additive smoothing 1.0. Four character operators apply adjacent internal swaps, deletions, insertions, or QWERTY-neighbor substitutions with per-token attempt probability 0.45. Seeds are fixed to $\{11,29,47,71,97\}$. Clean-only training is compared with single-operator augmentation, a balanced four-operator mixture, and our selected basis; all augmented methods receive the same number of examples.
+We use the official CLINC150 train, validation, and test partitions \citep{larson2019clinc}; intent labels make true-label margin and class quotas observable. The four typo operators are adjacent swap, deletion, insertion, and keyboard-neighbor substitution; this tests whether the selection gain spans distinct character edits. Each edit attempt has probability 0.45, with checks at 0.30 and 0.60. C1 covers 50- and 20-intent settings, both severity checks, and 10\%/50\% budgets at 20 intents. The full mixture contains one operator-balanced augmentation per clean item, not all four candidates. Seeds 307, 331, 353, 379, 401, 421, 443, and 467 are disjoint from exploration and fixed in the confirmation script. Each method's operator accuracies are persisted separately for paired reconstruction.
 
-The footprint tolerance is $\epsilon=0.01$. All footprints and basis selection use training or validation utterances only; test labels and accuracies are accessed only after $B^*$ is frozen. Accuracy is averaged across seeds. We report clean accuracy, the minimum accuracy over the four noisy conditions, and mean noisy accuracy. The two declared falsifiers are a bootstrap interval for $\rho_*$ that crosses zero and a basis whose worst-operator accuracy-gap interval exceeds 0.01 or whose clean-loss interval exceeds 0.01. The geometric $\epsilon$ and accuracy-gap boundary share the number 0.01 but have different units and roles.
-
-\subsection{Main Comparison}
-Table~\ref{tab:micro-main} reports the complete CLINC150 20-intent CPU subset comparison across augmentation policy, input condition, and accuracy metric. The full mixture improves worst-operator accuracy from 0.863 to 0.875. The minimal basis obtains 0.870, an observed gap of 0.005, and slightly higher clean accuracy (0.954 versus 0.953). Its mean noisy accuracy differs by less than one tenth of a percentage point. However, the bootstrap interval for the worst-gap statistic is approximately $[-0.003,0.014]$, crossing the 0.01 acceptance boundary. The point gap therefore does not establish the uncertainty-aware claim.
+\subsection{Primary comparison}
+Table~\ref{tab:main} reports the method by metric comparison. At the matched 1,250-example budget, random selection reaches 0.8014 mean noisy accuracy, whereas MTA reaches 0.8182. The paired gain is 0.0168, with a 95\% interval [0.0132, 0.0208]. MTA also raises clean accuracy from the clean-only model's 0.9133 to 0.9238. The full mixture remains 0.0036 higher on mean noisy accuracy, but the paired interval [-0.0056, -0.0017] lies entirely above the predeclared $-0.01$ boundary. Thus MTA meets the narrow refit-data claim without claiming superiority to full-mixture training. Appendix~\ref{app:derivations} records derivations and the executable check boundary.
 
 \begin{table*}[t]
-\centering\scriptsize\setlength{\tabcolsep}{4pt}
-\begin{tabular}{lcccc}
-\toprule
-\multicolumn{5}{c}{\textbf{Dataset: CLINC150 20-intent CPU subset} $\cdot$ augmentation policy $\cdot$ input condition $\cdot$ metric}\\
-Method & Clean Accuracy $\uparrow$ & Worst-operator Accuracy $\uparrow$ & Mean noisy Accuracy $\uparrow$ & Worst-accuracy gap $\downarrow$\\
-\midrule
-Clean-only word Naive Bayes & 0.9517 & 0.8633 & 0.8715 & 0.0117\\
-Balanced four-operator augmentation & 0.9530 & \textbf{0.8750} & \textbf{0.8902} & 0.0000\\
-Our method: minimal footprint-cover basis & \textbf{0.9540} & 0.8700 & 0.8895 & 0.0050\\
-\bottomrule
-\end{tabular}
-\caption{Clean and worst-operator comparison under a matched augmentation budget. Values are five-seed means; the declared accuracy-gap acceptance boundary is 0.01.}
-\label{tab:micro-main}
+\centering\small
+\begin{tabular}{lrrrr}\toprule
+Method & Clean accuracy $\uparrow$ & Mean noisy accuracy $\uparrow$ & Worst-operator accuracy $\uparrow$ & Augmented examples $\downarrow$ \\\midrule
+Clean only & 0.9133 & 0.7948 & 0.7889 & 0 \\
+Random budget & 0.9090 & 0.8014 & 0.7918 & 1,250 \\
+MTA & \textbf{0.9238} & 0.8182 & \textbf{0.8017} & 1,250 \\
+Full mixture & 0.9131 & \textbf{0.8217} & 0.7958 & 5,000 \\
+\bottomrule\end{tabular}
+\caption{Primary CLINC150 50-intent method-by-metric comparison, averaged over eight seeds held out from exploration. MTA uses the same 1,250-example refit budget as random selection; the full mixture uses 5,000 examples. Best values are bold.}
+\label{tab:main}
 \end{table*}
 
-\subsection{Footprints and Cross-Operator Transfer}
-The selected basis is deletion, insertion, and swap; keyboard substitution lies within 0.0061 of their footprint hull. Across the five seeds, the edit-count-controlled correlation between footprint distance and strictly cross-operator transfer is $0.183$, with bootstrap 95\% CI $[-0.002,0.368]$. The interval crosses zero and most seed estimates have the opposite sign from the proposed mechanism. C1 is therefore falsified.
-
-Figure~\ref{fig:typo-sensitivity} shows held-out operator accuracy for the full mixture and minimal basis on the same dataset and augmentation policies. The basis is slightly better on swap, deletion, and insertion, but worse on keyboard substitution (0.870 versus 0.882). That localized loss explains its lower worst-case value and is important: hull coverage is an approximate selection rule, not an invariance guarantee.
+\subsection{Held-out-seed confirmation}
+Figure~\ref{fig:confirmation} plots each paired mean and C1 bootstrap interval. The six MTA-minus-random estimates are 0.0168, 0.0131, 0.0074, 0.0164, 0.0068, and 0.0174; every interval lower bound is positive. The smallest gain is at severity 0.30, but no margin-distribution analysis identifies why. At severity 0.60, MTA-minus-full is $-0.0071$ [$-0.0127$, $-0.0021$]; the interval crosses $-0.01$, so primary non-inferiority does not extend to this stress setting.
 
 \begin{figure}[tb]
 \centering
-\includegraphics[width=\columnwidth]{fig/typo_basis/results/F2_operator_transfer.pdf}
-\caption{Held-out operator accuracy on the CLINC150 20-intent CPU subset dataset. The augmentation policy is either the full mixture or minimal basis; the input condition is the named held-out operator and the metric is five-seed mean accuracy.}
-\label{fig:typo-sensitivity}
+\includegraphics[width=\columnwidth]{fig/typo_margin/actual/F2_confirmation.pdf}
+\caption{Confirmation setting by paired accuracy difference between MTA and the matched random budget. Error bars are bootstrap 95\% intervals; every lower bound exceeds zero.}
+\label{fig:confirmation}
 \end{figure}
 
-\subsection{What the Footprints Capture}
-The aggregate footprints are $z_{\mathrm{swap}}=(0.1764,0.2689)$, $z_{\mathrm{delete}}=(0.1831,0.1908)$, $z_{\mathrm{insert}}=(0.1941,0.1882)$, and $z_{\mathrm{keyboard}}=(0.1914,0.2289)$. Swap is separated mainly by trigram disruption, whereas deletion and insertion form a close pair. Keyboard substitution falls between that pair and swap in the two-dimensional plane, which is why it can be covered without becoming a basis vertex. This interpretation is label-free: neither the selected subset nor the hull distance uses classifier accuracy.
+\subsection{Operator analysis}
+Table~\ref{tab:operators} resolves the primary result by evaluation operator. Against random selection, MTA gains 0.0213 on swap, 0.0222 on deletion, 0.0096 on insertion, and 0.0138 on keyboard substitution. Thus the evaluation benefit appears on every operator. Relative to full mixture, MTA is lower on swap/deletion, higher on insertion, and nearly tied on keyboard; this descriptive pattern does not identify a training-side cause.
 
-The mean edit counts range only from 1.990 for swap to 2.161 for insertion. After controlling for edit-count difference, the five seed-level partial correlations are $0.217$, $0.483$, $0.329$, $0.058$, and $-0.170$. Their signs and magnitudes are unstable, which explains why the resampled interval includes zero.
+\begin{table}[tb]
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{lrrrr}\toprule
+Method & Swap & Delete & Insert & Keyboard \\\midrule
+Random budget & 0.8114 & 0.8053 & 0.7922 & 0.7968 \\
+MTA & 0.8327 & 0.8275 & \textbf{0.8017} & 0.8107 \\
+Full mixture & \textbf{0.8437} & \textbf{0.8363} & 0.7958 & \textbf{0.8113} \\
+\bottomrule\end{tabular}
+\caption{Primary-setting method-by-operator accuracy. MTA improves over the matched random budget for every operator; best values are bold.}
+\label{tab:operators}
+\end{table}
 
-\subsection{Reading the Acceptance Check}
-The one-percentage-point boundary was declared before running the comparison. The observed 0.005 worst-operator gap is half that value, but the resampled upper bound is about 0.014. Only the point estimate meets the boundary; the uncertainty-aware claim does not. Keyboard substitution remains the limiting condition. This distinction prevents the qualitative phrase ``matches the mixture'' from hiding both the tolerance and its uncertainty.
+\subsection{Budget sensitivity}
+Figure~\ref{fig:budget} fixes 20 intents and varies only budget. MTA exceeds random selection at 10\%, 25\%, and 50\%, with gains of 0.0068, 0.0131, and 0.0174. These predeclared points show breadth, not a tuned optimum.
 
-Clean accuracy does not reveal a trade-off here. The basis scores 0.954, compared with 0.953 for the full mixture and 0.952 for clean-only training after rounding to three decimals. These small differences should not be interpreted as evidence that corruption improves clean generalization. The clean-loss interval does not indicate a harmful loss, but C2 remains false because its joint worst-gap requirement fails. Likewise, the 0.0007 mean-noisy gap between basis and mixture is descriptive and is not promoted to an additional hypothesis.
-
-\subsection{Reproducibility and Cost}
-The implementation uses the Python standard library for data preparation, perturbation, multinomial Naive Bayes, metrics, geometry, and bootstrapping. It downloads one pinned official CLINC150 JSON revision if the cache is absent, then runs without network access. A full five-seed execution takes roughly ten seconds on a local CPU, consumes zero GPU hours, and makes no paid model calls. Two executions produced identical result payloads after removing their wall-clock duration fields. Their SHA-256 digest begins \texttt{5f9e29e5f2fa44a69}; the complete digest is recorded with the released result artifact.
-
-Each paper cell resolves to a JSON pointer in the result ledger. The main table contributes twelve atomic cells and the operator-transfer figure contributes eight. This traceability does not make the experiment broader, but it guards against a common failure in small studies: copying a rounded value into prose after a later rerun has changed the underlying artifact.
-
-\subsection{Bootstrap Construction}
-For C1, one seed contributes a partial correlation over the twelve strict off-diagonal ordered operator pairs; 2,000 seed-bootstrap replicates form the percentile interval. For C2, each replicate recomputes the minimum of seed-mean per-operator accuracies rather than averaging per-seed minima. C2 is accepted only when the upper bounds for both the worst-gap and clean-loss statistics are at most 0.01.
-
-The observed worst-gap statistic is 0.005, whereas its percentile interval is $[-0.004,0.014]$. The clean-loss interval is approximately $[-0.005,0.000]$ and therefore passes its component boundary. Because C2 is conjunctive, the worst-gap failure decides the overall result. This reporting choice makes the negative adjudication reproducible and avoids treating a small clean-accuracy fluctuation as evidence of improvement.
-
-\subsection{Negative-Result Diagnostics}
-The C1 failure is not caused by one isolated seed. Four of five partial correlations are positive, contrary to the proposed negative direction, while the remaining seed is moderately negative. A plausible explanation is that Naive Bayes transfer depends on which intent-bearing tokens are changed, whereas the footprint averages disruption without weighting label-specific evidence.
-
-C2 fails more narrowly. The basis point estimates are close to the full mixture on every operator, yet five seeds do not localize the worst-gap statistic below the one-point boundary. This is a precision failure rather than evidence of a large degradation. Additional seeds could narrow seed uncertainty, but they would constitute a new prospectively frozen experiment; they cannot retroactively convert this run into support. Likewise, redefining the boundary around the observed 0.005 gap would be post hoc and is not attempted.
+\begin{figure}[tb]
+\centering
+\includegraphics[width=\columnwidth]{fig/typo_margin/actual/F3_budget.pdf}
+\caption{Budget by method and mean noisy accuracy in the fixed 20-intent scope. MTA exceeds matched random selection at every budget.}
+\label{fig:budget}
+\end{figure}

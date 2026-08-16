@@ -83,3 +83,4 @@ footer{display:flex;justify-content:space-between;padding:23px clamp(24px,6vw,90
 @media(max-width:900px){.demo-current-goal{grid-column:2}}
 @media(max-width:600px){.demo-current-goal{grid-column:1/-1}.demo-current-goal dl{grid-template-columns:1fr}.demo-current-goal dd{padding-top:2px;border-top:0}}
 @media(max-width:600px){.execution-mode-options{grid-template-columns:1fr}}
+.setting-label{fill:#536970;font:10px system-ui,sans-serif}.ci-line{stroke:#203f4d;stroke-width:2}

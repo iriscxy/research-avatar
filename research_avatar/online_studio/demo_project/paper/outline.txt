@@ -1,0 +1,7 @@
+- Working title: Spend Typo Budget Where the Classifier Is Unsure: Class-Balanced Margin-Targeted Augmentation
+- Core claim C1: MTA beats matched class-balanced random selection in every frozen confirmation setting.
+- Core claim C2: In the primary setting, MTA remains within one point of full-mixture noisy accuracy with one quarter of its augmented examples.
+- Core claim C3: The positive effect spans all four operators and six settings evaluated over the same eight frozen seeds held out from exploration.
+- Story: Uniform typo sampling ignores what the current classifier finds difficult. MTA generates the same candidates, ranks them by true-label score gap, and spends equal per-intent quotas on the lowest-gap items. Held-out-seed confirmation identifies a positive matched-budget selector effect while bounding the scope.
+- Method: Candidate generation → true-label margin → class-balanced quota selector → shared refit/evaluator → paired bootstrap decision rules.
+- Artifact ledger: F1 fig:motivation body; T1 tab:main body; F2 fig:confirmation body; T2 tab:operators body-or-appendix (kept in body); F3 fig:budget body. Labels, kinds, and dimensions exactly match the approved experiment contract.

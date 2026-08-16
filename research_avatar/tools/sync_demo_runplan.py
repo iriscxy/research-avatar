@@ -32,6 +32,9 @@ def export(source: Path, destination: Path) -> dict:
     snapshot = {
         "source": source_label,
         "schema_version": state.get("schema_version"),
+        "execution_mode": state.get("execution_mode"),
+        "goal_confirmation": state.get("goal_confirmation"),
+        "state": state.get("state"),
         "active_goal": state.get("active_goal"),
         "proposed_goal_id": state.get("proposed_goal_id"),
         "approved_artifact_ids": state.get("approved_artifact_ids", []),

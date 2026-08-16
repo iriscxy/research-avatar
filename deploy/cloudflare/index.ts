@@ -9,6 +9,11 @@ const PASSWORD_ITERATIONS = 100_000;
 interface Env {
   ONLINE_STUDIO: DurableObjectNamespace;
   AUTH_DB: D1Database;
+  CF_VERSION_METADATA: {
+    id: string;
+    tag: string;
+    timestamp: string;
+  };
   GOOGLE_OAUTH_CLIENT_ID?: string;
   GOOGLE_OAUTH_CLIENT_SECRET?: string;
 }
@@ -383,7 +388,13 @@ async function proxy(request: Request, env: Env, user: User | null): Promise<Res
     headers.set("x-online-user-provider", user.provider);
   }
   const forwarded = new Request(request, { headers });
-  return getContainer(env.ONLINE_STUDIO, "public-studio-promptmodalfix2").fetch(forwarded);
+  // A named container can survive a Worker/image deployment. Scope the name to
+  // the immutable Worker version so every release starts from the matching
+  // bundled demo project instead of serving a stale prior image indefinitely.
+  return getContainer(
+    env.ONLINE_STUDIO,
+    `public-studio-${env.CF_VERSION_METADATA.id}`,
+  ).fetch(forwarded);
 }
 
 export default {

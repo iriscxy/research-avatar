@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
-"""Mechanical sanity checks for the footprint-cover definitions."""
-from math import dist
+import json
+from decimal import Decimal
+from pathlib import Path
 
-points = {"swap": (0.176384, 0.268927), "delete": (0.183126, 0.190846), "insert": (0.194127, 0.188247), "keyboard": (0.191414, 0.228889)}
-assert all(dist(p, p) == 0 for p in points.values())
-assert all(abs(dist(a, b) - dist(b, a)) < 1e-12 for a in points.values() for b in points.values())
-assert len({"delete", "insert", "swap"}) < len(points)
-print("PASS: metric symmetry, identity, and strict basis reduction")
+root = Path(__file__).resolve().parents[2]
+result = json.loads((root / "results/typo_margin/confirmatory_results.json").read_text())
+primary = result["cases"]["primary-50"]
+assert primary["budget"]["selection_balance"] == "equal per intent class"
+assert primary["budget"]["selected_per_seed"] == 1250
+assert primary["budget"]["full_mixture_per_seed"] == 5000
+for case in result["cases"].values():
+    assert Decimal(str(case["inference"]["margin_vs_random_noisy_mean"]["bootstrap_95_ci"][0])) > 0
+noninferiority_lcb = Decimal(str(primary["inference"]["margin_vs_full_noisy_mean"]["bootstrap_95_ci"][0]))
+assert noninferiority_lcb > Decimal("-0.01")
+print(json.dumps({"checks": [{"id": "C2", "passed": True, "method": "numeric", "residual": float(noninferiority_lcb - Decimal("-0.01"))}]}))

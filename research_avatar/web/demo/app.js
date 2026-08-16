@@ -37,69 +37,46 @@ const resultTable = ({ id, title, headers, rows, note }) => `
   </section>`;
 
 const experimentPlanDemo = () => {
-  const methods = ["No Defense", "ABD", "RTV", "JBShield", "TrajGuard", "First-Divergence Repair"];
+  const methods = ["仅干净数据", "同预算随机增强", "MTA（本文方法）", "四倍完整混合增强"];
   return `
     <article class="actual-expplan">
       <header class="expplan-title">
         <p class="artifact-kicker">实验方案 · 已确认</p>
-        <h4>First-Divergence Repair</h4>
-        <p>先明确论文需要回答的问题，再为每个主张安排可核验的实验、图表和失败条件。</p>
-        <div class="expplan-facts"><span>ACL 2027</span><span>4 张图</span><span>3 张表</span><span>144 个待填数据单元</span><span>4×A100 · 约 428 GPU 小时</span></div>
+        <h4>Margin-Targeted Typo Augmentation</h4>
+        <p>在相同类别配额和最终重训练样本数下，验证优先选择低真实标签分数差的 typo 是否稳定优于随机选择。</p>
+        <div class="expplan-facts"><span>COLING 2027 Short</span><span>3 张图</span><span>2 张表</span><span>40 个待填数据单元</span><span>本地 CPU · 0 GPU 小时</span></div>
       </header>
-
-      <section class="plain-section">
-        <p class="artifact-kicker">研究目标与参考依据</p>
-        <h4>明确投稿目标与参考边界</h4>
-        <ul><li><strong>投稿目标：</strong>ACL 2027 主会长文。</li><li><strong>方法参照：</strong>以 RTV 界定科学问题、轨迹机制和核心比较基线。</li><li><strong>写作参照：</strong>以研究者自己的 ABD 论文校准段落功能、章节比例和图表节奏。</li></ul>
-      </section>
-
-      <section class="plain-section projected-paper-overview">
-        <p class="artifact-kicker">论文结构</p>
-        <h4>先确定论文要讲清楚什么</h4>
-        <p>标题、摘要方向、段落结构、图表、可证伪主张、实现方案和预算在实验开始前统一规划。</p>
-      </section>
 
       <section class="plain-section projected-abstract">
         <p class="artifact-kicker">标题与摘要方向</p>
-        <h4>First-Divergence Repair: Causal Single-Layer Recovery from Style-Induced Jailbreaks</h4>
-        <p>We test whether intent-preserving style transformations cause a reproducible first exit from a model's safety trajectory and whether repairing only that layer restores downstream safety. A unified white-box framework compares five rerun representation defenses across AdvBench, HarmBench, XSTest, and Just-Eval. The claim survives only if first-exit repair uniquely beats wrong-layer and repeated-repair controls while improving the safety–utility–cost frontier.</p>
-      </section>
-
-      <section class="plain-section">
-        <p class="artifact-kicker">图表规划</p>
-        <h4>让每张图表承担明确的论证任务</h4>
-        <p>方案包含 4 张图和 3 张表。本页选取一张数据图和一张主结果表，说明实验数据将如何进入论文。</p>
+        <h4>Spend Typo Budget Where the Classifier Is Unsure</h4>
+        <p>MTA 为每条训练样本生成 swap、delete、insert 和 keyboard 四种候选 typo，用干净分类器计算真实标签分数差，再按类别等额选择最低分数差候选。实验只改变选择策略，候选池、模型、类别分布、重训练数量和测试集保持一致。</p>
       </section>
 
       <section class="plain-section setup-section">
-        <p class="artifact-kicker">段落与证据</p><h4>每个关键段落都对应具体证据</h4>
-        <h5 class="embedded-heading">实验设置</h5>
-        <dl class="setup-grid"><dt>模型</dt><dd>Llama-3.1-8B-Instruct · Mistral-7B-Instruct-v0.3 · Qwen2.5-7B-Instruct</dd><dt>安全评测</dt><dd>AdvBench 50 行为子集 · HarmBench 1.0</dd><dt>正常任务与质量评测</dt><dd>XSTest · Just-Eval · Alpaca 正常任务对照</dd><dt>安全评估器</dt><dd>SORRY-Bench</dd><dt>比较方法</dt><dd>No Defense · ABD · RTV · JBShield · TrajGuard</dd><dt>核心指标</dt><dd>首次偏离稳定性 · 下游轨迹恢复 · DSR · XSTest 误拒率 · Just-Eval 保持率 · 延迟开销</dd></dl>
+        <p class="artifact-kicker">段落与证据</p><h4>每个关键主张都有对应图表和失败条件</h4>
+        <dl class="setup-grid"><dt>数据</dt><dd>固定版本 CLINC150；50-intent 主实验与 20-intent 范围检查</dd><dt>模型</dt><dd>共享的 multinomial Naive Bayes word-count 分类器</dd><dt>比较方法</dt><dd>仅干净数据 · 类别平衡随机预算 · MTA · 类别平衡完整混合</dd><dt>主要指标</dt><dd>干净准确率 · 四种 typo 的平均与最差准确率 · 配对 bootstrap 95% 区间</dd><dt>固定种子</dt><dd>六个设置复用同一组 8 个、与探索阶段分离的种子</dd><dt>证据产物</dt><dd>F1 动机图 · T1 主表 · F2 六设置区间图 · T2 操作符表 · F3 固定 20-intent 预算曲线</dd></dl>
       </section>
+
+      ${resultTable({id:"T1",title:"50-intent 主比较",headers:["方法","干净准确率 ↑","平均 typo 准确率 ↑","最差操作符准确率 ↑","增强样本数 ↓"],rows:methods,note:"C1 只有在 MTA−随机的配对 95% 区间下界大于 0 时成立；C2 只有在 MTA−完整混合的区间下界大于 −0.01 时成立。"})}
 
       <section class="evidence-artifact">
-        <p class="artifact-kicker">代表性图表 · 轨迹首次偏离</p><h4>安全轨迹从哪一层开始发生变化</h4>
-        ${projectedPanel({title:"图 2A · 安全轨迹的首次偏离位置",dataset:"AdvBench 50 + 意图匹配的风格改写",metric:"纵轴为安全轨迹偏离率，横轴为归一化网络深度",fields:"model_id · intent_id · style_id · layer_id · tube_exit",xLabel:"归一化网络深度",xs:["0.0","0.14","0.29","0.43","0.57","0.71","0.86","1.0"],series:["直接有害请求","风格改写后的有害请求"],image:"assets/expplan/F2_exit_depth.png"})}
+        <p class="artifact-kicker">F2 · 六设置确认图</p><h4>同一冻结种子组上的结果必须全部为正</h4>
+        ${pendingTable({headers:["设置","MTA − 随机 · 平均 typo 准确率","配对 95% 区间"],rows:["50 intents","20 intents","severity 0.30","severity 0.60","budget 10%","budget 50%"]})}
+        <p class="field-line">图表源字段：case_id · seed · random_noisy_accuracy · mta_noisy_accuracy · bootstrap_ci</p>
       </section>
-
-      ${resultTable({id:"代表性结果表",title:"安全性与可用性的统一比较",headers:["方法或条件","AdvBench DSR ↑（%，95% CI）","HarmBench DSR ↑（%，95% CI）","XSTest 误拒率 ↓（%，95% CI）","Just-Eval 保持率 ↑（%，95% CI）"],rows:methods,note:"所有方法使用相同的生成与评测设置重新运行，表中只接收本项目实际得到的结果。"})}
 
       <section class="plain-section claim-contract">
-        <p class="artifact-kicker">主张与失败条件</p><h4>在实验前说明什么结果会推翻主张</h4>
-        <div class="claim-rows"><div><b>C1</b><p>匹配意图的风格变换产生可复现的最早 safety-tube exit。</p><span>若 exit depth 跨 paraphrase、seed 或 model 不稳定，则失败。</span></div><div><b>C2</b><p>只修 first-exit layer 足以恢复下游安全几何并降低 harmful compliance。</p><span>若随机层、ABD 层、后续层或重复修复并列或更优，则失败。</span></div><div><b>C3</b><p>一次修复改善 safety–utility–cost frontier。</p><span>若 DSR 增益必须以更差的 XSTest、Just-Eval 或 latency 换取，则失败。</span></div></div>
-      </section>
-
-      <section class="plain-section implementation-section">
-        <p class="artifact-kicker">实现方案</p><h4>所有方法在同一实验框架中比较</h4>
-        <div class="table-scroll"><table class="implementation-table"><thead><tr><th>方法</th><th>采用的实现方式</th></tr></thead><tbody><tr><th>No Defense</th><td>复用统一生成流程，关闭所有防御。</td></tr><tr><th>ABD</th><td>在本地框架中实现安全边界估计、惩罚项和层选择，并复用统一的激活接口。</td></tr><tr><th>RTV</th><td>在本地框架中实现拒绝方向指纹与多层 Mahalanobis 轨迹评分。</td></tr><tr><th>JBShield</th><td>通过本地适配器接入官方的概念提取、评分、缓解和混合输入门控；<a href="https://github.com/NISPLab/JBShield" target="_blank" rel="noreferrer">查看官方代码</a>。</td></tr><tr><th>TrajGuard</th><td>在本地框架中实现滑动窗口隐状态聚合、持续性阈值和语义判定。</td></tr><tr><th>本文方法：First-Divergence Repair</th><td>在同一模型、轨迹、生成和评测接口上实现首次偏离定位、单次修复与下游恢复。</td></tr></tbody></table></div>
+        <p class="artifact-kicker">主张与失败条件</p><h4>正结果必须同时满足这些预先固定的边界</h4>
+        <div class="claim-rows"><div><b>C1</b><p>MTA 在全部六个设置中优于同预算随机选择。</p><span>任一配对区间下界不高于 0，则对应广度主张失败。</span></div><div><b>C2</b><p>主设置用四分之一增强样本达到完整混合的一点以内。</p><span>MTA−完整混合区间下界不高于 −0.01，则非劣主张失败。</span></div><div><b>C3</b><p>优势覆盖 swap、delete、insert、keyboard 四种测试操作符。</p><span>任一操作符点估计不优于随机，则收窄跨操作符主张。</span></div></div>
       </section>
 
       <section class="plain-section">
-        <p class="artifact-kicker">预算与决策标准</p><h4>提前确定资源上限和停止条件</h4>
-        <p>预算为 4×A100、约 428 GPU 小时；先验证首次偏离现象，再冻结阈值与修复强度。进入最终实验后不再调参；任一关键失败条件成立时，收窄或放弃对应主张。</p>
+        <p class="artifact-kicker">解释边界</p><h4>验证完整选择器效果，不冒充几何机制证明</h4>
+        <p>低分数差选择还可能改变编辑强度和难例来源的重复权重，因此当前设计只识别整个选择策略的效果；编辑数匹配与每来源唯一候选是后续机制对照，不作为当前论文已经证明的结论。</p>
       </section>
 
-      <section class="approval-line"><strong>方案确认</strong><span>已确认 · 2026-08-09</span><p>研究者确认图表、待测结果、预算和判断标准；如果证据不支持，就收窄或放弃相应主张。</p></section>
+      <section class="approval-line"><strong>方案确认</strong><span>已确认 · 2026-08-17</span><p>阈值和设置固定在确认脚本中；若证据不支持，就报告失败条件而不是改写判断标准。</p></section>
     </article>`;
 };
 
@@ -109,14 +86,15 @@ const runStatusMark = status => ({completed:"✅",running:"▶",proposed:"→",l
 
 const publicPartTitles = {
   P1: "基础通路验证",
-  P2: "关键现象验证",
-  P5: "主结果验证",
+  P2: "正结果确认",
 };
 
 const publicArtifactLabels = {
   F1: "图 1",
   F2: "图 2",
+  F3: "图 3",
   T1: "表 1",
+  T2: "表 2",
 };
 
 const executionModePanel = goal => `<div class="demo-current-goal execution-mode-panel" data-demo-current-goal="${escapeHtml(goal.id)}">
@@ -135,13 +113,13 @@ const goalHierarchy = () => {
   const goals = Object.fromEntries(runPlanDemoState.goals.map(goal => [goal.id, goal]));
   const currentId = runPlanDemoState.active_goal || runPlanDemoState.proposed_goal_id;
   const completed = runPlanDemoState.goals.filter(goal => goal.status === "completed").length;
-  const representativeGoalIds = [currentId, "G2.1", "G5.1"].filter((id, index, ids) => id && goals[id] && ids.indexOf(id) === index);
+  const representativeGoalIds = [currentId, "G1.1", "G2.1"].filter((id, index, ids) => id && goals[id] && ids.indexOf(id) === index);
   const representativeParts = representativeGoalIds.map(goalId => {
     const goal = goals[goalId];
     const part = runPlanDemoState.parts.find(item => item.id === goal.part_id);
     return {part, goal};
   });
-  return `<section class="goal-hierarchy"><p class="artifact-kicker">Goal 执行计划</p><p class="runplan-demo-note">完整实验先被拆成有依赖关系的 Goals。这里选取基础通路、关键现象和主结果三个里程碑，展示每个 Goal 的任务、完成标准，以及完成后数据表和图如何回到对应位置。</p>${representativeParts.map(({part, goal}) => {
+  return `<section class="goal-hierarchy"><p class="artifact-kicker">Goal 执行计划</p><p class="runplan-demo-note">这个本地 CPU 研究被拆为两个可验证 Goal：先固定可复现通路，再运行六设置确认并一次填充全部实证图表。当前 ${completed}/${runPlanDemoState.goals.length} 个 Goal 已完成。</p>${representativeParts.map(({part, goal}) => {
     const destination = goal.artifact_ids?.length ? goal.artifact_ids.map(id => publicArtifactLabels[id] || id).join("、") : "本任务不直接更新图表";
     const completedExample = goal.id === "G2.1";
     return `<div class="part-row"><h4><span>${escapeHtml(part.id.replace("P", "阶段 "))}</span>${escapeHtml(publicPartTitles[part.id] || part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p><div class="expanded-goal ${completedExample ? "demo-completed-goal" : ""}"><b>${completedExample ? "✅" : runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}${completedExample ? '<small>完成效果示例</small>' : ""}</strong><span>对应论文内容：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成标准：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? executionModePanel(goal) : ""}${completedExample ? resultProvenanceDemo() : ""}</div></div>`;
@@ -149,23 +127,27 @@ const goalHierarchy = () => {
 };
 
 const completedF2Rows = [
-  ["0.00", 0.04, 0.06], ["0.14", 0.05, 0.11], ["0.29", 0.08, 0.26], ["0.43", 0.13, 0.47],
-  ["0.57", 0.19, 0.68], ["0.71", 0.25, 0.79], ["0.86", 0.29, 0.84], ["1.00", 0.32, 0.86]
+  ["50 intents", 0.01675, 0.01317, 0.02079],
+  ["20 intents", 0.01307, 0.00802, 0.01688],
+  ["severity .30", 0.00745, 0.00547, 0.00943],
+  ["severity .60", 0.01641, 0.01016, 0.02172],
+  ["budget 10%", 0.00682, 0.00344, 0.01073],
+  ["budget 50%", 0.01740, 0.01359, 0.02120],
 ];
 
-const provenanceNumber = (value, depth, series) => `<span class="provenance-number" tabindex="0">${value.toFixed(2)}<span class="provenance-tooltip" role="tooltip"><b>演示数值 · 非科学结果</b><span><strong>任务</strong> G2.1</span><span><strong>数据切片</strong> depth=${depth} · ${series}</span><span><strong>原始记录</strong> results/demo/g2_1/raw_trace.jsonl</span><span><strong>筛选条件</strong> approved model + matched intent/style IDs</span><span><strong>计算公式</strong> sum(tube_exit) / valid records = ${value.toFixed(4)}</span><span><strong>运行命令</strong> python -m code.first_divergence.acquire --goal G2.1</span><span><strong>验证</strong> ledger schema, config digest, rerun match, source path reopen</span></span></span>`;
+const provenanceNumber = (value, setting, field) => `<span class="provenance-number" tabindex="0">${value.toFixed(4)}<span class="provenance-tooltip" role="tooltip"><b>已核验科学结果</b><span><strong>任务</strong> G2.1</span><span><strong>设置</strong> ${setting} · ${field}</span><span><strong>原始结果</strong> results/typo_margin/confirmatory_results.json</span><span><strong>派生数据</strong> results/typo_margin/paper_values.json</span><span><strong>计算</strong> 8 个冻结种子的配对准确率差与 percentile bootstrap</span><span><strong>运行命令</strong> python3 code/typo_margin/confirm.py</span><span><strong>验证</strong> 40/40 ledger cells REAL / VERIFIED</span></span></span>`;
 
 const completedF2Chart = () => {
-  const points = column => completedF2Rows.map((row, index) => `${54 + index * 61},${202 - row[column] * 170}`).join(" ");
-  return `<figure class="completed-chart"><svg viewBox="0 0 520 245" role="img" aria-label="Demo F2A safety tube exit rate chart"><g class="chart-grid"><line x1="54" y1="32" x2="481" y2="32"/><line x1="54" y1="117" x2="481" y2="117"/><line x1="54" y1="202" x2="481" y2="202"/></g><g class="chart-axis"><line x1="54" y1="25" x2="54" y2="202"/><line x1="54" y1="202" x2="486" y2="202"/></g><g class="chart-labels"><text x="18" y="36">1.0</text><text x="18" y="121">0.5</text><text x="18" y="206">0.0</text><text x="51" y="224">0.0</text><text x="256" y="224">depth</text><text x="466" y="224">1.0</text></g><polyline class="series-direct" points="${points(1)}"/><polyline class="series-style" points="${points(2)}"/>${completedF2Rows.map((row,index) => `<circle class="point-direct" cx="${54 + index * 61}" cy="${202 - row[1] * 170}" r="3.5"/><circle class="point-style" cx="${54 + index * 61}" cy="${202 - row[2] * 170}" r="3.5"/>`).join("")}<g class="chart-legend"><line x1="286" y1="18" x2="309" y2="18" class="series-direct"/><text x="315" y="22">Direct harmful</text><line x1="397" y1="18" x2="420" y2="18" class="series-style"/><text x="426" y="22">Styled</text></g></svg><figcaption>由左侧同一张数字源表生成；没有独立的 plot-only 数据源。</figcaption></figure>`;
+  const x = value => 55 + value / 0.025 * 410;
+  return `<figure class="completed-chart"><svg viewBox="0 0 520 260" role="img" aria-label="六个确认设置的 MTA 减随机准确率及 95% 区间"><g class="chart-grid"><line x1="55" y1="25" x2="55" y2="225"/><line x1="219" y1="25" x2="219" y2="225"/><line x1="383" y1="25" x2="383" y2="225"/></g>${completedF2Rows.map((row,index) => { const y=42+index*32; return `<text x="7" y="${y+4}" class="setting-label">${row[0]}</text><line x1="${x(row[2])}" y1="${y}" x2="${x(row[3])}" y2="${y}" class="ci-line"/><line x1="${x(row[2])}" y1="${y-5}" x2="${x(row[2])}" y2="${y+5}" class="ci-line"/><line x1="${x(row[3])}" y1="${y-5}" x2="${x(row[3])}" y2="${y+5}" class="ci-line"/><circle cx="${x(row[1])}" cy="${y}" r="4" class="point-style"/>`; }).join("")}<g class="chart-labels"><text x="50" y="247">0</text><text x="207" y="247">0.01</text><text x="371" y="247">0.02</text><text x="438" y="247">MTA − random</text></g></svg><figcaption>圆点为平均差，横线为配对 bootstrap 95% 区间；所有下界均高于零。</figcaption></figure>`;
 };
 
 const resultProvenanceDemo = () => `
-  <section class="evidence-artifact completed-result future-result-example"><p class="artifact-kicker">完成后的结果示例</p><h4>首次偏离率随网络深度的变化</h4>
-    <div class="simulated-run-summary"><strong>✅ 演示运行已完成</strong><span>16 个数据点全部核验</span><span>原始记录可重新打开</span><span>图形可重新生成</span></div>
-    <p>以下数据用于演示任务完成后的呈现方式，并非当前研究结论。每个数字都能查看来源、计算公式和运行命令。</p>
-    <div class="provenance-flow"><span>原始记录</span><i>→</i><span>结果核验</span><i>→</i><span>指标计算</span><i>→</i><span>填入数据表</span><i>→</i><span>生成图形</span></div>
-    <div class="completed-result-grid"><div class="table-scroll"><table class="result-shell source-table completed-source"><thead><tr><th>Normalized depth</th><th>Direct harmful</th><th>Style-transformed harmful</th></tr></thead><tbody>${completedF2Rows.map(([depth,direct,styled]) => `<tr><th>${depth}</th><td>${provenanceNumber(direct,depth,"direct harmful")}</td><td>${provenanceNumber(styled,depth,"style-transformed harmful")}</td></tr>`).join("")}</tbody></table><p class="hover-instruction">鼠标停在任一数字上，或用键盘聚焦，即可查看 raw path、筛选、公式、命令与验证过程。</p></div>${completedF2Chart()}</div>
+  <section class="evidence-artifact completed-result future-result-example"><p class="artifact-kicker">真实完成结果</p><h4>六个设置中的 MTA − 随机选择</h4>
+    <div class="simulated-run-summary"><strong>✅ 确认运行已完成</strong><span>40/40 数据单元已核验</span><span>配对区间可重算</span><span>图形可重新生成</span></div>
+    <p>这里展示当前正结果研究的真实确认数据。每个数字都能查看结果路径、计算方法、命令和验证状态。</p>
+    <div class="provenance-flow"><span>冻结种子结果</span><i>→</i><span>配对差值</span><i>→</i><span>bootstrap 区间</span><i>→</i><span>证据台账</span><i>→</i><span>论文图形</span></div>
+    <div class="completed-result-grid"><div class="table-scroll"><table class="result-shell source-table completed-source"><thead><tr><th>设置</th><th>平均差</th><th>95% 下界</th><th>95% 上界</th></tr></thead><tbody>${completedF2Rows.map(([setting,estimate,low,high]) => `<tr><th>${setting}</th><td>${provenanceNumber(estimate,setting,"estimate")}</td><td>${provenanceNumber(low,setting,"CI low")}</td><td>${provenanceNumber(high,setting,"CI high")}</td></tr>`).join("")}</tbody></table><p class="hover-instruction">鼠标停在任一数字上，或用键盘聚焦，即可查看来源、计算和验证过程。</p></div>${completedF2Chart()}</div>
   </section>`;
 
 const paperStudioScreenshots = () => `<section class="paper-studio-live">
@@ -225,15 +207,15 @@ const stages = [
   {
     id: "literature", short: "文献调研", path: "literature", title: "先建立可核验的文献地图", compare: null,
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">第二步 · 文献调研</p><h3>把相关工作整理成可核验的研究地图</h3><p>从不同角度检索并核对论文，梳理主要方向、争议和仍待解决的问题。</p></div><span class="status-pill">54 篇已核验</span></div>
-      ${commandStrip("整理并核验相关文献", "$researchlit stylish jailbreak")}
+      <div class="stage-head"><div><p class="eyebrow">第二步 · 文献调研</p><h3>把相关工作整理成可核验的研究地图</h3><p>从不同角度检索并核对论文，梳理主要方向、争议和仍待解决的问题。</p></div><span class="status-pill">30 篇已核验</span></div>
+      ${commandStrip("整理并核验相关文献", "$researchlit typographical robustness in lightweight intent classification")}
       ${reportDocument("literature")}`
   },
   {
     id: "ideas", short: "方向选择", path: "ideas", title: "候选先过门槛，再由研究者选择",
     compare: ["通常用排序快速呈现候选方向", "研究者再判断价值与新颖性", "把新颖性与可证伪性设为独立硬门槛"],
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">第三步 · 研究方向</p><h3>比较候选方向，明确新颖性与风险</h3><p>每个方向都说明研究空白、核心机制、可证伪条件和最近工作的重合程度，最后由研究者选择。</p></div><span class="status-pill">待研究者选择</span></div>
+      <div class="stage-head"><div><p class="eyebrow">第三步 · 研究方向</p><h3>比较候选方向，明确新颖性与风险</h3><p>每个方向都说明研究空白、核心机制、可证伪条件和最近工作的重合程度，最后由研究者选择。</p></div><span class="status-pill">I7 已选择</span></div>
       ${commandStrip("生成候选方向并逐一核验", "$ideagen")}
       ${reportDocument("ideas")}`
   },
@@ -366,7 +348,7 @@ async function initializeDemo() {
   try {
     const [structureResponse, runPlanResponse] = await Promise.all([
       fetch("report-structures.json?v=20260815-goal-modes"),
-      fetch("runplan-state.json?v=20260815-goal-modes")
+      fetch("runplan-state.json?v=20260817-mta-positive")
     ]);
     if (!structureResponse.ok) throw new Error(`report structures HTTP ${structureResponse.status}`);
     if (!runPlanResponse.ok) throw new Error(`run plan snapshot HTTP ${runPlanResponse.status}`);

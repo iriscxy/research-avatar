@@ -542,6 +542,16 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("demo_key_required", script)
         self.assertIn("openRequestedDemoKeyDialog();", script)
 
+    def test_cloudflare_release_uses_version_scoped_container(self):
+        """A deploy must not keep serving the prior image's demo snapshot."""
+        root = Path(__file__).resolve().parents[1]
+        worker = (root / "deploy/cloudflare/index.ts").read_text(encoding="utf-8")
+        wrangler = (root / "wrangler.example.jsonc").read_text(encoding="utf-8")
+        self.assertIn("env.CF_VERSION_METADATA.id", worker)
+        self.assertIn('"version_metadata"', wrangler)
+        self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
+        self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
+
     def test_upload_page_names_the_default_package_output(self):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn("outputs/paper-studio-evidence.zip", html)

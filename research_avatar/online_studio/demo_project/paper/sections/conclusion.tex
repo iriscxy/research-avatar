@@ -1,2 +1,5 @@
-\section{Conclusion}
-We tested typo-augmentation selection by label-free feature-footprint coverage. In a deterministic CPU experiment, footprint distance was not negatively associated with cross-operator transfer, and a three-operator basis had a favorable 0.5-percentage-point observed gap but failed the uncertainty-aware acceptance check against a four-operator mixture. The falsification shows why point estimates and geometric coverage alone are insufficient, while remaining explicitly bounded to one dataset slice, classifier, and synthetic operator family.\label{paper:endconclusion}
+\section{Conclusion}\label{sec:conclusion}
+
+Margin-Targeted Typo Augmentation turns a fixed final-refit example budget into a supervised selection problem. On CLINC150, class-balanced low-score-gap selection improves noisy intent accuracy over matched random sampling in all six prespecified settings and remains within one point of a four-times-larger mixture in the primary setting. The result supports a narrow allocation principle for this classifier and candidate pool, while making no claim of lower candidate-generation cost or an isolated geometric boundary mechanism.
+
+\label{paper:endconclusion}

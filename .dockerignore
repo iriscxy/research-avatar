@@ -16,9 +16,13 @@ build
 researcher-profile
 reports
 results
+!research_avatar/online_studio/demo_project/results/
+!research_avatar/online_studio/demo_project/results/**
 code
 data
 paper
+!research_avatar/online_studio/demo_project/paper/
+!research_avatar/online_studio/demo_project/paper/**
 outputs
 inputs
 tmp

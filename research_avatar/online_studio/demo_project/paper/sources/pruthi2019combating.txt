@@ -1,0 +1,620 @@
+        Combating Adversarial Misspellings with Robust Word Recognition
+
+
+                       Danish PruthiBhuwan Dhingra         Zachary C. Lipton
+                                  Carnegie Mellon University
+                                       Pittsburgh, USA
+                    {ddanish, bdhingra}@cs.cmu.edu, zlipton@cmu.edu
+
+
+
+
+                          Abstract                                 Alteration            Movie Review                 Label
+                                                                                A triumph, relentless and beautiful
+        To combat adversarial spelling mistakes, we                 Original
+                                                                                     in its downbeat darkness
+                                                                                                                       +
+        propose placing a word recognition model in
+        front of the downstream classifier. Our word                            A triumph, relentless and beuatiful
+                                                                     Swap                                              –
+                                                                                     in its downbeat darkness
+        recognition models build upon the RNN semi-                             A triumph, relentless and beautiful
+        character architecture, introducing several new              Drop                                              –
+                                                                                      in its dwnbeat darkness
+        backoff strategies for handling rare and un-
+                                                                                A triumph, relentless and beautiful
+        seen words. Trained to recognize words cor-                + Defense                                           +
+                                                                                     in its downbeat darkness
+        rupted by random adds, drops, swaps, and                                A triumph, relentless and beautiful
+                                                                   + Defense                                           +
+        keyboard mistakes, our method achieves 32%                                   in its downbeat darkness
+        relative (and 3.3% absolute) error reduction
+        over the vanilla semi-character model. No-               Table 1: Adversarial spelling mistakes inducing senti-
+        tably, our pipeline confers robustness on the            ment misclassification and word-recognition defenses.
+        downstream classifier, outperforming both ad-
+        versarial training and off-the-shelf spell check-
+        ers. Against a BERT model fine-tuned for sen-            misspellings constitute a longstanding real-world
+        timent analysis, a single adversarially-chosen           problem. Spammers continually bombard email
+        character attack lowers accuracy from 90.3%              servers, subtly misspelling words in efforts to
+        to 45.8%. Our defense restores accuracy to
+                                                                 evade spam detection while preserving the emails’
+        75%1 . Surprisingly, better word recognition
+        does not always entail greater robustness. Our
+                                                                 intended meaning (Lee and Ng, 2005; Fumera
+        analysis reveals that robustness also depends            et al., 2006). As another example, programmatic
+        upon a quantity that we denote the sensitivity.          censorship on the Internet has spurred communi-
+                                                                 ties to adopt similar methods to communicate sur-
+1       Introduction                                             reptitiously (Bitso et al., 2013).
+Despite the rapid progress of deep learning tech-                   In this paper, we focus on adversarially-chosen
+niques on diverse supervised learning tasks, these               spelling mistakes in the context of text classifica-
+models remain brittle to subtle shifts in the data               tion, addressing the following attack types: drop-
+distribution. Even when the permissible changes                  ping, adding, and swapping internal characters
+are confined to barely-perceptible perturbations,                within words. These perturbations are inspired by
+training robust models remains an open challenge.                psycholinguistic studies (Rawlinson, 1976; Matt
+Following the discovery that imperceptible attacks               Davis, 2003) which demonstrated that humans can
+could cause image recognition models to misclas-                 comprehend text altered by jumbling internal char-
+sify examples (Szegedy et al., 2013), a veritable                acters, provided that the first and last characters of
+sub-field has emerged in which authors iteratively               each word remain unperturbed.
+propose attacks and countermeasures.                                First, in experiments addressing both BiLSTM
+   For all the interest in adversarial computer vi-              and fine-tuned BERT models, comprising four
+sion, these attacks are rarely encountered out-                  different input formats: word-only, char-only,
+side of academic research. However, adversarial                  word+char, and word-piece (Wu et al., 2016), we
+    1
+                                                                 demonstrate that an adversary can degrade a clas-
+     All code for our defenses, attacks, and baselines is
+available at https://github.com/danishpruthi/                    sifier’s performance to that achieved by random
+Adversarial-Misspellings                                         guessing. This requires altering just two charac-
+
+                                                            5582
+           Proceedings of the 57th Annual Meeting of the Association for Computational Linguistics, pages 5582–5591
+                  Florence, Italy, July 28 - August 2, 2019. c 2019 Association for Computational Linguistics
+ters per sentence. Such modifications might flip       find that it is important that the recognition model
+words either to a different word in the vocabu-        supply few degrees of freedom to an attacker. We
+lary or, more often, to the out-of-vocabulary to-      provide a metric to quantify this notion of sensi-
+ken UNK . Consequently, adversarial edits can de-      tivity in word recognition models and study its re-
+grade a word-level model by transforming the in-       lation to robustness empirically. Models with low
+formative words to UNK . Intuitively, one might        sensitivity and word error rate are most robust.
+suspect that word-piece and character-level mod-
+els would be less susceptible to spelling attacks      2   Related Work
+as they can make use of the residual word con-
+text. However, our experiments demonstrate that        Several papers address adversarial attacks on NLP
+character and word-piece models are in fact more       systems. Changes to text, whether word- or
+vulnerable. We show that this is due to the ad-        character-level, are all perceptible, raising some
+versary’s effective capacity for finer grained ma-     questions about what should rightly be considered
+nipulations on these models. While against a           an adversarial example (Ebrahimi et al., 2018b;
+word-level model, the adversary is mostly lim-         Belinkov and Bisk, 2018). Jia and Liang (2017)
+ited to UNK -ing words, against a word-piece or        address the reading comprehension task, show-
+character-level model, each character-level add,       ing that by appending distractor sentences to the
+drop, or swap produces a distinct input, providing     end of stories from the SQuAD dataset (Rajpurkar
+the adversary with a greater set of options.           et al., 2016), they could cause models to output in-
+                                                       correct answers. Inspired by this work, Glockner
+   Second, we evaluate first-line techniques in-
+                                                       et al. (2018) demonstrate an attack that breaks en-
+cluding data augmentation and adversarial train-
+                                                       tailment systems by replacing a single word with
+ing, demonstrating that they offer only marginal
+                                                       either a synonym or its hypernym. Recently, Zhao
+benefits here, e.g., a BERT model achieving 90.3
+                                                       et al. (2018) investigated the problem of producing
+accuracy on a sentiment classification task, is
+                                                       natural-seeming adversarial examples, noting that
+degraded to 64.1 by an adversarially-chosen 1-
+                                                       adversarial examples in NLP are often ungram-
+character swap in the sentence, which can only be
+                                                       matical (Li et al., 2016).
+restored to 69.2 by adversarial training.
+                                                          In related work on character-level attacks,
+   Third (our primary contribution), we propose        Ebrahimi et al. (2018b,a) explored gradient-based
+a task-agnostic defense, attaching a word recog-       methods to generate string edits to fool classifica-
+nition model that predicts each word in a sen-         tion and translation systems, respectively. While
+tence given a full sequence of (possibly mispelled)    their focus is on efficient methods for generat-
+inputs. The word recognition model’s outputs           ing adversaries, ours is on improving the worst
+comprise the input to a downstream classification      case adversarial performance. Similarly, Belinkov
+model. Our word recognition models build upon          and Bisk (2018) studied how synthetic and natu-
+the RNN-based semi-character word recognition          ral noise affects character-level machine transla-
+model due to Sakaguchi et al. (2017). While our        tion. They considered structure invariant represen-
+word recognizers are trained on domain-specific        tations and adversarial training as defenses against
+text from the task at hand, they often predict UNK     such noise. Here, we show that an auxiliary word
+at test time, owing to the small domain-specific       recognition model, which can be trained on unla-
+vocabulary. To handle unobserved and rare words,       beled data, provides a strong defense.
+we propose several backoff strategies including           Spelling correction (Kukich, 1992) is often
+falling back on a generic word recognizer trained      viewed as a sub-task of grammatical error correc-
+on a larger corpus. Incorporating our defenses,        tion (Ng et al., 2014; Schmaltz et al., 2016). Clas-
+BERT models subject to 1-character attacks are         sic methods rely on a source language model and a
+restored to 88.3, 81.1, 78.0 accuracy for swap,        noisy channel model to find the most likely correc-
+drop, add attacks respectively, as compared to         tion for a given word (Mays et al., 1991; Brill and
+69.2, 63.6, and 50.0 for adversarial training          Moore, 2000). Recently, neural techniques have
+   Fourth, we offer a detailed qualitative analysis,   been applied to the task (Sakaguchi et al., 2017;
+demonstrating that a low word error rate alone is      Li et al., 2018), which model the context and or-
+insufficient for a word recognizer to confer robust-   thography of the input together. Our work extends
+ness on the downstream task. Additionally, we          the ScRNN model of Sakaguchi et al. (2017).
+
+                                                   5583
+3     Robust Word Recognition                              formance is unreasonably dependant on the cho-
+                                                           sen vocabulary size. In principle, one can design
+To tackle character-level adversarial attacks, we
+                                                           models to predict (correctly) only a few chosen
+introduce a simple two-stage solution, placing a
+                                                           words, and ignore the remaining majority and still
+word recognition model (W ) before the down-
+                                                           reach 100% accuracy. For the adversarial setting,
+stream classifier (C). Under this scheme, all inputs
+                                                           rare and unseen words in the wild are particularly
+are classified by the composed model C ◦ W . This
+                                                           critical, as they provide opportunities for the at-
+modular approach, with W and C trained sepa-
+                                                           tackers. A reliable word-recognizer should handle
+rately, offers several benefits: (i) we can deploy the
+                                                           these cases gracefully. Below, we explore different
+same word recognition model for multiple down-
+                                                           ways to back off when the ScRNN predicts UNK
+stream classification tasks/models; and (ii) we can
+                                                           (a frequent outcome for rare and unseen words):
+train the word recognition model with larger unla-
+beled corpora.                                                • Pass-through: word-recognizer passes on
+   Against adversarial mistakes, two important                  the (possibly misspelled) word as is.
+factors govern the robustness of this combined                • Backoff to neutral word: Alternatively,
+model: W ’s accuracy in recognizing misspelled                  noting that passing UNK -predicted words
+words and W ’s sensitivity to adversarial perturba-             through unchanged exposes the downstream
+tions on the same input. We discuss these aspects               model to potentially corrupted text, we con-
+in detail below.                                                sider backing off to a neutral word like
+3.1    ScRNN with Backoff                                       ‘a’, which has a similar distribution across
+                                                                classes.
+We now describe semi-character RNNs for word
+recognition, explain their limitations, and suggest           • Backoff to background model: We also
+techniques to improve them.                                     consider falling back upon a more generic
+                                                                word recognition model trained upon a larger,
+ScRNN Model Inspired by the psycholinguis-                      less-specialized corpus whenever the fore-
+tic studies (Matt Davis, 2003; Rawlinson, 1976),                ground word recognition model predicts
+Sakaguchi et al. (2017) proposed a semi-character                UNK 2 . Figure 1 depicts this scenario pic-
+based RNN (ScRNN) that processes a sentence                     torially.
+of words with misspelled characters, predict-
+ing the correct words at each step. Let s =                Empirically, we find that the background model
+{w1 , w2 , . . . , wn } denote the input sentence, a se-   (by itself) is less accurate, because of the large
+quence of constituent words wi . Each input word           number of words it is trained to predict. Thus,
+(wi ) is represented by concatenating (i) a one hot        it is best to train a precise foreground model on
+vector of the first character (wi1 ); (ii) a one hot       an in-domain corpus and focus on frequent words,
+representation of the last character (wil , where          and then to resort to a general-purpose background
+l is the length of word wi ); and (iii) a bag of           model for rare and unobserved words. Next, we
+characters    representation of the internal characters    delineate our second consideration for building ro-
+( l−1
+ P                                                         bust word-recognizers.
+    j=2 ij ). ScRNN treats the first and the last
+         w
+characters individually, and is agnostic to the or-        3.2   Model Sensitivity
+dering of the internal characters. Each word, rep-
+                                                           In computer vision, an important factor determin-
+resented accordingly, is then fed into a BiLSTM
+                                                           ing the success of an adversary is the norm con-
+cell. At each sequence step, the training target is
+                                                           straint on the perturbations allowed to an image
+the correct corresponding word (output dimension
+                                                           (||x − x0 ||∞ < ). Higher values of  lead to
+equal to vocabulary size), and the model is opti-
+                                                           a higher chance of mis-classification for at least
+mized with cross-entropy loss.
+                                                           one x0 . Defense methods such as quantization (Xu
+Backoff Variations While Sakaguchi et al.                  et al., 2017) and thermometer encoding (Buck-
+(2017) demonstrate strong word recognition per-            man et al., 2018) try to reduce the space of pertur-
+formance, a drawback of their evaluation setup is          bations available to the adversary by making the
+that they only attack and evaluate on the subset           model invariant to small changes in the input.
+of words that are a part of their training vocabu-             2
+                                                                 Potentially the background model could be trained with
+lary. In such a setting, the word recognition per-         full vocabulary so that it never predicts UNK
+
+                                                       5584
+Figure 1: A schematic sketch of our proposed word recognition system, consisting of a foreground and a back-
+ground model. We train the foreground model on the smaller, domain-specific dataset, and the background model
+on a larger dataset (e.g., the IMDB movie corpus). We train both models to reconstruct the correct word from
+the orthography and context of the individual words, using synthetically corrupted inputs during training. Subse-
+quently, we invoke the background model whenever the foreground model predicts UNK .
+
+
+   In NLP, we often get such invariance for free,                where V ◦ W (si ) returns the input representation
+e.g., for a word-level model, most of the pertur-                (of the downstream classifier) for the output string
+bations produced by our character-level adversary                produced by the word-recognizer W using si and
+lead to an UNK at its input. If the model is robust              #u (·) counts the number of unique arguments.
+to the presence of these UNK tokens, there is little                Intuitively, we expect a high value of SW,VA   to
+room for an adversary to manipulate it. Character-               lead to a lower robustness of the downstream clas-
+level models, on the other hand, despite their supe-             sifier, since the adversary has more degrees of
+rior performance in many tasks, do not enjoy such                freedom to attack the classifier. Thus, when using
+invariance. This characteristic invariance could be              word recognition as a defense, it is prudent to de-
+exploited by an attacker. Thus, to limit the number              sign a low sensitivity system with a low error rate.
+of different inputs to the classifier, we wish to re-            However, as we will demonstrate, there is often a
+duce the number of distinct word recognition out-                trade-off between sensitivity and error rate.
+puts that an attacker can induce, not just the num-
+ber of words on which the model is “fooled”. We                  3.3   Synthesizing Adversarial Attacks
+denote this property of a model as its sensitivity.
+                                                                 Suppose we are given a classifier C : S → Y
+   We can quantify this notion for a word recogni-
+                                                                 which maps natural language sentences s ∈ S to
+tion system W as the expected number of unique
+                                                                 a label from a predefined set y ∈ Y. An adversary
+outputs it assigns to a set of adversarial pertur-
+                                                                 for this classifier is a function A which maps a sen-
+bations. Given a sentence s from the set of sen-
+                                                                 tence s to its perturbed versions {s01 , s02 , . . . , s0n }
+tences S, let A(s) = s1 0 , s2 0 , . . . , sn 0 denote the
+                                                                 such that each s0i is close to s under some notion
+set of n perturbations to it under attack type A,
+                                                                 of distance between sentences. We define the ro-
+and let V be the function that maps strings to an
+                                                                 bustness of classifier C to the adversary A as:
+input representation for the downstream classifier.
+For a word level model, V would transform sen-                                                              
+tences to a sequence of word ids, mapping OOV                            RC,A = Es          min 1[C(s0 ) = y] ,          (2)
+                                                                                           s0 ∈A(s)
+words to the same UNK ID. Whereas, for a char
+(or word+char, word-piece) model, V would map
+                                                                 where y represents the ground truth label for s. In
+inputs to a sequence of character IDs. Formally,
+                                                                 practice, a real-world adversary may only be able
+sensitivity is defined as
+                                                                 to query the classifier a few times, hence RC,A
+                                                                 represents the worst-case adversarial performance
+                 #u (V ◦ W (s1 0 ), . . . , V ◦ W (sn 0 ))       of C. Methods for generating adversarial exam-
+                                                          
+ A
+SW,V = Es                                                    ,   ples, such as HotFlip (Ebrahimi et al., 2018b), fo-
+                                   n
+                                                         (1)     cus on efficient algorithms for searching the min
+
+                                                            5585
+above. Improving RC,A would imply better ro-                    tacks). In the all attack setting, we mix all attacks
+bustness against all these methods.                             by randomly choosing one for each word. This
+                                                                most closely resembles a real world attack setting.
+Allowed Perturbations (A(s)) We explore ad-
+versaries which perturb sentences with four types               Experimental Setup In addition to our word
+of character-level edits: (1) Swap: swapping two                recognition models, we also compare to After
+adjacent internal characters of a word. (2) Drop:               The Deadline (ATD), an open-source spell cor-
+removing an internal character of a word. (3) Key-              rector4 . We found ATD to be the best freely-
+board: substituting an internal character with ad-              available corrector5 . We refer the reader to Sak-
+jacent characters of QWERTY keyboard (4) Add:                   aguchi et al. (2017) for comparisons of ScRNN to
+inserting a new character internally in a word. In              other anonymized commercial spell checkers.
+line with the psycholinguistic studies (Matt Davis,                For the ScRNN model, we use a single-layer Bi-
+2003; Rawlinson, 1976), to ensure that the pertur-              LSTM with a hidden dimension size of 50. The
+bations do not affect human ability to comprehend               input representation consists of 198 dimensions,
+the sentence, we only allow the adversary to edit               which is thrice the number of unique characters
+the internal characters of a word, and not edit stop-           (66) in the vocabulary. We cap the vocabulary
+words or words shorter than 4 characters.                       size to 10K words, whereas we use the entire vo-
+                                                                cabulary of 78470 words when we backoff to the
+Attack Strategy For 1-character attacks, we try
+                                                                background model. For training these networks,
+all possible perturbations listed above until we
+                                                                we corrupt the movie reviews according to all at-
+find an adversary that flips the model prediction.
+                                                                tack types, i.e., applying one of the 4 attack types
+For 2-character attacks, we greedily fix the edit
+                                                                to each word, and trying to reconstruct the original
+which had the least confidence among 1-character
+                                                                words via cross entropy loss.
+attacks, and then try all the allowed perturbations
+on the remaining words. Higher order attacks can                                     Word Recognition
+be performed in a similar manner. The greedy                       Spell-Corrector   Swap   Drop    Add    Key    All
+strategy reduces the computation required to ob-                   ATD                7.2    12.6   13.3   6.9    11.2
+tain higher order attacks3 , but also means that the
+                                                                   ScRNN (78K)        6.3    10.2   8.7    9.8    8.7
+robustness score is an upper bound on the true ro-
+                                                                             ScRNN (10K) w/ Backoff Variants
+bustness of the classifier.
+                                                                   Pass-Through       8.5    10.5   10.7   11.2   10.2
+                                                                   Neutral            8.7    10.9   10.8   11.4   10.6
+4     Experiments and Results                                      Background         5.4    8.1     6.4    7.6   6.9
+In this section, we first discuss our experiments on            Table 2: Word Error Rates (WER) of ScRNN with each
+the word recognition systems.                                   backoff strategy, plus ATD and an ScRNN trained only
+                                                                on the background corpus (78K vocabulary) The error
+4.1    Word Error Correction                                    rates include 5.25% OOV words.
+Data: We evaluate the spell correctors from §3 on
+movie reviews from the Stanford Sentiment Tree-
+bank (SST) (Socher et al., 2013). The SST dataset               Results We calculate the word error rates
+consists of 8544 movie reviews, with a vocabu-                  (WER) of each of the models for different at-
+lary of over 16K words. As a background cor-                    tacks and present our findings in Table 2. Note
+pus, we use the IMDB movie reviews (Maas et al.,                that ATD incorrectly predicts 11.2 words for ev-
+2011), which contain 54K movie reviews, and a                   ery 100 words (in the ‘all’ setting), whereas, all of
+vocabulary of over 78K words. The two datasets                  the backoff variations of the ScRNN reconstruct
+do not share any reviews in common. The spell-                  better. The most accurate variant involves backing
+correction models are evaluated on their ability                off to the background model, resulting in a low er-
+to correct misspellings. The test setting consists              ror rate of 6.9%, leading to the best performance
+of reviews where each word (with length ≥ 4,                    on word recognition. This is a 32% relative error
+barring stopwords) is attacked by one of the at-                    4
+                                                                     https://www.afterthedeadline.com/
+                                                                    5
+tack types (from swap, add, drop and keyboard at-                    We compared ATD with Hunspell (http:
+                                                                //hunspell.github.io/), which is used in Linux
+   3
+     Its complexity is O(l), instead of O(lm ) where l is the   applications. ATD was significantly more robust owing to
+sentence length and m is the order.                             taking context into account while correcting.
+
+                                                            5586
+reduction compared to the vanilla ScRNN model                 Baseline defense strategies Two common
+with a pass-through backoff strategy. We can at-              methods for dealing with adversarial examples
+tribute the improved performance to the fact that             include: (1) data augmentation (DA) (Krizhevsky
+there are 5.25% words in the test corpus that are             et al., 2012); and (2) adversarial training (Adv)
+unseen in the training corpus, and are thus only              (Goodfellow et al., 2014). In DA, the trained
+recoverable by backing off to a larger corpus. No-            model is fine-tuned after augmenting the training
+tably, only training on the larger background cor-            set with an equal number of examples randomly
+pus does worse, at 8.7%, since the distribution of            attacked with a 1-character edit. In Adv, the
+word frequencies is different in the background               trained model is fine-tuned with additional adver-
+corpus compared to the foreground corpus.                     sarial examples (selected at random) that produce
+                                                              incorrect predictions from the current-state classi-
+4.2   Robustness to adversarial attacks                       fier. The process is repeated iteratively, generating
+                                                              and adding newer adversarial examples from the
+We use sentiment analysis and paraphrase detec-
+                                                              updated classifier model, until the adversarial
+tion as downstream tasks, as for these two tasks,
+                                                              accuracy on dev set stops improving.
+1-2 character edits do not change the output labels.
+                                                              Results In Table 3, we examine the robustness
+Experimental Setup For sentiment classifica-                  of the sentiment models under each attack and de-
+tion, we systematically study the effect of                   fense method. In the absence of any attack or
+character-level adversarial attacks on two architec-          defense, BERT (a word-piece model) performs
+tures and four different input formats. The first             the best (90.3%7 ) followed by word+char mod-
+architecture encodes the input sentence into a se-            els (80.5%), word-only models (79.2%) and then
+quence of embeddings, which are then sequen-                  char-only models (70.3%). However, even single-
+tially processed by a BiLSTM. The first and last              character attacks (chosen adversarially) can be
+states of the BiLSTM are then used by the soft-               catastrophic, resulting in a significantly degraded
+max layer to predict the sentiment of the input. We           performance of 46%, 57%, 59% and 33%, respec-
+consider three input formats for this architecture:           tively under the ‘all’ setting.
+(1) Word-only: where the input words are encoded                 Intuitively, one might suppose that word-piece
+using a lookup table; (2) Char-only: where the                and character-level models would be more robust
+input words are encoded using a separate single-              to such attacks given they can make use of the
+layered BiLSTM over their characters; and (3)                 remaining context. However, we find that they
+Word+Char: where the input words are encoded                  are the more susceptible. To see why, note that
+using a concatenation of (1) and (2) 6 .                      the word ‘beautiful’ can only be altered in a few
+   The second architecture uses the fine-tuned                ways for word-only models, either leading to an
+BERT model (Devlin et al., 2018), with an input                UNK or an existing vocabulary word, whereas,
+format of word-piece tokenization. This model                 word-piece and character-only models treat each
+has recently set a new state-of-the-art on sev-               unique character combination differently. This
+eral NLP benchmarks, including the sentiment                  provides more variations that an attacker can ex-
+analysis task we consider here. All models                    ploit. Following similar reasoning, add and key
+are trained and evaluated on the binary version               attacks pose a greater threat than swap and drop
+of the sentence-level Stanford Sentiment Tree-                attacks. The robustness of different models can be
+bank (Socher et al., 2013) dataset with only pos-             ordered as word-only > word+char > char-only ∼
+itive and negative reviews.                                   word-piece, and the efficacy of different attacks as
+   We also consider the task of paraphrase detec-             add > key > drop > swap.
+tion. Here too, we make use of the fine-tuned                    Next, we scrutinize the effectiveness of defense
+BERT (Devlin et al., 2018), which is trained and              methods when faced against adversarially chosen
+evaluated on the Microsoft Research Paraphrase                attacks. Clearly from table 3, DA and Adv are not
+Corpus (MRPC) (Dolan and Brockett, 2005).                        7
+                                                                   The reported accuracy on SST-B by BERT in Glue
+                                                              Benchmarks is slightly higher as it is trained and evalu-
+    6
+      Implementation details: The embedding dimension size    ated on phrase-level sentiment prediction task which has
+for the word, char and word+char models are 64, 32 and        more training examples compared to the sentence-level task
+64 + 32 respectively, with 64, 64 and 128 set as the hidden   we consider. We use the official source code at https:
+dimension sizes for the three models.                         //github.com/google-research/bert
+
+                                                          5587
+                                  Sentiment Analysis (1-char attack/2-char attack)
+      Model                    No attack       Swap           Drop         Add           Key            All
+                                                Word-Level Models
+      BiLSTM                      79.2      (64.3/53.6)   (63.7/52.7)   (60.0/43.2)   (60.2/42.4)   (58.6/40.2)
+      BiLSTM + ATD                79.3      (76.2/75.3)   (66.5/59.9)   (55.6/47.5)   (62.6/57.6)   (55.8/37.0)
+      BiLSTM + Pass-through       79.3      (78.6/78.5)   (69.1/65.3)   (65.0/59.2)   (69.6/65.6)   (63.2/52.4)
+      BiLSTM + Background         78.8      (78.9/78.4)   (69.6/66.8)   (62.6/56.4)   (68.2/62.2)   (59.6/49.0)
+      BiLSTM + Neutral            80.1      (80.1/79.9)   (72.4/70.2)   (67.2/61.2)   (69.0/64.6)   (63.2/54.0)
+                                                Char-Level Models
+      BiLSTM                      70.3      (53.6/42.9)   (48.8/37.1)   (33.8/14.8)   (40.8/22.0)   (32.6/14.0)
+      BiLSTM + ATD                71.0      (66.6/65.2)   (58.0/53.0)   (54.6/44.4)   (61.6/57.5)   (46.5/35.4)
+      BiLSTM + Pass-through       70.3      (65.8/62.9)   (58.3/54.2)   (54.0/44.2)   (58.8/52.4)   (51.6/39.8)
+      BiLSTM + Background         70.1      (70.3/69.8)   (60.4/57.7)   (57.4/52.6)   (58.8/54.2)   (53.6/47.2)
+      BiLSTM + Neutral            70.7      (70.7/70.7)   (62.1/60.5)   (57.8/53.6)   (61.4/58.0)   (55.2/48.4)
+                                                Word+Char Models
+      BiLSTM                      80.5      (63.9/52.3)   (62.8/50.8)   (57.8/39.8)   (58.4/40.8)   (56.6/35.6)
+      BiLSTM + ATD                80.8      (78.0/77.3)   (67.7/60.9)   (55.6/50.5)   (68.7/64.6)   (48.5/37.4)
+      BiLSTM + Pass-through       80.1      (79.0/78.7)   (69.5/65.7)   (64.0/59.0)   (66.0/62.0)   (61.5/56.5)
+      BiLSTM + Background         79.5      (79.6/79.0)   (69.7/66.7)   (62.0/57.0)   (65.0/56.5)   (59.4/49.8)
+      BiLSTM + Neutral            79.5      (79.5/79.4)   (71.2/68.8)   (65.0/59.0)   (65.5/61.5)   (61.5/55.5)
+                                                Word-piece Models
+      BERT                        90.3      (64.1/47.4)   (59.2/39.9)   (46.2/26.4)   (54.3/34.9)   (45.8/24.6)
+      BERT + DA                   90.2      (68.3/50.6)   (62.7/39.9)   (43.6/17.0)   (57.7/32.4)   (41.0/15.8)
+      BERT + Adv                  89.6      (69.2/52.9)   (63.6/40.5)   (50.0/22.0)   (60.1/36.6)   (47.0/20.2)
+      BERT + ATD                  89.0      (84.5/84.5)   (73.0/64.0)   (77.0/69.5)   (80.0/75.0)   (67.0/55.0)
+      BERT + Pass-through         89.8      (85.5/83.9)   (78.9/75.0)   (70.4/64.4)   (75.3/70.3)   (68.0/58.5)
+      BERT + Background           89.3      (89.1/89.1)   (79.3/76.5)   (76.5/71.0)   (77.5/74.4)   (73.0/67.5)
+      BERT + Neutral              88.3      (88.3/88.3)   (81.1/79.5)   (78.0/74.0)   (78.8/76.8)   (75.0/68.0)
+
+Table 3: Accuracy of various classification models, with and without defenses, under adversarial attacks. Even
+1-character attacks significantly degrade classifier performance. Our defenses confer robustness, recovering over
+76% of the original accuracy, under the ‘all’ setting for all four model classes.
+
+
+effective in this case. We observed that despite a          the swap and drop attacks. However, these gains
+low training error, these models were not able to           do not consistently translate in all other settings,
+generalize to attacks on newer words at test time.          as lower WER is necessary but not sufficient. Be-
+ATD spell corrector is the most effective on key-           sides lower error rate, we find that a solid defense
+board attacks, but performs poorly on other attack          should furnish the attacker the fewest options to
+types, particularly the add attack strategy.                attack, i.e. it should have a low sensitivity. As
+   The ScRNN model with pass-through backoff                we shall see in section § 4.3, the backoff neutral
+offers better protection, bringing back the adver-          variation has the lowest sensitivity due to mapping
+sarial accuracy within 5% range for the swap at-             UNK predictions to a fixed neutral word. Thus, it
+tack. It is also effective under other attack classes,      results in the highest robustness on most of the at-
+and can mitigate the adversarial effect in word-            tack types for all four model classes.
+piece models by 21%, character-only models by
+19%, and in word, and word+char models by over                Model                   No Attack
+                                                                                                      All attacks
+4.5% . This suggests that the direct training signal                                                1-char    2-char
+of word error correction is more effective than the           BERT                       89.0        60.0         31.0
+indirect signal of sentiment classification available         BERT + ATD                 89.9        75.8         61.6
+                                                              BERT + Pass-through        89.0        84.5         81.5
+to DA and Adv for model robustness.                           BERT + Neutral             84.0        82.5         82.5
+   We observe additional gains by using back-
+ground models as a backoff alternative, because of          Table 4: Accuracy of BERT, with and without defenses,
+its lower word error rate (WER), especially, under          on MRPC when attacked under the ‘all’ attack setting.
+
+                                                       5588
+                   Sensitivity Analysis                           12
+                                                                                                  11
+  Backoff          Swap    Drop     Add    Key    All             11      63.2
+                                                                          63.2                              55.2
+           Closed Vocabulary Models (word-only)                   10                              10                            51.6
+
+                                                                WER
+  Pass-Through      17.6    19.7     0.8   7.3    11.3
+  Background        19.5    22.3     1.1   9.5    13.1
+                                                                      9                         WER   9
+  Neutral           17.5    19.7     0.8   7.2    11.3                8                               8
+                                                                            Pass-through 59.6
+      Open Vocab. Models (char/word+char/word-piece)                  7     Background
+                                                                            Neutral                   7
+  Pass-Through      39.6    35.3    19.2   26.9   30.3                6                                    53.6
+  Background        20.7    25.1     1.3   11.6   14.7                         12          13         10             20          30
+                                                                            Sensitivity                           Sensitivity
+  Neutral           17.5    19.7     0.8    7.2   11.3
+
+                                                            Figure 2: Effect of sensitivity and word error rate on
+Table 5: Sensitivity values for word recognizers. Neu-
+                                                            robustness (depicted by the bubble sizes) in word-only
+tral backoff shows lowest sensitivity.
+                                                            models (left) and char-only models (right).
+
+   Table 4 shows the accuracy of BERT on 200 ex-            word+char, and word-piece models, the pass-
+amples from the dev set of the MRPC paraphrase              through version is more sensitive than the back-
+detection task under various attack and defense             ground variant, as it passes words as is (and each
+settings. We re-trained the ScRNN model vari-               combination is considered uniquely). However,
+ants on the MRPC training set for these experi-             for word-only models, pass-through is less sen-
+ments. Again, we find that simple 1-2 character             sitive as all the OOV character combinations are
+attacks can bring down the accuracy of BERT sig-            rendered identical.
+nificantly (89% to 31%). Word recognition mod-                 Ideally, a preferred defense is one with low sen-
+els can provide an effective defense, with both our         sitivity and word error rate. In practice, however,
+pass-through and neutral variants recovering most           we see that a low error rate often comes at the cost
+of the accuracy. While the neutral backoff model            of sensitivity. We visualize this trade-off in Fig-
+is effective on 2-char attacks, it hurts performance        ure 2, where we plot WER and sensitivity on the
+in the no attack setting, since it incorrectly mod-         two axes, and depict the robustness when using
+ifies certain correctly spelled entity names. Since         different backoff variants. Generally, sensitivity is
+the two variants are already effective, we did not          the more dominant factor out of the two, as the er-
+train a background model for this task.                     ror rates of the considered variants are reasonably
+                                                            low.
+4.3    Understanding Model Sensitivity
+                                                            Human Intelligibility We verify if the senti-
+Experimental setup To study model sensitiv-                 ment (of the reviews) is preserved with char-level
+ity, for each sentence, we perturb one randomly-            attacks. In a human study with 50 attacked (and
+chosen word and replace it with all possible per-           subsequently misclassified), and 50 unchanged re-
+turbations under a given attack type. The resulting         views, it was noted that 48 and 49, respectively,
+set of perturbed sentences is then fed to the word          preserved the sentiment.
+recognizer (whose sensitivity is to be estimated).
+As described in equation 1, we count the number             5         Conclusion
+of unique predictions from the output sentences.
+                                                            As character and word-piece inputs become com-
+Two corrections are considered unique if they are
+                                                            monplace in modern NLP pipelines, it is worth
+mapped differently by the downstream classifier.
+                                                            highlighting the vulnerability they add. We
+Results The neutral backoff variant has the low-            show that minimally-doctored attacks can bring
+est sensitivity (Table 5). This is expected, as it          down accuracy of classifiers to random guess-
+returns a fixed neutral word whenever the ScRNN             ing. We recommend word recognition as a safe-
+predicts an UNK , therefore reducing the number             guard against this and build upon RNN-based
+of unique outputs it predicts. Open vocabulary              semi-character word recognizers. We discover that
+(i.e. char-only, word+char, word-piece) down-               when used as a defense mechanism, the most ac-
+stream classifiers consider every unique combi-             curate word recognition models are not always the
+nation of characters differently, whereas word-             most robust against adversarial attacks. Addition-
+only classifiers internally treat all out of vocab-         ally, we highlight the need to control the sensitiv-
+ulary (OOV) words alike. Hence, for char-only,              ity of these models to achieve high robustness.
+
+                                                         5589
+6   Acknowledgements                                       Ian J Goodfellow, Jonathon Shlens, and Christian
+                                                              Szegedy. 2014. Explaining and harnessing adversar-
+The authors are grateful to Graham Neubig, Ed-                ial examples. In International Conference on Learn-
+uard Hovy, Paul Michel, Mansi Gupta, and An-                  ing Representations (ICLR).
+tonios Anastasopoulos for suggestions and feed-            Robin Jia and Percy Liang. 2017. Adversarial exam-
+back.                                                        ples for evaluating reading comprehension systems.
+                                                             Empirical Methods in Natural Language Processing
+                                                             (EMNLP).
+References                                                 Alex Krizhevsky, Ilya Sutskever, and Geoffrey E Hin-
+Yonatan Belinkov and Yonatan Bisk. 2018. Synthetic           ton. 2012. Imagenet classification with deep con-
+  and natural noise both break neural machine transla-       volutional neural networks. In Advances in neural
+  tion. In International Conference on Learning Rep-         information processing systems (NIPS).
+  resentations (ICLR).
+                                                           Karen Kukich. 1992. Techniques for automatically
+Constance Bitso, Ina Fourie, and Theo JD Bothma.             correcting words in text. Acm Computing Surveys
+  2013. Trends in transition from classical cen-             (CSUR), 24(4):377–439.
+  sorship to internet censorship: selected country         Honglak Lee and Andrew Y Ng. 2005. Spam deobfus-
+  overviews. Innovation: journal of appropriate              cation using a hidden markov model. In CEAS.
+  librarianship and information work in Southern
+  Africa, 2013(46):166–191.                                Hao Li, Yang Wang, Xinyu Liu, Zhichao Sheng, and
+                                                             Si Wei. 2018. Spelling error correction using a
+Eric Brill and Robert C. Moore. 2000. An improved            nested rnn model and pseudo training data. arXiv
+   error model for noisy channel spelling correction.        preprint arXiv:1811.00238.
+   In Proceedings of the 38th Annual Meeting on As-
+   sociation for Computational Linguistics, ACL ’00,       Jiwei Li, Will Monroe, and Dan Jurafsky. 2016. Un-
+   pages 286–293, Stroudsburg, PA, USA. Association           derstanding neural networks through representation
+   for Computational Linguistics.                             erasure. arXiv preprint arXiv:1612.08220.
+
+Jacob Buckman, Aurko Roy, Colin Raffel, and Ian            Andrew L. Maas, Raymond E. Daly, Peter T. Pham,
+   Goodfellow. 2018. Thermometer encoding: One hot           Dan Huang, Andrew Y. Ng, and Christopher Potts.
+   way to resist adversarial examples. International         2011. Learning word vectors for sentiment analysis.
+   Conference on Learning Representations (ICLR).            In Association for Computational Linguistics (ACL).
+
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and              Matt Davis. 2003.   Psycholinguistic evi-
+   Kristina Toutanova. 2018. Bert: Pre-training of deep     dence on scrambled letters in reading.
+   bidirectional transformers for language understand-      https://www.mrc-cbu.cam.ac.uk/
+   ing. arXiv preprint arXiv:1810.04805.                    people/matt.davis/cmabridge/.
+
+William B Dolan and Chris Brockett. 2005. Automati-        Eric Mays, Fred J. Damerau, and Robert L. Mercer.
+  cally constructing a corpus of sentential paraphrases.      1991. Context based spelling correction. Informa-
+  In Proceedings of the Third International Workshop          tion Processing & Management, 27(5):517 – 522.
+  on Paraphrasing (IWP2005).
+                                                           Hwee Tou Ng, Siew Mei Wu, Ted Briscoe, Christian
+                                                             Hadiwinoto, Raymond Hendy Susanto, and Christo-
+Javid Ebrahimi, Daniel Lowd, and Dejing Dou. 2018a.
+                                                             pher Bryant. 2014. The conll-2014 shared task on
+   On adversarial examples for character-level neural
+                                                             grammatical error correction. In Proceedings of the
+   machine translation. In International Conference on
+                                                             Eighteenth Conference on Computational Natural
+   Computational Linguistics (COLING).
+                                                             Language Learning: Shared Task, pages 1–14.
+Javid Ebrahimi, Anyi Rao, Daniel Lowd, and Dejing          Pranav Rajpurkar, Jian Zhang, Konstantin Lopyrev, and
+   Dou. 2018b. Hotflip: White-box adversarial exam-          Percy Liang. 2016. SQuAD: 100,000+ questions for
+   ples for nlp. In Association for Computational Lin-       machine comprehension of text. In Empirical Meth-
+   guistics (ACL).                                           ods in Natural Language Processing (EMNLP).
+Giorgio Fumera, Ignazio Pillai, and Fabio Roli. 2006.      Graham Ernest Rawlinson. 1976. The significance of
+  Spam filtering based on the analysis of text infor-        letter position in word recognition. Ph.D. thesis,
+  mation embedded into images. Journal of Machine            University of Nottingham.
+  Learning Research (JMLR).
+                                                           Keisuke Sakaguchi, Kevin Duh, Matt Post, and Ben-
+Max Glockner, Vered Shwartz, and Yoav Goldberg.              jamin Van Durme. 2017. Robsut wrod reocginiton
+ 2018. Breaking nli systems with sentences that re-          via semi-character recurrent neural network. In As-
+ quire simple lexical inferences. In Association for         sociation for the Advancement of Artificial Intelli-
+ Computational Linguistics (ACL).                            gence (AAAI).
+
+                                                       5590
+Allen Schmaltz, Yoon Kim, Alexander M. Rush, and
+  Stuart Shieber. 2016. Sentence-level grammatical
+  error identification as sequence-to-sequence correc-
+  tion. In Proceedings of the 11th Workshop on In-
+  novative Use of NLP for Building Educational Ap-
+  plications, pages 242–251, San Diego, CA. Associ-
+  ation for Computational Linguistics.
+Richard Socher, Alex Perelygin, Jean Wu, Jason
+  Chuang, Christopher D Manning, Andrew Ng, and
+  Christopher Potts. 2013. Recursive deep models
+  for semantic compositionality over a sentiment tree-
+  bank. In Empirical Methods in Natural Language
+  Processing (EMNLP).
+Christian Szegedy, Wojciech Zaremba, Ilya Sutskever,
+  Joan Bruna, Dumitru Erhan, Ian Goodfellow, and
+  Rob Fergus. 2013. Intriguing properties of neural
+  networks. arXiv preprint arXiv:1312.6199.
+Yonghui Wu, Mike Schuster, Zhifeng Chen, Quoc V
+  Le, Mohammad Norouzi, Wolfgang Macherey,
+  Maxim Krikun, Yuan Cao, Qin Gao, Klaus
+  Macherey, et al. 2016.       Google’s neural ma-
+  chine translation system: Bridging the gap between
+  human and machine translation. arXiv preprint
+  arXiv:1609.08144.
+
+Weilin Xu, David Evans, and Yanjun Qi. 2017. Feature
+  squeezing: Detecting adversarial examples in deep
+  neural networks. arXiv preprint arXiv:1704.01155.
+
+Zhengli Zhao, Dheeru Dua, and Sameer Singh. 2018.
+  Generating natural adversarial examples. In Inter-
+  national Conference on Learning Representations
+  (ICLR).
+
+
+
+
+                                                     5591
+

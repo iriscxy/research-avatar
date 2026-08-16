@@ -1,0 +1,353 @@
+                           Training on Synthetic Noise
+            Improves Robustness to Natural Noise in Machine Translation
+
+ Vladimir Karpukhin                    Omer Levy        Jacob Eisenstein∗            Marjan Ghazvininejad
+
+                                     Facebook Artificial Intelligence Research
+                                                   Seattle, WA
+
+
+
+                         Abstract                               Drawing inspiration from dropout and noise-
+                                                             based regularization methods, we explore the
+    Contemporary machine translation systems
+    achieve greater coverage by applying sub-                space of random noising methods at training time,
+    word models such as BPE and character-level              and evaluate performance on both clean text and
+    CNNs, but these methods are highly sensitive             text corrupted by “natural noise” found in real
+    to orthographical variations such as spelling            spelling errors. We find that by feeding our trans-
+    mistakes. We show how training on a mild                 lation models a balanced diet of several types of
+    amount of random synthetic noise can dra-                synthetic noise at training time (random charac-
+    matically improve robustness to these vari-
+                                                             ter deletions, insertions, substitutions, and swaps),
+    ations, without diminishing performance on
+    clean text. We focus on translation perfor-              it is possible to obtain substantial improvements
+    mance on natural typos, and show that robust-            on such naturally noisy data, with minimal impact
+    ness to such noise can be achieved using a bal-          on the performance on clean data, and without ac-
+    anced diet of simple synthetic noises at train-          cessing the test noise data or even its distribution.
+    ing time, without access to the natural noise               Our method substantially improves the robust-
+    data or distribution.                                    ness of a transformer-based machine translation
+1   Introduction                                             model with CNN character encoders to spelling
+                                                             errors across multiple input languages (German,
+Machine translation systems are generally trained            French, and Czech). Of the different noise types
+on clean data, without spelling errors. Yet many             we use at training, we find that random charac-
+translation scenarios require robustness to such er-         ter deletions are particularly useful, followed by
+rors: for example, social media text in which there          character insertions. However, noisy training does
+is little emphasis on standard spelling (Michel and          not improve translations of social media text, as
+Neubig, 2018), and interactive settings in which             indicated by performance on the MTNT dataset
+users must enter text on a mobile device. Systems            of Reddit posts (Michel and Neubig, 2018). This
+trained on clean data generally perform poorly               finding aligns with previous work arguing that the
+when faced with such errors at test time (Heigold            distinctive feature of social media text is not noise
+et al., 2017; Belinkov and Bisk, 2018).                      or orthographical errors, but rather, variation in
+   One potential solution is to introduce noise              writing style and vocabulary (Eisenstein, 2013).
+at training time, similar in spirit to the use of
+adversarial examples (Goodfellow et al., 2014;
+                                                             2   Noise Models
+Ebrahimi et al., 2018). So far, using synthetic
+noise at training time has been found to im-                 We focus on orthographical noise; character-level
+prove performance only on test data with exactly             noise that affects the spelling of individual terms.
+the same kind of synthetic noise, while at the               Orthographical noise is problematic for machine
+same time impairing performance on clean test                translation systems that operate on token-level em-
+data (Heigold et al., 2017; Belinkov and Bisk,               beddings because noised terms are usually out-of-
+2018). We desire methods that perform well on                vocabulary, even when divided into subwords us-
+both clean text and naturally-occurring noise, but           ing techniques such as byte pair encoding (BPE;
+this is beyond the current state of the art.                 Sennrich et al., 2015). Interestingly, orthograph-
+    ∗
+        Jacob Eisenstein is now at Google Research.          ical noise can also pose problems for character-
+
+                                                        42
+    Proceedings of the 2019 EMNLP Workshop W-NUT: The 5th Workshop on Noisy User-generated Text, pages 42–47
+                       Hong Kong, Nov 4, 2019. c 2019 Association for Computational Linguistics
+                  Deletion       A character is deleted.                            whale → whle
+                  Insertion      A character is inserted into a random position.    whale → wxhale
+                  Substitution   A character is replaced with a random character.   whale → whalz
+                  Swap           Two adjacent characters change position.           whale → wahle
+
+Table 1: The synthetic noise types applied during training. Noise is applied on a random character, selected from
+a uniform distribution. The right column illustrates the application of each noise type on the word “whale.”
+
+level encoding models, which are based on mod-                ural noise for training, it is not always realistic.
+els such as convolutional neural networks (CNNs;              Significant engineering effort is required to obtain
+Kim et al., 2016). These models learn to match                such noise examples, making it difficult to build
+filters against specific character n-grams, so when           naturally-noised training sets for any source lan-
+n-grams are disrupted by orthographical noise, the            guage. Furthermore, orthography varies across de-
+resulting encoding may radically differ from the              mographics and periods, so it is unrealistic to an-
+encoding of a “clean” version of the same text. Be-           ticipate the exact distribution of noise at test time.
+linkov and Bisk (2018) report significant degrada-
+tions in performance after applying noise to only a           3   Experiment
+small fraction of input tokens.                               Data Following Belinkov and Bisk (2018), we
+                                                              evaluated our method on the IWSLT 2016 ma-
+Synthetic Noise Table 1 describes the four types
+                                                              chine translation benchmark (Cettolo et al., 2016).
+of synthetic noise we used during training. Substi-
+                                                              We translated from three source languages (Ger-
+tutions and swaps were experimented with exten-
+                                                              man, French, Czech) to English, each with a train-
+sively in previous work (Heigold et al., 2017; Be-
+                                                              ing set of approximately 200K sentence pairs.
+linkov and Bisk, 2018), but deletion and insertion
+                                                              Synthetic noise was added only to the training
+were not. Deletion and insertion pose a different
+                                                              data, and natural noise was added only to the test
+challenge to character encoders, because they al-
+                                                              data; the validation data remained untouched.
+ter the distances between character sequences in
+the word, as well as the overall word length.                 Model We used a transformer-based translation
+   During training, we noised each token by sam-              model (Vaswani et al., 2017) with a CNN-based
+pling from a multinomial distribution of 60%                  character encoder (Kim et al., 2016).
+clean (no noise) and 10% probability for each of              Hyperparameters We followed the base con-
+the four noise types. The noise was added dynam-              figuration of the transformer (Vaswani et al., 2017)
+ically, allowing for different mutations of the same          with 6 encoder and decoder layers of 512/2048
+example over different epochs.                                model/hidden dimensions and 8 attention heads.
+                                                              Character embeddings had 256 dimensions and
+Natural Noise We evaluate our models on nat-
+                                                              the character CNN followed the specifications of
+ural noise from edit histories of Wikipedia (for
+                                                              Kim et al. (2016). We optimized the model with
+French and German; Max and Wisniewski, 2010;
+                                                              Adam and used the inverse square-root learning
+Zesch, 2012) and manually-corrected essays (for
+                                                              rate schedule typically used for transformers, but
+Czech; Šebesta et al., 2017). These authors have
+                                                              with a peek learning rate of 0.001. Each batch
+obtained a set of likely spelling error pairs, each
+                                                              contained a maximum of 8,000 tokens. We used
+involving a clean spelling and a candidate error.
+                                                              a dropout rate of 0.2. We generated the transla-
+We used that set to replace correct words with
+                                                              tions with beam search (5 beams), and computed
+their misspelled versions for each evaluation sam-
+                                                              BLEU scores to measure test set performance.
+ple text in the source language. When there are
+multiple error forms for a single word, an error is           Results Table 2 shows the model’s performance
+selected randomly. Not all words have errors, and             on data with varying amounts of natural errors. As
+so even with maximal noise, only 20-50% of the                observed in prior art (Heigold et al., 2017; Be-
+tokens are noised.                                            linkov and Bisk, 2018), when there are signifi-
+   Natural noise is more representative of what               cant amounts of natural noise, the model’s perfor-
+might actually be encountered by a deployed ma-               mance drops significantly. However, training on
+chine translation system, so we reserve it for test           our synthetic noise cocktail greatly improves per-
+data. While it is possible, in theory, to use nat-            formance, regaining between 19% and 54% of the
+
+                                                         43
+                                                                                  BLEU
+  Dataset     Noise Probability    Noised Tokens   Clean Training Data       + Synthetic Noise     ∆       %Recovered
+   de-en            0.00%              0.00%              34.20                   33.53           –0.67        –
+   de-en           25.00%              9.72%              27.93                   31.32            3.39      54.1%
+   de-en          100.00%             39.36%              12.49                   23.34           10.85      50.0%
+   fr-en            0.00%              0.00%              39.61                   39.94            0.33        –
+   fr-en           25.00%             13.47%              30.48                   34.07            3.59      39.3%
+   fr-en          100.00%             53.74%              11.48                   19.43            7.95      28.3%
+   cs-en            0.00%              0.00%              27.48                   27.09           –0.39        –
+   cs-en           25.00%              6.14%              24.31                   24.91            0.60      18.9%
+   cs-en          100.00%             24.53%              16.64                   18.91            2.27      20.9%
+
+Table 2: Performance on the IWSLT 2016 translation task with varying rates of natural noise in the test set. Noise
+Probability is the probability of attempting to apply natural noise to a test token, while Noised Tokens is the
+fraction of tokens that were noised in practice; not every word in the vocabulary has a corresponding misspelling.
+
+            Training Noise        BLEU     ∆                        Dataset       Del      Ins      Sub      Swap
+            No Training Noise     12.49                              de-en      16.6%     26.5%    17.0%     6.0%
+            + Deletion            17.39    4.90                      fr-en      11.8%     11.4%     9.7%     2.6%
+            + Insertion           15.00    2.51                      cs-en       6.6%      6.1%    41.7%     0.4%
+            + Substitution        11.99   –0.50
+            + Swap                14.04    1.55               Table 4: The proportion of natural errors caused
+            All Training Noise    23.34                       by deleting/inserting/substituting a single character or
+            − Deletion            14.96   –8.38               swapping two adjacent characters.
+            − Insertion           18.81   -4.53
+            − Substitution        20.23   –3.11
+            − Swap                23.07   –0.27               the most effective synthetic noise in preparing
+                                                              our model for natural errors, followed by inser-
+Table 3: Performance on IWSLT 2016 de-en test with
+                                                              tion. We observe the same trend for French and
+maximal natural noise when training with one noise
+type (top) and three noise types (bottom).                    Czech. This result could explain why our experi-
+                                                              ments show a significant improvement when train-
+                                                              ing on synthetic noise, while previous work, which
+BLEU score that was lost to natural noise. More-
+                                                              trained only on synthetic substitutions and swaps,
+over, this training regime has minimal impact on
+                                                              did not observe similar improvements.
+clean text translations, with negative and positive
+fluctuations that are smaller than 1 BLEU point.              Natural Noise Analysis Finally, we analyze
+   To determine the ceiling performance of noise-             how well our synthetic noise covers the distribu-
+based training, we split the set of natural typos             tion of natural noise. Table 4 shows the percentage
+and used one part for training and the other for              of noised tokens that can be covered by a single
+test. However, we observed that training on natu-             noising operation. With the exception of substitu-
+ral noise behaves very similarly to training with-            tions in Czech, higher overlap between synthetic
+out noise at all (not shown), perhaps because the             and natural noise appears to correlate with higher
+natural typos did not have enough variance to en-             recovery rate in Table 2. One possible explanation
+courage the model to generalize well.                         for this outlier is that random synthetic substitu-
+                                                              tions might be less effective at imitating real sub-
+Ablation Analysis To determine the individual
+                                                              stitutions, and that perhaps a more informed model
+contribution of each type of synthetic noise, we
+                                                              is needed for simulating synthetic substitutions.
+conduct an ablation study. We first add only one
+type of synthetic noise at 10% (i.e. 90% of the               4   Translating Social Media Text
+training data is clean), and measure performance.
+We then take the full set of noise types, and re-             We also apply our synthetic noise training proce-
+move a single type at each time to see how impor-             dure to social media, using the recently-released
+tant it is given the other noises.                            MTNT dataset of Reddit posts (Michel and Neu-
+   Table 3 shows the model’s performance on the               big, 2018), focusing on the English-French trans-
+German dataset when training with various mix-                lation pair. Note that no noise was inserted into the
+tures of noise. We find that deletion is by far               test data in this case; the only source of noise is the
+
+                                                         44
+       Dataset    Clean Train     + Synthetic Noise                    Most relevant for us is the work of Belinkov
+        en-fr         21.1               20.6                       and Bisk (2018), who evaluated on natural noise
+        fr-en         23.6               24.1                       obtained from Wikipedia edit histories (e.g., Max
+                                                                    and Wisniewski, 2010). They find that robustness
+Table 5: The performance of a machine translation                   to natural noise can be obtained by training on the
+model on the MTNT task.
+                                                                    same noise model, but that (a) training on syn-
+                                                                    thetic noise does not yield robustness to natural
+non-standard spellings inherent to the dataset.
+                                                                    noise at test time, and (b) training on natural noise
+   As shown in Table 5, noised training has min-
+                                                                    significantly impairs performance on clean text. In
+imal impact on performance. We did not ex-
+                                                                    contrast, we show that training on the right blend
+haustively explore the space of possible noising
+                                                                    of synthetic noise can yield substantial improve-
+strategies, and so these negative results should be
+                                                                    ments on natural noise at test time, without signif-
+taken only as a preliminary finding. Nonetheless,
+                                                                    icantly impairing performance on clean data. Our
+there are reasons to believe that synthetic train-
+                                                                    ablation results suggest that deletion and insertion
+ing noise may not help in this case. Michel and
+                                                                    noise (not included by Belinkov and Bisk) are es-
+Neubig (2018) note that the rate of spelling errors,
+                                                                    sential to achieving robustness to natural noise.
+as reported by a spell check system, is not espe-
+                                                                       An alternative to noise infusion is to build
+cially high in MTNT; other differences from stan-
+                                                                    character-level encoders that are robust to noise by
+dard corpora include the use of entirely new words
+                                                                    design. Belinkov and Bisk (2018) experiment with
+and names, terms from other languages (especially
+                                                                    a bag of characters, while Sakaguchi et al. (2017)
+English), grammar differences, and paralinguis-
+                                                                    use character-level recurrent neural networks com-
+tic phenomena such as emoticons. These findings
+                                                                    bined with special representations for the first and
+align with prior work showing that social media
+                                                                    last characters of each token. These models are
+does not feature high rates of misspellings (Rello
+                                                                    particularly suited for specific types of swapping
+and Baeza-Yates, 2012). Furthermore, many of the
+                                                                    and scrambling noises, but are not robust to natu-
+spelling variants in MTNT have very high edit dis-
+                                                                    ral noise. We conducted preliminary experiments
+tance (e.g., catholique → catho [Fr]). It is unlikely
+                                                                    with noise-invariant encoders, but obtained better
+that training with mild synthetic noise would yield
+                                                                    results by adding noise at training time. A re-
+robustness to these variants, which reflect well-
+                                                                    lated idea is to optimize an adversarial objective,
+understood stylistic patterns rather than random
+                                                                    in which a discriminator tries to distinguish noised
+variation at the character level.1
+                                                                    and clean examples from their encoded represen-
+5   Related work                                                    tations (Cheng et al., 2018). This improves per-
+                                                                    formance on clean data, but it makes optimization
+The use of noise to improve robustness in ma-                       unstable, which is a well-known defect of adver-
+chine learning has a long history (e.g., Holm-                      sarial learning (Arjovsky et al., 2017). Cheng et al.
+strom and Koistinen, 1992; Wager et al., 2013),                     (2018) do not evaluate on natural noise.
+with early work by Bishop (1995) demonstrating a
+connection between additive noise and regulariza-                   6   Conclusion
+tion. To achieve robustness to orthographical er-
+rors, we require noise that operates at the character               This work takes a step towards making machine
+level. Heigold et al. (2017) demonstrated that syn-                 translation robust to character-level noise. We
+thetic noising operations such as random swaps                      show how training on synthetic character-level
+and replacements can degrade performance when                       noise, similar in spirit to dropout, can significantly
+inserted at test time; they also show that some ro-                 improve a translation model’s robustness to natu-
+bustness can be obtained by inserting the same                      ral spelling mistakes. In particular, we find that
+noise at training time. Similarly, Sperber et al.                   deleting and inserting random characters play a
+(2017) explore the impact of speech-like noise.                     key role in preparing the model for test-time typos.
+    1
+      Contemporaneous work shows that MTNT performance              While our method works well on misspellings, it
+can be improved by a domain-specific noising distribution           does not appear to generalize to non-standard text
+that includes character insertions and deletions, as well as        in social media. We conjecture that spelling mis-
+the random insertion of emoticons, stopwords, and profan-
+ity (Vaibhav et al., 2019). The specific impact of spelling         takes constitute a small part of the deviations from
+noise is not evaluated, nor is the impact on clean text.            standard text, and that the main challenges in this
+
+                                                               45
+domain stem from other linguistic phenomena.                   Lasse Holmstrom and Petri Koistinen. 1992. Using
+                                                                 additive noise in back-propagation training. IEEE
+Acknowledgments Thanks to the anonymous                          Transactions on Neural Networks, 3(1):24–38.
+reviewers for their feedback. We also thank Luke               Yoon Kim, Yacine Jernite, David Sontag, and Alexan-
+Zettlemoyer and our colleagues at FAIR for valu-                 der M Rush. 2016. Character-aware neural language
+able feedback. Specifically, we thank Abdelrah-                  models. In AAAI, pages 2741–2749.
+man Mohamed for sharing his expertise on non-
+                                                               Aurélien Max and Guillaume Wisniewski. 2010. Min-
+autoregressive models.                                           ing naturally-occurring corrections and paraphrases
+                                                                 from wikipedia’s revision history. In LREC.
+
+References                                                     Paul Michel and Graham Neubig. 2018. Mtnt: A
+                                                                 testbed for machine translation of noisy text. In
+Martin Arjovsky, Soumith Chintala, and Léon Bottou.             EMNLP.
+ 2017. Wasserstein generative adversarial networks.
+ In International Conference on Machine Learning,              Luz Rello and Ricardo A Baeza-Yates. 2012. Social
+ pages 214–223.                                                  media is not that bad! the lexical quality of social
+                                                                 media. In ICWSM.
+Yonatan Belinkov and Yonatan Bisk. 2018. Synthetic             Keisuke Sakaguchi, Kevin Duh, Matt Post, and Ben-
+  and natural noise both break neural machine transla-           jamin Van Durme. 2017. Robsut wrod reocgini-
+  tion. In ICLR.                                                 ton via semi-character recurrent neural network. In
+                                                                 AAAI, pages 3281–3287.
+Chris M Bishop. 1995. Training with noise is equiva-
+  lent to tikhonov regularization. Neural computation,         Karel Šebesta, Zuzanna Bedřichová, Kateřina
+  7(1):108–116.                                                  Šormová, Barbora Štindlová, Milan Hrdlička,
+                                                                 Tereza Hrdličková, Jiřı́ Hana, Vladimı́r Petkevič,
+Mauro Cettolo, Niehues Jan, Stüker Sebastian, Luisa             Tomáš Jelı́nek, Svatava Škodová, Petr Janeš,
+ Bentivogli, Roldano Cattoni, and Marcello Federico.             Kateřina Lundáková, Hana Skoumalová, Šimon
+ 2016. The IWSLT 2016 evaluation campaign. In In-                Sládek, Piotr Pierscieniak, Dagmar Toufarová,
+ ternational Workshop on Spoken Language Transla-                Milan Straka, Alexandr Rosen, Jakub Náplava,
+ tion.                                                           and Marie Poláčková. 2017. CzeSL grammatical
+                                                                 error correction dataset (CzeSL-GEC).           LIN-
+Yong Cheng, Zhaopeng Tu, Fandong Meng, Junjie                    DAT/CLARIN digital library at the Institute of
+  Zhai, and Yang Liu. 2018. Towards robust neural                Formal and Applied Linguistics (ÚFAL), Faculty of
+  machine translation. In Proceedings of the 56th An-            Mathematics and Physics, Charles University.
+  nual Meeting of the Association for Computational
+  Linguistics (Volume 1: Long Papers), pages 1756–             Rico Sennrich, Barry Haddow, and Alexandra Birch.
+  1766, Melbourne, Australia. Association for Com-               2015. Neural machine translation of rare words with
+  putational Linguistics.                                        subword units. arXiv preprint arXiv:1508.07909.
+
+Javid Ebrahimi, Anyi Rao, Daniel Lowd, and Dejing              Matthias Sperber, Jan Niehues, and Alex Waibel. 2017.
+   Dou. 2018. Hotflip: White-box adversarial exam-              Toward robust neural machine translation for noisy
+   ples for text classification. In Proceedings of the          input sequences. In International Workshop on Spo-
+   56th Annual Meeting of the Association for Compu-            ken Language Translation (IWSLT), Tokyo, Japan.
+   tational Linguistics (Volume 2: Short Papers), pages
+   31–36, Melbourne, Australia. Association for Com-           Vaibhav, Sumeet Singh, Craig Stewart, and Graham
+   putational Linguistics.                                       Neubig. 2019. Improving robustness of machine
+                                                                 translation with synthetic noise. arXiv preprint
+Jacob Eisenstein. 2013. What to do about bad language            arXiv:1902.09508.
+   on the internet. In Proceedings of the 2013 confer-
+                                                               Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob
+   ence of the North American Chapter of the associa-
+                                                                 Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz
+   tion for computational linguistics: Human language
+                                                                 Kaiser, and Illia Polosukhin. 2017. Attention is all
+   technologies, pages 359–369.
+                                                                 you need. In Advances in Neural Information Pro-
+                                                                 cessing Systems, pages 5998–6008.
+Ian J Goodfellow, Jonathon Shlens, and Christian
+   Szegedy. 2014. Explaining and harnessing adver-             Stefan Wager, Sida Wang, and Percy S Liang. 2013.
+   sarial examples. arXiv preprint arXiv:1412.6572.               Dropout training as adaptive regularization. In Ad-
+                                                                  vances in neural information processing systems,
+Georg Heigold, Günter Neumann, and Josef van                     pages 351–359.
+  Genabith. 2017. How robust are character-based
+  word embeddings in tagging and mt against wrod               Torsten Zesch. 2012. Measuring contextual fitness us-
+  scramlbing or randdm nouse?     arXiv preprint                 ing error contexts extracted from the wikipedia revi-
+  arXiv:1704.04441.                                              sion history. In Proceedings of the 13th Conference
+
+                                                          46
+of the European Chapter of the Association for Com-
+putational Linguistics, pages 529–538. Association
+for Computational Linguistics.
+
+
+
+
+                                                      47
+

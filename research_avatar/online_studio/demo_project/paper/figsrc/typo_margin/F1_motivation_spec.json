@@ -1,0 +1,18 @@
+{
+  "figure_id": "F1_motivation",
+  "canvas_in": [
+    3.32,
+    2.8
+  ],
+  "image_size": "1024x1536",
+  "quality": "high",
+  "no_text": true,
+  "draw_prompt": "Redraw the composition as a strict Illustrator-style academic vector diagram on RGB pure white (#FFFFFF). Remove the black vignette, gray page tint, glow, gradients, shadows, bevels, and every alphabetic or numeric character from the prior image. There must be zero text and zero letters. Use a portrait single-column canvas with three compact vertical regions. At top, draw one outlined clean token strip that branches to exactly four typo candidates represented only by abstract token strips: crossed adjacent tiles for swap, one missing tile for deletion, one added tile for insertion, and one replaced diamond tile for keyboard substitution. In the middle, align the four candidates beside a thin vertical uncertainty rank with four circle markers; use marker position plus distinct outline shapes, not brightness, to encode rank. At bottom, place two same-size selection trays side by side, each containing exactly four small candidate tokens. Connect the four lowest-ranked markers to the left tray; fill the right tray with exactly four mixed candidates. Put the same four small class-quota dots above both trays to encode identical class balance and identical count. Use only solid muted teal #087F74, orange #C06A32, blue #506AA8, pale gray #E7ECEB, and charcoal #263A42 with thin strokes. No prose boxes, results, bars, axes, metrics, icons of people, scenery, decorative effects, or dark background. Keep 5 percent safe white margins for a 3.32 by 2.8 inch final figure.",
+  "labels": [],
+  "print_readability": {
+    "final_font_floor_pt": 7,
+    "non_color_encoding": "direct labels, rank order, and distinct glyph shapes",
+    "grayscale_result": "pending",
+    "density_decision": "three compact vertically aligned regions"
+  }
+}

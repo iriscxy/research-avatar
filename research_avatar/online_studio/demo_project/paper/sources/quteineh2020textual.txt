@@ -1,0 +1,674 @@
+Textual Data Augmentation for Efficient Active Learning on Tiny Datasets
+                                         ∗                                                               ∗
+                  Husam Quteineh1 , Spyridon Samothrakis2 , and Richard Sutcliffe3
+1
+    Business and Local Government Data Research Centre, School of CSEE, University of Essex
+                             husam.quteineh@essex.ac.uk
+                                  2
+                                    IADS, University of Essex
+                                   ssamot@essex.ac.uk
+                    3
+                      IPMI Group, School of IST, Northwest University China
+                                    rsutcl@nwu.edu.cn
+
+
+
+                         Abstract                              data must either be manually created, or collected
+                                                               from real world interactions. One strategy for cre-
+     In this paper we propose a novel data augmen-
+                                                               ating data is to transform existing examples in cer-
+     tation approach where guided outputs of a lan-
+     guage generation model, e.g. GPT-2, when la-
+                                                               tain ways in order to produce new data items and
+     beled, can improve the performance of text                hence increase the size of the training dataset. This
+     classifiers through an active learning process.           approach has been applied successfully in com-
+     We transform the data generation task into                puter vision for example, by manipulating exist-
+     an optimization problem which maximizes                   ing images while preserving the label to create
+     the usefulness of the generated output, using             additional data points (Shorten and Khoshgoftaar,
+     Monte Carlo Tree Search (MCTS) as the opti-               2019). However, in NLP, augmenting data is a
+     mization strategy and incorporating entropy as
+                                                               very difficult task due to the complex nature of
+     one of the optimization criteria. We test our
+     approach against a Non-Guided Data Genera-                language (Wei and Zou, 2019). In this paper we
+     tion (NGDG) process that does not optimize                assume a real-life scenario where the data at hand
+     for a reward function. Starting with a small              is insufficient for running a typical active learning
+     set of data, our results show an increased per-           algorithm. We introduce a method that enables us
+     formance with MCTS of 26% on the TREC-                    to automatically generate artificial text examples
+     6 Questions dataset, and 10% on the Stanford              that complement an existing dataset. Our approach
+     Sentiment Treebank SST-2 dataset. Compared
+                                                               minimizes the human factor in data creation by au-
+     with NGDG, we are able to achieve increases
+     of 3% and 5% on TREC-6 and SST-2.
+                                                               tomating the process through a guided searching
+                                                               procedure.
+1     Introduction                                                Once a set of examples is generated, it is required
+                                                               to be manually labeled before it is added to the orig-
+Active learning (AL) is a well applied approach in             inal training set. The classifier is then retrained on
+areas where unlabeled data is abundantly available,            the new, augmented training set. This procedure
+but labels are either scarce or costly to obtain (Set-         is repeated multiple times until the desired perfor-
+tles, 2009). In AL, a classifier is improved upon              mance is either achieved or until performance no
+through an iterative learning process; at each cycle,          longer improves. We do this in active learning cy-
+a subset of the original dataset with the most infor-          cles, where only a subset of the generated data is
+mative examples is selected to be labeled, typically           used; this involves selecting examples in terms of
+by a human expert, before it is then added to the              how much information they would add to an exist-
+existing training data (Settles, 2009).                        ing classifier. In our experiments we use entropy
+   Previous active learning research on textual data           as a measure of informativeness.
+to our knowledge has always assumed the availabil-                As our aim is to find the most informative exam-
+ity of datasets containing large pools of unlabeled            ples, we tackle this problem by applying a search
+data. In cases where the available data is insuffi-            approach. Given that text examples are generated
+cient for active learning, the burden is transferred           from an extremely large number of possible com-
+to the data collection process, where additional               binations, we apply the Monte Carlo Tree Search
+     ∗
+         Corresponding author                                  MCTS algorithm (Browne et al., 2012) to limit the
+
+                                                          7400
+         Proceedings of the 2020 Conference on Empirical Methods in Natural Language Processing, pages 7400–7410,
+                          November 16–20, 2020. c 2020 Association for Computational Linguistics
+search space. Here MCTS is expected to guide a           uncertainty-based approaches, diversity-based ap-
+language generation model to output informative          proaches, and expected model change. In an
+examples. In this context, MCTS assigns values           uncertainty-based selection strategy, the active
+to previously generated examples using a scoring         learner chooses the examples that it is most uncer-
+function that incorporates the learning classifier of    tain about. This assumes a probabilistic framework
+the previous active learning cycle, starting with a      where the learner predicts a probability distribution
+baseline classifier trained on the initial dataset for   P = (p1 , p2 , ..., pn ) for labels L = (l1 , l2 , ..., ln )
+the first active learning run. In our experiments,       for a given example ei ∈ SU . In a binary clas-
+we test MCTS with two different scoring functions:       sification setting, Lewis et al. presume that the
+one that only measures the uncertainty of the gen-       most uncertain examples have a posterior proba-
+erated examples through entropy, and another that        bility closest to 0.5 for any label li ∈ {0, 1}∀i
+combines the measure of uncertainty with a mea-          (Lewis and Gale, 1994; Lewis and Catlett, 1994).
+sure of diversity by computing the cosine similarity     In a multi-class setting, a selection strategy could
+of every newly generated example with the pre-           choose examples with the lowest posterior probabil-
+vious content. These scores determine the text           ity or be based on entropy (eq. 5) as in (Hwa, 2004;
+premise that is passed to the language model when        Settles and Craven, 2008; Joshi et al., 2009). Given
+generating newer examples.                               that the difference in degree of certainty for simi-
+   We compare MCTS to Non-Guided Data Gener-             lar examples can be small, uncertainty selections
+ation (NGDG), an approach where the knowledge            are prone to return similar examples (Wang et al.,
+of the learning classifier is not involved in the data   2017). To address this issue, some works incorpo-
+generation process. Here, for each newly gener-          rate measures to exploit the diversity information
+ated example, the text premise is always a token         of the examples in the selection process (Sener and
+representing the beginning of a sentence, <bos>.         Savarese, 2017; Wang et al., 2017; Sinha et al.,
+   The remainder of this paper is organized as fol-      2019). Finally, expected-model change selects ex-
+lows; Section 2 provides a background as well as an      amples that would cause the greatest change to a
+overview of related literature. Section 3 describes      model’s output if their labels were known (Freytag
+the proposed approach. Section 4 presents the ex-        et al., 2014; Roy and McCallum, 2001; Settles et al.,
+periments which were carried out. Section 5 gives        2008). This approach however, can be computa-
+conclusions and plans for future work.                   tionally expensive for big data and large feature
+                                                         spaces (Settles, 2009). Hence, this approach has
+2     Background                                         not been very successful with deep learning models
+                                                         (Siddiqui et al., 2019).
+2.1    Active Learning
+                                                            In sum, research on active learning has focused
+In this paper we consider the pool-based AL model,       on applications where a large pool of unlabeled
+a commonly adapted approach in text classification       data already exists. However, we are interested
+problems (Hu et al., 2016; Krithara et al., 2006;        in real-life scenarios where this data may not be
+Tong and Koller, 2001; Nigam and McCallum,               available. Other approaches such as Snorkel1 use
+1998). This approach assumes the availability of all     heuristics to generate data (Ratner et al., 2017) but
+the data from the beginning of the process. We start     this can prove impractical for text. In this paper
+with a set of data SD , where a large pool of it is      we consider the case were the number of available
+unlabeled SU , leaving only a small subset SL with       data SD is extremely small, so that typical active
+labels l1 , l2 , .., ln ∈ L . Hence, SD = SU + SL . A    learning approaches become inapplicable due to
+classifier is first trained on SL . Then, at each AL     the absence of SU . Our aim is to generate synthetic
+iteration, a selection strategy is applied to select     data for SU that can then be queried by an active
+a pool of data SP from SU to be labeled by the           learning algorithm to select an informative subset
+expert. Examples in SP are chosen on the basis           SP for labeling. The selection process we apply
+of being the most informative of SU , such that, if      can be classed as an uncertainty approach, except
+added to the training data, an improvement in the        for the Diversity-Based MCTS (described in sec-
+classifier’s performance is to be expected.              tion 3.1.4) which incorporates a similarity check
+   As described by Yoo and Kweon (2019); Sid-            that could also be classed as a diversity approach.
+diqui et al. (2019), there are three main selec-
+                                                            1
+tion strategies that can be applied to obtain SP :              https://www.snorkel.org/
+
+                                                    7401
+2.2   Language Models                                         2.3   Monte Carlo Tree Search MCTS
+The year 2018 proved to be an exceptional one                 MCTS is a tree search method that attempts to
+for the NLP community as research shifted rapidly             find compelling solutions without having to run to
+from pretrained shallow embeddings to more com-               completion. It does so by walking through random
+plex pretrained language models adopted from the              paths in the search space while constructing a tree
+computer vision field. This is evident in develop-            using the results of a predefined reward function.
+ments such as Embeddings from Language Models                 Due its ability to find paths leading to an optimal
+(ELMO) (Peters et al., 2018), Universal Language              solution when the search space is infinitely large,
+Model Fine-tuning for Text Classification (ULM-               MCTS has been widely adopted by the AI gaming
+FIT) (Howard and Ruder, 2018), generative pre-                community (Arneson et al., 2010; Perez et al., 2013;
+training (Radford et al., 2018), Bidirectional En-            Chang et al., 2016).
+coder Representations from Transformers (BERT)                   The longer MCTS runs, the stronger its moves
+(Devlin et al., 2018) and many more.                          get. This is because it manages to balance be-
+   In the same year, OpenAI released a transformer-           tween two main criteria: exploring new search
+based language model, GPT (Radford et al., 2018),             paths and exploiting paths that have been already
+which was trained with a traditional language mod-            explored. MCTS consists of four major steps: Se-
+eling approach by predicting the next word in a               lection, Expansion, Simulation, and Backpropaga-
+sequence. In language modeling, the objective is              tion (Chaslot et al., 2008). When applied to board
+to estimate the probability of a next token in a se-          games, MCTS constructs a tree to determine a win-
+quence conditioned on the context tokens (Bengio              ning strategy. In this setting, a node represents a
+et al., 2003). In a unidirectional training approach          board position, an edge represents a move, and a
+such as GPT-2, the context is the history or past             path represents a sequence of moves.
+tokens. The probability of the sequence for tokens               Selection: Starting from a root node R, the al-
+w = w1 , ..., wn can be defined as:                           gorithm selects a move that leads to a node N that
+                i=n
+                Y                                             has no identified children. On the one hand, the se-
+       p(w) =         p(w(i) |w(1) , . . . , w(i−1) )   (1)   lected move could be random, ignoring the scores
+                i=1                                           of already visited paths; in this case, some paths
+As such, given a set of sentences as input, the objec-        are not visited. On the other hand, the selected
+tive of the language model is to find the parameters          move could be completely based on already vis-
+θ that maximize the log-likelihood:                           ited nodes (e.g. by storing average wins for each
+                                                              node); here, the algorithm might miss other nodes
+           θ∗ = arg max {log p(w; θ)}                   (2)
+                       θ                                      that could lead to higher win rates. In order to
+This training procedure did not give GPT the edge             balance between the benefits of exploration and
+over other state-of-the-art models like BERT on               exploitation, a selection policy such as the Upper
+classification tasks, possibly due to BERT taking             Confidence Bound (UCB) can be used (Auer et al.,
+advantage of a bidirectional architecture. However,           2002). UCB makes sure that as many nodes as pos-
+this did not stop OpenAI’s GPT from prevailing                sible are explored while still favouring branches
+in other departments. As it turns out, compared               that are visited more often than their counterparts.
+to BERT, GPT is able to generate text sequences               The selection is then done by choosing the nodes
+of higher quality (Wang and Cho, 2019). In 2019,              with the highest UCB value. In our implementa-
+OpenAI released a successor, GPT-2 (Radford et al.,           tion, given that the scoring criterion is an entropy
+2019) that included slight adjustments to the orig-           value ranging between 0 and 1, we apply a small
+inal GPT model and was trained on larger data                 adjustment to the vanilla UCB policy, described in
+collections. Although its architecture was very sim-          section 3.1.1:
+ilar to its predecessor, GPT-2 presented significant                                       s
+progress in language generation. The main contri-                                  Wi         2 × lnSp
+                                                                         U CB =        +C                       (3)
+bution of GPT-2 was its ability to scale up training                                Si            Si
+parameters from 110 Million to 1.5 Billion. In our
+experiments we were able to achieve satisfactory re-          where Wi is the number of simulations generated
+sults with the smallest version of the GPT-2 model;           from node i which resulted with a win, Si the total
+12 hidden layers and 124M parameters.                         number of simulations generated from node i, Sp
+
+                                                          7402
+the total number of simulations generated from the       2019). In the same vein, Wang and Yang (2015)
+parent node, and C an exploration parameter.             randomly replace words with neighboring ones
+                                                         from an embedding space. Kobayashi (2018) uses
+Expansion: In this phase, a new child node is            a bidirectional language model to randomly replace
+added to the node selected in the previous step.         words with alternatives. Here the language model
+This new node is based on a random selection of          is fed the sentence input excluding the word at po-
+one of the possible moves. The values for this new       sition x, to predict an alternative word at position x.
+node are initialized to 0 wins out of 0 simulations      Another word replacement approach is applied by
+where Wi = 0 and Si = 0.                                 Wang et al. (2018b) in a machine translation task,
+Simulation (Roll-out): A simulation is run from          where words in both the source and target sentence
+the root node R until a terminal node T is found.        are replaced with other random words. In back-
+The terminal node will output a value that is then       translation, also known as round-trip translation
+passed upwards in the backpropagation phase.             (Aiken and Park, 2010), an input text is translated
+                                                         into an intermediate language and then the result
+Backpropagation: A simulation stops when a               is translated back to the original language. This
+terminal node T is reached. The values for each          technique is applied in the works of Sennrich et al.
+node leading to T are then updated by adding 1 to        (2015); Aroyehun and Gelbukh (2018).
+the number of visits Si and number of wins Wi .
+                                                         3   Proposed Method
+2.4   Related Work
+In previous work, our group applied a similar            In games, MCTS can be applied to predict moves
+framework to a private dataset, where instead of         in order to counter an opponent’s strategy so that a
+GPT-2, a recurrent neural network was used to gen-       winnable state is reached. However, text generation
+erate words, and the reward function was solely          is more similar to a single player scenario, where
+based on entropy (Sankarpandi et al., 2019). Fur-        decisions are based on which token to select when
+thermore, experiments were based on a much larger        moving from one state to the other.
+initial training set, and there was an added burden         A language model calculates a probability dis-
+on the user to manually correct ill-formed outputs.      tribution over a sequence of words. When pass-
+To our knowledge, the next closest work to ours is       ing over a stream of text, each vocabulary token
+Anaby-Tavor et al. (2019), where GPT-2 and a clas-       is assigned a probability score for occurring next.
+sifier are applied to generate new weakly-labeled        Hence, tokens with higher probability scores are
+examples. This process involves fine-tuning GPT-         more likely to appear next in the sequence. In our
+2 on existing training examples while providing          setting, we are interested in multiple token candi-
+the class labels as part of the input. Examples are      dates for all remaining words in the sequence. To
+then selected and kept as training data based on the     achieve this we use a top-k sampling scheme as
+classifier’s confidence score. Kumar et al. (2020)       used by Fan et al. (2018). At each time step, each
+further explores this approach with different trans-     token in the vocabulary is assigned a probability
+former based models (Vaswani et al., 2017) for data      score for coming next in the sequence. To get the
+generation. This approach however, relies on GPT-        top k candidates, vocabulary tokens are sorted by
+2 to provide weak labels as it generates data. It also   their probability scores and anything below the k’th
+does not employ a guided search to generate the          token is then zeroed out. The probability mass is
+best examples at a given stage. By excluding the         then redistributed among the k token candidates.
+process of generating weak labels, this approach            This process can be modeled as a tree where each
+could be considered analogous to our Non-Guided          node represents a token linked to k child nodes rep-
+Data Generation method in section 4.2.                   resenting the top k candidate tokens that are likely
+   Other data augmentation work in NLP relies on         to appear next in the sequence. Hence, this is sim-
+generating examples that are simply different forms      ilar to a board game where each board position is
+of the existing text. Two approaches are word ma-        represented by a node: The root node corresponds
+nipulation and the use of back-translations. Word        to an empty board while a terminal node is where
+manipulation involves techniques like randomly           no further moves can be made. In our setting, we
+swapping words, replacing words with their syn-          use a special token for both the root and terminal
+onyms, or deleting random words (Wei and Zou,            nodes. We represent the starting token with <bos>
+
+                                                    7403
+and the ending token with <eos>.                          phase are not stored, we would be left with many
+   As an example, a language model that is fine-          incomplete paths which did not reach a terminal
+tuned on a survey on pet adoption could be used           node (see Figure 1). To account for this, we keep
+to generate the tree of predictions in Figure 1. A        track of all the simulations without impacting the
+full version of this tree would represent all the pos-    selection policy. Thus we still have the same tree as
+sible combinations of text that can be generated          in Figure 1, but we also have a record of the paths
+by the language model. In an ideal setting, we            generated from non-terminal leaf nodes. The Se-
+would search this tree for the paths that represent       lection, Expansion, Simulation and Backprogation
+the most informative examples. However, given             phases for each MCTS iteration are described in
+that the tree will grow exponentially as the number       the following sections.
+of next token candidates is increased, it would be
+                                                          3.1.1 Selection
+computationally expensive to apply a brute force
+search algorithm where every path is examined.            The vanilla UCB function is mostly adopted in
+For this reason, we apply the Monte Carlo Tree            strategies where the outcome is chosen from a fixed
+Search (MCTS) algorithm in the data generation            set of categorical values, win, lose or tie. The ob-
+process, as discussed next.                               jective is to reach a winnable state with the min-
+                                                          imum number of visits. This is reflected in the
+                                                          UCB equation (eq. 3). By contrast, our purpose is
+                                                          to maximize the importance of nodes that lead to
+                                                          higher reward values (section 3.1.4), as shown in
+                                                          eq. 4, adopted from Chaudhry and Lee (2018):
+                                                                                          s
+                                                                                             2 × lnSp
+                                                                  U CB = max(Ni ) + C                      (4)
+                                                                                                Si
+
+                                                          where max(Ni ) is the maximum reward at node i,
+                                                          C is an exploration constant, Si is the total number
+                                                          of visits to node i, and Pi is the total number of
+                                                          visits to the parent node for node i.
+                                                          3.1.2 Expansion
+                                                          Once a node is selected, we add all its immediate
+                                                          child nodes. These are the allowed moves from a
+                                                          given state, that is the top k token candidates gener-
+                                                          ated by a language model, given the state’s context
+Figure 1: MCTS traverses down the tree as it creates      history. Figure 2 illustrates the process. For k = 3,
+paths spanning from the root node <bos> until a ter-      the context history for the state at the root node
+minal node <eos> is reached. Tokens of the same path      is the token <bos>. When passed to a language
+form a sentence when concatenated e.g. the path in red.   generation model, the words “Where”, “What” and
+                                                          “Who” are examples of the top three candidates to
+                                                          follow <bos>. Assume the node “Who” is picked
+3.1   MCTS for Data Generation
+                                                          in the selection phase at i = 1. Its state context
+In a typical MCTS application, a separate tree is         history “<bos> Who” returns the candidate tokens
+formed for every decision. Applying this to our           “discovered”, “is”, and “invented”; these are added
+approach would require us to build a tree for each        as child nodes in the expansion phase.
+next word in the sequence. This would be com-
+putationally expensive due to the overhead of gen-        3.1.3 Simulation (Roll-out)
+erating candidates and computing reward values.           A simulation starts from the added child node in the
+An alternative would be to construct a single tree        expansion phase. During this process, a sequence
+only, while allowing MCTS to run for a longer pe-         is generated by picking at random a possible can-
+riod. This would result in a tree where each path         didate for each next token until a terminal state
+is a possible output. However, given the nature of        is reached. Given that candidate tokens are gen-
+MCTS where the paths generated in the roll-out            erated over a probability distribution, we apply a
+
+                                                     7404
+                                                           where xent is the entropy value for example x, and
+                                                           θent the entropy cut-off threshold.
+                                                              In Diversity-Based MCTS, in addition to en-
+                                                           tropy, we compute the cosine similarity between
+                                                           each generated candidate and a comparison list ini-
+                                                           tialized with the classifier’s training data. This is
+                                                           to ensure the diversity of the generated examples.
+                                                           If the similarity score is above a certain threshold
+                                                           θsim , the reward for the candidate will be set to 0,
+                                                           as shown in eq. 7. Conversely, if it is below θsim ,
+ Figure 2: A possible MCTS output after 2 iterations
+                                                           the candidate is added to the comparison list, so
+                                                           that future candidates will be penalized if they are
+weighted choice method, enforcing non-uniform              too similar to it.
+randomness. As explained earlier in 3.1, simula-                                
+                                                                                0,        if xent ≥ θent
+tions are tracked without affecting the growth of
+                                                                                
+the tree. Taking this into account, we are able to            f (xent , xsim ) = 0,        if xsim > θsim (7)
+                                                                                
+                                                                                  xent , otherwise
+                                                                                
+modify the value of k for the tokens, without affect-
+ing the functionality of MCTS. We will refer to this
+as Ks to distinguish it from the K in the expansion        where xsim is the maximum cosine similarity score
+phase. If Ks >> K, we are able to achieve higher           between example x and the comparison list, and
+variance in the generated data while maintaining           θsim the cosine similarity threshold.
+the width of the tree.
+                                                           3.2    Data Selection and Active Learning
+3.1.4   Backpropagation                                    Once MCTS reaches completion, all leaf nodes
+Once an example is generated, its reward value is          from the final tree are selected. Given that we
+computed. The path of the expanded node is then            have kept track of the generated simulations from
+updated by backpropagating the reward value and            a node, each non-terminal leaf node is now linked
+increasing the number of visits by one.                    to a generated sequence of text. The final set of
+   For the reward function, we implement two vari-         text examples is then sorted by the values from
+ants of MCTS, hereafter referred to as Uncertainty-        their corresponding nodes. The top n examples
+Based MCTS and Diversity-Based MCTS, where                 are selected, labeled by hand and appended to the
+the only difference is in the reward function.             original training set. We then retrain the learning
+   In Uncertainty-Based MCTS, given the learn-             classifier on the new dataset.
+ing classifier’s softmax probabilities over the possi-
+                                                           4     Experiments
+ble class labels, we compute the normalized form
+of Shannon’s entropy as shown in eq. 5:                    4.1    Datasets
+                       n                                   In our experiments, we attempt to emulate real life
+                       X                      1
+        Hn (P ) = −          pi logb pi ·            (5)   scenarios where training data is scarce. So from
+                                            logb n         each dataset below, we create an initial training set
+                       i=1
+                                                           by randomly selecting a very small subset of the
+where P is a setP of probabilities P = {pi ; i =           available training data. We then fine-tune GPT-2 on
+1, ..., n}, with ni=1 pi = 1 for n labels, normal-         the created subset and use our method from section
+ized by logb n. We expect meaningless content in           3 to generate new training examples. Once data is
+regions of higher entropy, and so limit the search         generated, we label the top n examples, sorted by
+space to a predefined value for maximum entropy,           the max reward value, as described in 3.2.
+θent . Examples with an entropy above this thresh-            We study the effectiveness of our methods on
+old become less important by returning a lowered           two different tasks, question classification and sen-
+reward value (e.g. 0), as shown in eq. 6.                  timent analysis.
+                      (                                       Question Classification: For this task we use
+                       0,        if xent ≥ θent            the 6-label version of the TREC Questions dataset,
+        f (xent ) =                                  (6)
+                       xent , otherwise                    TREC-6 (Li and Roth, 2002). TREC-6 divides
+
+                                                       7405
+questions into 6 categories: HUM, DESC, ENTY,            Adam (Kingma and Ba, 2014). We fixed the
+LOC, NUM, and ABBR. From the available train-            classifier’s hyper-parameters following a hyper-
+ing data, we randomly select only 5 examples per         parameter search to a batch-size of 2, 0.0001 learn-
+label, making a total of 30 examples for training        ing rate, and trained over 15 epochs.
+the baseline classifier. Evaluation is done over the
+provided test set of 500 questions.                      4.3   Data Generation Parameters
+   Sentiment Analysis: For this task we use
+the Stanford Sentiment Treebank SST-2 Dataset            We fix the MCTS UCB policy constant C to 2, θent
+(Socher et al., 2013), with sentiments divided into      to 0.95, and θsim to 0.9 for all experiments. To
+2 labels, positive and negative. We use the data split   achieve fairness in the comparison, when using the
+from the GLUE SST task (Wang et al., 2018a), and         NGDG method (section 4.2), we discard examples
+evaluate on the provided development set. From the       with entropy above θent = 0.95 in the experiments.
+available training data, we only select 10 random
+examples per label and discard the rest.                 4.4   Data Selection
+                                                         For MCTS, as the learning classifier is part of the
+4.2     Model Comparison
+                                                         data generation process, the output examples are
+In our experiments we compare two variants of            already mapped to their reward values and to the
+MCTS with only a minor difference in the reward          classifier’s predicted labels. For NGDG, however,
+function, one with the effect of θsim as described in    because the classifier does not take part in the gen-
+section 3.1.4, and one without its effect. We further    eration process, it must be applied to the generated
+test the effectiveness of MCTS for data augmenta-        data afterwards, to predict labels and compute val-
+tion by comparing it to a data generation approach       ues for entropy. After classification, the data is
+that does not optimize for a reward value. We re-        sorted by entropy (for NGDG) or reward value (for
+fer to this approach as non-guided data generation       MCTS), and the labels of the top n examples are
+(NGDG). Similar to MCTS, NGDG applies a top-k            corrected manually. Finally, to limit the effect of
+sampling procedure to generate candidate tokens.         an imbalanced dataset, we restrict the number of
+However, unlike MCTS, the selection of the next          the selected examples xmax , to the first 10 per la-
+token is entirely based on the distribution of the       bel. In the event where all labels have more than
+candidate tokens. This is exactly the same proce-        10 examples, xmax corresponds to the count of the
+dure as the simulation phase in MCTS, but instead        label with the least number of examples.
+of constructing a tree search, simulations are run
+independently of one another. To emulate the flexi-      4.5   Experiment 1: TREC-6 Question Data
+bility of having higher variance over the latter parts
+of the generated text in MCTS (section 3.1.3), we        For this experiment, we fixed the number of simu-
+increased k for the number of candidate tokens af-       lations at 3000 and the top n examples for labelling
+ter the first n output tokens in the sequence. Here      to 50 for both MCTS and NGDG. We set the num-
+n is fixed at 3 in all our experiments. After the data   ber of candidate tokens K to 6 and Ks to 20. For
+is generated, we apply the classifier of the previous    NGDG, K changes from 6 to 20 after the first 3
+active learning cycle to compute an entropy value        tokens are generated from the sequence. Table 1
+(eq. 5) for each example. Data is then sorted by         shows the average accuracy achieved over the 6
+the entropy, and the top n examples below θent are       labels throughout 8 Active Learning runs on the
+then selected for labeling.                              TREC-6 test set, as well as giving the added num-
+   The classifier used for our experiments is a relu     ber of examples after each AL cycle.
+layer neural network with the Universal Sentence
+Encoder (USE) for the embedding layer. We im-            4.6   Experiment 2: SST-2 Sentiment Data
+plement this classifier using the Keras2 toolkit.
+                                                         Similar to experiment 1, we kept the number of
+The classifier contains an embedding layer with
+                                                         simulations at 3000 and top n at 50 for both MCTS
+512 neurons, a 600-neuron fully-connected dense
+                                                         and NGDG. Whereas, we set the number of candi-
+layer, a dropout layer with a 0.2 dropout rate,
+                                                         date tokens K = 15 and Ks = 30 for MCTS. In
+a softmax activation output and optimized using
+                                                         NGDG, K changes from 15 to 30 after the first 3
+   2
+       https://keras.io/                                 tokens are generated. Results are in Table 2.
+
+                                                    7406
+                    MCTS                                                        MCTS
+ AL Run                                 NGDG                   AL Run                               NGDG
+             Diversity Uncert.                                           Diversity Uncert.
+ Start       65 (30#) 65 (30#)          65 (30#)               Start     73 (20#) 73 (20#)          73 (20#)
+ 1           68 (48#) 78 (49#)          78 (47#)               1         77 (26#) 72 (24#)          68 (30#)
+ 2           86 (68#) 82 (52#)          86 (61#)               2         74 (29#) 74 (27#)          75 (41#)
+ 3           92 (73#) 87 (55#)          87 (72#)               3         78 (37#) 74 (34#)          77 (49#)
+ 4           91 (76#) 89 (59#)          88 (83#)               4         79 (43#) 73 (38#)          76 (56#)
+ 5           92 (83#) 91 (71#)          86 (89#)               5         80 (46#) 76 (39#)          81 (60#)
+ 6           91 (91#) 90 (76#)          84 (103#)              6         80 (49#) 78 (42#)          81 (64#)
+ 7           90 (94#) 89 (87#)          84 (113#)              7         81 (52#) 76 (44#)          79 (72#)
+ 8           91 (98#) 90 (94#)          88 (126#)              8         81 (57#) 78 (45#)          80 (77#)
+
+Table 1: Classification results after each Active Learn-    Table 3: Classification results after each AL run for the
+ing (AL) run for the TREC-6 question classification         SST-2 sentiment analysis task with top n = 20.
+task. Before AL, 30 training examples result in 65%
+classification accuracy. After AL 1, under Diversity-
+                                                               #  Example
+Based MCTS for example, 18 new examples are
+added (total 48#), giving 68% accuracy, while under            1  Why did Einstein lose a fight with cancer?
+Uncertainty-Based MCTS (Uncert.), 19 new examples              2  Why did Lincole Ljungberg retire?
+are added (total 49), giving accuracy 78%. The rest of         3  Why was Lorne L. Huntington’s IQ so low?
+the table is analogous.                                        4  What are three fundamental principles of
+                                                                  socialism?
+                    MCTS                                       5 What is D.C.’s major metropolitan area?
+ AL Run                                 NGDG
+             Diversity Uncert.                                 6 When was Antarctica formed?
+ Start       73 (20#) 73 (20#)          73 (20#)               7 When did animals roam the earth?
+ 1           74 (34#) 77 (34#)          69 (32#)               8 Where can a geologist find fossils?
+ 2           79 (41#) 76 (44#)          72 (43#)               9 Where can an electrician find work?
+ 3           79 (50#) 78 (48#)          75 (55#)               10 How did Moses rule the ancient tribes?
+ 4           80 (60#) 80 (54#)          76 (79#)               11 How often have animals been killed by car
+ 5           80 (65#) 80 (55#)          75 (92#)                  crashes?
+ 6           80 (79#) 80 (62#)          76 (103#)              12 Which is Fordham’s largest engineering
+ 7           83 (87#) 80 (64#)          79 (116#)                 college?
+ 8           83 (95#) 79 (69#)          78 (124#)
+                                                            Table 4: Some examples generated on TREC-6 through
+Table 2: Classification results after each AL run for the   the Diversity-Based MCTS for experiment 1.
+SST-2 sentiment analysis task with top n = 50.
+
+                                                            bines information from two different sentence types
+4.7   Experiment 3: SST-2 Sentiment Data                    NUM and DESC in a coherent way. Example 3
+We repeated experiment 2 with the same configura-           again demonstrates a form of ‘cross-type’ learning:
+tions, except that top n, is now 20 (not 50) for both       The Einstein training sentence above is the only
+MCTS and NGDG. Results are shown in Table 3.                mention of IQ and is of type NUM. Yet example
+                                                            3 is a well-formed DESC sentence. For example
+4.8   Discussion                                            4, perhaps the most related training instances are
+Table 4 shows twelve sentences generated by the             “What are the four elements?” and “What are the
+Diversity-Based MCTS. These can give us insights            chemicals used in glowsticks?”. These are asking
+concerning our approach and the role of GPT-2 in            for lists but concerning elements and chemicals,
+it. First, consider example 1 in the table (“Why did        not abstract concepts like socialism.
+Einstein lose a fight with cancer?” – type DESC).              Interestingly, even though the training set con-
+In the initial training set, there is only one mention      tains no ‘When’ sentences, examples such as 6
+of Einstein (“What was Einstein’s IQ?” – NUM),              and 7 could still be created; because MCTS pushes
+and one of cancer (“How do doctors diagnose bone            GPT-2 to generate novel sentences as it constructs
+cancer?” – DESC). Nevertheless, example 1 com-              the tree, those of the form “What kind, when...”
+
+                                                        7407
+were created during the path traversal process.          MCTS prone to output meaningless sentences. For
+These were then corrected during the labeling stage.     instance, “What kind!!??”, “Which is the abbrev?”,
+We did not witness this phenomenon with NGDG,            and “What does IQ be?” were outputs of MCTS in
+possibly because MCTS is directed by a reward            the TREC-6 experiments. This point is reflected in
+function that penalizes sentences of low entropy.        the lower overall number of added examples when
+This allows MCTS to search through the space of          comparing MCTS to NGDG over the 8 AL runs.
+possible sentence combinations more efficiently.         Moreover, when MCTS over-exploits visited paths,
+   Concerning the LOC examples 8 and 9, the only         it can get stuck in certain sub-trees, leading it to
+‘Where’ training question is “Where do hyenas            output examples with a high level of similarity. For
+live?”. Yet, in our experiments, we were able to         instance, “good movie” and “good movie!” are
+expand on this by generating additional ‘Where’          identical examples with the only difference being
+questions which are very different from the hyenas       the exclamation mark ‘!’. This issue is especially
+and different from each other: A fossil is some-         noticeable in the MCTS Uncertainty-Based experi-
+thing which a geologist might find, while work is        ment in Table 3, where due to the number of closely
+something which an electrician might find. Both          similar examples in the output, a lower proportion
+are meaningful, while the sense of ‘find’ in each        of the top 20 examples could be labeled. Hence, to
+is quite distinct. Finally, while the remaining ex-      diversify the generated output, we introduced θsim
+amples in table 4 could not be directly linked to        in the MCTS Diversity-Based approach.
+relevant examples in the training data, this only con-      Overall, the success of our approach relies on the
+firms our purpose of using a pretrained model like       quality of the search space, which is determined by
+GPT-2 that can make use of its external knowledge        the language model; if it performs less well, this
+while remaining relevant to the target task.             can result in a noisier space. Hence, in our previous
+                                                         work (Sankarpandi et al., 2019), our group could
+   In summary, by integrating GPT-2 with our meth-
+                                                         not achieve comparable results. Moreover, addi-
+ods, we gained substantial improvements over the
+                                                         tional user involvement was needed to make sense
+baseline classifier. This shows how text generation
+                                                         of ill-formed outputs, making the whole approach
+can improve performance for tasks with scarce data.
+                                                         laborious and more prone to the user’s bias.
+Even when starting with just a few examples per
+label, we were able to generate informative data         5   Conclusion
+that boosted the accuracy on TREC-6 from 65% to
+91% with MCTS and 88% with NGDG, on SST-2                In this paper we proposed a framework for improv-
+from 73% to 83% and 78% respectively, after 8            ing a classifier’s performance with synthetic data.
+AL runs. Even when reducing the number of ex-            We have shown in our experiments that even when
+amples for labeling from 50 to 20 in experiment          starting with just a few examples, we are able to
+3, we were still able to achieve an improvement of       achieve noticeable improvements. We believe this
+81% with MCTS and 80% with NGDG. This sug-               approach is likely to work for any domain or lan-
+gests the effectiveness of our approach in solving       guage so long as the language model is able to
+real-world classification tasks when minimal data        generate meaningful output. In this work for in-
+is available. Moreover, with MCTS we witnessed           stance, we did not need more than 20 examples to
+improvements in performance compared to NGDG             fine-tune GPT-2 for the SST-2 experiments, or 30
+on both the TREC-6 and SST-2 datasets. MCTS              for the TREC-6 experiments. We expect even better
+guides the growth of the tree by visiting more rel-      results when more examples are provided or with
+evant nodes more frequently. Hence, relevancy is         the application of an improved language model like
+increased by the paths that maximize the reward          GPT-3. In future work, we plan to extend our ap-
+function, those that correspond to high entropy val-     proach to further improve the reward and policy
+ues in our setting.                                      functions, and to reduce the human-labeling factor.
+   However, searching only for high entropy is
+                                                         Acknowledgments
+more likely to incur noise in the final output such
+as ill-formed sentences or content that does not         Husam Quteineh acknowledges the support of the
+fall under the labeling criteria. Since ill-formed       Business and Local Government Data Research
+sentences are likely to incur high entropy values,       Centre BLG DRC (ES/S007156/1) funded by the
+the lack of a sentence quality measure can make          Economic and Social Research Council (ESRC).
+
+                                                    7408
+References                                                Jeremy Howard and Sebastian Ruder. 2018. Fine-
+                                                             tuned language models for text classification. CoRR,
+Milam Aiken and Mina Park. 2010. The efficacy of             abs/1801.06146.
+  round-trip translation for mt evaluation. Translation
+  Journal, 14(1):1–10.                                    Rong Hu, Brian Mac Namee, and Sarah Jane De-
+                                                            lany. 2016. Active learning for text classification
+Ateret Anaby-Tavor, Boaz Carmeli, Esther Goldbraich,
+                                                            with reusability. Expert systems with applications,
+  Amir Kantor, George Kour, Segev Shlomov, Naama
+                                                            45:438–449.
+  Tepper, and Naama Zwerdling. 2019. Not enough
+  data? deep learning to the rescue! arXiv preprint       Rebecca Hwa. 2004. Sample selection for statistical
+  arXiv:1911.03118.                                         parsing. Computational linguistics, 30(3):253–276.
+Broderick Arneson, Ryan B Hayward, and Philip Hen-        Ajay J Joshi, Fatih Porikli, and Nikolaos Pa-
+  derson. 2010. Monte carlo tree search in hex. IEEE        panikolopoulos. 2009. Multi-class active learning
+  Transactions on Computational Intelligence and AI         for image classification. In 2009 IEEE Conference
+  in Games, 2(4):251–258.                                   on Computer Vision and Pattern Recognition, pages
+Segun Taofeek Aroyehun and Alexander Gelbukh.               2372–2379. IEEE.
+  2018. Aggression detection in social media: Us-         Diederik P Kingma and Jimmy Ba. 2014. Adam: A
+  ing deep neural networks, data augmentation, and          method for stochastic optimization. arXiv preprint
+  pseudo labeling. In Proceedings of the First Work-        arXiv:1412.6980.
+  shop on Trolling, Aggression and Cyberbullying
+  (TRAC-2018), pages 90–97, Santa Fe, New Mexico,         Sosuke Kobayashi. 2018. Contextual augmentation:
+  USA. Association for Computational Linguistics.           Data augmentation by words with paradigmatic re-
+                                                            lations. In Proceedings of the 2018 Conference of
+Peter Auer, Nicolo Cesa-Bianchi, and Paul Fischer.          the North American Chapter of the Association for
+  2002. Finite-time analysis of the multiarmed bandit       Computational Linguistics: Human Language Tech-
+  problem. Machine learning, 47(2-3):235–256.               nologies, Volume 2 (Short Papers), pages 452–457,
+Yoshua Bengio, Réjean Ducharme, Pascal Vincent,            New Orleans, Louisiana. Association for Computa-
+  and Christian Janvin. 2003.   A neural proba-             tional Linguistics.
+  bilistic language model. J. Mach. Learn. Res.,          Anastasia Krithara, Cyril Goutte, Jean-Michel Renders,
+  3(null):1137–1155.                                        and MR Amini. 2006. Reducing the annotation bur-
+C. B. Browne, E. Powley, D. Whitehouse, S. M. Lucas,        den in text classification. In Proceedings of the 1st
+   P. I. Cowling, P. Rohlfshagen, S. Tavener, D. Perez,     International Conference on Multidisciplinary Infor-
+   S. Samothrakis, and S. Colton. 2012. A survey            mation Sciences and Technologies (InSciT 2006),
+   of monte carlo tree search methods. IEEE Trans-          Merida, Spain.
+   actions on Computational Intelligence and AI in
+                                                          Varun Kumar, Ashutosh Choudhary, and Eunah Cho.
+   Games, 4(1):1–43.
+                                                            2020. Data augmentation using pre-trained trans-
+Hyeong Soo Chang, Michael C Fu, Jiaqiao Hu, and             former models. arXiv preprint arXiv:2003.02245.
+  Steven I Marcus. 2016. Google deep mind’s al-
+                                                          David D Lewis and Jason Catlett. 1994. Heteroge-
+  phago. OR/MS Today, 43(5):24–29.
+                                                            neous uncertainty sampling for supervised learning.
+Guillaume Chaslot, Sander Bakkes, Istvan Szita, and         In Machine learning proceedings 1994, pages 148–
+  Pieter Spronck. 2008. Monte-carlo tree search: A          156. Elsevier.
+  new framework for game ai. In AIIDE.
+                                                          David D Lewis and William A Gale. 1994. A sequen-
+Muhammad Umar Chaudhry and Jee-Hyong Lee. 2018.             tial algorithm for training text classifiers. In SI-
+ Feature selection for high dimensional data using          GIR’94, pages 3–12. Springer.
+ monte carlo tree search. IEEE Access, 6:76036–
+ 76048.                                                   Xin Li and Dan Roth. 2002. Learning question clas-
+                                                            sifiers. In Proceedings of the 19th international
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and               conference on Computational linguistics-Volume 1,
+   Kristina Toutanova. 2018. BERT: pre-training of          pages 1–7. Association for Computational Linguis-
+   deep bidirectional transformers for language under-      tics.
+   standing. CoRR, abs/1810.04805.
+                                                          Kamal Nigam and Andrew McCallum. 1998. Pool-
+Angela Fan, Mike Lewis, and Yann N. Dauphin.                based active learning for text classification. In
+  2018. Hierarchical neural story generation. CoRR,         Conference on Automated Learning and Discovery
+  abs/1805.04833.                                           (CONALD).
+Alexander Freytag, Erik Rodner, and Joachim Denzler.      Diego Perez, Julian Togelius, Spyridon Samothrakis,
+  2014. Selecting influential examples: Active learn-       Philipp Rohlfshagen, and Simon M Lucas. 2013.
+  ing with expected model output changes. In Euro-          Automated map generation for the physical traveling
+  pean Conference on Computer Vision, pages 562–            salesman problem. IEEE Transactions on Evolution-
+  577. Springer.                                            ary Computation, 18(5):708–720.
+
+                                                      7409
+Matthew E. Peters, Mark Neumann, Mohit Iyyer, Matt        Samarth Sinha, Sayna Ebrahimi, and Trevor Darrell.
+ Gardner, Christopher Clark, Kenton Lee, and Luke           2019. Variational adversarial active learning. CoRR,
+ Zettlemoyer. 2018. Deep contextualized word repre-         abs/1904.00370.
+ sentations. CoRR, abs/1802.05365.
+                                                          Richard Socher, Alex Perelygin, Jean Wu, Jason
+Alec Radford, Karthik Narasimhan, Tim Salimans,             Chuang, Christopher D Manning, Andrew Y Ng,
+  and Ilya Sutskever. 2018. Improving language              and Christopher Potts. 2013. Recursive deep mod-
+  understanding by generative pre-training. URL             els for semantic compositionality over a sentiment
+  https://s3-us-west-2. amazonaws. com/openai-              treebank. In Proceedings of the 2013 conference on
+  assets/researchcovers/languageunsupervised/language       empirical methods in natural language processing,
+  understanding paper. pdf.                                 pages 1631–1642.
+
+Alec Radford, Jeff Wu, Rewon Child, David Luan,           Simon Tong and Daphne Koller. 2001. Support vec-
+  Dario Amodei, and Ilya Sutskever. 2019. Language          tor machine active learning with applications to text
+  models are unsupervised multitask learners.               classification. Journal of machine learning research,
+                                                            2(Nov):45–66.
+Alexander Ratner, Stephen H. Bach, Henry Ehrenberg,
+  Jason Fries, Sen Wu, and Christopher Ré. 2017.         Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob
+  Snorkel: Rapid training data creation with weak su-       Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz
+  pervision. Proc. VLDB Endow., 11(3):269–282.              Kaiser, and Illia Polosukhin. 2017. Attention is all
+                                                            you need. In Advances in neural information pro-
+Nicholas Roy and Andrew McCallum. 2001. Toward              cessing systems, pages 5998–6008.
+  optimal active learning through monte carlo estima-
+  tion of error reduction. ICML, Williamstown, pages      Alex Wang and Kyunghyun Cho. 2019. Bert has
+  441–448.                                                  a mouth, and it must speak: Bert as a markov
+                                                            random field language model.   arXiv preprint
+S. K. Sankarpandi, S. Samothrakis, L. Citi, and             arXiv:1902.04094.
+  P. Brady. 2019. Active learning without unla-
+  beled samples: generating questions and labels us-      Alex Wang, Amanpreet Singh, Julian Michael, Felix
+  ing monte carlo tree search. In 2019 IEEE Inter-          Hill, Omer Levy, and Samuel R Bowman. 2018a.
+  national Conference on Big Data (Big Data), pages         Glue: A multi-task benchmark and analysis platform
+  4628–4631.                                                for natural language understanding. arXiv preprint
+                                                            arXiv:1804.07461.
+Ozan Sener and Silvio Savarese. 2017. Active learn-
+                                                          Gaoang Wang, Jenq-Neng Hwang, Craig Rose, and Far-
+  ing for convolutional neural networks: A core-set
+                                                            ron Wallace. 2017. Uncertainty sampling based ac-
+  approach. arXiv preprint arXiv:1708.00489.
+                                                            tive learning with diversity constraint by sparse se-
+Rico Sennrich, Barry Haddow, and Alexandra Birch.           lection. In 2017 IEEE 19th International Workshop
+  2015. Improving neural machine translation models         on Multimedia Signal Processing (MMSP), pages 1–
+  with monolingual data. CoRR, abs/1511.06709.              6. IEEE.
+
+                                                          William Yang Wang and Diyi Yang. 2015. That’s so an-
+Burr Settles. 2009. Active learning literature survey.
+                                                            noying!!!: A lexical and frame-semantic embedding
+  Technical report, University of Wisconsin-Madison
+                                                            based data augmentation approach to automatic cat-
+  Department of Computer Sciences.
+                                                            egorization of annoying behaviors using #petpeeve
+Burr Settles and Mark Craven. 2008. An analysis of ac-      tweets. In Proceedings of the 2015 Conference on
+  tive learning strategies for sequence labeling tasks.     Empirical Methods in Natural Language Processing,
+  In Proceedings of the 2008 Conference on Empiri-          pages 2557–2563, Lisbon, Portugal. Association for
+  cal Methods in Natural Language Processing, pages         Computational Linguistics.
+  1070–1079.                                              Xinyi Wang, Hieu Pham, Zihang Dai, and Graham
+                                                            Neubig. 2018b. SwitchOut: an efficient data aug-
+Burr Settles, Mark Craven, and Soumya Ray. 2008.
+                                                            mentation algorithm for neural machine translation.
+  Multiple-instance active learning. In J. C. Platt,
+                                                            In Proceedings of the 2018 Conference on Empiri-
+  D. Koller, Y. Singer, and S. T. Roweis, editors, Ad-
+                                                            cal Methods in Natural Language Processing, pages
+  vances in Neural Information Processing Systems
+                                                            856–861, Brussels, Belgium. Association for Com-
+  20, pages 1289–1296. Curran Associates, Inc.
+                                                            putational Linguistics.
+Connor Shorten and Taghi M Khoshgoftaar. 2019. A          Jason W. Wei and Kai Zou. 2019. EDA: easy data aug-
+  survey on image data augmentation for deep learn-          mentation techniques for boosting performance on
+  ing. Journal of Big Data, 6(1):60.                         text classification tasks. CoRR, abs/1901.11196.
+Yawar Siddiqui, Julien Valentin, and Matthias Nießner.    Donggeun Yoo and In So Kweon. 2019. Learning loss
+  2019. Viewal: Active learning with viewpoint en-          for active learning. CoRR, abs/1905.03677.
+  tropy for semantic segmentation. arXiv preprint
+  arXiv:1911.11789.
+
+                                                     7410
+
