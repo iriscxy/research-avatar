@@ -1,9 +1,11 @@
 # Direct runtime/dev dependencies frozen for reproducible repository setup.
 # Regenerate intentionally when upgrading; do not silently float CI dependencies.
 beautifulsoup4==4.15.0
+google-auth==2.50.0
 matplotlib==3.10.5
 openai==3.1.0
 Pillow==12.3.0
 python-pptx==1.0.2
 playwright==1.60.0
 PyYAML==6.0.3
+requests==2.32.5

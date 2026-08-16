@@ -55,6 +55,11 @@ FIGURE_TOOL = PACKAGE_ROOT / "tools" / "figure_ppt.py"
 PROJECT_CONFIG_FILE = PAPER / "paper_studio.json"
 DEFAULT_MODEL = os.environ.get("PAPER_STUDIO_MODEL", "gpt-5-nano")
 DEFAULT_PROVIDER = os.environ.get("PAPER_STUDIO_PROVIDER", "openai").strip().lower()
+ONLINE_PROJECT_MODE = os.environ.get("PAPER_STUDIO_ONLINE", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 if DEFAULT_PROVIDER not in {"openai", "deepseek"}:
     DEFAULT_PROVIDER = "openai"
 PROVIDER_DEFAULT_MODELS = {
@@ -2923,6 +2928,26 @@ def latex_prose_issues(source: str) -> list[str]:
     return issues
 
 
+def online_latex_security_issues(source: str) -> list[str]:
+    """Reject TeX primitives that could escape an online session's paper tree."""
+    if not ONLINE_PROJECT_MODE:
+        return []
+    forbidden = re.compile(
+        r"\\(?:"
+        r"input|include|includegraphics|openin|openout|read|write|immediate|"
+        r"usepackage|documentclass|bibliography|addbibresource|newcommand|"
+        r"renewcommand|providecommand|def|edef|gdef|xdef|let|catcode|csname|"
+        r"special|directlua|write18|lstinputlisting|verbatiminput|"
+        r"begin\s*\{\s*filecontents\*?\s*\}"
+        r")",
+        re.IGNORECASE,
+    )
+    matches = sorted(set(match.group(0) for match in forbidden.finditer(source)))
+    if "^^" in source:
+        matches.append("TeX ^^ character encoding")
+    return matches
+
+
 def candidate_for_accept(
     paragraph: dict[str, Any],
     *,
@@ -3069,7 +3094,7 @@ def api_setup_for_provider(provider: str) -> dict[str, Any]:
     env_name = config["environment_variable"]
     configured = bool(os.environ.get(env_name))
     commands = [f'export {env_name}="粘贴你的 API key"']
-    return {
+    result = {
         "provider": provider,
         "provider_label": config["label"],
         "required": True,
@@ -3080,6 +3105,16 @@ def api_setup_for_provider(provider: str) -> dict[str, Any]:
         "restart_command": API_KEY_RESTART_COMMAND,
         "security_note": "不要把真实 API key 输入聊天、提交到仓库或保存到浏览器。",
     }
+    if ONLINE_PROJECT_MODE:
+        result.update(
+            {
+                "location": "Online Paper Studio 会话内存",
+                "setup_command": "",
+                "restart_command": "",
+                "security_note": "API key 只驻留在线会话进程内存，不写入项目或浏览器存储。",
+            }
+        )
+    return result
 
 
 def select_llm_provider(state: dict[str, Any], provider: str) -> bool:
@@ -3177,6 +3212,11 @@ def post_openai(payload: dict[str, Any], *, provider: str | None = None) -> dict
     api_key = os.environ.get(config["environment_variable"])
     if not api_key:
         setup = api_setup_for_provider(provider)
+        if ONLINE_PROJECT_MODE:
+            raise StudioError(
+                f"当前在线会话没有配置 {config['label']} API key；"
+                "请返回 Online Paper Studio 入口并创建新会话。"
+            )
         raise StudioError(
             f"尚未配置 {config['label']} LLM API。请在启动 Paper Studio 的本机终端输入 "
             f"`{setup['setup_command']}`，停止当前服务后重新运行 "
@@ -3716,6 +3756,12 @@ instead of guessing."""
     final_reference_error = artifact_reference_error(text, bound_artifacts)
     if final_reference_error:
         raise StudioError(final_reference_error)
+    security_issues = online_latex_security_issues(text)
+    if security_issues:
+        raise StudioError(
+            "在线写作候选包含被禁用的 LaTeX 文件或执行命令："
+            + ", ".join(security_issues)
+        )
     if revision_requested and re.sub(r"\s+", " ", text).strip() == re.sub(
         r"\s+", " ", revision_source
     ).strip():
@@ -3904,6 +3950,11 @@ def compile_paper() -> CompileResult:
         "LC_ALL": "C",
         "LANG": "C",
     }
+    if ONLINE_PROJECT_MODE:
+        # Kpathsea paranoid mode confines TeX reads/writes to the paper tree.
+        compile_environment.update(
+            {"openin_any": "p", "openout_any": "p", "shell_escape": "0"}
+        )
     command = [
         "latexmk",
         "-pdf",
@@ -3979,6 +4030,11 @@ def accept_full_draft_paragraph(
     prose_issues = latex_prose_issues(text)
     if prose_issues:
         raise StudioError("全文生成包含 LaTeX 风险字符：" + "; ".join(prose_issues))
+    security_issues = online_latex_security_issues(text)
+    if security_issues:
+        raise StudioError(
+            "全文生成包含在线模式禁用的 LaTeX 命令：" + ", ".join(security_issues)
+        )
 
     target = PAPER / "sections" / SECTION_MAP[section]["file"]
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -6664,7 +6720,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
                 "studio_title": "Paper Studio",
                 "subtitle": "等待 paperwrite 填入论文项目数据",
                 "config_file": PROJECT_CONFIG_FILE.relative_to(ROOT).as_posix(),
-                "root": str(ROOT.resolve()),
+                "root": "" if ONLINE_PROJECT_MODE else str(ROOT.resolve()),
                 "loaded": False,
             },
             "model": state.get("model", DEFAULT_MODEL),
@@ -6703,7 +6759,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         "studio_title": str(PROJECT_METADATA.get("studio_title", "Paper Studio")),
         "subtitle": str(PROJECT_METADATA.get("subtitle", "")),
         "config_file": PROJECT_CONFIG_FILE.relative_to(ROOT).as_posix(),
-        "root": str(ROOT.resolve()),
+        "root": "" if ONLINE_PROJECT_MODE else str(ROOT.resolve()),
         "loaded": True,
     }
     total_paragraphs = sum(
@@ -6979,7 +7035,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(
                 {
                     "ok": True,
-                    "project": {"root": str(ROOT.resolve())},
+                    "project": {
+                        "root": "" if ONLINE_PROJECT_MODE else str(ROOT.resolve())
+                    },
                     "empty_project": EMPTY_PROJECT_MODE or not project_files_ready(),
                     "pid": os.getpid(),
                 }
@@ -7012,6 +7070,21 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         try:
             body = self.read_json()
+            if ONLINE_PROJECT_MODE and self.path in {
+                "/api/agent-chat",
+                "/api/agent-chat/cancel",
+                "/api/figure/agent-chat",
+                "/api/figure/build",
+                "/api/figure/generate",
+                "/api/figure/panel/generate",
+                "/api/figure/compose",
+                "/api/table/generate",
+                "/api/table/agent-edit",
+            }:
+                raise StudioError(
+                    "在线 HTML 写作会话不运行本地 Codex Agent；"
+                    "正文、标题、Caption 与 LLM 写作功能仍可正常使用。"
+                )
             if self.path == "/api/generate":
                 self.handle_generate(body)
             elif self.path == "/api/title/generate":
@@ -7380,6 +7453,12 @@ class Handler(BaseHTTPRequestHandler):
             raise StudioError(
                 "候选含有会破坏 pdflatex 正文的字符，请先让 GPT 修正或手动转为 "
                 "LaTeX：" + "; ".join(prose_issues)
+            )
+        security_issues = online_latex_security_issues(text)
+        if security_issues:
+            raise StudioError(
+                "在线模式禁止会读取文件、写文件或执行代码的 LaTeX 命令："
+                + ", ".join(security_issues)
             )
         if not (PAPER / "main.tex").exists():
             raise StudioError("paper/main.tex is missing; scaffold the approved outline before accepting prose.")

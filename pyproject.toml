@@ -8,10 +8,12 @@ version = "0.1.0"
 requires-python = ">=3.10"
 dependencies = [
   "beautifulsoup4>=4.15,<5",
+  "google-auth>=2.40,<3",
   "matplotlib>=3.9,<4",
   "openai>=3.1,<4",
   "Pillow>=12.3,<13",
   "python-pptx>=1.0,<2",
+  "requests>=2.32,<3",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +32,7 @@ include = ["research_avatar*"]
 
 [tool.setuptools.package-data]
 "research_avatar.paper_studio" = ["static/*", "*.mjs", "README.md"]
+"research_avatar.online_studio" = ["static/*", "README.md"]
 "research_avatar.research_studio" = ["static/*"]
 "research_avatar.web.demo" = ["*.html", "*.js", "*.css", "*.json", "_routes.json", "assets/**/*"]
 "research_avatar.web.functions" = ["*.js"]

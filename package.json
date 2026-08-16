@@ -1,0 +1,15 @@
+{
+  "name": "research-avatar-cloudflare",
+  "private": true,
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "check:worker": "wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.0.29"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "wrangler": "^4.30.0"
+  }
+}

@@ -29,3 +29,4 @@ tmp/
 # Generated presentations and process artifacts stay local.
 outputs/
 .paper_preflight/
+.online-paper-studio/

@@ -6,7 +6,7 @@ Research Avatar 是一套面向**有经验研究者**的轻量级、个性化科
 
 ---
 
-[Live Demo →](https://research-avatar-demo.pages.dev/)
+[Online Paper Studio：注册、上传并开始写作 →](https://research-avatar-studio.yingtaomj.workers.dev/)
 
 ---
 
@@ -60,6 +60,21 @@ export DEEPSEEK_API_KEY="粘贴你的 API key"
 
 全部流程和生成文件可以在 **[http://127.0.0.1:8780](http://127.0.0.1:8780)** 看到。
 
+远程用户可以直接打开
+**[Online Paper Studio](https://research-avatar-studio.yingtaomj.workers.dev/)**，注册后上传
+`PROFILE.html`、实验/调研 HTML 和自己的 LLM API key 并开始写作。邮箱账户与登录
+会话持久保存在 Cloudflare D1；写作工作区和 API key 都是临时会话数据，请及时导出项目 ZIP。
+
+也可以在本地启动同一入口：
+
+```bash
+python3 -m research_avatar.online_studio --port 8876
+```
+
+本地访问 **[http://127.0.0.1:8876](http://127.0.0.1:8876)**。它支持邮箱密码
+账户与 Google 登录；公网部署说明、容器和 Nginx 示例见
+[`research_avatar/online_studio/README.md`](research_avatar/online_studio/README.md)。
+
 ## 目录结构
 
 根目录优先展示研究者直接使用和交付的内容；这些目录会在对应 Skill 首次运行时创建：
@@ -76,6 +91,7 @@ paper/                # LaTeX、图表、PPTX 与最终论文
 
 ```text
 research_avatar/
+├── online_studio/    # 登录、上传资料与临时 API key 的在线写作入口
 ├── paper_studio/     # 论文写作工作台
 ├── research_studio/  # 全流程浏览界面
 ├── tools/            # CLI、校验器与科研工作流工具
