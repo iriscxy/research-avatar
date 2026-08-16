@@ -34,15 +34,33 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 
 # framework / dependency signals
-_FRAMEWORKS = [
-    "transformers", "deepspeed", "accelerate", "fsdp", "vllm", "peft", "trl",
-    "lightning", "pytorch", "torch", "jax", "flax", "wandb", "datasets",
-    "bitsandbytes", "flash_attn", "flash-attn", "xformers",
-]
+_FRAMEWORK_PATTERNS = {
+    name: re.compile(pattern, re.I)
+    for name, pattern in {
+        "transformers": r"(?<![A-Za-z0-9])transformers(?![A-Za-z0-9])",
+        "deepspeed": r"(?<![A-Za-z0-9])deepspeed(?![A-Za-z0-9])",
+        "accelerate": r"(?<![A-Za-z0-9])accelerate(?![A-Za-z0-9])",
+        "fsdp": r"(?<![A-Za-z0-9])fsdp(?![A-Za-z0-9])",
+        "vllm": r"(?<![A-Za-z0-9])vllm(?![A-Za-z0-9])",
+        "peft": r"(?<![A-Za-z0-9])peft(?![A-Za-z0-9])",
+        "trl": r"(?<![A-Za-z0-9])trl(?![A-Za-z0-9])",
+        "lightning": r"(?<![A-Za-z0-9])lightning(?![A-Za-z0-9])",
+        "pytorch": r"(?<![A-Za-z0-9])pytorch(?![A-Za-z0-9])",
+        "torch": r"(?<![A-Za-z0-9])torch(?![A-Za-z0-9])",
+        "jax": r"(?<![A-Za-z0-9])jax(?![A-Za-z0-9])",
+        "flax": r"(?<![A-Za-z0-9])flax(?![A-Za-z0-9])",
+        "wandb": r"(?<![A-Za-z0-9])wandb(?![A-Za-z0-9])",
+        "datasets": r"(?<![A-Za-z0-9])datasets(?![A-Za-z0-9])",
+        "bitsandbytes": r"(?<![A-Za-z0-9])bitsandbytes(?![A-Za-z0-9])",
+        "flash-attn": r"(?<![A-Za-z0-9])flash[_-]attn(?![A-Za-z0-9])",
+        "xformers": r"(?<![A-Za-z0-9])xformers(?![A-Za-z0-9])",
+    }.items()
+}
 # launchers
 _LAUNCHERS = ["torchrun", "accelerate launch", "deepspeed", "python -m torch.distributed",
               "srun", "sbatch", "modal run"]
@@ -81,8 +99,8 @@ def _empty() -> dict:
 
 def _scan_text(text: str, agg: dict) -> None:
     low = text.lower()
-    for fw in _FRAMEWORKS:
-        if fw in low:
+    for fw, pattern in _FRAMEWORK_PATTERNS.items():
+        if pattern.search(text):
             agg["_dep"][fw] += 1
     for la in _LAUNCHERS:
         if la in low:
@@ -131,7 +149,8 @@ def mine(events: Path | None, transcripts: list[Path], max_lines: int) -> dict:
                         break
                     n += 1
                     _scan_text(line, agg)
-        except Exception:  # noqa: BLE001
+        except (OSError, UnicodeError) as error:
+            print(f"warning: could not read history source {f}: {error}", file=sys.stderr)
             continue
     out["lines_scanned"] = n
 

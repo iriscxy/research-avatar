@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Verify that final Idea-report prose is covered by a real GPT API receipt."""
+"""Verify that final Idea-report prose is covered by a supported LLM API receipt."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -31,8 +30,8 @@ def main() -> int:
         except json.JSONDecodeError as exc:
             errors.append(f"invalid readability receipt JSON: {exc}")
             receipt = {}
-    if receipt.get("status") != "complete" or receipt.get("provider") != "openai-api":
-        errors.append("readability receipt must record a complete openai-api pass")
+    if receipt.get("status") != "complete" or receipt.get("provider") not in {"openai-api", "deepseek-api"}:
+        errors.append("readability receipt must record a complete supported LLM API pass")
     if not str(receipt.get("model", "")).strip():
         errors.append("readability receipt lacks model")
     response_ids = receipt.get("api_response_ids")

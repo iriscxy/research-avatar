@@ -108,21 +108,37 @@ def _entry_type(venue: str) -> str:
     return "inproceedings"
 
 
+def _bibtex_text(value: object) -> str:
+    """Escape plain Scholar metadata without rewriting Unicode content."""
+    text = str(value or "")
+    replacements = {
+        "\\": r"\textbackslash{}",
+        "{": r"\{",
+        "}": r"\}",
+        "%": r"\%",
+        "&": r"\&",
+        "_": r"\_",
+        "#": r"\#",
+        "$": r"\$",
+    }
+    return "".join(replacements.get(character, character) for character in text)
+
+
 def _bibtex(paper: dict, key: str) -> str:
     etype = _entry_type(paper.get("venue", ""))
     authors_bib = " and ".join(
         a.strip() for a in (paper.get("authors", "") or "").split(",") if a.strip()
     )
-    fields = [("title", paper.get("title", "").strip())]
+    fields = [("title", _bibtex_text(paper.get("title", "").strip()))]
     if authors_bib:
-        fields.append(("author", authors_bib))
+        fields.append(("author", _bibtex_text(authors_bib)))
     venue = (paper.get("venue", "") or "").strip()
     if venue:
-        fields.append(("journal" if etype == "article" else "booktitle", venue))
+        fields.append(("journal" if etype == "article" else "booktitle", _bibtex_text(venue)))
     if paper.get("year"):
         fields.append(("year", str(paper["year"])))
     if paper.get("doi"):
-        fields.append(("doi", paper["doi"]))
+        fields.append(("doi", str(paper["doi"]).strip()))
     body = ",\n".join(f"  {k} = {{{v}}}" for k, v in fields if v)
     return f"@{etype}{{{key},\n{body}\n}}"
 
@@ -150,7 +166,7 @@ def _make_keys(papers: list[dict]) -> None:
 # --------------------------------------------------------------------------- #
 def _s2_search(fetcher: str, title: str) -> list[dict]:
     proc = subprocess.run(
-        ["python3", fetcher, "search", title, "--max", "3"],
+        [sys.executable, fetcher, "search", title, "--max", "3"],
         capture_output=True, encoding="utf-8", errors="replace", timeout=40,
     )
     if proc.returncode != 0:

@@ -19,6 +19,15 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE_ROOT = ROOT / ".agents" / "skills"
 TARGET_ROOT = ROOT / ".claude" / "skills"
 
+
+def is_disposable(path: Path) -> bool:
+    """Return whether a generated filesystem entry must never enter a mirror."""
+    return (
+        "__pycache__" in path.parts
+        or path.suffix.lower() in {".pyc", ".pyo"}
+        or path.name == ".DS_Store"
+    )
+
 def skill_names() -> tuple[str, ...]:
     return tuple(
         path.name
@@ -60,7 +69,7 @@ def build_mirror(destination: Path) -> None:
         target_dir = destination / name
         target_dir.mkdir(parents=True, exist_ok=True)
         for source in source_dir.rglob("*"):
-            if not source.is_file() or source.name == ".DS_Store":
+            if not source.is_file() or is_disposable(source):
                 continue
             relative = source.relative_to(source_dir)
             if relative.parts[:1] == ("agents",):
@@ -82,7 +91,7 @@ def file_snapshot(root: Path) -> dict[str, bytes]:
     return {
         str(path.relative_to(root)): path.read_bytes()
         for path in sorted(root.rglob("*"))
-        if path.is_file() and path.name != ".DS_Store"
+        if path.is_file() and not is_disposable(path)
     }
 
 

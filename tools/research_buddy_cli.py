@@ -9,12 +9,13 @@ import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path.cwd().resolve()
+PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 
 
-def run(command: list[str]) -> int:
+def run(command: list[str], *, cwd: Path = ROOT) -> int:
     process = subprocess.run(
-        command, cwd=ROOT, encoding="utf-8", errors="replace", check=False
+        command, cwd=cwd, encoding="utf-8", errors="replace", check=False
     )
     return process.returncode
 
@@ -29,21 +30,43 @@ def main() -> int:
         return run([sys.executable, "-m", "unittest", "discover", "-s", "tests"])
     if args.command == "validate":
         commands = [
-            [sys.executable, "-m", "compileall", "-q", "tools", "paper_studio"],
-            ["node", "--check", "paper_studio/static/app.js"],
+            [
+                sys.executable,
+                "-m",
+                "compileall",
+                "-q",
+                "tools",
+                "paper_studio",
+                "research_studio",
+            ],
+            ["node", "--check", str(PACKAGE_ROOT / "demo" / "app.js")],
+            ["node", "--check", str(PACKAGE_ROOT / "paper_studio" / "static" / "app.js")],
+            ["node", "--check", str(PACKAGE_ROOT / "research_studio" / "static" / "app.js")],
+            ["node", "--check", str(PACKAGE_ROOT / "functions" / "_middleware.js")],
         ]
         if (ROOT / "paper" / "main.tex").is_file():
             commands.append(
-                [sys.executable, "tools/paper_preflight.py", "--paper-dir", "paper", "--source-only"]
+                [
+                    sys.executable,
+                    str(PACKAGE_ROOT / "tools" / "paper_preflight.py"),
+                    "--paper-dir",
+                    str(ROOT / "paper"),
+                    "--source-only",
+                ]
             )
         for command in commands:
-            code = run(command)
+            code = run(command, cwd=PACKAGE_ROOT)
             if code:
                 return code
         return 0
     return run([
-        sys.executable, "tools/paper_preflight.py", "--paper-dir", "paper", "--compile",
-        "--render-dir", "paper/.paper_preflight/pages",
+        sys.executable,
+        str(PACKAGE_ROOT / "tools" / "paper_preflight.py"),
+        "--paper-dir",
+        str(ROOT / "paper"),
+        "--compile",
+        "--render-dir",
+        str(ROOT / "paper" / ".paper_preflight" / "pages"),
     ])
 
 

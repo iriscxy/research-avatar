@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mine *workflow preferences* (how the researcher likes to work) from coding-agent
 transcripts — a SEMANTIC complement to ``experiment_history.py`` (which mines
-deterministic hyperparameter values).
+toolchain, model, hardware, and failure-memory signals).
 
 This tool does the **deterministic narrowing only**: it pulls the human's own
 short directive turns out of ``~/.claude/projects/<slug>/*.jsonl`` and keeps the
@@ -27,7 +27,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 from pathlib import Path
 
 # --------------------------------------------------------------------------- #

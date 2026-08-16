@@ -116,12 +116,17 @@ pipeline.addEventListener("click", event => {
   const button = event.target.closest("[data-stage]");
   if (!button) return;
   setStage(Number(button.dataset.stage));
+  // Navigation must remain immediate even when the two-second background
+  // refresh currently owns loadState().  Otherwise a click can appear to be
+  // ignored until the next poll and a quick reload opens a different tab.
+  if (app.state) renderStage();
   loadState();
 });
 document.addEventListener("keydown", event => {
   if (!app.state || !["ArrowLeft","ArrowRight"].includes(event.key)) return;
   const delta = event.key === "ArrowRight" ? 1 : -1;
   setStage((app.stage + delta + app.state.stages.length) % app.state.stages.length);
+  renderStage();
   loadState();
 });
 window.addEventListener("focus", () => { if (app.state) loadState(); });

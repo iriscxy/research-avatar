@@ -30,7 +30,13 @@ CONTRACT_RE = re.compile(
     r"(.*?)</script>",
     re.DOTALL | re.IGNORECASE,
 )
-APPROVAL_FIELDS = {"approval_status", "approved_at", "approval_channel", "approval_contract_sha256"}
+APPROVAL_FIELDS = {
+    "approval_status",
+    "approved_at",
+    "approval_channel",
+    "approval_contract_sha256",
+    "approval_contract_version",
+}
 
 
 def contract_digest(contract: dict[str, Any]) -> str:

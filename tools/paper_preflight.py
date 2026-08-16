@@ -8,7 +8,6 @@ import json
 import re
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -46,7 +45,14 @@ def read_tex_tree(main: Path, root: Path) -> tuple[str, list[dict]]:
             return ""
         source = re.sub(r"(?m)(?<!\\)%.*$", "", source)
         parts, cursor = [], 0
-        for match in re.finditer(r"\\(?:input|include)\s*(?:\{([^}]+)\}|([^\s%]+))", source):
+        # Match only the TeX file-loading commands themselves.  Without the
+        # control-word boundary, ``\\includegraphics`` is misread as
+        # ``\\include`` followed by a bogus filename such as
+        # ``graphics[width=...]``.
+        for match in re.finditer(
+            r"\\(?:input|include)(?![A-Za-z@])\s*(?:\{([^}]+)\}|([^\s%]+))",
+            source,
+        ):
             parts.append(source[cursor:match.start()])
             child = Path((match.group(1) or match.group(2)).strip())
             if not child.suffix:

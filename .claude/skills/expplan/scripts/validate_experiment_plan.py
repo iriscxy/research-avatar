@@ -471,7 +471,9 @@ def validate(plan: Path) -> list[str]:
                 schema_panels = schema.get("figures", {}).get(aid, [])
                 if len(schema_panels) != len(panel_pairs):
                     errors.append(f"{aid}: table schema panel count does not match HTML")
-                for index, (pair, panel_schema) in enumerate(zip(panel_pairs, schema_panels), 1):
+                for index, (pair, panel_schema) in enumerate(
+                    zip(panel_pairs, schema_panels), 1  # noqa: B905 - mismatch reported above
+                ):
                     expected_marks = panel_schema.get("plotted_marks")
                     expected_pending = panel_schema.get("pending_values", expected_marks)
                     actual_pending = len(PENDING_TD_RE.findall(pair))
@@ -527,6 +529,15 @@ def validate(plan: Path) -> list[str]:
     publication_fulltext = str(structure_publication.get("fulltext_path", "")).strip()
     if structure_publication and publication_fulltext != local_full_text:
         errors.append("structure reference local full text must match its publications.json record")
+
+    external_ref = contract.get("references", {}).get("external_mechanism", {})
+    external_full_text = str(external_ref.get("local_full_text", "")).strip()
+    if not external_ref.get("url") or not external_full_text:
+        errors.append("external mechanism reference must have a URL and local full text")
+    elif Path(external_full_text).is_absolute():
+        errors.append("external mechanism reference local full text must be project-relative")
+    elif not (project_root / external_full_text).is_file():
+        errors.append("external mechanism reference local full text does not exist")
 
     body_figures = sum(item.get("kind") == "figure" for item in artifacts)
     body_tables = sum(item.get("kind") == "table" for item in artifacts)

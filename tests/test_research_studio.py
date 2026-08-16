@@ -1,10 +1,13 @@
 import json
+import io
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, call, patch
 
+import research_studio.server as studio
 from research_studio.server import (
+    Handler,
     build_state,
     ensure_project_studios,
     ensure_research_studio,
@@ -15,10 +18,69 @@ from research_studio.server import (
     record_expplan_approval,
     render_ledger_html,
     render_publications_html,
+    start_paper_studio,
 )
 
 
 class ResearchStudioTests(unittest.TestCase):
+    def test_http_server_accepts_browser_asset_bursts(self):
+        self.assertGreaterEqual(studio.StudioHTTPServer.request_queue_size, 32)
+
+    def test_profile_job_state_is_initialized_and_uses_profile_html_only(self):
+        source = Path(studio.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("researcher-profile/profile.md", source.lower())
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile = root / "researcher-profile" / "PROFILE.html"
+            profile.parent.mkdir(parents=True)
+            profile.write_text("<html><body>Writing Style</body></html>", encoding="utf-8")
+            with patch.dict(
+                studio.PROFILE_JOB,
+                {"status": "complete", "message": "done", "logs": []},
+                clear=True,
+            ):
+                state = studio.profile_job_state()
+                progress = studio.profile_progress_state(state, root)
+        self.assertEqual(state["status"], "complete")
+        self.assertEqual(progress["percent"], 100)
+        self.assertEqual(progress["current_phase"], 8)
+
+    @patch("research_studio.server.subprocess.Popen")
+    @patch("research_studio.server.paper_studio_status")
+    def test_paper_studio_rejects_a_different_workspace_on_the_port(self, status, popen):
+        status.return_value = {
+            "running": True,
+            "same_workspace": False,
+            "url": "http://127.0.0.1:8765",
+        }
+        result = start_paper_studio()
+        self.assertFalse(result["ok"])
+        self.assertIn("different workspace", result["error"])
+        popen.assert_not_called()
+
+    def test_request_body_rejects_arrays_and_oversized_payloads(self):
+        handler = object.__new__(Handler)
+        handler.headers = {"Content-Length": "2"}
+        handler.rfile = io.BytesIO(b"[]")
+        with self.assertRaisesRegex(ValueError, "JSON object"):
+            handler.read_json()
+
+        handler.headers = {"Content-Length": "20000"}
+        handler.rfile = io.BytesIO(b"{}")
+        with self.assertRaisesRegex(ValueError, "body size"):
+            handler.read_json()
+
+    def test_cancelled_response_does_not_emit_handler_traceback(self):
+        class ClosedSocket:
+            def write(self, _data):
+                raise BrokenPipeError("browser closed preview")
+
+        handler = object.__new__(Handler)
+        handler.wfile = ClosedSocket()
+        handler.close_connection = False
+        handler.write_body(b"preview")
+        self.assertTrue(handler.close_connection)
+
     @patch("research_studio.server.subprocess.Popen")
     @patch("research_studio.server.research_studio_status")
     def test_ensure_reuses_existing_workspace_server(self, status, popen):

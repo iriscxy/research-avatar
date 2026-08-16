@@ -136,7 +136,7 @@ def linkify_values(report: str, payload: dict[str, dict[str, object]]) -> str:
                 f"filled result {result_id} lacks a table cell carrying data-result-id"
             )
         report = cell.sub(
-            lambda match: (
+            lambda match, escaped=escaped, summary=summary: (
                 match.group(1)
                 + f'<a class="result-value" href="#provenance-{escaped}" '
                   f'data-result-id="{escaped}" data-provenance-trigger="{escaped}" '

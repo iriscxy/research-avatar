@@ -16,6 +16,7 @@ import csv
 import datetime as dt
 import html
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -32,12 +33,26 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(os.environ.get("RESEARCH_AVATAR_ROOT", Path.cwd())).resolve()
 STATIC = Path(__file__).resolve().parent / "static"
+DEMO = PACKAGE_ROOT / "demo"
 PAPER_STUDIO_URL = "http://127.0.0.1:8765"
 PAPER_STUDIO_LOCK = threading.Lock()
 PAPER_STUDIO_PROCESS: subprocess.Popen[bytes] | None = None
+PROFILE_JOB_LOCK = threading.RLock()
+PROFILE_JOB: dict[str, Any] = {
+    "status": "idle",
+    "message": "等待在终端运行 $profileconstruct。",
+    "logs": [],
+}
 LOCAL_URL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+class StudioHTTPServer(ThreadingHTTPServer):
+    """Threaded local server with enough backlog for browser asset bursts."""
+
+    request_queue_size = 64
 
 ARTIFACTS = {
     "profile": ("researcher-profile/PROFILE.html", "text/html; charset=utf-8"),
@@ -610,18 +625,32 @@ def build_state(root: Path = ROOT) -> dict[str, Any]:
     }
 
 
-def paper_studio_alive() -> bool:
+def paper_studio_status() -> dict[str, Any]:
     try:
         with LOCAL_URL_OPENER.open(f"{PAPER_STUDIO_URL}/api/state", timeout=1.2) as response:
-            return response.status == 200
-    except (urllib.error.URLError, OSError):
-        return False
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError, json.JSONDecodeError):
+        return {"running": False, "same_workspace": False, "url": PAPER_STUDIO_URL}
+    project = payload.get("project", {}) if isinstance(payload, dict) else {}
+    root = str(project.get("root", "")).strip()
+    same_workspace = bool(root) and Path(root).resolve() == ROOT.resolve()
+    return {"running": True, "same_workspace": same_workspace, "url": PAPER_STUDIO_URL}
+
+
+def paper_studio_alive() -> bool:
+    return bool(paper_studio_status()["running"])
 
 
 def start_paper_studio() -> dict[str, Any]:
     global PAPER_STUDIO_PROCESS
     with PAPER_STUDIO_LOCK:
-        if paper_studio_alive():
+        initial = paper_studio_status()
+        if initial["running"] and not initial["same_workspace"]:
+            return {
+                "ok": False,
+                "error": f"{PAPER_STUDIO_URL} is already serving a different workspace.",
+            }
+        if initial["running"]:
             return {"ok": True, "url": PAPER_STUDIO_URL, "already_running": True}
         if PAPER_STUDIO_PROCESS is None or PAPER_STUDIO_PROCESS.poll() is not None:
             workspace_hash = hashlib.sha256(str(ROOT).encode("utf-8")).hexdigest()[:12]
@@ -639,8 +668,14 @@ def start_paper_studio() -> dict[str, Any]:
             log_handle.close()
         deadline = time.time() + 4
         while time.time() < deadline:
-            if paper_studio_alive():
+            status = paper_studio_status()
+            if status["running"] and status["same_workspace"]:
                 return {"ok": True, "url": PAPER_STUDIO_URL, "already_running": False}
+            if status["running"]:
+                return {
+                    "ok": False,
+                    "error": f"{PAPER_STUDIO_URL} was claimed by a different workspace.",
+                }
             time.sleep(0.15)
     return {"ok": False, "error": "Paper Studio did not become ready within 4 seconds."}
 
@@ -773,14 +808,13 @@ def profile_progress_state(job: dict[str, Any], root: Path = ROOT) -> dict[str, 
     elif "cleanup" in logs or "whitelist" in logs or "phase 8" in logs:
         current_phase = 8
     elif ((profile_path.exists() and int(profile_path.stat().st_mtime) >= started_at)
-          or "+++ b/researcher-profile/profile.md" in logs or "phase 7" in logs):
+          or "phase 7" in logs):
         current_phase = 7
     elif "habits.json" in logs or "workflow preferences" in logs or "phase 6" in logs:
         current_phase = 6
     elif "known dead-ends" in logs or "phase 5" in logs:
         current_phase = 5
-    elif ((style_path.exists() and int(style_path.stat().st_mtime) >= started_at)
-          or "writing_style.md" in logs or "phase 4" in logs):
+    elif "writing style" in logs or "phase 4" in logs:
         current_phase = 4
     elif "task_type" in logs or "classif" in logs or "phase 3" in logs:
         current_phase = 3
@@ -823,7 +857,7 @@ def profile_progress_state(job: dict[str, Any], root: Path = ROOT) -> dict[str, 
     elif current_phase == 4 and style_target:
         phase_fraction = min(1.0, style_read / style_target)
     elif current_phase == 7:
-        phase_fraction = sum(path.exists() for path in (profile_path, style_path)) / 2
+        phase_fraction = float(profile_path.exists())
     progress_percent = ((max(0, current_phase - 1) + phase_fraction) / len(definitions) * 100) if current_phase else 0
     return {
         "current_phase": current_phase,
@@ -947,6 +981,12 @@ def run_profileconstruct_job(upload_path: Path, publication_count: int, input_na
 class Handler(BaseHTTPRequestHandler):
     server_version = "ResearchStudio/1.0"
 
+    def write_body(self, body: bytes) -> None:
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
+
     def send_bytes(self, body: bytes, mime: str, status: int = 200) -> None:
         self.send_response(status)
         self.send_header("Content-Type", mime)
@@ -954,10 +994,25 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.end_headers()
-        self.wfile.write(body)
+        self.write_body(body)
 
     def send_json(self, value: Any, status: int = 200) -> None:
         self.send_bytes(json.dumps(value, ensure_ascii=False).encode(), "application/json; charset=utf-8", status)
+
+    def read_json(self, *, limit: int = 16_384) -> dict[str, Any]:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError as exc:
+            raise ValueError("Invalid request body size.") from exc
+        if length <= 0 or length > limit:
+            raise ValueError("Invalid request body size.")
+        try:
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("Request body must be valid JSON.") from exc
+        if not isinstance(payload, dict):
+            raise ValueError("Request body must be a JSON object.")
+        return payload
 
     def do_GET(self) -> None:  # noqa: N802
         request_path = unquote(urlparse(self.path).path)
@@ -965,7 +1020,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(build_state())
             return
         if request_path == "/api/paper-studio/status":
-            self.send_json({"running": paper_studio_alive(), "url": PAPER_STUDIO_URL})
+            self.send_json(paper_studio_status())
             return
         if request_path.startswith("/artifact/"):
             key = request_path.removeprefix("/artifact/")
@@ -985,9 +1040,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if request_path.startswith("/demo/"):
             relative = request_path.removeprefix("/demo/") or "index.html"
-            target = (ROOT / "demo" / relative).resolve()
+            target = (DEMO / relative).resolve()
             try:
-                target.relative_to((ROOT / "demo").resolve())
+                target.relative_to(DEMO.resolve())
             except ValueError:
                 self.send_json({"error": "invalid path"}, HTTPStatus.BAD_REQUEST)
                 return
@@ -1001,7 +1056,7 @@ class Handler(BaseHTTPRequestHandler):
             target.relative_to(STATIC.resolve())
         except ValueError:
             try:
-                target.relative_to((ROOT / "demo").resolve())
+                target.relative_to(DEMO.resolve())
             except ValueError:
                 self.send_json({"error": "invalid static path"}, HTTPStatus.BAD_REQUEST)
                 return
@@ -1019,8 +1074,7 @@ class Handler(BaseHTTPRequestHandler):
         request_path = urlparse(self.path).path
         if request_path == "/api/idea-selection":
             try:
-                length = min(int(self.headers.get("Content-Length", "0")), 16_384)
-                payload = json.loads(self.rfile.read(length) or b"{}")
+                payload = self.read_json()
                 idea_id = str(payload.get("idea_id", "")).strip()
                 reason = str(payload.get("reason", "")).strip()
                 selection = record_idea_selection(ROOT / ARTIFACTS["ideas"][0], idea_id, reason)
@@ -1082,7 +1136,7 @@ def main() -> None:
         action = "started" if result["started"] else "already running"
         print(f"Research Studio {action}: {result['url']}")
         return
-    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    server = StudioHTTPServer((args.host, args.port), Handler)
     url = f"http://{args.host}:{args.port}"
     print(f"Research Studio: {url}")
     print(f"Workspace: {ROOT}")

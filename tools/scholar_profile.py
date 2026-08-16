@@ -349,7 +349,7 @@ def fetch_auto(url: str) -> str:
         msg = str(exc)
         if "Apple Events" in msg or "-1743" in msg:
             msg += " | " + _js_toggle_hint("chrome")
-        raise RuntimeError(msg)
+        raise RuntimeError(msg) from exc
     if not html.strip():
         raise RuntimeError("Chrome returned an empty page for " + url)
     return html

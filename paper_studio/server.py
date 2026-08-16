@@ -35,7 +35,11 @@ from pathlib import Path
 from typing import Any
 
 
-ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+# Runtime project data belongs to the directory from which the Studio is
+# launched. Package-owned web assets and helper programs remain beside this
+# module, which matters after a wheel is installed into site-packages.
+ROOT = Path(os.environ.get("RESEARCH_AVATAR_ROOT", Path.cwd())).resolve()
 STATIC = Path(__file__).resolve().parent / "static"
 PAPER = ROOT / "paper"
 STATE_DIR = PAPER / ".paper_studio"
@@ -47,7 +51,7 @@ DATA_FIGURE_AGENT_DIR = FIGURE_SOURCE_DIR / "data_agents"
 PPT_COMPOSER = Path(__file__).resolve().parent / "ppt_compose.mjs"
 TABLE_PREVIEW_DIR = STATE_DIR / "table_previews"
 PAPER_PAGE_DIR = STATE_DIR / "paper_pages"
-FIGURE_TOOL = ROOT / "tools" / "figure_ppt.py"
+FIGURE_TOOL = PACKAGE_ROOT / "tools" / "figure_ppt.py"
 PROJECT_CONFIG_FILE = PAPER / "paper_studio.json"
 DEFAULT_MODEL = os.environ.get("PAPER_STUDIO_MODEL", "gpt-5-nano")
 DEFAULT_PROVIDER = os.environ.get("PAPER_STUDIO_PROVIDER", "openai").strip().lower()
@@ -87,6 +91,12 @@ CANCELLED_AGENT_CHAT_JOBS: set[str] = set()
 FULL_DRAFT_JOB_LOCK = threading.RLock()
 CANCELLED_FULL_DRAFT_JOBS: set[str] = set()
 SERVER_INSTANCE_TOKEN = uuid.uuid4().hex
+
+
+class StudioHTTPServer(ThreadingHTTPServer):
+    """Threaded local server with enough backlog for browser asset bursts."""
+
+    request_queue_size = 64
 
 
 class ProjectConfigError(RuntimeError):
@@ -2129,7 +2139,7 @@ def paragraph_texts_from_manuscript(
         return None
     return {
         str(paragraph["id"]): block
-        for paragraph, block in zip(paragraphs, blocks)
+        for paragraph, block in zip(paragraphs, blocks)  # noqa: B905 - equal lengths checked above
     }
 
 
@@ -4395,7 +4405,7 @@ def structural_paragraph_spans(
         )
     return [
         (*span, str(paragraph["id"]))
-        for span, paragraph in zip(spans, paragraphs)
+        for span, paragraph in zip(spans, paragraphs)  # noqa: B905 - partial mapping is intentional
     ]
 
 
@@ -6417,7 +6427,7 @@ def composition_geometry(
         ratios = [panel["width_pt"] / panel["height_pt"] for panel in placed]
         height = (target_width - gap * (len(placed) - 1)) / sum(ratios)
         cursor = 0.0
-        for panel, ratio in zip(placed, ratios):
+        for panel, ratio in zip(placed, ratios):  # noqa: B905 - ratios derive from placed
             panel.update(x=cursor, top=0.0, width=height * ratio, height=height)
             cursor += panel["width"] + gap
         return target_width, height, placed
@@ -6512,6 +6522,7 @@ def compose_data_figure(
     paths = figure_paths(figure_id)
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
     FIGURE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=f"compose-{figure_id.lower()}-", dir=STATE_DIR
     ) as temporary_name:
@@ -6638,6 +6649,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
                 "studio_title": "Paper Studio",
                 "subtitle": "等待 paperwrite 填入论文项目数据",
                 "config_file": PROJECT_CONFIG_FILE.relative_to(ROOT).as_posix(),
+                "root": str(ROOT.resolve()),
                 "loaded": False,
             },
             "model": state.get("model", DEFAULT_MODEL),
@@ -6676,6 +6688,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         "studio_title": str(PROJECT_METADATA.get("studio_title", "Paper Studio")),
         "subtitle": str(PROJECT_METADATA.get("subtitle", "")),
         "config_file": PROJECT_CONFIG_FILE.relative_to(ROOT).as_posix(),
+        "root": str(ROOT.resolve()),
         "loaded": True,
     }
     total_paragraphs = sum(
@@ -6932,9 +6945,12 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
             if length <= 0 or length > 2_000_000:
                 raise StudioError("Invalid request body size.")
-            return json.loads(self.rfile.read(length).decode("utf-8"))
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
         except (ValueError, json.JSONDecodeError) as exc:
             raise StudioError("Request body must be valid JSON.") from exc
+        if not isinstance(payload, dict):
+            raise StudioError("Request body must be a JSON object.")
+        return payload
 
     def do_GET(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0]
@@ -8466,7 +8482,7 @@ def main() -> None:
         )
         if prose_changed or artifacts_changed:
             save_state(state)
-    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    server = StudioHTTPServer((args.host, args.port), Handler)
     url = f"http://{args.host}:{args.port}"
     print(f"Paper Studio: {url}")
     print(f"Workspace: {ROOT}")

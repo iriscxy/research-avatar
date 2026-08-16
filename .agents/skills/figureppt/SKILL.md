@@ -40,8 +40,7 @@ figure is faithful to the mechanism. (Read it back; re-run if it misreads the me
 python3 tools/figure_ppt.py draw spec.json --provider openai   # gpt-image-1, quality=high
 ```
 Draws with `spec.draw_prompt` **VERBATIM — nothing appended** (a BioRender figure keeps its own
-labels). Drawer is a flag: `openai` now (OPENAI_API_KEY); `gemini` (Nano Banana) once
-`GEMINI_API_KEY` + `google-generativeai` are wired. Produces `<fig>.bg.png`, and **every draw is
+labels). The currently supported drawer is `openai` (`OPENAI_API_KEY`). Produces `<fig>.bg.png`, and **every draw is
 archived** to `iterations/<figure_id>/round_NN.png` + `round_NN.prompt.txt` (the exact prompt used
 that round) — no iteration is overwritten, so the whole refine history is kept. (Opt into
 imagery-only + editable-label-overlay with `spec {"no_text": true}` if you want crisp editable
@@ -103,8 +102,10 @@ python3 tools/figure_ppt.py pdfimage spec.json --img <fig>.bg.png   # unattended
 ```
 `pdfimage` uses headless Chrome and atomically replaces the PDF that drops into the paper; it does not require LibreOffice or PowerPoint UI automation.
 
-`python3 tools/figure_ppt.py all spec.json --paper <method> [--refine-rounds N]` chains
-genprompt → draw → (refine → draw)×N → build → pdf.
+`python3 tools/figure_ppt.py all spec.json --paper <method>` is the legacy convenience chain
+genprompt → draw → image-backed build → pdf. It deliberately has no scripted refinement flag:
+for a publication figure, inspect the first image, revise `spec.draw_prompt`, redraw as needed,
+then rebuild through the appropriate editable path.
 
 ## Workflow when called by $paperwrite
 1. `emit-example` → a spec; set `canvas_in: [W,H]` to the Fig 1 slot's aspect ratio + `image_size`.

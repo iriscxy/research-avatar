@@ -287,7 +287,7 @@ def translate_batch(
     if not isinstance(values, list) or len(values) != len(items):
         raise RuntimeError("LLM API returned partial translation coverage")
     translations: dict[str, str] = {}
-    for expected, actual in zip(items, values):
+    for expected, actual in zip(items, values):  # noqa: B905 - equal lengths checked above
         if not isinstance(actual, dict) or actual.get("id") != expected["id"]:
             raise RuntimeError(f"LLM API changed translation item order near {expected['id']}")
         translated = normalize(str(actual.get("text", "")))

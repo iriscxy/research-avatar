@@ -28,17 +28,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
-import sys
 import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-UA = "research-avatar/1.0 (mailto:zzs144118@gmail.com)"
-MAILTO = "zzs144118@gmail.com"
+CONTACT_EMAIL = os.environ.get("RESEARCH_AVATAR_CONTACT_EMAIL", "").strip()
+UA = "research-avatar/1.0"
+if CONTACT_EMAIL:
+    UA += f" (mailto:{CONTACT_EMAIL})"
+MAILTO = CONTACT_EMAIL
 
 
 # --------------------------------------------------------------------------- #
@@ -69,24 +72,27 @@ def title_match(a: str, b: str) -> bool:
 # --------------------------------------------------------------------------- #
 def http(url: str, *, timeout: int = 30, retries: int = 4, backoff: float = 3.0,
          binary: bool = False, headers: dict | None = None):
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return None
     h = {"User-Agent": UA}
     if headers:
         h.update(headers)
-    last = None
     for i in range(retries):
         try:
             req = urllib.request.Request(url, headers=h)
             with urllib.request.urlopen(req, timeout=timeout) as r:
-                data = r.read()
+                maximum = 100 * 1024 * 1024 if binary else 10 * 1024 * 1024
+                data = r.read(maximum + 1)
+                if len(data) > maximum:
+                    return None
                 return data if binary else data.decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
-            last = e
             if e.code == 429 or 500 <= e.code < 600:
                 time.sleep(backoff * (i + 1))
                 continue
             return None
-        except Exception as e:  # noqa: BLE001
-            last = e
+        except Exception:  # noqa: BLE001
             time.sleep(backoff * (i + 1))
     return None
 
@@ -97,15 +103,17 @@ def http(url: str, *, timeout: int = 30, retries: int = 4, backoff: float = 3.0,
 def arxiv_lookup(title: str):
     """-> (arxiv_id, abstract) or (None, None)."""
     q = urllib.parse.quote(f'ti:"{title}"')
-    url = f"http://export.arxiv.org/api/query?search_query={q}&max_results=5"
+    url = f"https://export.arxiv.org/api/query?search_query={q}&max_results=5"
     xml = http(url, retries=3)
     if not xml:
         # fallback: loose all-field query
         q2 = urllib.parse.quote(f'all:{title}')
-        xml = http(f"http://export.arxiv.org/api/query?search_query={q2}&max_results=5", retries=2)
+        xml = http(f"https://export.arxiv.org/api/query?search_query={q2}&max_results=5", retries=2)
     if not xml:
         return None, None
     ns = {"a": "http://www.w3.org/2005/Atom"}
+    if "<!DOCTYPE" in xml.upper() or "<!ENTITY" in xml.upper():
+        return None, None
     try:
         root = ET.fromstring(xml)
     except ET.ParseError:
@@ -123,11 +131,13 @@ def arxiv_lookup(title: str):
 
 def arxiv_by_id(aid: str):
     """Fetch abstract for a known arXiv id via the id_list query."""
-    url = f"http://export.arxiv.org/api/query?id_list={urllib.parse.quote(aid)}&max_results=1"
+    url = f"https://export.arxiv.org/api/query?id_list={urllib.parse.quote(aid)}&max_results=1"
     xml = http(url, retries=3)
     if not xml:
         return None
     ns = {"a": "http://www.w3.org/2005/Atom"}
+    if "<!DOCTYPE" in xml.upper() or "<!ENTITY" in xml.upper():
+        return None
     try:
         root = ET.fromstring(xml)
     except ET.ParseError:
@@ -147,8 +157,9 @@ def _strip_jats(s: str) -> str:
 def crossref_lookup(title: str):
     """-> (doi, abstract) or (None, None)."""
     q = urllib.parse.quote(title)
-    url = (f"https://api.crossref.org/works?query.bibliographic={q}"
-           f"&rows=5&mailto={MAILTO}")
+    url = f"https://api.crossref.org/works?query.bibliographic={q}&rows=5"
+    if MAILTO:
+        url += f"&mailto={urllib.parse.quote(MAILTO)}"
     raw = http(url, retries=3)
     if not raw:
         return None, None
@@ -187,9 +198,14 @@ def s2_lookup(title: str):
 
 
 def unpaywall_pdf(doi: str):
-    if not doi:
+    # Unpaywall requires a contact email.  Keep it local/configurable instead
+    # of publishing a maintainer's personal address in the repository.
+    if not doi or not MAILTO:
         return None
-    url = f"https://api.unpaywall.org/v2/{urllib.parse.quote(doi)}?email={MAILTO}"
+    url = (
+        f"https://api.unpaywall.org/v2/{urllib.parse.quote(doi)}"
+        f"?email={urllib.parse.quote(MAILTO)}"
+    )
     raw = http(url, retries=3)
     if not raw:
         return None
