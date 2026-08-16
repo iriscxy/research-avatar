@@ -33,8 +33,8 @@
       </div>
       <section class="hero">
       <p class="eyebrow">ONLINE PAPER STUDIO</p>
-      <h1>带上你的研究资料，进入同一套写作台。</h1>
-      <p class="lede">上传 <code>PROFILE.html</code> 与实验计划、结果或调研 HTML，提供你自己的 LLM API key。资料按会话隔离，key 只驻留服务器内存，不写入项目文件。</p>
+      <h1>上传前序 HTML，直接进入 Paper Studio。</h1>
+      <p class="lede">使用前面步骤生成的 <code>PROFILE.html</code>，再上传结果 HTML 或实验计划 HTML。输入 OpenAI API key 后，系统会打开与本地完全相同的 Paper Studio 写作界面。</p>
       <div id="session-actions" class="session-actions hidden">
         <a class="resume" href="/studio">继续当前写作会话 →</a>
         <a class="export" href="/api/online/export">导出项目 ZIP</a>
@@ -42,43 +42,29 @@
       </section>
 
       <form id="setup-form" class="card">
-      <div class="grid two">
-        <label>项目名<input name="project_name" required maxlength="160" placeholder="例如：Reliable Agent Evaluation"></label>
-        <label>论文标题<input name="title" required maxlength="300" placeholder="可以先用 working title"><small>当前 PDF 流程使用 pdfLaTeX，请填写英文标题。</small></label>
+      <div class="setup-heading">
+        <p class="step-index">01</p>
+        <div><h2>上传研究资料</h2><p>两个上传项都需要填写；结果与实验计划可同时上传多个 HTML。</p></div>
       </div>
-      <div class="grid two">
-        <label>LLM API
-          <select name="provider">
-            <option value="openai">OpenAI</option>
-            <option value="deepseek">DeepSeek</option>
-          </select>
+      <div class="grid two upload-grid">
+        <label class="upload-field">研究者画像 HTML
+          <input id="profile-file" name="profile_file" type="file" accept=".html,.htm,text/html" required>
+          <small>选择由 <code>$constructprofile</code> 生成的 <code>PROFILE.html</code>。</small>
         </label>
-        <label>写作模型<input name="model" value="gpt-5-nano" required></label>
+        <label class="upload-field">结果或实验计划 HTML
+          <input id="research-files" name="research_files" type="file" accept=".html,.htm,text/html" multiple required>
+          <small>选择 Result HTML、<code>EXPERIMENT_PLAN.html</code> 或其他前序研究 HTML。</small>
+        </label>
       </div>
-      <label>API key<input name="api_key" type="password" required autocomplete="off" spellcheck="false" placeholder="仅送入本次服务器内存"></label>
-      <label id="access-wrap" class="optional">部署访问口令（若管理员启用）<input name="access_token" type="password" autocomplete="off"></label>
-      <label>研究资料 HTML
-        <input id="files" name="files" type="file" accept=".html,.htm,text/html" multiple required>
-        <small>必须包含名为 PROFILE.html 的文件；最多 20 个，每个不超过 8 MB，总请求不超过 24 MB。</small>
-      </label>
 
-      <section class="outline">
-        <h2>创建前编辑并确认论文结构</h2>
-        <label>Approved outline
-          <textarea id="outline" name="outline" rows="14" required>Abstract | Summarize the problem, approach, evidence, and main conclusion in one self-contained paragraph.
-Introduction | Motivate the research problem, identify the precise gap, and state the paper's contributions without overclaiming.
-Related Work | Position the work against the closest research threads and make the distinction from prior work explicit.
-Method | Explain the proposed approach, its design choices, and enough operational detail for a technical reader to reproduce it.
-Experiments | Describe the evaluation protocol and report only results supported by the uploaded evidence; preserve placeholders for missing measurements.
-Discussion | Interpret the evidence, discuss limitations and failure modes, and separate observations from hypotheses.
-Conclusion | Close the argument with the supported findings, limitations, and concrete future work.</textarea>
-          <small>每行使用 “英文 section 标题 | 该节具体写作目的”。第一行必须是 Abstract，共 2–12 节。</small>
-        </label>
-        <p>每节先创建一个可交互生成、评论和接受的段落单元。缺失实验结果必须保留占位，不允许模型编造。</p>
-      </section>
-      <label class="check"><input name="outline_confirmed" type="checkbox" required> 我确认以上结构作为本次写作的已批准初始 outline。</label>
+      <div class="setup-heading key-heading">
+        <p class="step-index">02</p>
+        <div><h2>连接 OpenAI</h2><p>Key 仅进入当前隔离会话的服务器内存，不写入文件、浏览器存储或导出项目。</p></div>
+      </div>
+      <label>OpenAI API key<input name="api_key" type="password" required autocomplete="off" spellcheck="false" placeholder="sk-…"></label>
+      <label id="access-wrap" class="optional">部署访问口令（若管理员启用）<input name="access_token" type="password" autocomplete="off"></label>
       <p id="message" role="status" aria-live="polite"></p>
-      <button id="submit" type="submit">创建隔离写作会话</button>
+      <button id="submit" type="submit">进入 Paper Studio →</button>
       <p class="security">在线写作会话是临时工作区。关闭或超时前请从写作台导出项目 ZIP；你的 API key 不会写入导出文件。</p>
       </form>
     </div>

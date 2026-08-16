@@ -3,9 +3,11 @@
 Public deployment: <https://research-avatar-studio.yingtaomj.workers.dev/>
 
 This is the private, deployable entry point for the fixed Paper Studio UI. It
-accepts `PROFILE.html` plus researcher-owned supporting HTML files, creates one
-isolated writing workspace per browser session, and starts the existing Paper
-Studio as a localhost-only worker.
+accepts the generated `PROFILE.html` plus at least one result or experiment-plan
+HTML file, creates one isolated writing workspace per browser session, and starts
+the existing Paper Studio as a localhost-only worker. The upload page derives its
+project label and working title from the supporting HTML, uses OpenAI with the
+default writing model, and does not ask the researcher to recreate an outline.
 
 For a local smoke test:
 
@@ -13,7 +15,7 @@ For a local smoke test:
 python3 -m research_avatar.online_studio --port 8876
 ```
 
-Then open <http://127.0.0.1:8876>. The LLM API key entered on the setup page is
+Then open <http://127.0.0.1:8876>. The OpenAI API key entered on the setup page is
 kept in server memory and in the isolated worker environment only. It is never
 written to a project file, returned to the browser, placed in browser storage,
 or included in an export.

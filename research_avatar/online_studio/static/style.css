@@ -19,6 +19,14 @@ code { color: #1d6845; }
 .link-button { padding: 0; color: #1d6845; background: transparent; }
 .grid { display: grid; gap: 18px; }
 .two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.setup-heading { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.setup-heading h2 { margin: 0 0 5px; font: 600 25px/1.15 Georgia, serif; }
+.setup-heading p { margin: 0; color: #68736d; line-height: 1.5; }
+.step-index { display: grid; place-items: center; flex: 0 0 42px; height: 42px; border-radius: 50%; color: white !important; background: #28704d; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
+.key-heading { margin-top: 34px; padding-top: 30px; border-top: 1px solid #dce1dd; }
+.upload-grid { margin-bottom: 4px; }
+.upload-field { min-height: 154px; align-content: start; padding: 18px; border: 1px dashed #aab8ae; border-radius: 14px; background: #f7faf7; }
+.upload-field input { margin-top: 5px; background: white; }
 label { display: grid; gap: 8px; margin-bottom: 18px; font-weight: 700; font-size: 14px; }
 input, select, textarea { width: 100%; border: 1px solid #bcc6bf; border-radius: 10px; background: #fff; padding: 12px 13px; color: #17201d; font: inherit; font-weight: 500; }
 textarea { resize: vertical; line-height: 1.5; }

@@ -48,6 +48,22 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("Concise, evidence-first prose.", text)
         self.assertNotIn("doNotIncludeThisSecret", text)
 
+    def test_project_identity_comes_from_supporting_html(self):
+        files = [
+            ("PROFILE.html", PROFILE_HTML),
+            (
+                "EXPERIMENT_PLAN.html",
+                "<html><head><title>Fallback Plan</title></head>"
+                "<body><h1>Mechanism-Aware Evaluation</h1></body></html>",
+            ),
+        ]
+        self.assertEqual(
+            online._project_identity(files),
+            ("Mechanism-Aware Evaluation", "Mechanism-Aware Evaluation"),
+        )
+        with self.assertRaisesRegex(online.OnlineStudioError, "结果 HTML"):
+            online._project_identity([("PROFILE.html", PROFILE_HTML)])
+
     def test_online_latex_blocks_file_and_execution_primitives(self):
         with patch.object(paper_studio, "ONLINE_PROJECT_MODE", True):
             issues = paper_studio.online_latex_security_issues(
@@ -215,13 +231,17 @@ class OnlineStudioTests(unittest.TestCase):
         ):
             session = online.create_session(
                 {
-                    "provider": "openai",
-                    "model": "gpt-5-nano",
                     "api_key": key,
-                    "project_name": "Online Test",
-                    "title": "Private Online Draft",
-                    "outline_confirmed": True,
-                    "files": [{"name": "PROFILE.html", "data": encoded_profile}],
+                    "files": [
+                        {"name": "PROFILE.html", "data": encoded_profile},
+                        {
+                            "name": "results.html",
+                            "data": base64.b64encode(
+                                b"<html><body><h1>Private Online Draft</h1>"
+                                b"<p>Accuracy: 91%.</p></body></html>"
+                            ).decode(),
+                        },
+                    ],
                 },
                 user_id="test-user",
             )
@@ -243,6 +263,15 @@ class OnlineStudioTests(unittest.TestCase):
             for path in session.root.rglob("*"):
                 if path.is_file():
                     self.assertNotIn(key.encode(), path.read_bytes(), path)
+
+    def test_setup_page_only_asks_for_generated_html_and_openai_key(self):
+        source = (online.STATIC / "index.html").read_text(encoding="utf-8")
+        self.assertIn('name="profile_file"', source)
+        self.assertIn('name="research_files"', source)
+        self.assertIn('name="api_key"', source)
+        self.assertNotIn('name="project_name"', source)
+        self.assertNotIn('name="outline"', source)
+        self.assertNotIn('name="model"', source)
 
 
 if __name__ == "__main__":

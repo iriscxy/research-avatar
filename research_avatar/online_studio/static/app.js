@@ -1,16 +1,10 @@
 const form = document.querySelector('#setup-form');
 const message = document.querySelector('#message');
 const submit = document.querySelector('#submit');
-const provider = form.elements.provider;
-const model = form.elements.model;
 const authCard = document.querySelector('#auth-card');
 const authForm = document.querySelector('#auth-form');
 const authMessage = document.querySelector('#auth-message');
 const workspaceShell = document.querySelector('#workspace-shell');
-
-provider.addEventListener('change', () => {
-  model.value = provider.value === 'deepseek' ? 'deepseek-v4-flash' : 'gpt-5-nano';
-});
 
 async function showAuthenticated(user) {
   authCard.classList.add('hidden');
@@ -99,7 +93,11 @@ form.addEventListener('submit', async (event) => {
   submit.disabled = true;
   const files = [];
   try {
-    for (const file of form.elements.files.files) {
+    const selectedFiles = [
+      form.elements.profile_file.files[0],
+      ...form.elements.research_files.files,
+    ].filter(Boolean);
+    for (const file of selectedFiles) {
       const bytes = new Uint8Array(await file.arrayBuffer());
       let binary = '';
       const chunk = 0x8000;
@@ -109,24 +107,9 @@ form.addEventListener('submit', async (event) => {
       files.push({ name: file.name, data: btoa(binary) });
     }
     const payload = {
-      project_name: form.elements.project_name.value,
-      title: form.elements.title.value,
-      provider: provider.value,
-      model: model.value,
+      provider: 'openai',
       api_key: form.elements.api_key.value,
       access_token: form.elements.access_token.value,
-      outline_confirmed: form.elements.outline_confirmed.checked,
-      sections: form.elements.outline.value.split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => {
-          const separator = line.indexOf('|');
-          if (separator < 0) throw new Error('Outline 每行都必须包含 “|”。');
-          return {
-            title: line.slice(0, separator).trim(),
-            purpose: line.slice(separator + 1).trim(),
-          };
-        }),
       files,
     };
     const response = await fetch('/api/online/session', {

@@ -129,6 +129,31 @@ class _VisibleHTMLText(HTMLParser):
         )
 
 
+class _HTMLIdentity(HTMLParser):
+    """Read only the document title and first heading from an uploaded page."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.capture: str | None = None
+        self.parts: dict[str, list[str]] = {"title": [], "h1": []}
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        del attrs
+        if tag in self.parts and not self.parts[tag]:
+            self.capture = tag
+
+    def handle_endtag(self, tag: str) -> None:
+        if self.capture == tag:
+            self.capture = None
+
+    def handle_data(self, data: str) -> None:
+        if self.capture:
+            self.parts[self.capture].append(data)
+
+    def value(self, tag: str) -> str:
+        return " ".join("".join(self.parts[tag]).split()).strip()
+
+
 def _database() -> sqlite3.Connection:
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DATA_ROOT / "auth.sqlite3", timeout=10)
@@ -484,6 +509,29 @@ def _source_text(files: list[tuple[str, str]]) -> str:
     return merged
 
 
+def _project_identity(files: list[tuple[str, str]]) -> tuple[str, str]:
+    """Derive safe setup metadata so the upload page does not ask for it twice."""
+
+    supporting = [(name, source) for name, source in files if name.lower() != "profile.html"]
+    if not supporting:
+        raise OnlineStudioError("除 PROFILE.html 外，还必须上传结果 HTML 或实验计划 HTML。")
+    name, source = supporting[0]
+    parser = _HTMLIdentity()
+    parser.feed(source)
+    parser.close()
+    candidates = [parser.value("h1"), parser.value("title"), Path(name).stem]
+    project_name = next((value for value in candidates if value), "Online Paper")[:160]
+    title = next(
+        (
+            value
+            for value in candidates
+            if value and value.isascii() and len(value) <= 300
+        ),
+        "Research Paper Draft",
+    )
+    return project_name, title
+
+
 def _write_workspace(
     root: Path,
     *,
@@ -693,24 +741,12 @@ def create_session(payload: dict[str, Any], *, user_id: str) -> Session:
         )
     if active_sessions >= MAX_ACTIVE_SESSIONS:
         raise OnlineStudioError("当前在线写作会话已满，请稍后重试。")
-    provider = str(payload.get("provider") or "").strip().lower()
+    provider = str(payload.get("provider") or "openai").strip().lower()
     if provider not in PROVIDERS:
         raise OnlineStudioError("请选择 OpenAI 或 DeepSeek。")
     api_key = str(payload.get("api_key") or "").strip()
     if len(api_key) < 8 or len(api_key) > 512 or any(character.isspace() for character in api_key):
         raise OnlineStudioError("API key 格式无效。")
-    project_name = str(payload.get("project_name") or "").strip()
-    title = str(payload.get("title") or "").strip()
-    if (
-        not project_name
-        or len(project_name) > 160
-        or not title
-        or len(title) > 300
-        or not title.isascii()
-    ):
-        raise OnlineStudioError("项目名不能为空；论文标题必须是长度合理的英文/ASCII 文本。")
-    if payload.get("outline_confirmed") is not True:
-        raise OnlineStudioError("请先确认页面显示的论文结构。")
     access_token = os.environ.get("ONLINE_STUDIO_ACCESS_TOKEN")
     supplied_access_token = str(payload.get("access_token") or "")
     if access_token and not secrets.compare_digest(access_token, supplied_access_token):
@@ -719,6 +755,7 @@ def create_session(payload: dict[str, Any], *, user_id: str) -> Session:
     if not model or len(model) > 128 or any(character.isspace() for character in model):
         raise OnlineStudioError("模型名称格式无效。")
     files = _decode_html_files(payload.get("files"))
+    project_name, title = _project_identity(files)
     sections = _validated_sections(payload.get("sections"))
     session_id = secrets.token_urlsafe(32)
     root = (
