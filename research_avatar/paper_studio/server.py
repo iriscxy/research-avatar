@@ -97,7 +97,8 @@ FULL_DRAFT_JOB_LOCK = threading.RLock()
 CANCELLED_FULL_DRAFT_JOBS: set[str] = set()
 SERVER_INSTANCE_TOKEN = uuid.uuid4().hex
 REFERENCE_EXCERPT_MAX_CHARS = 6000
-BIBLIOGRAPHY_PROMPT_MAX_CHARS = 120000
+BIBLIOGRAPHY_PROMPT_MAX_CHARS = 32000
+BIBLIOGRAPHY_PROMPT_MIN_RECORDS = 8
 
 
 class StudioHTTPServer(ThreadingHTTPServer):
@@ -3061,24 +3062,68 @@ def _bibtex_field(entry: str, field: str) -> str:
     return entry[cursor : end if end >= 0 else len(entry)].strip()
 
 
-def bibliography_prompt_catalog() -> str:
-    """Return compact citation metadata for prompts, never full local BibTeX records."""
+def bibliography_prompt_catalog(
+    relevant_text: str = "", *, required_keys: set[str] | None = None
+) -> str:
+    """Return a bounded, relevance-ranked citation catalog for one writing turn.
+
+    A paper may have hundreds of BibTeX records.  Sending all of them at every
+    section bootstrap wastes input tokens and usually makes citation selection
+    worse.  Keep records already cited by the supplied text, rank the remainder
+    by lexical overlap, and retain a small fallback set for sparse plans.
+    """
     source = bibliography_catalog()
     starts = list(re.finditer(r"@\w+\s*\{\s*([^,\s]+)\s*,", source))
-    records: list[str] = []
+    entries: list[tuple[str, str, str, int]] = []
     fields = ("author", "title", "year", "booktitle", "journal", "doi", "eprint", "url")
     for index, match in enumerate(starts):
         entry = source[match.start() : starts[index + 1].start() if index + 1 < len(starts) else len(source)]
-        values = [f"key={match.group(1).strip()}"]
+        key = match.group(1).strip()
+        values = [f"key={key}"]
         for field in fields:
             value = _bibtex_field(entry, field)
             if value:
                 values.append(f"{field}={value[:800]}")
         record = " | ".join(values)
-        if sum(len(item) + 1 for item in records) + len(record) > BIBLIOGRAPHY_PROMPT_MAX_CHARS:
-            records.append("[catalog truncated; use verified keys already present or citation resolution]")
+        entries.append((key, record, " ".join(values).lower(), index))
+
+    required = set(required_keys or ()) | citation_keys(relevant_text)
+    terms = {
+        token.lower()
+        for token in re.findall(r"[A-Za-z][A-Za-z0-9-]{3,}", relevant_text)
+        if token.lower()
+        not in {
+            "about", "after", "before", "between", "could", "figure", "from",
+            "have", "into", "paper", "paragraph", "results", "section", "should",
+            "table", "that", "their", "these", "this", "using", "were", "with",
+        }
+    }
+
+    def rank(item: tuple[str, str, str, int]) -> tuple[int, int, int]:
+        key, _record, searchable, index = item
+        overlap = sum(1 for term in terms if term in searchable)
+        return (1 if key in required else 0, overlap, -index)
+
+    ranked = sorted(entries, key=rank, reverse=True)
+    if terms or required:
+        relevant = [item for item in ranked if rank(item)[0] or rank(item)[1]]
+        seen = {item[0] for item in relevant}
+        for item in entries:
+            if len(relevant) >= BIBLIOGRAPHY_PROMPT_MIN_RECORDS:
+                break
+            if item[0] not in seen:
+                relevant.append(item)
+                seen.add(item[0])
+        ranked = relevant
+
+    records: list[str] = []
+    used = 0
+    for _key, record, _searchable, _index in ranked:
+        if used + len(record) + 1 > BIBLIOGRAPHY_PROMPT_MAX_CHARS:
+            records.append("[catalog truncated; missing citations may use verified scholarly search]")
             break
         records.append(record)
+        used += len(record) + 1
     return "\n".join(records)
 
 
@@ -3457,7 +3502,7 @@ claims, wording, and required heading. Use only citation keys present in
 <paragraph_purpose>{purpose}</paragraph_purpose>
 <newly_added_keys>{", ".join(added_keys)}</newly_added_keys>
 <paragraph>{paragraph}</paragraph>
-<verified_bibliography>{bibliography_prompt_catalog()}</verified_bibliography>
+<verified_bibliography>{bibliography_prompt_catalog(paragraph, required_keys=set(added_keys))}</verified_bibliography>
 
 Return the paragraph with citations synchronized to this exact bibliography.""",
         "text": {"verbosity": "low"},
@@ -3480,6 +3525,7 @@ def resolve_citations(
     purpose: str,
     paragraph: str,
 ) -> tuple[str, str, list[str]]:
+    existing_bibliography = bibliography_prompt_catalog(paragraph + "\n" + purpose)
     schema = {
         "type": "object",
         "properties": {
@@ -3523,7 +3569,7 @@ requires.""",
         "input": f"""<section>{section}</section>
 <paragraph_purpose>{purpose}</paragraph_purpose>
 <paragraph>{paragraph}</paragraph>
-<existing_bibliography>{bibliography_prompt_catalog()}</existing_bibliography>
+<existing_bibliography>{existing_bibliography}</existing_bibliography>
 
 Search only for citations that are missing from the existing bibliography. For each
 new source, provide a complete BibTeX entry and the exact scholarly URL consulted.""",
@@ -3600,13 +3646,17 @@ def call_openai(
     ):
         current_section = ""
     stable_context = ""
+    evidence = section_evidence(section)
     if not previous_response_id:
+        bibliography_context = "\n".join(
+            (section_meta["title"], purpose, current_text, current_section, evidence)
+        )
         stable_context = f"""<conversation_bootstrap>
 <approved_outline>{read_text(PAPER / 'outline.txt', 22000)}</approved_outline>
 <working_abstract>{read_text(PAPER / 'working_abstract.txt', 10000)}</working_abstract>
 <writing_style>{writing_style_context()}</writing_style>
-<bibliography_catalog>{bibliography_prompt_catalog()}</bibliography_catalog>
-<section_evidence>{section_evidence(section)}</section_evidence>
+<bibliography_catalog>{bibliography_prompt_catalog(bibliography_context)}</bibliography_catalog>
+<section_evidence>{evidence}</section_evidence>
 </conversation_bootstrap>"""
     bound_artifacts = artifact_writing_context(artifacts, figure_states)
     required_heading_command = heading_latex(
@@ -3772,7 +3822,7 @@ instead of guessing."""
                     "markers, and figure/table cross-references."
                 ),
                 "input": (
-                    f"<verified_bibliography>{bibliography_prompt_catalog()}</verified_bibliography>\n"
+                    f"<verified_bibliography>{bibliography_prompt_catalog(text)}</verified_bibliography>\n"
                     f"<paragraph>{text}</paragraph>"
                 ),
                 "text": {"verbosity": "medium"},
@@ -4213,7 +4263,9 @@ def full_draft_worker(token: str, model: str) -> None:
                     and section_state.get("bibliography_fingerprint")
                     != current_bib_fingerprint
                 ):
-                    bibliography_update = bibliography_prompt_catalog()
+                    bibliography_update = bibliography_prompt_catalog(
+                        paragraph["purpose"] + "\n" + section_evidence(section)
+                    )
                 figure_states = json.loads(json.dumps(state.get("figures", {})))
                 job.update(
                     current_section=section,
@@ -7420,7 +7472,9 @@ class Handler(BaseHTTPRequestHandler):
             and section_state.get("bibliography_fingerprint")
             != current_bib_fingerprint
         ):
-            bibliography_update = bibliography_prompt_catalog()
+            bibliography_update = bibliography_prompt_catalog(
+                purpose + "\n" + section_evidence(section)
+            )
         response_id, text, citations_added = call_openai(
             section=section,
             model=model,

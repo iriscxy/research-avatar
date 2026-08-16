@@ -2234,6 +2234,36 @@ args = parser.parse_args()
             else:
                 bibliography.write_text(previous, encoding="utf-8")
 
+    def test_prompt_bibliography_prefers_records_relevant_to_the_section(self):
+        bibliography = studio.PAPER / "references.bib"
+        previous = bibliography.read_text(encoding="utf-8") if bibliography.exists() else None
+        try:
+            records = [
+                "@article{generic%02d, title={Generic Unrelated Topic %02d}, year={2025}}"
+                % (index, index)
+                for index in range(11)
+            ]
+            records.append(
+                "@article{typorobust, title={Keyboard Typo Robustness for Intent Classification}, year={2026}}"
+            )
+            bibliography.write_text("\n".join(records) + "\n", encoding="utf-8")
+
+            compact = studio.bibliography_prompt_catalog(
+                "Measure keyboard typo robustness in intent classification."
+            )
+
+            self.assertTrue(compact.startswith("key=typorobust"))
+            self.assertNotIn("key=generic10", compact)
+            self.assertLessEqual(
+                len(compact),
+                studio.BIBLIOGRAPHY_PROMPT_MAX_CHARS + 100,
+            )
+        finally:
+            if previous is None:
+                bibliography.unlink(missing_ok=True)
+            else:
+                bibliography.write_text(previous, encoding="utf-8")
+
     def test_reference_excerpt_rejects_whole_paper_sized_selection(self):
         reference = Path(studio.paragraph_plan()["reference_file"])
         original = reference.read_text(encoding="utf-8")
