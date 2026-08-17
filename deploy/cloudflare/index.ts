@@ -51,6 +51,10 @@ export class OnlineStudioContainerV3 extends OnlineStudioContainer {}
 // this release; the Worker-version-scoped instance name handles later deploys.
 export class OnlineStudioContainerV4 extends OnlineStudioContainer {}
 
+// Rotate the application pool when a release must evict already-running V4
+// containers immediately instead of waiting for their two-hour idle timeout.
+export class OnlineStudioContainerV5 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
