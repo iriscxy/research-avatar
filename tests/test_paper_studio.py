@@ -1381,7 +1381,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260817.6"', html)
+        self.assertIn('src="static/app.js?v=20260817.7"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1518,7 +1518,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260817.6"', html)
+        self.assertIn('src="static/app.js?v=20260817.7"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1528,7 +1528,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('roundLabel.textContent = `第 ${round} 轮`', source)
         self.assertIn('message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`', source)
         self.assertIn("agent-chat-round", source)
-        self.assertIn('href="static/style.css?v=20260817.6"', html)
+        self.assertIn('href="static/style.css?v=20260817.7"', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)
@@ -4030,7 +4030,9 @@ args = parser.parse_args()
         self.assertIn("const mechanismPreviewModes = new Map()", source)
         self.assertIn('mechanismPreviewMode === "gpt"', source)
         self.assertIn('"显示 GPT 原图"', source)
-        self.assertIn('"显示 PPT/PDF 版"', source)
+        self.assertIn('"显示 GPT 构图底图（无文字）"', source)
+        self.assertIn('"显示可编辑 PPT/PDF 完整版"', source)
+        self.assertIn('id="mechanism-preview-note"', html)
 
     def test_mechanism_prompt_editor_has_two_columns_and_adjacent_draw_flow(self):
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
@@ -4110,6 +4112,7 @@ args = parser.parse_args()
         self.assertEqual(resolved, archived)
         self.assertIn("/figure-file/F1/draft?", figure["gpt_preview_url"])
         self.assertIn("/figure-file/F1/pdf?", figure["paper_preview_url"])
+        self.assertFalse(figure["gpt_preview_no_text"])
 
     def test_f6_requires_explicitly_marked_synthetic_layerwise_curves(self):
         state = _default_state()

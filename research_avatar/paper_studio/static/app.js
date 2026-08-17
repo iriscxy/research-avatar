@@ -1466,6 +1466,7 @@ function renderFigures() {
 
   const mechanismPreviewSwitch = $("mechanism-preview-switch");
   const mechanismPreviewToggle = $("mechanism-preview-toggle");
+  const mechanismPreviewNote = $("mechanism-preview-note");
   const mechanismBuildStatus = $("mechanism-build-status");
   const hasMechanismVersions = Boolean(
     figure.kind === "mechanism"
@@ -1491,9 +1492,13 @@ function renderFigures() {
         ? `可编辑 PPT/PDF 重建失败：${figure.last_message || figure.progress_message || "请点击重试。"}`
         : "GPT 原图已完成，但可编辑 PPT/PDF 尚未完成；请点击重试重建。")
     : "";
+  const textFreeGptPreview = Boolean(figure.gpt_preview_no_text);
   mechanismPreviewToggle.textContent = mechanismPreviewMode === "paper"
-    ? "显示 GPT 原图"
-    : "显示 PPT/PDF 版";
+    ? (textFreeGptPreview ? "显示 GPT 构图底图（无文字）" : "显示 GPT 原图")
+    : "显示可编辑 PPT/PDF 完整版";
+  mechanismPreviewNote.textContent = textFreeGptPreview
+    ? "GPT 图只提供构图参考；标题、标签和说明文字位于可编辑 PPT/PDF 完整版中。"
+    : "GPT 原图用于视觉对照；论文插入和下载仍以可编辑 PPT/PDF 版为准。";
   const effectivePreviewUrl = hasMechanismVersions
     ? (mechanismPreviewMode === "gpt" ? figure.gpt_preview_url : figure.paper_preview_url)
     : figure.preview_url;

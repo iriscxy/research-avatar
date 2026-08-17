@@ -1510,11 +1510,13 @@ def figure_paths(figure_id: str) -> dict[str, Path]:
 def mechanism_spec_path(figure_id: str) -> Path:
     """Resolve a mechanism spec across canonical and reorganized source trees."""
     paths = figure_paths(figure_id)
-    if paths["spec"].exists():
-        return paths["spec"]
+    slug = artifact_label_slug(FIGURES[figure_id]["label"], fallback=figure_id)
+    canonical = paths.get("spec", FIGURE_SOURCE_DIR / f"{slug}_spec.json")
+    if canonical.exists():
+        return canonical
     deliverable_stem = str(FIGURES[figure_id].get("deliverable_stem") or "").strip()
     relocated = FIGURE_SOURCE_DIR / f"{deliverable_stem}_spec.json"
-    return relocated if deliverable_stem and relocated.exists() else paths["spec"]
+    return relocated if deliverable_stem and relocated.exists() else canonical
 
 
 def mechanism_draft_path(figure_id: str) -> Path:
@@ -1534,6 +1536,19 @@ def mechanism_draft_path(figure_id: str) -> Path:
         if candidate.with_suffix(".prompt.txt").is_file():
             return candidate
     return paths["draft"]
+
+
+def mechanism_gpt_preview_no_text(figure_id: str) -> bool:
+    """Expose whether the archived GPT image was intentionally text-free."""
+    if FIGURES[figure_id]["kind"] != "mechanism":
+        return False
+    spec_path = mechanism_spec_path(figure_id)
+    if not spec_path.exists():
+        return False
+    try:
+        return bool(json.loads(spec_path.read_text(encoding="utf-8")).get("no_text"))
+    except (OSError, json.JSONDecodeError):
+        return False
 
 
 def data_panel_paths(figure_id: str, panel_id: str) -> dict[str, Path]:
@@ -1805,6 +1820,7 @@ def figure_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
                     if not is_data and mechanism_draft.exists()
                     else None
                 ),
+                "gpt_preview_no_text": mechanism_gpt_preview_no_text(figure_id),
                 "paper_preview_url": (
                     f"/figure-file/{figure_id}/pdf"
                     f"?v={int(paths['pdf'].stat().st_mtime)}"

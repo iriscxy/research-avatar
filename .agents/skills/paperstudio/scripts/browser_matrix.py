@@ -1275,6 +1275,7 @@ class Matrix:
                 ready=True,
                 status="built",
                 gpt_preview_url="/static/matrix-reference.png",
+                gpt_preview_no_text=True,
                 paper_preview_url="/paper.pdf",
                 preview_url="/paper.pdf",
                 preview_type="pdf",
@@ -1284,10 +1285,11 @@ class Matrix:
             card = page.locator(".figure-card", has_text=target["id"])
             if card.count() and "selected" not in (card.get_attribute("class") or ""):
                 card.click()
-            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示 GPT 原图"
+            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示 GPT 构图底图（无文字）"
+            assert "可编辑 PPT/PDF 完整版" in page.locator("#mechanism-preview-note").inner_text()
             assert page.locator("#figure-preview-pdf").is_visible()
             page.locator("#mechanism-preview-toggle").click()
-            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示 PPT/PDF 版"
+            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示可编辑 PPT/PDF 完整版"
             assert page.locator("#figure-preview-image").is_visible()
             page.locator("#mechanism-preview-toggle").click()
             assert page.locator("#figure-preview-pdf").is_visible()
