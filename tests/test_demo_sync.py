@@ -65,6 +65,12 @@ class DemoSyncTests(unittest.TestCase):
         self.assertNotIn("?v=20260814-reader-copy", source)
         self.assertNotIn("writing.png", source)
 
+    def test_six_stage_navigation_uses_the_available_desktop_width(self):
+        style = (ROOT / "research_avatar/web/demo/style.css").read_text(encoding="utf-8")
+        self.assertIn("width:min(100%,1500px)", style)
+        self.assertIn("min-height:104px", style)
+        self.assertIn(".journey-step strong{font-size:16px}", style)
+
     def test_cloudflare_release_copies_the_matching_paper_studio(self):
         dockerfile = (ROOT / "deploy/cloudflare/Dockerfile.release").read_text(
             encoding="utf-8"
