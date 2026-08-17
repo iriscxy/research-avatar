@@ -1219,7 +1219,7 @@ function renderAgentChat() {
     avatar.className = "agent-chat-avatar";
     avatar.textContent = user ? "你" : "A";
     const label = document.createElement("strong");
-    label.textContent = user ? "你" : "本地 Agent";
+    label.textContent = user ? "你" : "项目 Agent";
     header.append(avatar, label);
     if (!user && turn.execution) {
       const execution = document.createElement("span");
@@ -1258,7 +1258,7 @@ function renderAgentChat() {
     avatar.className = "agent-chat-avatar";
     avatar.textContent = "A";
     const label = document.createElement("strong");
-    label.textContent = "本地 Agent";
+    label.textContent = "项目 Agent";
     const execution = document.createElement("span");
     execution.className = "agent-chat-execution running";
     execution.textContent = "执行中";
@@ -1266,7 +1266,7 @@ function renderAgentChat() {
     const spinner = document.createElement("span");
     spinner.className = "agent-chat-spinner";
     spinner.setAttribute("aria-hidden", "true");
-    content.append(spinner, document.createTextNode(job.progress_message || "本地 Agent 正在执行…"));
+    content.append(spinner, document.createTextNode(job.progress_message || "项目 Agent 正在执行…"));
     header.append(avatar, label, execution);
     pending.append(header, content);
     roundElement.appendChild(pending);
@@ -1283,7 +1283,7 @@ function updateAgentChatControls() {
   const cancel = $("agent-chat-cancel");
   input.disabled = running;
   button.disabled = running;
-  button.textContent = running ? "本地 Agent 执行中…" : "发送给本地 Agent";
+  button.textContent = running ? "项目 Agent 执行中…" : "发送给项目 Agent";
   cancel.hidden = !running;
   cancel.disabled = false;
 }
@@ -1297,7 +1297,7 @@ async function pollAgentChatJob() {
     if (wasRunning && !stillRunning) render();
     else renderAgentChat();
   } catch (error) {
-    showMessage(`本地 Agent 状态刷新失败：${error.message}`, true);
+    showMessage(`项目 Agent 状态刷新失败：${error.message}`, true);
   } finally {
     ensureAgentChatPolling();
   }

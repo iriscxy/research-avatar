@@ -6200,10 +6200,10 @@ def ask_studio_local_agent(
     """Answer or execute one global Paper Studio browser-chat turn with local Codex."""
     codex = shutil_which("codex")
     if not codex:
-        raise StudioError("未找到本机 codex CLI，无法与本地 Agent 对话。")
+        raise StudioError("未找到项目 Agent 所需的 codex CLI。")
     message = message.strip()
     if not message:
-        raise StudioError("请输入要问本地 Agent 的内容。")
+        raise StudioError("请输入要问项目 Agent 的内容。")
     artifact_context = "当前没有选中的图表。"
     if artifact_id in FIGURES:
         definition = FIGURES[artifact_id]
@@ -6305,19 +6305,19 @@ def ask_studio_local_agent(
                 job_token=job_token,
             )
         except subprocess.TimeoutExpired as exc:
-            raise StudioError("本地 Agent 对话超时。") from exc
+            raise StudioError("项目 Agent 对话超时。") from exc
         if process.returncode:
             diagnostic = (process.stdout + "\n" + process.stderr).strip()
             raise StudioError(
-                "本地 Agent 对话失败。\n"
+                "项目 Agent 对话失败。\n"
                 + (diagnostic[-2400:] or "codex exec returned a non-zero status.")
             )
         if not output.exists():
-            raise StudioError("本地 Agent 没有返回回复。")
+            raise StudioError("项目 Agent 没有返回回复。")
         raw_answer = output.read_text(encoding="utf-8", errors="replace").strip()
         declared_intent, answer = parse_local_agent_answer(raw_answer)
     if not answer:
-        raise StudioError("本地 Agent 返回了空回复。")
+        raise StudioError("项目 Agent 返回了空回复。")
     after = chat_source_snapshot() if not confirmation_required else {}
     changed_files = sorted(
         path for path in set(before) | set(after) if before.get(path) != after.get(path)
@@ -6377,9 +6377,9 @@ def agent_chat_worker(
         execution = str(result["execution"])
         changed_files = list(result["changed_files"])
         status = "completed"
-        progress_message = "本地 Agent 已完成。"
+        progress_message = "项目 Agent 已完成。"
     except Exception as exc:  # pragma: no cover - final worker safety net
-        answer = f"本地 Agent 执行失败：{exc}"
+        answer = f"项目 Agent 执行失败：{exc}"
         execution = "failed"
         changed_files = []
         status = "failed"
@@ -8077,7 +8077,7 @@ class Handler(BaseHTTPRequestHandler):
             state = load_state()
             current_job = state.get("agent_chat_job") or {}
             if current_job.get("status") == "running":
-                raise StudioError("本地 Agent 正在执行上一条消息，请等待完成后再发送。")
+                raise StudioError("项目 Agent 正在执行上一条消息，请等待完成后再发送。")
             history = list(state.get("agent_chat_history", []))[-40:]
             token = uuid.uuid4().hex
             state["agent_chat_history"] = [
@@ -8089,7 +8089,7 @@ class Handler(BaseHTTPRequestHandler):
                 "status": "running",
                 "server_instance": SERVER_INSTANCE_TOKEN,
                 "started_at": int(time.time()),
-                "progress_message": "本地 Agent 正在读取上下文并执行…",
+                "progress_message": "项目 Agent 正在读取上下文并执行…",
                 "message": message,
             }
             save_state(state)
@@ -8102,7 +8102,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "本地 Agent 任务已启动。",
+                "message": "项目 Agent 任务已启动。",
                 "state": public_state(state),
             },
             status=HTTPStatus.ACCEPTED,
@@ -8114,13 +8114,13 @@ class Handler(BaseHTTPRequestHandler):
             state = load_state()
             job = state.get("agent_chat_job") or {}
             if job.get("status") != "running":
-                raise StudioError("当前没有正在运行的本地 Agent 任务。")
+                raise StudioError("当前没有正在运行的项目 Agent 任务。")
             token = str(job.get("token", ""))
             history = list(state.get("agent_chat_history", []))[-40:]
             history.append(
                 {
                     "role": "assistant",
-                    "content": "已停止本次本地 Agent 调用。",
+                    "content": "已停止本次项目 Agent 调用。",
                     "execution": "cancelled",
                     "changed_files": [],
                 }
@@ -8129,7 +8129,7 @@ class Handler(BaseHTTPRequestHandler):
             state["agent_chat_job"] = {
                 **job,
                 "status": "cancelled",
-                "progress_message": "本地 Agent 调用已停止。",
+                "progress_message": "项目 Agent 调用已停止。",
                 "finished_at": int(time.time()),
                 "reply_recorded": True,
             }
@@ -8142,7 +8142,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "已停止本次本地 Agent 调用。",
+                "message": "已停止本次项目 Agent 调用。",
                 "state": public_state(state),
             }
         )

@@ -778,12 +778,12 @@ class Matrix:
             fixture["agent_chat_job"] = {
                 "token": "matrix-job",
                 "status": "cancelled",
-                "progress_message": "本地 Agent 调用已停止。",
+                "progress_message": "项目 Agent 调用已停止。",
             }
             fixture["agent_chat_history"].append(
                 {
                     "role": "assistant",
-                    "content": "已停止本次本地 Agent 调用。",
+                    "content": "已停止本次项目 Agent 调用。",
                     "execution": "cancelled",
                     "changed_files": [],
                 }
@@ -809,7 +809,7 @@ class Matrix:
         assert len(posts) == 1, posts
         assert page.locator("#agent-chat-cancel").is_hidden()
         assert page.locator("#figure-agent-chat-input").is_enabled()
-        assert "已停止本次本地 Agent 调用" in page.locator("#figure-agent-chat-history").inner_text()
+        assert "已停止本次项目 Agent 调用" in page.locator("#figure-agent-chat-history").inner_text()
         assert "已停止" in page.locator("#figure-agent-chat-history").inner_text()
         assert not errors, errors
         self.results["agent_cancel_terminal_state"] = True
