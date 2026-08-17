@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Paper Studio</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="static/style.css?v=20260817.1">
+  <link rel="stylesheet" href="static/style.css?v=20260817.2">
 </head>
 <body>
   <div class="app">
@@ -15,6 +15,14 @@
         <h1 id="studio-title">Paper Studio</h1>
         <p id="project-subtitle">逐段对话、确认后写入 LaTeX</p>
       </div>
+      <section id="paper-contract" class="paper-contract" aria-label="已继承的论文写作契约" hidden>
+        <span>INHERITED FROM APPROVED PLAN</span>
+        <dl>
+          <div><dt>Target conference</dt><dd id="target-conference">—</dd></div>
+          <div><dt>Reference paper</dt><dd id="reference-paper">—</dd></div>
+        </dl>
+        <small id="paper-contract-source">写作阶段直接继承，无需重新选择。</small>
+      </section>
       <div id="sections" class="sections"></div>
       <div class="sidebar-foot">
         <div id="llm-runtime-config" hidden aria-hidden="true">
@@ -54,6 +62,7 @@
           <span id="api-status" class="status">API</span>
           <span id="conversation-status" class="status">Conversation</span>
           <button id="compile" class="secondary" disabled>编译 PDF</button>
+          <a id="project-export" class="secondary project-export" href="/api/online/export" download="paper-studio-project.zip" hidden>下载项目 ZIP</a>
         </div>
       </header>
 
@@ -398,6 +407,6 @@
       </div>
     </section>
   </div>
-  <script src="static/app.js?v=20260817.1"></script>
+  <script src="static/app.js?v=20260817.2"></script>
 </body>
 </html>

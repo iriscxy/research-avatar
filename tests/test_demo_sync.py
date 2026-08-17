@@ -16,6 +16,11 @@ class DemoSyncTests(unittest.TestCase):
         self.assertEqual(state["project_id"], project_id)
         self.assertEqual(config["figure_order"], ["F1", "F2", "F3"])
         self.assertEqual(config["table_order"], ["T1", "T2"])
+        self.assertEqual(config["project"]["target"]["venue"], "COLING 2027 Short Paper")
+        self.assertEqual(
+            config["project"]["reference_paper"]["publication_key"],
+            "wang2025word",
+        )
         for figure_id in config["figure_order"]:
             figure = state["figures"][figure_id]
             self.assertEqual(figure["status"], "approved")

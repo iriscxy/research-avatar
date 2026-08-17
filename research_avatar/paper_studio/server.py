@@ -307,6 +307,30 @@ def load_project_config(
         raise ProjectConfigError("paper_studio.json paths.metrics must contain valid JSON") from exc
     if not isinstance(metrics_payload, (dict, list)) or not metrics_payload:
         raise ProjectConfigError("paper_studio.json paths.metrics must contain a non-empty JSON object or list")
+    target = project.get("target")
+    reference_paper = project.get("reference_paper")
+    venue = str(project.get("venue", "")).strip()
+    if (
+        not venue
+        or not isinstance(target, dict)
+        or str(target.get("venue", "")).strip() != venue
+    ):
+        raise ProjectConfigError(
+            "paper_studio.json project.venue and matching project.target.venue "
+            "must be inherited from the approved 03 experiment plan"
+        )
+    if not isinstance(reference_paper, dict) or not str(
+        reference_paper.get("title", "")
+    ).strip():
+        raise ProjectConfigError(
+            "paper_studio.json project.reference_paper.title must identify the "
+            "structural reference selected before paper writing"
+        )
+    if not str(project.get("decision_source", "")).strip():
+        raise ProjectConfigError(
+            "paper_studio.json project.decision_source must name the approved "
+            "HTML contract that selected the venue and reference paper"
+        )
     return config
 
 
@@ -6992,6 +7016,11 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
                 "config_file": PROJECT_CONFIG_FILE.relative_to(ROOT).as_posix(),
                 "root": "" if ONLINE_PROJECT_MODE else str(ROOT.resolve()),
                 "loaded": False,
+                "venue": "",
+                "target": {},
+                "reference_paper": {},
+                "decision_source": "",
+                "export_url": "",
             },
             "model": state.get("model", DEFAULT_MODEL),
             "llm_provider": provider,
@@ -7033,6 +7062,27 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         "config_file": PROJECT_CONFIG_FILE.relative_to(ROOT).as_posix(),
         "root": "" if ONLINE_PROJECT_MODE else str(ROOT.resolve()),
         "loaded": True,
+        "venue": str(PROJECT_METADATA.get("venue", "")),
+        "target": {
+            key: value
+            for key in (
+                "venue",
+                "track",
+                "cycle",
+                "submission_content_pages",
+                "deadline",
+            )
+            if (value := PROJECT_METADATA.get("target", {}).get(key)) not in (None, "")
+        },
+        "reference_paper": {
+            key: value
+            for key in ("title", "authors", "venue", "publication_key", "url")
+            if (value := PROJECT_METADATA.get("reference_paper", {}).get(key))
+        },
+        "decision_source": str(PROJECT_METADATA.get("decision_source", "")),
+        "export_url": (
+            "/api/online/export" if ONLINE_PROJECT_MODE and not DEMO_MODE else ""
+        ),
     }
     total_paragraphs = sum(
         len(section.get("paragraphs", []))

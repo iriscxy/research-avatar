@@ -4,7 +4,22 @@
     "id": "margin-targeted-typo-coling-short-20260817",
     "name": "Margin-Targeted Typo Augmentation",
     "initial_title": "Spend Typo Budget Where the Classifier Is Unsure: Class-Balanced Margin-Targeted Augmentation",
-    "venue": "COLING 2027 Short"
+    "venue": "COLING 2027 Short Paper",
+    "target": {
+      "venue": "COLING 2027 Short Paper",
+      "track": "Main conference short paper",
+      "cycle": "2027",
+      "submission_content_pages": 4,
+      "deadline": "2026-10-12"
+    },
+    "reference_paper": {
+      "title": "Word Form Matters: LLMs' Semantic Reconstruction under Typoglycemia",
+      "authors": "Chenxi Wang, Tianle Gu, Zhongyu Wei, Lang Gao, Zirui Song, Xiuying Chen",
+      "venue": "Findings of ACL 2025",
+      "publication_key": "wang2025word",
+      "url": "https://aclanthology.org/2025.findings-acl.866/"
+    },
+    "decision_source": "reports/03_EXPERIMENT_PLAN.html"
   },
   "sections": [
     {

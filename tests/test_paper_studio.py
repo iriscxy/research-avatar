@@ -206,7 +206,13 @@ class PaperStudioTests(unittest.TestCase):
         }
         config = {
             "schema_version": "1.0",
-            "project": {"id": "style-jailbreak-test", "name": "Style Jailbreak", "initial_title": "Style Jailbreak", "venue": "ICLR"},
+            "project": {
+                "id": "style-jailbreak-test", "name": "Style Jailbreak",
+                "initial_title": "Style Jailbreak", "venue": "ICLR",
+                "target": {"venue": "ICLR"},
+                "reference_paper": {"title": "Fixture reference"},
+                "decision_source": "reports/03_EXPERIMENT_PLAN.html",
+            },
             "sections": section_specs,
             "figure_order": ["F1", "F3", "F2", "F4", "F5", "F6"], "figures": figures,
             "table_order": ["T1", "T2"], "tables": tables,
@@ -1260,6 +1266,28 @@ class PaperStudioTests(unittest.TestCase):
             with self.assertRaisesRegex(studio.ProjectConfigError, "paths.main is required"):
                 studio.load_project_config(path, root=root)
 
+    def test_project_config_requires_inherited_venue_and_reference_decisions(self):
+        config = json.loads(
+            (studio.PAPER / "paper_studio.json").read_text(encoding="utf-8")
+        )
+        with TemporaryDirectory() as temporary:
+            path = Path(temporary) / "paper_studio.json"
+            missing_target = json.loads(json.dumps(config))
+            missing_target["project"].pop("target")
+            path.write_text(json.dumps(missing_target), encoding="utf-8")
+            with self.assertRaisesRegex(
+                studio.ProjectConfigError, "approved 03 experiment plan"
+            ):
+                studio.load_project_config(path, root=studio.ROOT)
+
+            missing_reference = json.loads(json.dumps(config))
+            missing_reference["project"].pop("reference_paper")
+            path.write_text(json.dumps(missing_reference), encoding="utf-8")
+            with self.assertRaisesRegex(
+                studio.ProjectConfigError, "structural reference selected"
+            ):
+                studio.load_project_config(path, root=studio.ROOT)
+
     def test_project_config_rejects_malformed_data_grid(self):
         config = json.loads(
             (studio.PAPER / "paper_studio.json").read_text(encoding="utf-8")
@@ -1350,7 +1378,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260817.1"', html)
+        self.assertIn('src="static/app.js?v=20260817.2"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1487,7 +1515,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260817.1"', html)
+        self.assertIn('src="static/app.js?v=20260817.2"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1497,7 +1525,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('roundLabel.textContent = `第 ${round} 轮`', source)
         self.assertIn('message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`', source)
         self.assertIn("agent-chat-round", source)
-        self.assertIn('href="static/style.css?v=20260817.1"', html)
+        self.assertIn('href="static/style.css?v=20260817.2"', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)
@@ -1529,6 +1557,11 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('restorePdfPosition(pages, previousPosition)', source)
         self.assertIn('id="pdf-navigation-toggle"', html)
         self.assertIn('id="pdf-download"', html)
+        self.assertIn('id="project-export"', html)
+        self.assertIn('id="paper-contract"', html)
+        self.assertIn('id="target-conference"', html)
+        self.assertIn('id="reference-paper"', html)
+        self.assertIn('projectExport.hidden = !project.export_url', source)
         self.assertIn('download.hidden = false', source)
         self.assertIn('download.href = studioPath(state.pdf.url || "/paper.pdf")', source)
         self.assertIn('paper-studio.pdf-navigation-visible', source)

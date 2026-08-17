@@ -1682,6 +1682,22 @@ function render() {
   $("project-eyebrow").textContent = project.eyebrow || project.name || "PAPER PROJECT";
   $("studio-title").textContent = project.studio_title || "Paper Studio";
   $("project-subtitle").textContent = project.subtitle || "逐段对话、确认后写入 LaTeX";
+  const target = project.target || {};
+  const referencePaper = project.reference_paper || {};
+  const contractReady = Boolean(target.venue && referencePaper.title);
+  $("paper-contract").hidden = !contractReady;
+  $("target-conference").textContent = [target.venue, target.track]
+    .filter(Boolean)
+    .join(" · ") || "—";
+  $("reference-paper").textContent = [referencePaper.title, referencePaper.venue]
+    .filter(Boolean)
+    .join(" · ") || "—";
+  $("paper-contract-source").textContent = project.decision_source
+    ? `已从 ${project.decision_source} 继承；写作阶段无需重新选择。`
+    : "已从批准的前置计划继承；写作阶段无需重新选择。";
+  const projectExport = $("project-export");
+  projectExport.hidden = !project.export_url;
+  if (project.export_url) projectExport.href = studioPath(project.export_url);
   document.title = project.name ? `${project.name} · Paper Studio` : "Paper Studio";
   renderSections();
   const emptyMode = project.loaded === false;

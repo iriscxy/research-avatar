@@ -30,6 +30,15 @@ PLAN_CONTRACT = {
     "approval_status": "approved",
     "paper_title": "Evidence Writing",
     "target": {"venue": "ACL 2027", "submission_content_pages": 8},
+    "references": {
+        "researcher_owned_structure": {
+            "title": "Reference Structure Paper",
+            "authors": "A. Researcher",
+            "venue": "ACL 2026",
+            "publication_key": "reference2026",
+            "local_full_text": "researcher-profile/fulltext/txt/reference.txt",
+        }
+    },
     "paper_outline": [
         {
             "id": "abstract",
@@ -117,6 +126,7 @@ def project_archive():
             **PLAN_CONTRACT,
             "references": {
                 "researcher_owned_structure": {
+                    **PLAN_CONTRACT["references"]["researcher_owned_structure"],
                     "local_full_text": "researcher-profile/fulltext/txt/ref.txt"
                 }
             },
@@ -484,6 +494,15 @@ class OnlineStudioTests(unittest.TestCase):
             config = json.loads((root / "paper/paper_studio.json").read_text())
             self.assertEqual(config["table_order"], ["T1"])
             self.assertEqual(config["tables"]["T1"]["label"], "tab:main")
+            self.assertEqual(config["project"]["target"]["venue"], "ACL 2027")
+            self.assertEqual(
+                config["project"]["reference_paper"]["title"],
+                "Reference Structure Paper",
+            )
+            self.assertEqual(
+                config["project"]["decision_source"],
+                "reports/03_EXPERIMENT_PLAN.html",
+            )
 
     def test_scaffold_accepts_one_complete_project_zip(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -558,6 +577,23 @@ class OnlineStudioTests(unittest.TestCase):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn("outputs/paper-studio-evidence.zip", html)
         self.assertIn("点击上方选择框上传这个文件", html)
+
+    def test_project_export_is_a_zip_and_does_not_follow_symlinks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "paper").mkdir()
+            (root / "paper/main.tex").write_text("paper", encoding="utf-8")
+            outside = root.parent / (root.name + "-outside-secret.txt")
+            outside.write_text("must-not-export", encoding="utf-8")
+            link = root / "paper/outside.txt"
+            try:
+                link.symlink_to(outside)
+                data = online._project_zip_bytes(root)
+            finally:
+                outside.unlink(missing_ok=True)
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                self.assertEqual(archive.namelist(), ["paper/main.tex"])
+                self.assertEqual(archive.read("paper/main.tex"), b"paper")
 
     def test_live_worker_hides_root_and_never_persists_api_key(self):
         key = "sk-online-test-never-write-this"

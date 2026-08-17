@@ -49,6 +49,8 @@ MAX_FILES = 20
 MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
 MAX_ARCHIVE_EXPANDED_BYTES = 128 * 1024 * 1024
 MAX_ARCHIVE_FILES = 2000
+MAX_EXPORT_BYTES = 256 * 1024 * 1024
+MAX_EXPORT_FILES = 5000
 MAX_SOURCE_TEXT_CHARS = 60_000
 MAX_ACTIVE_SESSIONS = int(os.environ.get("ONLINE_STUDIO_MAX_SESSIONS", "16"))
 SESSION_IDLE_SECONDS = int(os.environ.get("ONLINE_STUDIO_IDLE_SECONDS", "14400"))
@@ -71,6 +73,24 @@ DEFAULT_SECTIONS = (
 
 class OnlineStudioError(RuntimeError):
     """A safe, user-facing online gateway error."""
+
+
+def _project_zip_bytes(root: Path) -> bytes:
+    """Build a bounded project export without following Agent-created symlinks."""
+    files: list[Path] = []
+    total = 0
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink() or not path.is_file():
+            continue
+        files.append(path)
+        total += path.stat().st_size
+        if len(files) > MAX_EXPORT_FILES or total > MAX_EXPORT_BYTES:
+            raise OnlineStudioError("项目过大，无法导出 ZIP；请先删除不需要的生成缓存。")
+    stream = io.BytesIO()
+    with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
+        for path in files:
+            archive.write(path, path.relative_to(root).as_posix())
+    return stream.getvalue()
 
 
 @dataclass
@@ -728,6 +748,19 @@ def _validated_upstream_contract(root: Path, plan_source: str, result_source: st
         raise OnlineStudioError("03 的 paper_outline 为空，无法构建 Paper Studio。")
     if not isinstance(artifacts, list):
         raise OnlineStudioError("03 的 paper_artifacts 格式无效。")
+    target = contract.get("target")
+    references = contract.get("references")
+    structural_reference = (
+        references.get("researcher_owned_structure")
+        if isinstance(references, dict)
+        else None
+    )
+    if not isinstance(target, dict) or not str(target.get("venue") or "").strip():
+        raise OnlineStudioError("03 缺少已确认的 target conference。")
+    if not isinstance(structural_reference, dict) or not str(
+        structural_reference.get("title") or ""
+    ).strip():
+        raise OnlineStudioError("03 缺少已确认的结构 reference paper。")
     result_parser = _ResultArtifactTables()
     result_parser.feed(result_source)
     result_parser.close()
@@ -1250,6 +1283,16 @@ def _write_workspace(
         "Inherited from approved reports/03_EXPERIMENT_PLAN.html.\n", encoding="utf-8"
     )
     target = contract.get("target") if isinstance(contract.get("target"), dict) else {}
+    references = (
+        contract.get("references")
+        if isinstance(contract.get("references"), dict)
+        else {}
+    )
+    structural_reference = (
+        references.get("researcher_owned_structure")
+        if isinstance(references.get("researcher_owned_structure"), dict)
+        else {}
+    )
     config = {
         "schema_version": "1.0",
         "project": {
@@ -1257,6 +1300,23 @@ def _write_workspace(
             "name": project_name,
             "initial_title": title,
             "venue": str(target.get("venue") or ""),
+            "target": {
+                key: value
+                for key in (
+                    "venue",
+                    "track",
+                    "cycle",
+                    "submission_content_pages",
+                    "deadline",
+                )
+                if (value := target.get(key)) not in (None, "")
+            },
+            "reference_paper": {
+                key: value
+                for key in ("title", "authors", "venue", "publication_key", "url")
+                if (value := structural_reference.get(key))
+            },
+            "decision_source": "reports/03_EXPERIMENT_PLAN.html",
             "eyebrow": "ONLINE PAPER STUDIO",
             "studio_title": "Paper Studio",
             "subtitle": "继承已批准 03、已验证 05 与 results 的隔离在线写作会话",
@@ -1922,12 +1982,11 @@ class Handler(BaseHTTPRequestHandler):
             connection.close()
 
     def _export(self, session: Session) -> None:
-        stream = io.BytesIO()
-        with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
-            for path in sorted(session.root.rglob("*")):
-                if path.is_file():
-                    archive.write(path, path.relative_to(session.root).as_posix())
-        data = stream.getvalue()
+        try:
+            data = _project_zip_bytes(session.root)
+        except OnlineStudioError as exc:
+            self._json({"ok": False, "error": str(exc)}, HTTPStatus.REQUEST_ENTITY_TOO_LARGE)
+            return
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "application/zip")
         self.send_header("Content-Disposition", 'attachment; filename="paper-studio-project.zip"')

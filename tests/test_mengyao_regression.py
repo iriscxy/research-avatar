@@ -362,7 +362,12 @@ class MengyaoRegressionTests(unittest.TestCase):
 
     def test_5_paper_studio_preflight_rejects_missing_paths_and_bad_grid(self):
         config = {
-            "schema_version": "1.0", "project": {"id": "fixture", "name": "Fixture"},
+            "schema_version": "1.0", "project": {
+                "id": "fixture", "name": "Fixture", "venue": "ACL",
+                "target": {"venue": "ACL"},
+                "reference_paper": {"title": "Fixture reference"},
+                "decision_source": "reports/03_EXPERIMENT_PLAN.html",
+            },
             "sections": [{"id": "method", "title": "Method", "file": "method.tex",
                           "result_keys": []}],
             "figure_order": [], "figures": {}, "table_order": ["T1"],
