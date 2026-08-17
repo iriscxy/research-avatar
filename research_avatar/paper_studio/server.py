@@ -6223,7 +6223,8 @@ def ask_studio_local_agent(
     if confirmation_required:
         mode_instruction = """服务端检测到这可能删除、清空或覆盖内容。本轮处于只读沙箱，不要修改文件。明确复述将受影响的内容，要求研究者回复“确认执行”。返回 intent=confirmation_required。"""
     else:
-        mode_instruction = """你必须根据研究者本轮消息和最近对话的语义，自行判断 intent，不使用关键词或动词白名单：
+        mode_instruction = """你就是当前项目中可执行的 Codex Agent，而不是只提供建议的客服。你具备当前项目内的文件读取与编辑、shell 命令、测试、编译和网络访问能力；对研究者授权的普通任务，像直接 Codex 一样自行完成从检查到修改再到验证的闭环。不得仅因为自己由网页启动，就声称沙箱禁止写文件、运行命令、访问网络或绑定测试端口；只有实际命令失败后，才能准确报告具体限制并继续采用可行替代方案。
+你必须根据研究者本轮消息和最近对话的语义，自行判断 intent，不使用关键词或动词白名单：
 - 如果研究者在提问、讨论、征求建议或举例，返回 intent=read_only，只读检查并回答，不修改文件。
 - 如果研究者要求完成、继续或重试一项具体工作，返回 intent=execute，并现在真实执行；不要只给建议，也不要要求切换模式。
 - 如果语义涉及删除、清空、广泛覆盖或其他难恢复操作且尚未明确确认，不修改文件，返回 intent=confirmation_required。
@@ -6232,8 +6233,8 @@ def ask_studio_local_agent(
 不得使用破坏性 git 命令。论文结构变化必须同步到 paper/paragraph_plan.json；增加新段落或分组时使用唯一段落 ID、
 正确 heading/heading_style 和有效 reference_lines。修改 LaTeX 后编译验证；修改网页后运行规定测试并更新静态版本。
 保持执行有界：先完成研究者要求的最小改动，只读取直接相关文件，做与风险相称的验证；不要扫描或重做无关工作。
-完成后在 answer 中简洁说明检查、修改和验证结果。"""
-    prompt = f"""你是 Paper Studio 中始终可用的本地 Codex Agent。请直接使用简洁中文处理研究者请求。
+完成后在 answer 中简洁说明检查、修改和验证结果。若实际修改了文件，绝不能声称“未修改任何文件”；若没有修改，也绝不能虚构已修改。"""
+    prompt = f"""你是 Paper Studio 中始终可用的项目 Codex Agent。请直接使用简洁中文处理研究者请求。
 不要要求研究者切换只读/可编辑/执行模式；普通轮次由你结合消息与历史语义决定，服务端只保留危险操作确认边界并核验真实文件变化。
 
 <operation_mode>
@@ -6284,6 +6285,11 @@ def ask_studio_local_agent(
             "--ephemeral",
             *local_agent_auth_args(),
             "--skip-git-repo-check",
+            *(
+                ["--config", "sandbox_workspace_write.network_access=true"]
+                if not confirmation_required
+                else []
+            ),
             "--sandbox",
             "read-only" if confirmation_required else "workspace-write",
             "--output-schema",
@@ -6324,6 +6330,13 @@ def ask_studio_local_agent(
     )
     if changed_files:
         execution = "executed"
+        verified_paths = "、".join(changed_files[:8])
+        if len(changed_files) > 8:
+            verified_paths += f" 等 {len(changed_files)} 个文件"
+        answer = (
+            f"系统核验：已实际变更 {len(changed_files)} 个项目文件：{verified_paths}。\n\n"
+            + answer
+        )
     elif confirmation_required or declared_intent == "confirmation_required":
         execution = "confirmation_required"
     elif declared_intent == "execute":

@@ -1378,7 +1378,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260817.4"', html)
+        self.assertIn('src="static/app.js?v=20260817.5"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1515,7 +1515,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260817.4"', html)
+        self.assertIn('src="static/app.js?v=20260817.5"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1525,7 +1525,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('roundLabel.textContent = `第 ${round} 轮`', source)
         self.assertIn('message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`', source)
         self.assertIn("agent-chat-round", source)
-        self.assertIn('href="static/style.css?v=20260817.4"', html)
+        self.assertIn('href="static/style.css?v=20260817.5"', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)
@@ -3179,6 +3179,7 @@ args = parser.parse_args()
         self.assertIn("两张图分开生成吗", observed["prompt"])
         self.assertIn("下一步怎么办", observed["prompt"])
         self.assertIn("workspace-write", observed["command"])
+        self.assertIn("sandbox_workspace_write.network_access=true", observed["command"])
         self.assertIn("--output-schema", observed["command"])
         self.assertNotIn("OPENAI_API_KEY", observed["env"])
 
@@ -3213,6 +3214,7 @@ args = parser.parse_args()
             "shell_environment_policy.ignore_default_excludes=false",
             observed["command"],
         )
+        self.assertIn("sandbox_workspace_write.network_access=true", observed["command"])
 
     def test_online_mode_allows_conversation_agent_routes(self):
         self.assertNotIn(
@@ -3265,8 +3267,10 @@ args = parser.parse_args()
         self.assertIsInstance(result, dict)
         self.assertEqual(result["execution"], "executed")
         self.assertEqual(result["changed_files"], ["paper/paragraph_plan.json"])
+        self.assertIn("系统核验：已实际变更 1 个项目文件", result["answer"])
         self.assertIn("workspace-write", observed["command"])
         self.assertIn("自行判断 intent", observed["prompt"])
+        self.assertIn("像直接 Codex 一样", observed["prompt"])
 
     def test_local_agent_semantic_intent_is_parsed_from_codex_output(self):
         self.assertEqual(
