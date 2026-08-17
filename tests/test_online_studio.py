@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -539,6 +540,42 @@ class OnlineStudioTests(unittest.TestCase):
                 timeout=20,
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_venue_template_preamble_actually_compiles_generated_math_prose(self):
+        # Regression: the acl template preamble originally omitted amsmath/amssymb,
+        # so ordinary generated math like \text{...} inside \( \) failed pdflatex
+        # with "Undefined control sequence" mid-batch-draft, well after the
+        # scaffold itself looked correct. Verify with real pdflatex, not just a
+        # package-name substring check, since substring checks would not have
+        # caught this class of bug.
+        pdflatex = shutil.which("pdflatex")
+        if not pdflatex:
+            self.skipTest("pdflatex not available in this environment")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            validator = subprocess.CompletedProcess([], 0, stdout="ok", stderr="")
+            with patch.object(online.subprocess, "run", return_value=validator):
+                online._write_workspace(
+                    root, files=pipeline_files(venue="COLING 2027 Short Paper"),
+                    archive=evidence_archive(),
+                )
+            paper = root / "paper"
+            (paper / "sections/experiments.tex").write_text(
+                r"\section{Experiments}" "\n"
+                r"Consider candidate perturbations, with "
+                r"\(C_{\text{clean}} = \{c \in C \mid \text{valid}(c)\}\)."
+                "\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [pdflatex, "-interaction=nonstopmode", "-halt-on-error", "main.tex"],
+                cwd=paper,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue((paper / "main.pdf").is_file())
 
     def test_scaffold_rejects_a_venue_with_no_bundled_official_template(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -14,7 +14,8 @@
     "\\usepackage[utf8]{inputenc}",
     "\\usepackage{microtype}",
     "\\usepackage{graphicx}",
-    "\\usepackage{booktabs}"
+    "\\usepackage{amsmath,amssymb,booktabs,flafter}",
+    "\\usepackage{xurl}"
   ],
   "assets": ["acl.sty", "acl_natbib.bst"],
   "bibliography_command": "\\bibliography{references}",
