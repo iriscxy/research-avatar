@@ -794,6 +794,56 @@ def section_table_anchors(
     return anchors
 
 
+def section_table_placeholder_anchors(
+    section: str,
+    section_state: dict[str, Any],
+    table_states: dict[str, dict[str, Any]],
+) -> dict[str, list[str]]:
+    """Place one labelled draft box after a table's first accepted reference.
+
+    Mirrors section_figure_placeholder_anchors: without this, a batch-written
+    paragraph that cites a not-yet-approved table's \\ref{} compiles with a
+    genuinely undefined reference for the rest of the run, since table
+    materialization (like figure materialization) only happens once the
+    whole full-draft loop finishes.
+    """
+    accepted = accepted_paragraph_ids(section_state)
+    anchors: dict[str, list[str]] = {}
+    for table_id in TABLE_ORDER:
+        if table_states.get(table_id, {}).get("status") == "approved":
+            continue
+        binding = first_artifact_binding(table_id)
+        if binding is None or binding[0] != section or binding[1] not in accepted:
+            continue
+        anchors.setdefault(binding[1], []).append(table_id)
+    return anchors
+
+
+def table_placeholder_latex(
+    table_id: str, table_state: dict[str, Any] | None = None
+) -> str:
+    """Return a compilable labelled float until the real table is approved."""
+    definition = TABLES[table_id]
+    table_state = table_state or {}
+    caption = str(table_state.get("caption") or definition["caption"]).strip()
+    wide = str(definition.get("width", "")).startswith("two-column")
+    environment = "table*" if wide else "table"
+    box_width = r"0.94\textwidth" if wide else r"0.94\columnwidth"
+    placeholder = latex_escape_title(
+        f"{table_id} placeholder -- table generation is in progress"
+    )
+    return "\n".join(
+        [
+            f"\\begin{{{environment}}}[t]",
+            r"  \centering",
+            f"  \\fbox{{\\parbox[c][0.1\\textheight][c]{{{box_width}}}{{\\centering {placeholder}}}}}",
+            f"  \\caption{{{caption}}}",
+            f"  \\label{{{definition['label']}}}",
+            f"\\end{{{environment}}}",
+        ]
+    )
+
+
 def render_section_source(
     section: str,
     section_state: dict[str, Any],
@@ -828,6 +878,11 @@ def render_section_source(
         else {}
     )
     table_anchors = section_table_anchors(section, table_states or {})
+    table_placeholder_anchors = (
+        section_table_placeholder_anchors(section, section_state, table_states)
+        if table_states is not None
+        else {}
+    )
     for paragraph_id, text in accepted_paragraphs:
         parts.append(f"% PAPER_STUDIO_PARAGRAPH:{paragraph_id}")
         parts.append(text)
@@ -844,6 +899,10 @@ def render_section_source(
         parts.extend(
             (table_states or {})[table_id]["latex"]
             for table_id in table_anchors.pop(paragraph_id, [])
+        )
+        parts.extend(
+            table_placeholder_latex(table_id, (table_states or {}).get(table_id))
+            for table_id in table_placeholder_anchors.pop(paragraph_id, [])
         )
     for figure_ids in figure_anchors.values():
         parts.extend(
@@ -4422,6 +4481,19 @@ def compile_paper() -> CompileResult:
     output = (process.stdout + "\n" + process.stderr).strip()
     tail = "\n".join(output.splitlines()[-30:])
     if process.returncode:
+        # latexmk reruns pdflatex multiple times; the actual fatal error (a
+        # line starting with "!") can appear many passes before the final
+        # one, so the last-30-lines tail alone often only shows trailing
+        # rerun/summary noise (e.g. a benign "undefined reference" warning)
+        # with no indication of what really failed. Surface every real
+        # pdflatex error line first, since those are what a researcher (or
+        # a retry) actually needs to act on.
+        error_lines = [
+            line for line in output.splitlines() if line.startswith("!")
+        ]
+        if error_lines:
+            summary = "Error summary:\n" + "\n".join(error_lines)
+            return CompileResult(False, summary + "\n\n" + tail)
         return CompileResult(False, tail or "LaTeX compilation failed.")
     return CompileResult(True, tail or "Compilation succeeded.")
 

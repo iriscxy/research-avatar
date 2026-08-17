@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "research-avatar-studio",
-  "main": "deploy/cloudflare/index.ts",
+  "main": "index.ts",
   "compatibility_date": "2026-08-16",
   "workers_dev": true,
   "preview_urls": true,
@@ -32,7 +32,7 @@
       "binding": "AUTH_DB",
       "database_name": "research-avatar-auth",
       "database_id": "REPLACE_WITH_D1_DATABASE_ID",
-      "migrations_dir": "deploy/cloudflare/migrations"
+      "migrations_dir": "migrations"
     }
   ],
   "migrations": [

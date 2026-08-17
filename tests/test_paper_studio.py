@@ -4319,6 +4319,26 @@ args = parser.parse_args()
         )
         self.assertNotIn(r"\includegraphics", source)
 
+    def test_first_table_reference_renders_placeholder_with_real_caption_and_label(self):
+        # Regression: only figures had a placeholder mechanism, so a batch
+        # -written paragraph citing a not-yet-approved table's \ref{} left a
+        # genuinely undefined LaTeX reference for the rest of the run (table
+        # materialization, like figure materialization, only happens once
+        # the whole full-draft loop finishes).
+        state = _default_state()
+        experiments = state["sections"]["experiments"]
+        experiments["paragraphs"][1]["accepted_text"] = (
+            r"Table~\ref{tab:main} reports the main comparison."
+        )
+        source, _ = render_section_source(
+            "experiments", experiments, state["figures"], state["tables"]
+        )
+        self.assertIn("T1 placeholder -- table generation is in progress", source)
+        self.assertIn(r"\label{tab:main}", source)
+        self.assertIn(rf"\caption{{{studio.TABLES['T1']['caption']}}}", source)
+        self.assertIn(r"\begin{table*}[t]", source)
+        self.assertNotIn(r"\begin{tabular}", source)
+
     def test_public_figure_state_exposes_separate_generation_and_insertion_gates(self):
         figure = figure_public_state(_default_state())[0]
         self.assertFalse(figure["generation_ready"])
