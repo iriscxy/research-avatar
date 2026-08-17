@@ -187,7 +187,18 @@ function safeEqual(left: Uint8Array, right: Uint8Array): boolean {
 async function readBody(request: Request): Promise<Record<string, unknown>> {
   const length = Number(request.headers.get("content-length") || "0");
   if (length > 16_384) throw new Error("登录请求过大。");
-  const body = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    // request.json() throws the raw V8 parser SyntaxError message (e.g.
+    // "Unexpected token 'o', \"not json\" is not valid JSON") on malformed
+    // input; every caller's catch block surfaces error.message verbatim to
+    // the client, so without this it was the one place in signup/login that
+    // leaked an internal parser string instead of the file's normal clean
+    // Chinese error text.
+    throw new Error("请求必须是有效 JSON。");
+  }
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw new Error("请求必须是 JSON 对象。");
   }
