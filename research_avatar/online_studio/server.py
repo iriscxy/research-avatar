@@ -39,6 +39,7 @@ from typing import Any
 STATIC = Path(__file__).resolve().parent / "static"
 DEMO_STATIC = Path(__file__).resolve().parents[1] / "web" / "demo"
 DEMO_PROJECT = Path(__file__).resolve().parent / "demo_project"
+VENUE_TEMPLATES_DIR = Path(__file__).resolve().parent / "venue_templates"
 COOKIE_NAME = "paper_studio_session"
 AUTH_COOKIE_NAME = "online_studio_auth"
 GOOGLE_STATE_COOKIE = "online_studio_google_state"
@@ -1119,6 +1120,42 @@ def _artifact_definitions(
     return figures, tables, metrics
 
 
+def _load_venue_templates() -> dict[str, dict[str, Any]]:
+    """Load the bundled official venue LaTeX templates under venue_templates/.
+
+    Each subdirectory is one template family (e.g. the ACL/EMNLP/NAACL/COLING
+    family, which all share acl.sty) described by its own template.json plus
+    the real .sty/.cls/.bst assets it ships. This is intentionally a small,
+    explicit, verified registry rather than a generic fallback: an unmatched
+    venue must fail the scaffold instead of silently compiling as a plain
+    article, which is the defect this registry exists to prevent.
+    """
+    templates: dict[str, dict[str, Any]] = {}
+    if not VENUE_TEMPLATES_DIR.is_dir():
+        return templates
+    for family_dir in sorted(VENUE_TEMPLATES_DIR.iterdir()):
+        manifest_path = family_dir / "template.json"
+        if not manifest_path.is_file():
+            continue
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["_dir"] = family_dir
+        templates[str(manifest["family"])] = manifest
+    return templates
+
+
+VENUE_TEMPLATES = _load_venue_templates()
+
+
+def _resolve_venue_template(venue: str) -> dict[str, Any] | None:
+    normalized = re.sub(r"[^a-z0-9 ]+", " ", venue.lower())
+    for manifest in VENUE_TEMPLATES.values():
+        for alias in manifest.get("aliases", []):
+            pattern = rf"(?<![a-z0-9]){re.escape(str(alias).lower())}(?![a-z0-9])"
+            if re.search(pattern, normalized):
+                return manifest
+    return None
+
+
 def _write_workspace(
     root: Path,
     *,
@@ -1162,6 +1199,16 @@ def _write_workspace(
     contract = _validated_upstream_contract(
         root, sources["03_EXPERIMENT_PLAN.html"], sources["05_EXP_RESULT.html"]
     )
+    target = contract.get("target") if isinstance(contract.get("target"), dict) else {}
+    venue = str(target.get("venue") or "").strip()
+    venue_template = _resolve_venue_template(venue)
+    if venue_template is None:
+        raise OnlineStudioError(
+            f"在线 Paper Studio 尚未内置目标会议“{venue}”的官方 LaTeX 模板，"
+            "不能用通用 article 模板顶替。请在 "
+            "research_avatar/online_studio/venue_templates/ 下添加该会议的官方 "
+            ".sty/.cls 与 template.json 后重新打包上传。"
+        )
     project_name, title = _project_identity(sources["03_EXPERIMENT_PLAN.html"], contract)
     sections = _outline_sections(contract)
     figures, tables, metrics = _artifact_definitions(contract, sections)
@@ -1240,21 +1287,29 @@ def _write_workspace(
             )
         else:
             main_inputs.append(f"\\input{{sections/{section_id}}}")
+    for asset_name in venue_template.get("assets", []):
+        asset_source = Path(venue_template["_dir"]) / asset_name
+        if not asset_source.is_file():
+            raise OnlineStudioError(
+                f"内置模板“{venue_template['family']}”缺少必需资源文件：{asset_name}。"
+            )
+        shutil.copyfile(asset_source, paper / asset_name)
+    bibliography_lines = (
+        [r"\input{sections/bibliography}"]
+        if not venue_template.get("needs_bibliographystyle", True)
+        else [r"\bibliographystyle{plain}", r"\input{sections/bibliography}"]
+    )
     main_tex = "\n".join(
         [
-            r"\documentclass[11pt]{article}",
-            r"\usepackage[margin=1in]{geometry}",
-            r"\usepackage{graphicx}",
-            r"\usepackage{booktabs}",
-            r"\usepackage{hyperref}",
+            str(venue_template["documentclass"]),
+            *[str(line) for line in venue_template.get("preamble", [])],
             f"\\title{{{_latex_escape(title)}}}",
             r"\author{Anonymous Author(s)}",
             r"\date{}",
             r"\begin{document}",
             r"\maketitle",
             *main_inputs,
-            r"\bibliographystyle{plain}",
-            r"\input{sections/bibliography}",
+            *bibliography_lines,
             r"\end{document}",
             "",
         ]
@@ -1282,7 +1337,6 @@ def _write_workspace(
     (paper / ".outline-approved").write_text(
         "Inherited from approved reports/03_EXPERIMENT_PLAN.html.\n", encoding="utf-8"
     )
-    target = contract.get("target") if isinstance(contract.get("target"), dict) else {}
     references = (
         contract.get("references")
         if isinstance(contract.get("references"), dict)

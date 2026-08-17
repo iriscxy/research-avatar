@@ -1,0 +1,22 @@
+{
+  "family": "acl",
+  "label": "ACL-family (ACL/EMNLP/NAACL/COLING/EACL/CoNLL/TACL/ARR)",
+  "aliases": [
+    "acl", "emnlp", "naacl", "coling", "eacl", "conll", "tacl",
+    "findings", "rolling review", "arr", "*acl"
+  ],
+  "documentclass": "\\documentclass[11pt]{article}",
+  "preamble": [
+    "\\usepackage[review]{acl}",
+    "\\usepackage{times}",
+    "\\usepackage{latexsym}",
+    "\\usepackage[T1]{fontenc}",
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage{microtype}",
+    "\\usepackage{graphicx}",
+    "\\usepackage{booktabs}"
+  ],
+  "assets": ["acl.sty", "acl_natbib.bst"],
+  "bibliography_command": "\\bibliography{references}",
+  "needs_bibliographystyle": false
+}

@@ -78,11 +78,14 @@ PLAN_CONTRACT = {
 }
 
 
-def pipeline_files():
+def pipeline_files(*, venue=None):
+    contract = json.loads(json.dumps(PLAN_CONTRACT))
+    if venue is not None:
+        contract["target"]["venue"] = venue
     plan = (
         "<html><head><title>Experiment Plan</title></head><body><h1>Evidence Writing</h1>"
         '<script type="application/json" id="experiment-plan-contract">'
-        + json.dumps(PLAN_CONTRACT)
+        + json.dumps(contract)
         + "</script></body></html>"
     )
     results = (
@@ -503,6 +506,53 @@ class OnlineStudioTests(unittest.TestCase):
                 config["project"]["decision_source"],
                 "reports/03_EXPERIMENT_PLAN.html",
             )
+
+    def test_scaffold_uses_the_target_venues_real_official_latex_template(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            validator = subprocess.CompletedProcess([], 0, stdout="ok", stderr="")
+            with patch.object(online.subprocess, "run", return_value=validator):
+                online._write_workspace(
+                    root, files=pipeline_files(venue="EMNLP 2026 Findings"),
+                    archive=evidence_archive(),
+                )
+            main_tex = (root / "paper/main.tex").read_text()
+            # The real ACL-family class, not a hand-rolled generic article.
+            self.assertIn(r"\usepackage[review]{acl}", main_tex)
+            self.assertNotIn(r"\usepackage[margin=1in]{geometry}", main_tex)
+            # acl.sty emits its own \bibliographystyle; a manual one breaks bibtex.
+            self.assertNotIn(r"\bibliographystyle", main_tex)
+            self.assertTrue((root / "paper/acl.sty").is_file())
+            self.assertTrue((root / "paper/acl_natbib.bst").is_file())
+            environment = {**os.environ, "RESEARCH_AVATAR_ROOT": str(root)}
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "research_avatar.paper_studio.server",
+                    "--validate-project",
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_scaffold_rejects_a_venue_with_no_bundled_official_template(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            validator = subprocess.CompletedProcess([], 0, stdout="ok", stderr="")
+            with patch.object(online.subprocess, "run", return_value=validator):
+                with self.assertRaisesRegex(online.OnlineStudioError, "官方 LaTeX 模板"):
+                    online._write_workspace(
+                        root,
+                        files=pipeline_files(venue="Some Unlisted Workshop 2099"),
+                        archive=evidence_archive(),
+                    )
+            # Fail closed: no partially-scaffolded generic-template paper/ survives.
+            self.assertFalse((root / "paper/main.tex").is_file())
 
     def test_scaffold_accepts_one_complete_project_zip(self):
         with tempfile.TemporaryDirectory() as directory:
