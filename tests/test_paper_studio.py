@@ -3180,6 +3180,20 @@ args = parser.parse_args()
             observed["command"],
         )
 
+    def test_online_mode_allows_conversation_agent_routes(self):
+        self.assertNotIn(
+            "/api/agent-chat", studio.ONLINE_DISABLED_ARTIFACT_AGENT_PATHS
+        )
+        self.assertNotIn(
+            "/api/agent-chat/cancel", studio.ONLINE_DISABLED_ARTIFACT_AGENT_PATHS
+        )
+        self.assertNotIn(
+            "/api/figure/agent-chat", studio.ONLINE_DISABLED_ARTIFACT_AGENT_PATHS
+        )
+        self.assertIn(
+            "/api/figure/build", studio.ONLINE_DISABLED_ARTIFACT_AGENT_PATHS
+        )
+
     def test_global_agent_chat_executes_explicit_safe_changes(self):
         observed = {}
         with TemporaryDirectory() as temporary:

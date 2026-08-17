@@ -63,6 +63,14 @@ ONLINE_PROJECT_MODE = os.environ.get("PAPER_STUDIO_ONLINE", "").lower() in {
     "true",
     "yes",
 }
+ONLINE_DISABLED_ARTIFACT_AGENT_PATHS = {
+    "/api/figure/build",
+    "/api/figure/generate",
+    "/api/figure/panel/generate",
+    "/api/figure/compose",
+    "/api/table/generate",
+    "/api/table/agent-edit",
+}
 DEMO_MODE = os.environ.get("PAPER_STUDIO_DEMO_MODE", "").lower() in {
     "1",
     "true",
@@ -7337,20 +7345,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         try:
             body = self.read_json()
-            if ONLINE_PROJECT_MODE and self.path in {
-                "/api/agent-chat",
-                "/api/agent-chat/cancel",
-                "/api/figure/agent-chat",
-                "/api/figure/build",
-                "/api/figure/generate",
-                "/api/figure/panel/generate",
-                "/api/figure/compose",
-                "/api/table/generate",
-                "/api/table/agent-edit",
-            }:
+            if ONLINE_PROJECT_MODE and self.path in ONLINE_DISABLED_ARTIFACT_AGENT_PATHS:
                 raise StudioError(
-                    "在线 HTML 写作会话不运行本地 Codex Agent；"
-                    "正文、标题、Caption 与 LLM 写作功能仍可正常使用。"
+                    "在线会话当前不运行图表构建 Agent；"
+                    "论文对话、正文、标题、Caption 与 LLM 写作功能仍可正常使用。"
                 )
             if self.path == "/api/generate":
                 self.handle_generate(body)
