@@ -74,13 +74,15 @@ For public registration behind a trusted edge proxy, set
 expose the built-in HTTP server directly; the Cloudflare Worker deployment strips
 client-supplied identity headers before adding its own D1-verified identity.
 
-The repository also includes `wrangler.example.jsonc` and
-`deploy/cloudflare/` for Cloudflare Workers + Containers. In that deployment,
-email accounts, salted password digests, hashed login tokens, and auth throttling
-state live in D1. The Container receives only the verified user identity and owns
-the temporary Paper Studio process. Copy the example config to the ignored local
-`wrangler.jsonc`, create the D1 database, apply its migrations, push the amd64
-container image to Cloudflare Registry, and run `npm run deploy`.
+The repository also includes `deploy/cloudflare/` (Worker source, package.json,
+wrangler config, D1 migrations) for Cloudflare Workers + Containers. In that
+deployment, email accounts, salted password digests, hashed login tokens, and
+auth throttling state live in D1. The Container receives only the verified
+user identity and owns the temporary Paper Studio process. Copy
+`deploy/cloudflare/wrangler.example.jsonc` to the ignored local
+`deploy/cloudflare/wrangler.jsonc`, create the D1 database, apply its
+migrations, push the amd64 container image to Cloudflare Registry, and run
+`make deploy` (or `npm run deploy` from inside `deploy/cloudflare/`).
 
 The container config pins `constraints.regions` to `WNAM`/`ENAM`/`WEUR`. Every
 OpenAI (and DeepSeek) call is made from inside the Container's own network
@@ -110,7 +112,8 @@ application with this exact authorized redirect URI:
 
     https://research-avatar-studio.yingtaomj.workers.dev/auth/google/callback
 
-Then store its credentials without committing them and redeploy:
+Then store its credentials without committing them and redeploy (run from
+`deploy/cloudflare/`):
 
     npx wrangler secret put GOOGLE_OAUTH_CLIENT_ID
     npx wrangler secret put GOOGLE_OAUTH_CLIENT_SECRET

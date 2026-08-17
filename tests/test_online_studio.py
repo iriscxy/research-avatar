@@ -734,12 +734,14 @@ class OnlineStudioTests(unittest.TestCase):
         """A deploy must not keep serving the prior image's demo snapshot."""
         root = Path(__file__).resolve().parents[1]
         worker = (root / "deploy/cloudflare/index.ts").read_text(encoding="utf-8")
-        wrangler = (root / "wrangler.example.jsonc").read_text(encoding="utf-8")
+        wrangler = (root / "deploy/cloudflare/wrangler.example.jsonc").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
-        self.assertIn('"class_name": "OnlineStudioContainerV11"', wrangler)
-        self.assertIn("export class OnlineStudioContainerV11", worker)
+        self.assertIn('"class_name": "OnlineStudioContainerV12"', wrangler)
+        self.assertIn("export class OnlineStudioContainerV12", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
 
     def test_upload_page_names_the_default_package_output(self):
