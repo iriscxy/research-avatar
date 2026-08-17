@@ -59,6 +59,10 @@ export class OnlineStudioContainerV5 extends OnlineStudioContainer {}
 // can survive behind an already-running container instance.
 export class OnlineStudioContainerV6 extends OnlineStudioContainer {}
 
+// Key-recovery release: rotate once more so authentication failures use the
+// safe runtime-key action instead of exposing raw Codex diagnostics.
+export class OnlineStudioContainerV7 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",

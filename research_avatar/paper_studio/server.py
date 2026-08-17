@@ -6224,6 +6224,20 @@ def parse_local_agent_answer(raw: str) -> tuple[str, str]:
     return intent, answer or raw.strip()
 
 
+def agent_api_key_failure(error: Exception | str) -> bool:
+    """Recognize Codex authentication failures without exposing diagnostics."""
+    diagnostic = str(error).lower()
+    return any(
+        marker in diagnostic
+        for marker in (
+            "invalid_api_key",
+            "incorrect api key",
+            "authentication_error",
+            "401 unauthorized",
+        )
+    )
+
+
 def chat_source_snapshot() -> dict[str, str]:
     """Fingerprint editable sources and researcher-visible paper artifacts."""
     snapshot: dict[str, str] = {}
@@ -6536,12 +6550,22 @@ def agent_chat_worker(
         status = "completed"
         progress_message = "项目 Agent 已完成。"
     except Exception as exc:  # pragma: no cover - final worker safety net
-        answer = f"项目 Agent 执行失败：{exc}"
-        execution = "failed"
+        invalid_key = agent_api_key_failure(exc)
+        answer = (
+            "项目 Agent 无法连接 OpenAI：当前 API Key 无效或已失效。"
+            "请点击“安全更换 API Key”，更新后再续做此任务。"
+            if invalid_key
+            else f"项目 Agent 执行失败：{exc}"
+        )
+        execution = "action_required" if invalid_key else "failed"
         changed_files = []
         active_thread_id = thread_id
         status = "failed"
-        progress_message = str(exc)
+        progress_message = (
+            "当前 API Key 无效或已失效，请安全更换后续做。"
+            if invalid_key
+            else str(exc)
+        )
     with STATE_LOCK:
         state = load_state()
         job = state.get("agent_chat_job") or {}
@@ -6572,7 +6596,11 @@ def agent_chat_worker(
                 **(
                     {"action": "retry_agent_job", "retry_message": message}
                     if execution in {"failed", "interrupted_changes"}
-                    else {}
+                    else (
+                        {"action": "replace_api_key", "retry_message": message}
+                        if execution == "action_required"
+                        else {}
+                    )
                 ),
             }
         )
@@ -8342,11 +8370,22 @@ class Handler(BaseHTTPRequestHandler):
             history = list(state.get("agent_chat_history", []))[-40:]
             for turn in reversed(history):
                 if turn.get("action") == "replace_api_key":
+                    retry_message = str(turn.get("retry_message") or "").strip()
                     turn.update(
                         {
-                            "content": "API Key 已在当前 Paper Studio 运行内存中安全更新；未写入聊天、浏览器存储或项目文件。",
+                            "content": (
+                                "API Key 已在当前 Paper Studio 运行内存中安全更新；"
+                                "请点击“续做并核验此任务”。"
+                                if retry_message
+                                else "API Key 已在当前 Paper Studio 运行内存中安全更新；"
+                                "未写入聊天、浏览器存储或项目文件。"
+                            ),
                             "execution": "runtime_action",
-                            "action": "replace_api_key_completed",
+                            "action": (
+                                "retry_agent_job"
+                                if retry_message
+                                else "replace_api_key_completed"
+                            ),
                         }
                     )
                     break

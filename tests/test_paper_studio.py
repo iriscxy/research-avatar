@@ -3378,6 +3378,69 @@ args = parser.parse_args()
         self.assertNotIn("sk-test-runtime-secret", json.dumps(visible))
         save.assert_called_once_with(state)
 
+    def test_runtime_key_turn_becomes_retry_action_after_auth_failure(self):
+        state = _default_state()
+        state["agent_chat_history"] = [
+            {
+                "role": "assistant",
+                "content": "当前 API Key 无效。",
+                "execution": "action_required",
+                "action": "replace_api_key",
+                "retry_message": "检查项目名称",
+            }
+        ]
+        response = {}
+        handler = object.__new__(Handler)
+        handler.send_json = lambda payload, status=200: response.update(payload)
+        with (
+            patch.object(studio, "load_state", return_value=state),
+            patch.object(studio, "save_state"),
+            patch.object(studio, "public_state", wraps=studio.public_state),
+            patch.dict(studio.os.environ, {}, clear=False),
+        ):
+            handler.handle_runtime_key(
+                {"provider": "openai", "api_key": "sk-valid-test-key"}
+            )
+
+        turn = state["agent_chat_history"][-1]
+        self.assertEqual(turn["execution"], "runtime_action")
+        self.assertEqual(turn["action"], "retry_agent_job")
+        self.assertEqual(turn["retry_message"], "检查项目名称")
+        self.assertIn("续做并核验此任务", turn["content"])
+
+    def test_agent_invalid_key_failure_is_safe_and_actionable(self):
+        state = _default_state()
+        state["agent_chat_history"] = [{"role": "user", "content": "检查项目"}]
+        state["agent_chat_job"] = {
+            "token": "job-1",
+            "status": "running",
+            "source_snapshot": {},
+        }
+        secret_fragment = "sk-test-secret-fragment"
+        with (
+            patch.object(studio, "load_state", return_value=state),
+            patch.object(studio, "save_state"),
+            patch.object(
+                studio,
+                "ask_studio_local_agent",
+                side_effect=studio.StudioError(
+                    f"401 Unauthorized: invalid_api_key {secret_fragment}"
+                ),
+            ),
+            patch.object(studio, "chat_source_snapshot", return_value={}),
+        ):
+            studio.agent_chat_worker(
+                "job-1", "检查项目", [], "abstract", "writing", "", None
+            )
+
+        reply = state["agent_chat_history"][-1]
+        self.assertEqual(reply["execution"], "action_required")
+        self.assertEqual(reply["action"], "replace_api_key")
+        self.assertEqual(reply["retry_message"], "检查项目")
+        self.assertIn("安全更换 API Key", reply["content"])
+        self.assertNotIn(secret_fragment, reply["content"])
+        self.assertNotIn(secret_fragment, state["agent_chat_job"]["progress_message"])
+
     def test_global_agent_chat_uses_codex_semantics_without_action_whitelist(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
