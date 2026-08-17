@@ -872,6 +872,66 @@ class Matrix:
         self.results["runtime_key_safe_action"] = True
         page.close()
 
+    def agent_restart_retry_action(self) -> None:
+        fixture = safe_fixture(self.state)
+        original = "experiment 插入一个段"
+        fixture["agent_chat_history"] = [
+            {"role": "user", "content": original},
+            {
+                "role": "assistant",
+                "content": "服务重启中断了 Agent 回复，但检测到 1 个项目文件已变更。",
+                "execution": "interrupted_changes",
+                "changed_files": ["paper/paragraph_plan.json"],
+                "action": "retry_agent_job",
+                "retry_message": original,
+            },
+        ]
+        fixture["agent_chat_job"] = {"status": "failed"}
+        page = self.browser.new_page()
+        errors: list[str] = []
+        posts: list[dict[str, Any]] = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+
+        def api(route) -> None:
+            if route.request.method == "GET":
+                route.fulfill(status=200, content_type="application/json", body=json.dumps(fixture))
+                return
+            body = route.request.post_data_json
+            posts.append({"url": route.request.url, "body": body})
+            assert route.request.url.endswith("/api/agent-chat"), route.request.url
+            assert body["message"].startswith("继续完成并核验上次任务"), body
+            assert original in body["message"], body
+            fixture["agent_chat_history"].extend(
+                [
+                    {"role": "user", "content": body["message"]},
+                    {
+                        "role": "assistant",
+                        "content": "已续做并核验完成。",
+                        "execution": "no_changes",
+                        "changed_files": [],
+                    },
+                ]
+            )
+            fixture["agent_chat_job"] = {"status": "completed"}
+            route.fulfill(
+                status=202,
+                content_type="application/json",
+                body=json.dumps({"ok": True, "state": fixture}),
+            )
+
+        page.route("**/api/**", api)
+        self.visit(page, "/?view=writing", "document.querySelector('#section-title').textContent !== 'Loading…'")
+        page.locator("#agent-chat-launcher").click()
+        assert "已变更 · 1 个文件待核验" in page.locator("#figure-agent-chat-history").inner_text()
+        page.locator(".agent-chat-retry").click()
+        page.wait_for_timeout(100)
+        assert len(posts) == 1, posts
+        assert "已续做并核验完成" in page.locator("#figure-agent-chat-history").inner_text()
+        assert page.locator("#figure-agent-chat-input").input_value() == ""
+        assert not errors, errors
+        self.results["agent_restart_retry_action"] = True
+        page.close()
+
     def generated_reset_dialog(self) -> None:
         fixture = safe_fixture(self.state)
         project_id = fixture["project"]["id"]
@@ -1548,6 +1608,7 @@ class Matrix:
             self.failure_restores_visible_drafts,
             self.runtime_key_safe_action,
             self.agent_cancel_terminal_state,
+            self.agent_restart_retry_action,
             self.generated_reset_dialog,
             self.artifact_double_dispatch,
             self.automatic_generation_sequence,

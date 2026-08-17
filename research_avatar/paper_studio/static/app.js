@@ -1227,6 +1227,8 @@ function renderAgentChat() {
       const changedCount = (turn.changed_files || []).length;
       execution.textContent = turn.execution === "executed"
         ? `已执行 · ${changedCount} 个文件`
+        : turn.execution === "interrupted_changes"
+          ? `已变更 · ${changedCount} 个文件待核验`
         : turn.execution === "confirmation_required"
           ? "等待确认"
           : turn.execution === "action_required"
@@ -1252,6 +1254,18 @@ function renderAgentChat() {
       action.className = "agent-action agent-chat-runtime-key";
       action.textContent = "安全更换 API Key";
       action.addEventListener("click", openRuntimeKeyDialog);
+      message.appendChild(action);
+    }
+    if (!user && turn.action === "retry_agent_job" && turn.retry_message) {
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "agent-action agent-chat-retry";
+      action.textContent = "续做并核验此任务";
+      action.addEventListener("click", () => {
+        const input = $("figure-agent-chat-input");
+        input.value = `继续完成并核验上次任务，避免重复已有改动。原请求：${turn.retry_message}`;
+        sendFigureAgentChat();
+      });
       message.appendChild(action);
     }
     roundElement.appendChild(message);

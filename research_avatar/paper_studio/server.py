@@ -1287,10 +1287,26 @@ def load_state() -> dict[str, Any]:
             and job.get("status") == "running"
             and job.get("server_instance") != SERVER_INSTANCE_TOKEN
         ):
+            baseline = job.get("source_snapshot")
+            changed_files: list[str] = []
+            if isinstance(baseline, dict):
+                current_snapshot = chat_source_snapshot()
+                changed_files = sorted(
+                    path
+                    for path in set(baseline) | set(current_snapshot)
+                    if baseline.get(path) != current_snapshot.get(path)
+                )
+            progress_message = (
+                f"服务重启中断了 Agent 回复，但检测到 {len(changed_files)} 个项目文件已变更；"
+                "请续做并核验任务是否完整。"
+                if changed_files
+                else "服务已重启；上一次 Agent 任务已终止，请续做。"
+            )
             state["agent_chat_job"] = {
                 **job,
                 "status": "failed",
-                "progress_message": "服务已重启；上一次 Agent 任务已终止，请重试。",
+                "progress_message": progress_message,
+                "changed_files": changed_files,
             }
             job = state["agent_chat_job"]
         if (
@@ -1308,10 +1324,16 @@ def load_state() -> dict[str, Any]:
                         "role": "assistant",
                         "content": str(
                             job.get("progress_message")
-                            or "本地 Agent 任务未完成，请重试。"
+                            or "项目 Agent 任务未完成，请续做。"
                         ),
-                        "execution": "failed",
-                        "changed_files": [],
+                        "execution": (
+                            "interrupted_changes"
+                            if job.get("changed_files")
+                            else "failed"
+                        ),
+                        "changed_files": list(job.get("changed_files") or []),
+                        "action": "retry_agent_job",
+                        "retry_message": message,
                     }
                 )
                 state["agent_chat_history"] = history[-40:]
@@ -6282,6 +6304,16 @@ def run_local_agent_process(
     return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
+def terminate_running_agent_chat_processes() -> None:
+    """Stop every Codex process group before this server instance exits."""
+    with AGENT_CHAT_PROCESS_LOCK:
+        running = list(RUNNING_AGENT_CHAT_PROCESSES.items())
+        for token, _process in running:
+            CANCELLED_AGENT_CHAT_JOBS.add(token)
+    for _token, process in running:
+        _terminate_process_group(process)
+
+
 def ask_studio_local_agent(
     message: str,
     history: list[dict[str, str]] | None = None,
@@ -6515,6 +6547,21 @@ def agent_chat_worker(
         job = state.get("agent_chat_job") or {}
         if job.get("token") != token or job.get("status") != "running":
             return
+        if execution == "failed" and isinstance(job.get("source_snapshot"), dict):
+            current_snapshot = chat_source_snapshot()
+            baseline = job["source_snapshot"]
+            changed_files = sorted(
+                path
+                for path in set(baseline) | set(current_snapshot)
+                if baseline.get(path) != current_snapshot.get(path)
+            )
+            if changed_files:
+                execution = "interrupted_changes"
+                answer = (
+                    f"项目 Agent 未能返回完整结果，但系统检测到 {len(changed_files)} "
+                    "个项目文件已变更；请续做并核验任务是否完整。\n\n"
+                    + answer
+                )
         chat_history = list(state.get("agent_chat_history", []))[-40:]
         chat_history.append(
             {
@@ -6522,6 +6569,11 @@ def agent_chat_worker(
                 "content": answer,
                 "execution": execution,
                 "changed_files": changed_files,
+                **(
+                    {"action": "retry_agent_job", "retry_message": message}
+                    if execution in {"failed", "interrupted_changes"}
+                    else {}
+                ),
             }
         )
         state["agent_chat_history"] = chat_history[-40:]
@@ -6534,6 +6586,7 @@ def agent_chat_worker(
             "finished_at": int(time.time()),
             "reply_recorded": True,
         }
+        state["agent_chat_job"].pop("source_snapshot", None)
         save_state(state)
 
 
@@ -7182,6 +7235,8 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         }
     result = json.loads(json.dumps(state))
     result.pop("agent_chat_thread_id", None)
+    if isinstance(result.get("agent_chat_job"), dict):
+        result["agent_chat_job"].pop("source_snapshot", None)
     result["project"] = {
         "id": PROJECT_ID,
         "name": str(PROJECT_METADATA.get("name", "")),
@@ -8250,6 +8305,7 @@ class Handler(BaseHTTPRequestHandler):
                 "started_at": int(time.time()),
                 "progress_message": "项目 Agent 正在读取上下文并执行…",
                 "message": message,
+                "source_snapshot": chat_source_snapshot(),
             }
             save_state(state)
             thread_id = str(state.get("agent_chat_thread_id") or "").strip() or None
@@ -8329,6 +8385,7 @@ class Handler(BaseHTTPRequestHandler):
                 "finished_at": int(time.time()),
                 "reply_recorded": True,
             }
+            state["agent_chat_job"].pop("source_snapshot", None)
             save_state(state)
         with AGENT_CHAT_PROCESS_LOCK:
             CANCELLED_AGENT_CHAT_JOBS.add(token)
@@ -9115,12 +9172,21 @@ def main() -> None:
     print(f"Model: {load_state().get('model') or DEFAULT_MODEL}")
     if not args.no_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+
+    previous_sigterm = signal.getsignal(signal.SIGTERM)
+
+    def stop_for_sigterm(_signum: int, _frame: Any) -> None:
+        raise KeyboardInterrupt
+
+    signal.signal(signal.SIGTERM, stop_for_sigterm)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nPaper Studio stopped.")
     finally:
+        terminate_running_agent_chat_processes()
         server.server_close()
+        signal.signal(signal.SIGTERM, previous_sigterm)
 
 
 if __name__ == "__main__":

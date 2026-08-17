@@ -1381,7 +1381,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260817.7"', html)
+        self.assertIn('src="static/app.js?v=20260817.8"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1405,6 +1405,9 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('state.agent_chat_job || null', source)
         self.assertIn('function ensureAgentChatPolling()', source)
         self.assertIn('execution.textContent = "执行中"', source)
+        self.assertIn('turn.action === "retry_agent_job"', source)
+        self.assertIn('className = "agent-action agent-chat-retry"', source)
+        self.assertIn("已变更 · ${changedCount} 个文件待核验", source)
         self.assertNotIn('(figure.placement_options || []).filter(', source)
         self.assertIn('item.disabled = !option.accepted', source)
         self.assertIn('? "重新解析 Prompt 并生成合成图"', source)
@@ -1518,7 +1521,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260817.7"', html)
+        self.assertIn('src="static/app.js?v=20260817.8"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1528,7 +1531,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('roundLabel.textContent = `第 ${round} 轮`', source)
         self.assertIn('message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`', source)
         self.assertIn("agent-chat-round", source)
-        self.assertIn('href="static/style.css?v=20260817.7"', html)
+        self.assertIn('href="static/style.css?v=20260817.8"', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)
@@ -3509,6 +3512,39 @@ args = parser.parse_args()
         self.assertEqual(state["agent_chat_history"][-1]["execution"], "no_changes")
         save.assert_called_once_with(state)
 
+    def test_failed_agent_worker_reports_changes_made_before_error(self):
+        state = _default_state()
+        state["agent_chat_history"] = [{"role": "user", "content": "插入一个段"}]
+        state["agent_chat_job"] = {
+            "token": "job-1",
+            "status": "running",
+            "source_snapshot": {"paper/paragraph_plan.json": "before"},
+        }
+        with (
+            patch.object(studio, "load_state", return_value=state),
+            patch.object(studio, "save_state") as save,
+            patch.object(
+                studio,
+                "ask_studio_local_agent",
+                side_effect=studio.StudioError("Codex connection ended"),
+            ),
+            patch.object(
+                studio,
+                "chat_source_snapshot",
+                return_value={"paper/paragraph_plan.json": "after"},
+            ),
+        ):
+            studio.agent_chat_worker(
+                "job-1", "插入一个段", [], "experiments", "writing", "", None
+            )
+
+        reply = state["agent_chat_history"][-1]
+        self.assertEqual(reply["execution"], "interrupted_changes")
+        self.assertEqual(reply["changed_files"], ["paper/paragraph_plan.json"])
+        self.assertEqual(reply["action"], "retry_agent_job")
+        self.assertNotIn("source_snapshot", state["agent_chat_job"])
+        save.assert_called_once_with(state)
+
     def test_interrupted_agent_chat_gets_visible_failure_reply_once(self):
         with TemporaryDirectory() as temporary:
             state_file = Path(temporary) / "state.json"
@@ -3538,8 +3574,73 @@ args = parser.parse_args()
         self.assertTrue(first["agent_chat_job"]["reply_recorded"])
         self.assertEqual(first["agent_chat_history"][-1]["role"], "assistant")
         self.assertEqual(first["agent_chat_history"][-1]["execution"], "failed")
-        self.assertIn("请重试", first["agent_chat_history"][-1]["content"])
+        self.assertIn("请续做", first["agent_chat_history"][-1]["content"])
+        self.assertEqual(
+            first["agent_chat_history"][-1]["action"], "retry_agent_job"
+        )
         self.assertEqual(len(second["agent_chat_history"]), 2)
+
+    def test_interrupted_agent_chat_reports_files_changed_before_restart(self):
+        with TemporaryDirectory() as temporary:
+            state_file = Path(temporary) / "state.json"
+            state = _default_state()
+            state["agent_chat_history"] = [
+                {"role": "user", "content": "experiment 插入一个段"}
+            ]
+            state["agent_chat_job"] = {
+                "token": "old-job",
+                "status": "running",
+                "server_instance": "old-server",
+                "message": "experiment 插入一个段",
+                "source_snapshot": {"paper/paragraph_plan.json": "before"},
+            }
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+            with (
+                patch.object(studio, "STATE_FILE", state_file),
+                patch.object(studio, "SERVER_INSTANCE_TOKEN", "new-server"),
+                patch.object(
+                    studio,
+                    "chat_source_snapshot",
+                    return_value={"paper/paragraph_plan.json": "after"},
+                ),
+            ):
+                recovered = studio.load_state()
+
+        reply = recovered["agent_chat_history"][-1]
+        self.assertEqual(reply["execution"], "interrupted_changes")
+        self.assertEqual(reply["changed_files"], ["paper/paragraph_plan.json"])
+        self.assertEqual(reply["action"], "retry_agent_job")
+        self.assertIn("1 个项目文件已变更", reply["content"])
+
+    def test_public_state_hides_agent_restart_source_snapshot(self):
+        state = _default_state()
+        state["agent_chat_job"] = {
+            "token": "job-1",
+            "status": "running",
+            "source_snapshot": {"paper/private.md": "digest"},
+        }
+        visible = studio.public_state(state)
+        self.assertNotIn("source_snapshot", visible["agent_chat_job"])
+
+    def test_server_shutdown_terminates_every_running_agent_process_group(self):
+        first = MagicMock()
+        second = MagicMock()
+        with patch.object(studio, "_terminate_process_group") as terminate:
+            with studio.AGENT_CHAT_PROCESS_LOCK:
+                studio.RUNNING_AGENT_CHAT_PROCESSES.update(
+                    {"job-first": first, "job-second": second}
+                )
+            try:
+                studio.terminate_running_agent_chat_processes()
+                self.assertIn("job-first", studio.CANCELLED_AGENT_CHAT_JOBS)
+                self.assertIn("job-second", studio.CANCELLED_AGENT_CHAT_JOBS)
+                self.assertEqual(
+                    {call.args[0] for call in terminate.call_args_list}, {first, second}
+                )
+            finally:
+                with studio.AGENT_CHAT_PROCESS_LOCK:
+                    studio.RUNNING_AGENT_CHAT_PROCESSES.clear()
+                    studio.CANCELLED_AGENT_CHAT_JOBS.clear()
 
     def test_local_agent_prompt_family_always_produces_terminal_reply(self):
         prompts = [
