@@ -75,6 +75,10 @@ export class OnlineStudioContainerV9 extends OnlineStudioContainer {}
 // Studio process that would falsely interrupt its own background job.
 export class OnlineStudioContainerV10 extends OnlineStudioContainer {}
 
+// Copy-review release: rotate the pool so the public Demo cannot retain a
+// pre-review static bundle from an already-running V10 container.
+export class OnlineStudioContainerV11 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
