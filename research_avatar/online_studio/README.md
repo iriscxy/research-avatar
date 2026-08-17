@@ -94,6 +94,17 @@ list restricted to geographies OpenAI reliably serves; do not add `APAC` or `ME`
 without confirming the actual Cloudflare Container point of presence in that
 constraint is not itself in an embargoed/unsupported territory.
 
+`instance_type` is pinned to `standard-1` (1/2 vCPU, 4 GiB memory). The
+Container runs this gateway process, the spawned per-session
+`research_avatar.paper_studio.server` writer subprocess, `latexmk`/`pdflatex`,
+Poppler, and the bundled Codex CLI all inside the same instance; a live
+end-to-end "直接生成全文初稿" batch run against `basic` (1 GiB) killed the
+writer subprocess mid-job (the gateway stayed up and reported "会话不存在或已
+过期"), losing the researcher's in-progress session even though completed
+paragraphs were already saved to disk under the now-unreachable session root.
+Do not downgrade the tier without re-running a full real batch-writing job
+against it first.
+
 To enable Google login on the public deployment, create a Google OAuth 2.0 Web
 application with this exact authorized redirect URI:
 

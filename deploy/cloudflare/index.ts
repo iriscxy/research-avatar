@@ -413,13 +413,30 @@ async function login(request: Request, env: Env): Promise<Response> {
 async function logout(request: Request, env: Env): Promise<Response> {
   const token = cookieValue(request, AUTH_COOKIE);
   if (token) {
+    // Resolve identity and ask the container to end this user's writing
+    // session (terminate its spawned Paper Studio child process) before the
+    // auth row is deleted. The container's own SESSIONS map has no other
+    // way to learn that a researcher logged out: it otherwise only reaps a
+    // session after four idle hours, so every earlier logout leaked a live
+    // child process into the *shared* per-Worker-version container for the
+    // rest of that window — starving concurrent researchers' memory and
+    // eventually OOM-killing whoever's batch-writing job was heaviest at
+    // the time. Best-effort: a container error here must not block logout.
+    const user = await currentUser(request, env);
+    if (user) {
+      try {
+        await proxyIdentified(request, env, user, "/api/online/session/close");
+      } catch {
+        // Best-effort cleanup; logout must still succeed.
+      }
+    }
     await env.AUTH_DB.prepare("DELETE FROM auth_sessions WHERE token_hash = ?")
       .bind(await sha256(token)).run();
   }
   return json({ ok: true }, 200, authCookie("", true));
 }
 
-async function proxy(request: Request, env: Env, user: User | null): Promise<Response> {
+function identityHeaders(request: Request, user: User | null): Headers {
   const headers = new Headers(request.headers);
   headers.delete("x-online-user-id");
   headers.delete("x-online-user-email");
@@ -429,14 +446,35 @@ async function proxy(request: Request, env: Env, user: User | null): Promise<Res
     headers.set("x-online-user-email", user.email);
     headers.set("x-online-user-provider", user.provider);
   }
-  const forwarded = new Request(request, { headers });
+  return headers;
+}
+
+function studioContainer(env: Env) {
   // A named container can survive a Worker/image deployment. Scope the name to
   // the immutable Worker version so every release starts from the matching
   // bundled demo project instead of serving a stale prior image indefinitely.
-  return getContainer(
-    env.ONLINE_STUDIO,
-    `public-studio-${env.CF_VERSION_METADATA.id}`,
-  ).fetch(forwarded);
+  return getContainer(env.ONLINE_STUDIO, `public-studio-${env.CF_VERSION_METADATA.id}`);
+}
+
+async function proxy(request: Request, env: Env, user: User | null): Promise<Response> {
+  const forwarded = new Request(request, { headers: identityHeaders(request, user) });
+  return studioContainer(env).fetch(forwarded);
+}
+
+async function proxyIdentified(
+  request: Request,
+  env: Env,
+  user: User,
+  path: string,
+): Promise<Response> {
+  const url = new URL(request.url);
+  url.pathname = path;
+  url.search = "";
+  const forwarded = new Request(url, {
+    method: "POST",
+    headers: identityHeaders(request, user),
+  });
+  return studioContainer(env).fetch(forwarded);
 }
 
 export default {

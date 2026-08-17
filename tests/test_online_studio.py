@@ -400,6 +400,48 @@ class OnlineStudioTests(unittest.TestCase):
                 (Path(directory) / "auth.sqlite3").read_bytes(),
             )
 
+    def test_logout_closes_the_researchers_own_writing_session(self):
+        # Regression: a session's spawned paper_studio.server child process
+        # previously only ever stopped via the four-hour idle reaper, so a
+        # researcher who logged out immediately still left a live subprocess
+        # running in the shared per-Worker-version container for hours,
+        # starving concurrent researchers' memory. close_session() is what
+        # the edge Worker's logout handler now calls before deleting the
+        # auth row (POST /api/online/session/close, proxyIdentified in
+        # deploy/cloudflare/index.ts).
+        process = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"]
+        )
+        try:
+            session = online.Session(
+                "close-me", "user-1", Path("/tmp/unused"), "openai", "gpt-5-nano",
+                process, 0,
+            )
+            with online.SESSIONS_LOCK:
+                online.SESSIONS["close-me"] = session
+            header = f"{online.COOKIE_NAME}=close-me"
+
+            # A foreign user_id must not be able to close someone else's session.
+            self.assertFalse(online.close_session(header, user_id="not-the-owner"))
+            self.assertIsNone(process.poll())
+            with online.SESSIONS_LOCK:
+                self.assertIn("close-me", online.SESSIONS)
+
+            self.assertTrue(online.close_session(header, user_id="user-1"))
+            process.wait(timeout=5)
+            self.assertIsNotNone(process.poll())
+            with online.SESSIONS_LOCK:
+                self.assertNotIn("close-me", online.SESSIONS)
+
+            # Idempotent: closing an already-closed/unknown session is a no-op.
+            self.assertFalse(online.close_session(header, user_id="user-1"))
+        finally:
+            with online.SESSIONS_LOCK:
+                online.SESSIONS.pop("close-me", None)
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=5)
+
     def test_google_authorization_code_callback_creates_authenticated_user(self):
         opener = urllib.request.build_opener(_NoRedirect())
         with tempfile.TemporaryDirectory() as directory, patch.object(

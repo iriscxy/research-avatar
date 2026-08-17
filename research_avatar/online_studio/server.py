@@ -1623,6 +1623,28 @@ def _session_from_cookie(header: str | None, *, user_id: str) -> Session | None:
     return None
 
 
+def close_session(header: str | None, *, user_id: str) -> bool:
+    """End the caller's own writing session immediately on logout.
+
+    Without this, a session's spawned research_avatar.paper_studio.server
+    child process only ever stops via the four-hour idle reaper, so it keeps
+    running (and consuming the shared container's finite memory) for the
+    rest of that window even though the researcher is gone. Scoped to the
+    caller's own user_id, matching every other session lookup in this file.
+    """
+    session_id = _cookie_value(header, COOKIE_NAME)
+    if session_id is None:
+        return False
+    with SESSIONS_LOCK:
+        session = SESSIONS.get(session_id)
+        if session is None or session.user_id != user_id:
+            return False
+        SESSIONS.pop(session_id)
+        if session.process.poll() is None:
+            session.process.terminate()
+        return True
+
+
 def _reap_sessions() -> None:
     while True:
         time.sleep(60)
@@ -1918,6 +1940,16 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/auth/logout":
             revoke_auth_session(self.headers.get("Cookie"))
             self._json({"ok": True}, cookie=_auth_cookie("", clear=True))
+        elif path == "/api/online/session/close":
+            # Called by the edge Worker's logout handler (proxyIdentified) so a
+            # researcher's spawned Paper Studio child process is terminated the
+            # moment they log out, instead of leaking into the shared container
+            # for up to SESSION_IDLE_SECONDS. Best-effort and idempotent: a
+            # missing/foreign/already-closed session is not an error here.
+            user = self._current_user()
+            if user:
+                close_session(self.headers.get("Cookie"), user_id=user["id"])
+            self._json({"ok": True})
         elif path == "/api/online/session":
             user = self._require_user()
             if not user:
