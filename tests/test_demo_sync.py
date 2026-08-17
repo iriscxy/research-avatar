@@ -52,16 +52,17 @@ class DemoSyncTests(unittest.TestCase):
     def test_paper_demo_mounts_the_real_completed_application(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         self.assertNotIn("data-paper-demo-view", source)
-        self.assertIn("下面加载固定应用本身，而不是截图", source)
         self.assertIn('iframe src="/demo-studio/"', source)
         self.assertIn("完成态 Demo · 只读", source)
         self.assertIn("建议在新页面打开", source)
-        self.assertIn("打开完整 Paper Studio", source)
+        self.assertIn("打开 Paper Studio", source)
         self.assertIn('class="paper-studio-open-callout"', source)
-        self.assertIn("不会产生 API 费用", source)
         self.assertIn("正文调用 LLM API（不是 Code Agent）逐段生成", source)
         self.assertIn("paper-studio-demo-api-key-required", source)
         self.assertIn("window.parent.postMessage", source)
+        self.assertNotIn("这就是完成论文后的真实 Paper Studio", source)
+        self.assertNotIn("下面加载固定应用本身", source)
+        self.assertNotIn("不会产生 API 费用", source)
         self.assertNotIn("?v=20260814-reader-copy", source)
         self.assertNotIn("writing.png", source)
 
@@ -110,10 +111,10 @@ class DemoSyncTests(unittest.TestCase):
             self.assertNotIn(internal_copy, source)
         for reader_copy in (
             "从论文主张反推实验和证据",
-            "把完整实验拆成一个个 Goal",
-            "一次确认全部 Goals",
-            "逐个查看并确认",
-            "在统一工作区中完成正文、图片和表格",
+            "按证据依赖执行实验",
+            "一次确认全部任务",
+            "逐项确认",
+            "撰写正文并制作图表",
         ):
             self.assertIn(reader_copy, source)
         self.assertIn("先确定论文要证明什么，再为每个主张安排图表、指标和失败条件", source)

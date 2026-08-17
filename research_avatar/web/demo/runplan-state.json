@@ -26,16 +26,16 @@
   "parts": [
     {
       "id": "P1",
-      "title": "Instrumentation",
-      "decision": "Establish one deterministic evidence path.",
+      "title": "基础通路验证",
+      "decision": "建立确定、可复现的证据通路。",
       "goals": [
         "G1.1"
       ]
     },
     {
       "id": "P2",
-      "title": "Held-out-seed positive confirmation",
-      "decision": "Test every frozen positive-result boundary.",
+      "title": "正结果确认",
+      "decision": "检验全部预先固定的正结果边界。",
       "goals": [
         "G2.1"
       ]
@@ -45,16 +45,16 @@
     {
       "id": "G1.1",
       "part_id": "P1",
-      "title": "Verify the deterministic positive-study path",
+      "title": "核验确定性实验通路",
       "status": "completed",
-      "decision_question": "Can the pinned data, balanced quotas, operators, and evidence paths reproduce?",
-      "visible_work": "Verify the source hash, held-out seed split, class balance, deterministic selector, and count-only motivation specification.",
-      "visible_evidence": "The deterministic pipeline and F1 specification are complete.",
-      "completion_check": "Pinned source, configuration, environment, and two reproducible result paths resolve.",
+      "decision_question": "固定数据、类别配额、扰动操作和证据路径能否复现？",
+      "visible_work": "核验数据哈希、确认种子划分、类别平衡、确定性选择器和 F1 规格。",
+      "visible_evidence": "确定性运行通路和 F1 规格均已完成。",
+      "completion_check": "固定数据、配置、环境和两条结果路径均可复现。",
       "artifact_ids": [
         "F1"
       ],
-      "budget": "local CPU; zero GPU-hours",
+      "budget": "本地 CPU；无需 GPU",
       "outputs": [
         "results/typo_margin/confirmatory_results.json"
       ],
@@ -63,19 +63,19 @@
     {
       "id": "G2.1",
       "part_id": "P2",
-      "title": "Run held-out-seed confirmation and fill every result artifact",
+      "title": "运行确认实验并填充全部结果图表",
       "status": "completed",
-      "decision_question": "Does class-balanced margin targeting beat matched random selection and retain full-mixture accuracy?",
-      "visible_work": "Run six frozen settings over the same eight seeds held out from exploration and compute the primary, operator, and budget views.",
-      "visible_evidence": "All 40 targets are filled with verified real values and traceable plots.",
-      "completion_check": "Every paired C1 interval is positive and the primary C2 interval remains above −0.01.",
+      "decision_question": "类别平衡的低分数差选择能否优于同预算随机选择，并保持完整混合增强的准确率？",
+      "visible_work": "在同一组 8 个确认种子上运行六个设置，计算主结果、操作符结果和预算曲线。",
+      "visible_evidence": "40 个数据单元均已填入可追踪的真实结果。",
+      "completion_check": "C1 的所有配对区间均为正，C2 主区间高于 −0.01。",
       "artifact_ids": [
         "T1",
         "F2",
         "T2",
         "F3"
       ],
-      "budget": "local CPU; zero GPU-hours",
+      "budget": "本地 CPU；无需 GPU",
       "outputs": [
         "results/typo_margin/confirmatory_results.json",
         "reports/05_EXP_RESULT.html"

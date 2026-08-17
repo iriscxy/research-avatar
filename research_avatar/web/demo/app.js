@@ -1,6 +1,6 @@
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 
-const commandStrip = (title, command, detail = "在本地终端运行；生成内容会自动出现在网页中。") => `
+const commandStrip = (title, command, detail = "生成结果会同步到网页。") => `
   <div class="command-card">
     <div><span>在本地终端运行</span><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></div>
     <code>${escapeHtml(command)}</code><button type="button" data-copy="${escapeHtml(command)}">复制命令</button>
@@ -43,26 +43,26 @@ const experimentPlanDemo = () => {
       <header class="expplan-title">
         <p class="artifact-kicker">实验方案 · 已确认</p>
         <h4>Margin-Targeted Typo Augmentation</h4>
-        <p>在相同类别配额和最终重训练样本数下，验证优先选择低真实标签分数差的 typo 是否稳定优于随机选择。</p>
-        <div class="expplan-facts"><span>COLING 2027 Short</span><span>3 张图</span><span>2 张表</span><span>40 个待填数据单元</span><span>本地 CPU · 0 GPU 小时</span></div>
+        <p>在类别配额和重训练样本数相同的条件下，检验优先选择低真实标签分数差的拼写扰动是否优于随机选择。</p>
+        <div class="expplan-facts"><span>COLING 2027 短文</span><span>3 张图</span><span>2 张表</span><span>40 个待填数据单元</span><span>本地 CPU · 无需 GPU</span></div>
       </header>
 
       <section class="plain-section projected-abstract">
         <p class="artifact-kicker">标题与摘要方向</p>
         <h4>Spend Typo Budget Where the Classifier Is Unsure</h4>
-        <p>MTA 为每条训练样本生成 swap、delete、insert 和 keyboard 四种候选 typo，用干净分类器计算真实标签分数差，再按类别等额选择最低分数差候选。实验只改变选择策略，候选池、模型、类别分布、重训练数量和测试集保持一致。</p>
+        <p>MTA 为每条训练样本生成交换、删除、插入和键盘邻键四类拼写扰动，用干净分类器计算真实标签分数差，再按类别等额选择最低分数差的候选。实验只改变选择策略，其余条件保持一致。</p>
       </section>
 
       <section class="plain-section setup-section">
         <p class="artifact-kicker">段落与证据</p><h4>每个关键主张都有对应图表和失败条件</h4>
-        <dl class="setup-grid"><dt>数据</dt><dd>固定版本 CLINC150；50-intent 主实验与 20-intent 范围检查</dd><dt>模型</dt><dd>共享的 multinomial Naive Bayes word-count 分类器</dd><dt>比较方法</dt><dd>仅干净数据 · 类别平衡随机预算 · MTA · 类别平衡完整混合</dd><dt>主要指标</dt><dd>干净准确率 · 四种 typo 的平均与最差准确率 · 配对 bootstrap 95% 区间</dd><dt>固定种子</dt><dd>六个设置复用同一组 8 个、与探索阶段分离的种子</dd><dt>证据产物</dt><dd>F1 动机图 · T1 主表 · F2 六设置区间图 · T2 操作符表 · F3 固定 20-intent 预算曲线</dd></dl>
+        <dl class="setup-grid"><dt>数据</dt><dd>固定版本 CLINC150；50 类主实验与 20 类范围检查</dd><dt>模型</dt><dd>共享的多项式朴素贝叶斯词频分类器</dd><dt>比较方法</dt><dd>仅干净数据 · 类别平衡随机增强 · MTA · 类别平衡完整混合</dd><dt>主要指标</dt><dd>干净准确率 · 四类拼写扰动的平均与最差准确率 · 配对自助法 95% 区间</dd><dt>固定种子</dt><dd>六个设置使用同一组 8 个确认种子</dd><dt>证据产物</dt><dd>F1 动机图 · T1 主表 · F2 六设置区间图 · T2 操作符表 · F3 固定 20 类预算曲线</dd></dl>
       </section>
 
-      ${resultTable({id:"T1",title:"50-intent 主比较",headers:["方法","干净准确率 ↑","平均 typo 准确率 ↑","最差操作符准确率 ↑","增强样本数 ↓"],rows:methods,note:"C1 只有在 MTA−随机的配对 95% 区间下界大于 0 时成立；C2 只有在 MTA−完整混合的区间下界大于 −0.01 时成立。"})}
+      ${resultTable({id:"T1",title:"50 类主实验",headers:["方法","干净准确率 ↑","平均扰动准确率 ↑","最差操作符准确率 ↑","增强样本数 ↓"],rows:methods,note:"C1 要求 MTA−随机的配对 95% 区间下界大于 0；C2 要求 MTA−完整混合的区间下界大于 −0.01。"})}
 
       <section class="evidence-artifact">
         <p class="artifact-kicker">F2 · 六设置确认图</p><h4>同一冻结种子组上的结果必须全部为正</h4>
-        ${pendingTable({headers:["设置","MTA − 随机 · 平均 typo 准确率","配对 95% 区间"],rows:["50 intents","20 intents","severity 0.30","severity 0.60","budget 10%","budget 50%"]})}
+        ${pendingTable({headers:["设置","MTA − 随机 · 平均扰动准确率","配对 95% 区间"],rows:["50 类","20 类","扰动强度 0.30","扰动强度 0.60","预算 10%","预算 50%"]})}
         <p class="field-line">图表源字段：case_id · seed · random_noisy_accuracy · mta_noisy_accuracy · bootstrap_ci</p>
       </section>
 
@@ -98,14 +98,14 @@ const publicArtifactLabels = {
 };
 
 const executionModePanel = goal => `<div class="demo-current-goal execution-mode-panel" data-demo-current-goal="${escapeHtml(goal.id)}">
-  <p class="artifact-kicker">Goal 确认</p>
-  <h5>查看完整计划后，选择如何确认</h5>
+  <p class="artifact-kicker">任务确认</p>
+  <h5>选择执行方式</h5>
   <div class="execution-mode-options">
-    <div class="selected"><b>一次确认全部 Goals</b><span>系统按依赖顺序自动执行；每个 Goal 仍分别保存、核验、更新图表和标记完成。</span></div>
-    <div><b>逐个查看并确认</b><span>每个 Goal 开始前先查看任务、产出和完成标准，再决定是否执行。</span></div>
+    <div class="selected"><b>一次确认全部任务</b><span>系统按依赖顺序执行，并分别保存和核验结果。</span></div>
+    <div><b>逐项确认</b><span>每项任务开始前查看产出和完成标准。</span></div>
   </div>
   <p class="execution-stop-rule">遇到验证失败、预算耗尽或需要新的研究判断时，自动执行会立即停止。</p>
-  <dl><dt>下一个 Goal</dt><dd>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}</dd><dt>预期产出</dt><dd>${(goal.outputs || []).map(escapeHtml).join(" · ")}</dd><dt>完成标准</dt><dd>${escapeHtml(goal.completion_check)}</dd></dl>
+  <dl><dt>下一项任务</dt><dd>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}</dd><dt>预期产出</dt><dd>${(goal.outputs || []).map(escapeHtml).join(" · ")}</dd><dt>完成标准</dt><dd>${escapeHtml(goal.completion_check)}</dd></dl>
 </div>`;
 
 const goalHierarchy = () => {
@@ -119,45 +119,43 @@ const goalHierarchy = () => {
     const part = runPlanDemoState.parts.find(item => item.id === goal.part_id);
     return {part, goal};
   });
-  return `<section class="goal-hierarchy"><p class="artifact-kicker">Goal 执行计划</p><p class="runplan-demo-note">这个本地 CPU 研究被拆为两个可验证 Goal：先固定可复现通路，再运行六设置确认并一次填充全部实证图表。当前 ${completed}/${runPlanDemoState.goals.length} 个 Goal 已完成。</p>${representativeParts.map(({part, goal}) => {
+  return `<section class="goal-hierarchy"><p class="artifact-kicker">实验任务</p><p class="runplan-demo-note">两项任务依次完成运行环境核验和六设置确认。当前 ${completed}/${runPlanDemoState.goals.length} 项已完成。</p>${representativeParts.map(({part, goal}) => {
     const destination = goal.artifact_ids?.length ? goal.artifact_ids.map(id => publicArtifactLabels[id] || id).join("、") : "本任务不直接更新图表";
     const completedExample = goal.id === "G2.1";
-    return `<div class="part-row"><h4><span>${escapeHtml(part.id.replace("P", "阶段 "))}</span>${escapeHtml(publicPartTitles[part.id] || part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p><div class="expanded-goal ${completedExample ? "demo-completed-goal" : ""}"><b>${completedExample ? "✅" : runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}${completedExample ? '<small>完成效果示例</small>' : ""}</strong><span>对应论文内容：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成标准：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? executionModePanel(goal) : ""}${completedExample ? resultProvenanceDemo() : ""}</div></div>`;
+    return `<div class="part-row"><h4><span>${escapeHtml(part.id.replace("P", "阶段 "))}</span>${escapeHtml(publicPartTitles[part.id] || part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p><div class="expanded-goal ${completedExample ? "demo-completed-goal" : ""}"><b>${completedExample ? "✅" : runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}</strong><span>对应论文内容：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成标准：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? executionModePanel(goal) : ""}${completedExample ? resultProvenanceDemo() : ""}</div></div>`;
   }).join("")}</section>`;
 };
 
 const completedF2Rows = [
-  ["50 intents", 0.01675, 0.01317, 0.02079],
-  ["20 intents", 0.01307, 0.00802, 0.01688],
+  ["50 类", 0.01675, 0.01317, 0.02079],
+  ["20 类", 0.01307, 0.00802, 0.01688],
   ["severity .30", 0.00745, 0.00547, 0.00943],
   ["severity .60", 0.01641, 0.01016, 0.02172],
   ["budget 10%", 0.00682, 0.00344, 0.01073],
   ["budget 50%", 0.01740, 0.01359, 0.02120],
 ];
 
-const provenanceNumber = (value, setting, field) => `<span class="provenance-number" tabindex="0">${value.toFixed(4)}<span class="provenance-tooltip" role="tooltip"><b>已核验科学结果</b><span><strong>任务</strong> G2.1</span><span><strong>设置</strong> ${setting} · ${field}</span><span><strong>原始结果</strong> results/typo_margin/confirmatory_results.json</span><span><strong>派生数据</strong> results/typo_margin/paper_values.json</span><span><strong>计算</strong> 8 个冻结种子的配对准确率差与 percentile bootstrap</span><span><strong>运行命令</strong> python3 code/typo_margin/confirm.py</span><span><strong>验证</strong> 40/40 ledger cells REAL / VERIFIED</span></span></span>`;
+const provenanceNumber = (value, setting, field) => `<span class="provenance-number" tabindex="0">${value.toFixed(4)}<span class="provenance-tooltip" role="tooltip"><b>已核验结果</b><span><strong>任务</strong> G2.1</span><span><strong>设置</strong> ${setting} · ${field}</span><span><strong>原始结果</strong> results/typo_margin/confirmatory_results.json</span><span><strong>派生数据</strong> results/typo_margin/paper_values.json</span><span><strong>计算</strong> 8 个确认种子的配对准确率差与百分位自助法区间</span><span><strong>运行命令</strong> python3 code/typo_margin/confirm.py</span><span><strong>验证</strong> 40/40 数据单元已核验</span></span></span>`;
 
 const completedF2Chart = () => {
   const x = value => 55 + value / 0.025 * 410;
-  return `<figure class="completed-chart"><svg viewBox="0 0 520 260" role="img" aria-label="六个确认设置的 MTA 减随机准确率及 95% 区间"><g class="chart-grid"><line x1="55" y1="25" x2="55" y2="225"/><line x1="219" y1="25" x2="219" y2="225"/><line x1="383" y1="25" x2="383" y2="225"/></g>${completedF2Rows.map((row,index) => { const y=42+index*32; return `<text x="7" y="${y+4}" class="setting-label">${row[0]}</text><line x1="${x(row[2])}" y1="${y}" x2="${x(row[3])}" y2="${y}" class="ci-line"/><line x1="${x(row[2])}" y1="${y-5}" x2="${x(row[2])}" y2="${y+5}" class="ci-line"/><line x1="${x(row[3])}" y1="${y-5}" x2="${x(row[3])}" y2="${y+5}" class="ci-line"/><circle cx="${x(row[1])}" cy="${y}" r="4" class="point-style"/>`; }).join("")}<g class="chart-labels"><text x="50" y="247">0</text><text x="207" y="247">0.01</text><text x="371" y="247">0.02</text><text x="438" y="247">MTA − random</text></g></svg><figcaption>圆点为平均差，横线为配对 bootstrap 95% 区间；所有下界均高于零。</figcaption></figure>`;
+  return `<figure class="completed-chart"><svg viewBox="0 0 520 260" role="img" aria-label="六个确认设置的 MTA 减随机准确率及 95% 区间"><g class="chart-grid"><line x1="55" y1="25" x2="55" y2="225"/><line x1="219" y1="25" x2="219" y2="225"/><line x1="383" y1="25" x2="383" y2="225"/></g>${completedF2Rows.map((row,index) => { const y=42+index*32; return `<text x="7" y="${y+4}" class="setting-label">${row[0]}</text><line x1="${x(row[2])}" y1="${y}" x2="${x(row[3])}" y2="${y}" class="ci-line"/><line x1="${x(row[2])}" y1="${y-5}" x2="${x(row[2])}" y2="${y+5}" class="ci-line"/><line x1="${x(row[3])}" y1="${y-5}" x2="${x(row[3])}" y2="${y+5}" class="ci-line"/><circle cx="${x(row[1])}" cy="${y}" r="4" class="point-style"/>`; }).join("")}<g class="chart-labels"><text x="50" y="247">0</text><text x="207" y="247">0.01</text><text x="371" y="247">0.02</text><text x="438" y="247">MTA − 随机</text></g></svg><figcaption>圆点为平均差，横线为配对自助法 95% 区间。</figcaption></figure>`;
 };
 
 const resultProvenanceDemo = () => `
   <section class="evidence-artifact completed-result future-result-example"><p class="artifact-kicker">真实完成结果</p><h4>六个设置中的 MTA − 随机选择</h4>
     <div class="simulated-run-summary"><strong>✅ 确认运行已完成</strong><span>40/40 数据单元已核验</span><span>配对区间可重算</span><span>图形可重新生成</span></div>
     <p>这里展示当前正结果研究的真实确认数据。每个数字都能查看结果路径、计算方法、命令和验证状态。</p>
-    <div class="provenance-flow"><span>冻结种子结果</span><i>→</i><span>配对差值</span><i>→</i><span>bootstrap 区间</span><i>→</i><span>证据台账</span><i>→</i><span>论文图形</span></div>
+    <div class="provenance-flow"><span>确认种子结果</span><i>→</i><span>配对差值</span><i>→</i><span>自助法区间</span><i>→</i><span>证据台账</span><i>→</i><span>论文图形</span></div>
     <div class="completed-result-grid"><div class="table-scroll"><table class="result-shell source-table completed-source"><thead><tr><th>设置</th><th>平均差</th><th>95% 下界</th><th>95% 上界</th></tr></thead><tbody>${completedF2Rows.map(([setting,estimate,low,high]) => `<tr><th>${setting}</th><td>${provenanceNumber(estimate,setting,"estimate")}</td><td>${provenanceNumber(low,setting,"CI low")}</td><td>${provenanceNumber(high,setting,"CI high")}</td></tr>`).join("")}</tbody></table><p class="hover-instruction">鼠标停在任一数字上，或用键盘聚焦，即可查看来源、计算和验证过程。</p></div>${completedF2Chart()}</div>
   </section>`;
 
 const paperStudioScreenshots = () => `<section class="paper-studio-live">
   <p class="artifact-kicker">论文写作工作区</p>
-  <h4>这就是完成论文后的真实 Paper Studio</h4>
-  <p>下面加载固定应用本身，而不是截图或重新绘制的假界面。可以切换正文、图和表，浏览每个已写段落、生成历史、可编辑图表与最终 PDF；Demo 使用完成态项目的只读副本，不会产生 API 费用。</p>
+  <h4>Paper Studio</h4>
   <a class="paper-studio-open-callout" href="/demo-studio/" target="_blank" rel="noopener">
     <span>建议在新页面打开</span>
-    <strong>打开完整 Paper Studio →</strong>
-    <small>使用更大的窗口查看论文正文、图表和 PDF，体验会更清楚。</small>
+    <strong>打开 Paper Studio →</strong>
   </a>
   <div class="paper-studio-frame-shell">
     <div class="paper-studio-frame-bar"><span>完成态 Demo · 只读</span></div>
@@ -233,13 +231,13 @@ const stages = [
       ${experimentPlanDemo()}`
   },
   {
-    id: "runplan", short: "实验执行", path: "run-plan", title: "把完整实验拆成一个个可验证的 Goal",
-    compare: ["强调连续自主探索与整体吞吐", "执行过程通常缺少清晰的证据边界", "先展示完整 Goals；可一次确认后自动执行，也可逐个查看并确认"],
+    id: "runplan", short: "实验执行", path: "run-plan", title: "按证据依赖执行实验",
+    compare: ["强调连续自主探索与整体吞吐", "执行过程通常缺少清晰的证据边界", "先展示全部任务，再一次确认或逐项确认"],
     render: () => {
       const currentId = runPlanDemoState?.active_goal || runPlanDemoState?.proposed_goal_id || "NONE";
       const allGoalsConfirmed = runPlanDemoState?.goal_confirmation?.scope === "all_goals";
       return `
-      <div class="stage-head"><div><p class="eyebrow">第五步 · 实验执行</p><h3>把完整实验拆成一个个 Goal</h3><p>先查看全部 Goal 的任务、依赖、完成标准和对应图表；随后可以一次确认全部 Goals 自动执行，也可以逐个查看并确认。</p></div><span class="status-pill">${allGoalsConfirmed ? "全部 Goals 已确认" : `${escapeHtml(currentId)} 等待确认`}</span></div>
+      <div class="stage-head"><div><p class="eyebrow">第五步 · 实验执行</p><h3>按证据依赖执行实验</h3><p>每项任务都明确依赖、产出、完成标准和对应图表，可一次确认或逐项确认。</p></div><span class="status-pill">${allGoalsConfirmed ? "全部任务已确认" : `${escapeHtml(currentId)} 等待确认`}</span></div>
       ${reportDocument("runplan")}
       ${goalHierarchy()}`;
     }
@@ -248,10 +246,9 @@ const stages = [
     id: "paper", short: "论文写作", path: "paper-writing", title: "逐段写作、实时编译、图表可编辑",
     compare: ["倾向批量生成 Markdown 或 LaTeX 草稿", "适合快速获得整体版本", "正文调用 LLM API（不是 Code Agent）逐段生成；确认接受后才写入 LaTeX 并实时编译"],
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">第六步 · 论文写作</p><h3>在统一工作区中完成正文、图片和表格</h3><p>逐段完善正文，制作可编辑图表，并在每次确认后查看重新编译的论文 PDF。</p></div><span class="status-pill">写作工作区</span></div>
-      ${commandStrip("结果完成后启动论文写作", "$paperwrite", "系统准备论文项目并打开写作工作区；LLM API 生成正文候选，本地工具负责可复现图表与排版。")}
-      ${paperStudioScreenshots()}
-      <section class="plain-section"><p class="artifact-kicker">写作与确认</p><h4>每项内容都经过确认后进入论文</h4><ul><li>正文：LLM API 生成可编辑候选，研究者确认后写入 LaTeX。</li><li>图片：实验数据生成结果图；机制图同时保留构图参考和可编辑文件。</li><li>表格：只使用经过核验的实验数字，确认后更新右侧 PDF。</li></ul></section>`
+      <div class="stage-head"><div><p class="eyebrow">第六步 · 论文写作</p><h3>撰写正文并制作图表</h3><p>正文、图表、LaTeX 与论文 PDF 在同一工作区同步更新。</p></div><span class="status-pill">写作工作区</span></div>
+      ${commandStrip("启动论文写作", "$paperwrite", "准备论文项目并打开 Paper Studio。")}
+      ${paperStudioScreenshots()}`
   }
 ];
 
