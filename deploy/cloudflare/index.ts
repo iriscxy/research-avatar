@@ -46,6 +46,11 @@ export class OnlineStudioContainerV2 extends OnlineStudioContainer {}
 // otherwise keep serving the previous image until their idle timeout.
 export class OnlineStudioContainerV3 extends OnlineStudioContainer {}
 
+// Container applications can retain an earlier image even after an in-place
+// image edit. A new class creates a clean application and instance pool for
+// this release; the Worker-version-scoped instance name handles later deploys.
+export class OnlineStudioContainerV4 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
