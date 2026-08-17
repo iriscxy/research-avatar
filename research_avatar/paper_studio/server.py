@@ -399,6 +399,44 @@ TABLE_ORDER = [str(item) for item in PROJECT_CONFIG["table_order"]]
 METRICS_FILE = _project_path(ROOT, PROJECT_CONFIG["paths"]["metrics"], "paths.metrics")
 
 
+def reload_figure_and_table_definitions_if_paper_studio_json_changed(
+    changed_files: list[str],
+) -> None:
+    """Pick up figure/table add/remove edits the local Agent made to disk.
+
+    FIGURES/FIGURE_ORDER/TABLES/TABLE_ORDER are loaded once at process
+    startup from paper/paper_studio.json and never re-read afterward. The
+    local Agent is explicitly documented to edit that file directly (e.g. a
+    researcher asking it to delete a figure/table), so without this a
+    correctly-completed deletion is invisible to the running server: it
+    keeps rendering, compiling, and reporting the old definition in
+    /api/state until the process is restarted, which looks from the
+    researcher's side exactly like "nothing happened, the PDF still has the
+    figure" even though the Agent's edit and recompile were both correct.
+    Only figure/table *definitions* are reloaded in place (not project.id,
+    sections, or other structural fields, which have their own explicit
+    invalidation path elsewhere); mutate the existing dict/list objects
+    rather than rebinding the module names so every already-imported
+    reference sees the update. load_state()'s own figures/tables
+    reconciliation against FIGURE_ORDER/TABLE_ORDER then cleans up any
+    now-removed artifact's runtime state on the very next load.
+    """
+    if EMPTY_PROJECT_MODE:
+        return
+    if "paper/paper_studio.json" not in changed_files:
+        return
+    try:
+        fresh = load_project_config()
+    except ProjectConfigError:
+        return
+    FIGURES.clear()
+    FIGURES.update(fresh["figures"])
+    FIGURE_ORDER[:] = [str(item) for item in fresh["figure_order"]]
+    TABLES.clear()
+    TABLES.update(fresh["tables"])
+    TABLE_ORDER[:] = [str(item) for item in fresh["table_order"]]
+
+
 def batch_writing_order() -> list[str]:
     """Return project-owned whole-draft order without inferring paper structure."""
     configured = PROJECT_CONFIG.get("batch_writing_order")
@@ -6765,6 +6803,7 @@ def agent_chat_worker(
         answer = str(result["answer"])
         execution = str(result["execution"])
         changed_files = list(result["changed_files"])
+        reload_figure_and_table_definitions_if_paper_studio_json_changed(changed_files)
         active_thread_id = result.get("thread_id")
         active_provider = str(result.get("provider") or project_agent_provider())
         status = "completed"
@@ -6800,6 +6839,7 @@ def agent_chat_worker(
                 for path in set(baseline) | set(current_snapshot)
                 if baseline.get(path) != current_snapshot.get(path)
             )
+            reload_figure_and_table_definitions_if_paper_studio_json_changed(changed_files)
             if changed_files:
                 execution = "interrupted_changes"
                 answer = (

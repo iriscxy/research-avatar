@@ -4362,6 +4362,53 @@ args = parser.parse_args()
         self.assertIn(r"\begin{table*}[t]", source)
         self.assertNotIn(r"\begin{tabular}", source)
 
+    def test_local_agent_figure_deletion_is_visible_without_a_server_restart(self):
+        # Reported directly: asking the local Agent chat to delete a figure
+        # produced no visible change -- the PDF still showed the figure. The
+        # Agent's file edit and recompile were actually correct (verified by
+        # inspecting paper/paper_studio.json and paper/main.pdf directly on a
+        # real repro), but FIGURES/FIGURE_ORDER/TABLES/TABLE_ORDER are only
+        # ever loaded once at process startup, so the already-running server
+        # kept reporting the old definition via /api/state until restarted --
+        # indistinguishable, from the researcher's side, from the Agent
+        # having done nothing at all.
+        original_figures = dict(studio.FIGURES)
+        original_figure_order = list(studio.FIGURE_ORDER)
+        original_tables = dict(studio.TABLES)
+        original_table_order = list(studio.TABLE_ORDER)
+        try:
+            self.assertIn("F1", studio.FIGURES)
+            reduced_config = {
+                "figures": {}, "figure_order": [],
+                "tables": {}, "table_order": [],
+            }
+            with patch.object(studio, "load_project_config", return_value=reduced_config):
+                # A turn that never touched paper_studio.json must not reload.
+                studio.reload_figure_and_table_definitions_if_paper_studio_json_changed(
+                    ["paper/sections/introduction.tex"]
+                )
+                self.assertIn("F1", studio.FIGURES)
+
+                studio.reload_figure_and_table_definitions_if_paper_studio_json_changed(
+                    ["paper/paper_studio.json"]
+                )
+            self.assertNotIn("F1", studio.FIGURES)
+            self.assertEqual(studio.FIGURE_ORDER, [])
+            self.assertEqual(studio.TABLES, {})
+            self.assertEqual(studio.TABLE_ORDER, [])
+            # Mutated in place, not rebound, so every already-imported
+            # reference (including the direct `FIGURES` import used
+            # throughout this test file) sees the same update.
+            self.assertIs(studio.FIGURES, FIGURES)
+            self.assertNotIn("F1", FIGURES)
+        finally:
+            studio.FIGURES.clear()
+            studio.FIGURES.update(original_figures)
+            studio.FIGURE_ORDER[:] = original_figure_order
+            studio.TABLES.clear()
+            studio.TABLES.update(original_tables)
+            studio.TABLE_ORDER[:] = original_table_order
+
     def test_public_figure_state_exposes_separate_generation_and_insertion_gates(self):
         figure = figure_public_state(_default_state())[0]
         self.assertFalse(figure["generation_ready"])
