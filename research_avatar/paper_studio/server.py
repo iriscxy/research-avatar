@@ -1310,6 +1310,11 @@ def load_state() -> dict[str, Any]:
                 "progress_message": progress_message,
                 "changed_files": changed_files,
             }
+            # A restarted server cannot safely resume a CLI thread whose prior
+            # writer may still be draining. Recent chat history already carries
+            # the semantic context, so the next retry starts a clean thread.
+            state["agent_chat_thread_id"] = None
+            state["agent_chat_provider"] = None
             job = state["agent_chat_job"]
         if (
             isinstance(job, dict)
@@ -5837,6 +5842,8 @@ def recover_interrupted_agent_chat_job() -> None:
         job.get("status") == "running"
         and job.get("server_instance") != SERVER_INSTANCE_TOKEN
     )
+    if interrupted:
+        terminate_stale_agent_process_group(job)
     missing_failure_reply = (
         job.get("status") == "failed"
         and not job.get("reply_recorded")
@@ -6230,6 +6237,14 @@ def parse_local_agent_answer(raw: str) -> tuple[str, str]:
     return intent, answer or raw.strip()
 
 
+def agent_thread_store_conflict(diagnostic: str) -> bool:
+    """Recognize a stale resumable thread without depending on one CLI version."""
+    lowered = diagnostic.casefold()
+    return "thread-store conflict" in lowered or (
+        "thread/resume" in lowered and "active writer" in lowered
+    )
+
+
 def agent_api_key_failure(error: Exception | str) -> bool:
     """Recognize Codex authentication failures without exposing diagnostics."""
     diagnostic = str(error).lower()
@@ -6307,6 +6322,8 @@ def run_local_agent_process(
             cancelled = job_token in CANCELLED_AGENT_CHAT_JOBS
             if not cancelled:
                 RUNNING_AGENT_CHAT_PROCESSES[job_token] = process
+        if not cancelled:
+            persist_agent_process_group(job_token, process.pid)
     if cancelled:
         _terminate_process_group(process)
     try:
@@ -6322,6 +6339,61 @@ def run_local_agent_process(
                     RUNNING_AGENT_CHAT_PROCESSES.pop(job_token, None)
                 CANCELLED_AGENT_CHAT_JOBS.discard(job_token)
     return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+def persist_agent_process_group(job_token: str, process_group_id: int) -> None:
+    """Make an Agent child discoverable if its owning server is killed abruptly."""
+    if not STATE_FILE.exists():
+        return
+    with STATE_LOCK:
+        state = load_state()
+        job = state.get("agent_chat_job") or {}
+        if job.get("token") != job_token or job.get("status") != "running":
+            return
+        job["process_group_id"] = int(process_group_id)
+        save_state(state)
+
+
+def terminate_stale_agent_process_group(job: dict[str, Any]) -> bool:
+    """Terminate only a recent recorded Codex/Claude process group after restart."""
+    try:
+        process_group_id = int(job.get("process_group_id") or 0)
+        started_at = int(job.get("started_at") or 0)
+    except (TypeError, ValueError):
+        return False
+    if process_group_id <= 1 or not started_at or time.time() - started_at > 3600:
+        return False
+    ps = shutil_which("ps")
+    if not ps:
+        return False
+    try:
+        inspected = subprocess.run(
+            [ps, "-p", str(process_group_id), "-o", "command="],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    command = inspected.stdout.casefold()
+    if inspected.returncode or not any(name in command for name in ("codex", "claude")):
+        return False
+    try:
+        os.killpg(process_group_id, signal.SIGTERM)
+    except ProcessLookupError:
+        return True
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline:
+        try:
+            os.killpg(process_group_id, 0)
+        except ProcessLookupError:
+            return True
+        time.sleep(0.05)
+    try:
+        os.killpg(process_group_id, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    return True
 
 
 def terminate_running_agent_chat_processes() -> None:
@@ -6425,37 +6497,37 @@ def ask_studio_local_agent(
             ),
             encoding="utf-8",
         )
-        if agent_provider == "claude":
-            command = [
-                agent_cli,
-                "-p",
-                "--output-format",
-                "json",
-                "--permission-mode",
-                "bypassPermissions",
-                "--dangerously-skip-permissions",
-            ]
-            if thread_id:
-                command.extend(["--resume", thread_id])
-        else:
-            command = [agent_cli, "exec"]
-            if thread_id:
-                command.append("resume")
-            command.extend(local_agent_auth_args())
-            command.extend(["--skip-git-repo-check", "--json"])
-        if agent_provider == "codex" and ONLINE_PROJECT_MODE:
-            command.extend(
-                [
-                    "--config",
-                    'sandbox_mode="workspace-write"',
-                    "--config",
-                    "sandbox_workspace_write.network_access=true",
+        def agent_command(resume_id: str | None) -> list[str]:
+            if agent_provider == "claude":
+                built = [
+                    agent_cli,
+                    "-p",
+                    "--output-format",
+                    "json",
+                    "--permission-mode",
+                    "bypassPermissions",
+                    "--dangerously-skip-permissions",
                 ]
-            )
-        elif agent_provider == "codex":
-            command.append("--dangerously-bypass-approvals-and-sandbox")
-        if agent_provider == "codex":
-            command.extend(
+                if resume_id:
+                    built.extend(["--resume", resume_id])
+                return built
+            built = [agent_cli, "exec"]
+            if resume_id:
+                built.append("resume")
+            built.extend(local_agent_auth_args())
+            built.extend(["--skip-git-repo-check", "--json"])
+            if ONLINE_PROJECT_MODE:
+                built.extend(
+                    [
+                        "--config",
+                        'sandbox_mode="workspace-write"',
+                        "--config",
+                        "sandbox_workspace_write.network_access=true",
+                    ]
+                )
+            else:
+                built.append("--dangerously-bypass-approvals-and-sandbox")
+            built.extend(
                 [
                     "--output-schema",
                     str(schema),
@@ -6463,11 +6535,15 @@ def ask_studio_local_agent(
                     str(output),
                 ]
             )
-            if not thread_id:
-                command.extend(["--color", "never", "--cd", str(ROOT)])
-            if thread_id:
-                command.append(thread_id)
-            command.append("-")
+            if not resume_id:
+                built.extend(["--color", "never", "--cd", str(ROOT)])
+            else:
+                built.append(resume_id)
+            built.append("-")
+            return built
+
+        active_resume_id = thread_id
+        command = agent_command(active_resume_id)
         try:
             process = run_local_agent_process(
                 command,
@@ -6478,8 +6554,30 @@ def ask_studio_local_agent(
             )
         except subprocess.TimeoutExpired as exc:
             raise StudioError("项目 Agent 对话超时。") from exc
-        if process.returncode:
+        diagnostic = (process.stdout + "\n" + process.stderr).strip()
+        if (
+            process.returncode
+            and active_resume_id
+            and agent_thread_store_conflict(diagnostic)
+        ):
+            # The prompt already contains recent history. Starting a new thread
+            # therefore preserves task context without contending for the stale
+            # thread-store writer left by an interrupted server.
+            active_resume_id = None
+            output.unlink(missing_ok=True)
+            command = agent_command(None)
+            try:
+                process = run_local_agent_process(
+                    command,
+                    input=prompt,
+                    timeout=600,
+                    env=environment,
+                    job_token=job_token,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise StudioError("项目 Agent 新会话重试超时。") from exc
             diagnostic = (process.stdout + "\n" + process.stderr).strip()
+        if process.returncode:
             raise StudioError(
                 f"{agent_label} 对话失败。\n"
                 + (diagnostic[-2400:] or f"{agent_provider} returned a non-zero status.")
@@ -6490,7 +6588,7 @@ def ask_studio_local_agent(
             if not output.exists():
                 raise StudioError("项目 Agent 没有返回回复。")
             raw_answer = output.read_text(encoding="utf-8", errors="replace").strip()
-            active_thread_id = thread_id or codex_thread_id(process.stdout)
+            active_thread_id = active_resume_id or codex_thread_id(process.stdout)
         declared_intent, answer = parse_local_agent_answer(raw_answer)
     if not answer:
         raise StudioError("项目 Agent 返回了空回复。")
@@ -6575,7 +6673,7 @@ def agent_chat_worker(
         )
         execution = "action_required" if invalid_key else "failed"
         changed_files = []
-        active_thread_id = thread_id
+        active_thread_id = None
         active_provider = project_agent_provider()
         status = "failed"
         progress_message = (
@@ -6625,6 +6723,9 @@ def agent_chat_worker(
         if active_thread_id:
             state["agent_chat_thread_id"] = active_thread_id
             state["agent_chat_provider"] = active_provider
+        elif status == "failed":
+            state["agent_chat_thread_id"] = None
+            state["agent_chat_provider"] = None
         state["agent_chat_job"] = {
             **job,
             "status": status,
@@ -6633,6 +6734,7 @@ def agent_chat_worker(
             "reply_recorded": True,
         }
         state["agent_chat_job"].pop("source_snapshot", None)
+        state["agent_chat_job"].pop("process_group_id", None)
         save_state(state)
 
 
@@ -7288,6 +7390,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
     result.pop("agent_chat_provider", None)
     if isinstance(result.get("agent_chat_job"), dict):
         result["agent_chat_job"].pop("source_snapshot", None)
+        result["agent_chat_job"].pop("process_group_id", None)
     result["project"] = {
         "id": PROJECT_ID,
         "name": str(PROJECT_METADATA.get("name", "")),
@@ -8459,6 +8562,7 @@ class Handler(BaseHTTPRequestHandler):
                 "reply_recorded": True,
             }
             state["agent_chat_job"].pop("source_snapshot", None)
+            state["agent_chat_job"].pop("process_group_id", None)
             save_state(state)
         with AGENT_CHAT_PROCESS_LOCK:
             CANCELLED_AGENT_CHAT_JOBS.add(token)

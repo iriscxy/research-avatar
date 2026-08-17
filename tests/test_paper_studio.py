@@ -2,7 +2,9 @@ import json
 import io
 import os
 import re
+import signal
 import subprocess
+import time
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
@@ -3327,6 +3329,51 @@ args = parser.parse_args()
         self.assertEqual(commands[1][1:3], ["exec", "resume"])
         self.assertIn(thread_id, commands[1])
 
+    def test_codex_active_writer_conflict_retries_same_turn_on_fresh_thread(self):
+        commands = []
+        stale_thread = "01a00ee4-3cf1-7670-b4f1-3cbbd1b2af11"
+        fresh_thread = "01a00ee4-3cf1-7670-b4f1-3cbbd1b2af22"
+
+        def fake_run(command, **kwargs):
+            commands.append(command)
+            if len(commands) == 1:
+                return CompletedProcess(
+                    command,
+                    1,
+                    "",
+                    "thread/resume failed: thread-store conflict: thread already has an active writer",
+                )
+            output = Path(command[command.index("--output-last-message") + 1])
+            output.write_text(
+                '{"intent":"execute","answer":"已在新会话继续完成。"}',
+                encoding="utf-8",
+            )
+            return CompletedProcess(
+                command,
+                0,
+                json.dumps({"type": "thread.started", "thread_id": fresh_thread}),
+                "",
+            )
+
+        with (
+            patch.object(studio, "shutil_which", return_value="/usr/bin/codex"),
+            patch.object(studio, "run_local_agent_process", side_effect=fake_run),
+        ):
+            result = studio.ask_studio_local_agent(
+                "intro增加一段",
+                [{"role": "user", "content": "intro增加一段"}],
+                return_details=True,
+                thread_id=stale_thread,
+            )
+
+        self.assertEqual(result["execution"], "no_changes")
+        self.assertEqual(result["thread_id"], fresh_thread)
+        self.assertEqual(len(commands), 2)
+        self.assertEqual(commands[0][1:3], ["exec", "resume"])
+        self.assertIn(stale_thread, commands[0])
+        self.assertNotIn("resume", commands[1])
+        self.assertNotIn(stale_thread, commands[1])
+
     def test_api_key_change_request_uses_secret_safe_action(self):
         state = _default_state()
         response = {}
@@ -3628,6 +3675,8 @@ args = parser.parse_args()
                 "server_instance": "old-server",
                 "message": "intro不需要每一段都引用图1  一个段落引用就行了",
             }
+            state["agent_chat_thread_id"] = "stale-thread"
+            state["agent_chat_provider"] = "codex"
             state_file.write_text(json.dumps(state), encoding="utf-8")
             with (
                 patch.object(studio, "STATE_FILE", state_file),
@@ -3646,6 +3695,38 @@ args = parser.parse_args()
             first["agent_chat_history"][-1]["action"], "retry_agent_job"
         )
         self.assertEqual(len(second["agent_chat_history"]), 2)
+        self.assertIsNone(first["agent_chat_thread_id"])
+        self.assertIsNone(first["agent_chat_provider"])
+
+    def test_stale_recorded_codex_process_group_is_terminated_safely(self):
+        job = {"process_group_id": 43210, "started_at": int(time.time())}
+        inspected = CompletedProcess(
+            ["ps"], 0, "node /usr/local/bin/codex exec resume stale-thread\n", ""
+        )
+        with (
+            patch.object(studio, "shutil_which", return_value="/bin/ps"),
+            patch.object(studio.subprocess, "run", return_value=inspected),
+            patch.object(
+                studio.os,
+                "killpg",
+                side_effect=[None, ProcessLookupError()],
+            ) as killpg,
+        ):
+            terminated = studio.terminate_stale_agent_process_group(job)
+        self.assertTrue(terminated)
+        self.assertEqual(killpg.call_args_list[0].args, (43210, signal.SIGTERM))
+
+    def test_stale_process_cleanup_rejects_unrelated_reused_pid(self):
+        job = {"process_group_id": 43210, "started_at": int(time.time())}
+        inspected = CompletedProcess(["ps"], 0, "python unrelated_server.py\n", "")
+        with (
+            patch.object(studio, "shutil_which", return_value="/bin/ps"),
+            patch.object(studio.subprocess, "run", return_value=inspected),
+            patch.object(studio.os, "killpg") as killpg,
+        ):
+            terminated = studio.terminate_stale_agent_process_group(job)
+        self.assertFalse(terminated)
+        killpg.assert_not_called()
 
     def test_interrupted_agent_chat_reports_files_changed_before_restart(self):
         with TemporaryDirectory() as temporary:
@@ -3685,9 +3766,11 @@ args = parser.parse_args()
             "token": "job-1",
             "status": "running",
             "source_snapshot": {"paper/private.md": "digest"},
+            "process_group_id": 12345,
         }
         visible = studio.public_state(state)
         self.assertNotIn("source_snapshot", visible["agent_chat_job"])
+        self.assertNotIn("process_group_id", visible["agent_chat_job"])
 
     def test_server_shutdown_terminates_every_running_agent_process_group(self):
         first = MagicMock()

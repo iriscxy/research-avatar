@@ -67,6 +67,10 @@ export class OnlineStudioContainerV7 extends OnlineStudioContainer {}
 // of retaining an already-running V7 container with the previous UI bundle.
 export class OnlineStudioContainerV8 extends OnlineStudioContainer {}
 
+// Thread-recovery release: pull the image that abandons stale CLI writers and
+// automatically retries resume conflicts in a fresh Agent thread.
+export class OnlineStudioContainerV9 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
