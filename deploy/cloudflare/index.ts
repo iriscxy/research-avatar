@@ -95,6 +95,9 @@ export class OnlineStudioContainerV13 extends OnlineStudioContainer {}
 // Figure-reload release: rotate proactively per the established pattern.
 export class OnlineStudioContainerV14 extends OnlineStudioContainer {}
 
+// Chat-removed release: rotate proactively per the established pattern.
+export class OnlineStudioContainerV15 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
