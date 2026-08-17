@@ -63,6 +63,10 @@ export class OnlineStudioContainerV6 extends OnlineStudioContainer {}
 // safe runtime-key action instead of exposing raw Codex diagnostics.
 export class OnlineStudioContainerV7 extends OnlineStudioContainer {}
 
+// Direct-Agent release: force the application to pull the new image instead
+// of retaining an already-running V7 container with the previous UI bundle.
+export class OnlineStudioContainerV8 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
