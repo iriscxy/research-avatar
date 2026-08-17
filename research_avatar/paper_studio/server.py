@@ -23,6 +23,7 @@ import sys
 import tempfile
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 import uuid
@@ -3268,7 +3269,36 @@ def normalize_latex_ready_text(source: str) -> str:
     )
 
 
-LATEX_PROSE_UNICODE_MATH = frozenset("∈∉≤≥≠≈⋆⋅×÷±μΣδκΦλ−→←⇒∞")
+# Explicit Greek/letterlike math variable ranges: Unicode's general category
+# alone cannot flag these, since it classifies them as ordinary letters
+# (Ll/Lu) -- the same category as plain ASCII a-z, which prose legitimately
+# contains everywhere. Every other math glyph pdflatex can't render directly
+# (operators, relations, arrows, set notation, ...) is category "Sm" ("Symbol,
+# math"), which we check directly below instead of maintaining a manually
+# curated, perpetually-incomplete character list -- the previous fixed set
+# (∈∉≤≥≠≈⋆⋅×÷±μΣδκΦλ−→←⇒∞) missed ⊆ and every other subset/set-operation
+# glyph, which is exactly what broke a real batch-writing run.
+LATEX_PROSE_UNICODE_MATH_RANGES = (
+    (0x0370, 0x03FF),  # Greek and Coptic (math variables: α β γ θ φ ψ ω ...)
+    (0x2100, 0x214F),  # Letterlike Symbols (blackboard bold: ℝ ℤ ℕ ℚ ℂ ...)
+    (0x2190, 0x21FF),  # Arrows
+    (0x27C0, 0x27EF),  # Miscellaneous Mathematical Symbols-A
+    (0x2980, 0x29FF),  # Miscellaneous Mathematical Symbols-B
+    (0x2A00, 0x2AFF),  # Supplemental Mathematical Operators
+)
+
+
+def _is_latex_unsafe_unicode_math(character: str) -> bool:
+    codepoint = ord(character)
+    if codepoint < 128:
+        # Plain ASCII +, <, =, >, |, ~ are also Unicode category "Sm" but are
+        # ordinary, pdflatex-safe characters (e.g. the common "Figure~\ref{}"
+        # non-breaking-space convention) -- only non-ASCII math glyphs are a
+        # rendering hazard.
+        return False
+    if unicodedata.category(character) == "Sm":
+        return True
+    return any(low <= codepoint <= high for low, high in LATEX_PROSE_UNICODE_MATH_RANGES)
 
 
 def latex_prose_issues(source: str) -> list[str]:
@@ -3291,7 +3321,9 @@ def latex_prose_issues(source: str) -> list[str]:
         masked = re.sub(pattern, "", masked)
 
     issues: list[str] = []
-    unicode_math = sorted(set(masked) & LATEX_PROSE_UNICODE_MATH)
+    unicode_math = sorted(
+        {character for character in set(masked) if _is_latex_unsafe_unicode_math(character)}
+    )
     if unicode_math:
         issues.append("Unicode math glyphs: " + " ".join(unicode_math))
     specials = {

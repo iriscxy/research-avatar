@@ -539,6 +539,29 @@ class PaperStudioTests(unittest.TestCase):
             [],
         )
 
+    def test_latex_prose_preflight_flags_set_notation_glyphs_not_in_old_fixed_list(self):
+        # Regression: a live batch-writing run crashed pdflatex mid-job with
+        # "! LaTeX Error: Unicode character ⊆ (U+2286) not set up for use
+        # with LaTeX" from GPT-written prose ("a subset C_rand ⊆ C(x)") that
+        # the preflight should have caught and rejected before it ever
+        # reached pdflatex. The old check was a manually curated fixed set
+        # (∈∉≤≥≠≈⋆⋅×÷±μΣδκΦλ−→←⇒∞) that simply never included ⊆ or any other
+        # set-operation glyph (⊂ ⊇ ⊃ ∪ ∩ ∅ ...).
+        issues = latex_prose_issues("a subset C_rand ⊆ C(x) of size k")
+        self.assertTrue(any("⊆" in item for item in issues))
+        for glyph in "⊂⊇⊃∪∩∅∀∃∘⊗⊕":
+            self.assertTrue(
+                any(glyph in item for item in latex_prose_issues(f"x {glyph} y")),
+                f"{glyph!r} should be flagged as an unsafe Unicode math glyph",
+            )
+
+    def test_latex_prose_preflight_does_not_flag_ascii_symbol_math_category_chars(self):
+        # Unicode classifies plain ASCII + < = > | ~ as category "Sm" (the
+        # same category as ⊆, ∈, etc.), but these are ordinary pdflatex-safe
+        # characters -- notably ~ in the common "Figure~\ref{}" convention.
+        # Only non-ASCII glyphs are an actual rendering hazard.
+        self.assertEqual(latex_prose_issues("a + b < c = d > e | f ~ g"), [])
+
     def test_latex_normalization_canonicalizes_decorated_citation_placeholder(self):
         self.assertEqual(
             normalize_latex_ready_text(
