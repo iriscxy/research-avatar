@@ -550,6 +550,8 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
+        self.assertIn('"class_name": "OnlineStudioContainerV2"', wrangler)
+        self.assertIn("export class OnlineStudioContainerV2", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
 
     def test_upload_page_names_the_default_package_output(self):

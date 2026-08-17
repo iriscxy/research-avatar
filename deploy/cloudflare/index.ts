@@ -37,6 +37,10 @@ export class OnlineStudioContainer extends Container {
   };
 }
 
+// A new container class gives image rollouts a fresh application pool. Keeping
+// the previous export preserves Wrangler's Durable Object migration history.
+export class OnlineStudioContainerV2 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
