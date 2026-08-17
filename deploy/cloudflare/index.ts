@@ -41,6 +41,11 @@ export class OnlineStudioContainer extends Container {
 // the previous export preserves Wrangler's Durable Object migration history.
 export class OnlineStudioContainerV2 extends OnlineStudioContainer {}
 
+// A fresh Durable Object class forces Cloudflare to start new container
+// instances when the application image changes; existing class instances may
+// otherwise keep serving the previous image until their idle timeout.
+export class OnlineStudioContainerV3 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
