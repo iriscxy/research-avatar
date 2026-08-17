@@ -673,9 +673,13 @@ function renderPdf() {
   const navigationRoot = $("pdf-navigation");
   const empty = $("pdf-empty");
   const toggle = $("pdf-navigation-toggle");
+  const download = $("pdf-download");
   toggle.textContent = pdfNavigationVisible ? "隐藏导航栏" : "显示导航栏";
   toggle.setAttribute("aria-pressed", pdfNavigationVisible ? "true" : "false");
   if (state.pdf.exists) {
+    download.hidden = false;
+    download.href = studioPath(state.pdf.url || "/paper.pdf");
+    download.download = `${String(state.project && state.project.id || "paper").replace(/[^A-Za-z0-9._-]+/g, "-")}.pdf`;
     viewer.style.display = "flex";
     viewer.classList.toggle("navigation-visible", pdfNavigationVisible);
     empty.style.display = "none";
@@ -723,6 +727,7 @@ function renderPdf() {
     pages.onscroll = updatePdfPageIndicator;
     requestAnimationFrame(updatePdfPageIndicator);
   } else {
+    download.hidden = true;
     viewer.style.display = "none";
     empty.style.display = "flex";
     updatePdfPageIndicator();

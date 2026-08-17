@@ -1350,7 +1350,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260816.5"', html)
+        self.assertIn('src="static/app.js?v=20260817.1"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1487,7 +1487,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260816.5"', html)
+        self.assertIn('src="static/app.js?v=20260817.1"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1497,7 +1497,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('roundLabel.textContent = `第 ${round} 轮`', source)
         self.assertIn('message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`', source)
         self.assertIn("agent-chat-round", source)
-        self.assertIn('href="static/style.css?v=20260816.1"', html)
+        self.assertIn('href="static/style.css?v=20260817.1"', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)
@@ -1528,6 +1528,9 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('const previousPosition = capturePdfPosition(pages)', source)
         self.assertIn('restorePdfPosition(pages, previousPosition)', source)
         self.assertIn('id="pdf-navigation-toggle"', html)
+        self.assertIn('id="pdf-download"', html)
+        self.assertIn('download.hidden = false', source)
+        self.assertIn('download.href = studioPath(state.pdf.url || "/paper.pdf")', source)
         self.assertIn('paper-studio.pdf-navigation-visible', source)
         self.assertIn('pdfNavigationVisible ? "隐藏导航栏" : "显示导航栏"', source)
         self.assertIn('function uniqueArtifacts(artifacts = [])', source)
@@ -3144,6 +3147,38 @@ args = parser.parse_args()
         self.assertIn("workspace-write", observed["command"])
         self.assertIn("--output-schema", observed["command"])
         self.assertNotIn("OPENAI_API_KEY", observed["env"])
+
+    def test_online_global_agent_uses_single_invocation_codex_key(self):
+        observed = {}
+
+        def fake_run(command, **kwargs):
+            observed["command"] = command
+            observed["env"] = kwargs["env"]
+            output = Path(command[command.index("--output-last-message") + 1])
+            output.write_text(
+                '{"intent":"read_only","answer":"线上 Agent 已响应。"}',
+                encoding="utf-8",
+            )
+            return CompletedProcess(command, 0, "", "")
+
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(studio, "shutil_which", return_value="/usr/local/bin/codex"),
+            patch.object(studio, "run_local_agent_process", side_effect=fake_run),
+            patch.dict(studio.os.environ, {"OPENAI_API_KEY": "sk-online-session"}),
+        ):
+            result = studio.ask_studio_local_agent(
+                "这张图表达了什么？", return_details=True
+            )
+
+        self.assertEqual(result["answer"], "线上 Agent 已响应。")
+        self.assertNotIn("OPENAI_API_KEY", observed["env"])
+        self.assertEqual(observed["env"]["CODEX_API_KEY"], "sk-online-session")
+        self.assertIn("--ignore-user-config", observed["command"])
+        self.assertIn(
+            "shell_environment_policy.ignore_default_excludes=false",
+            observed["command"],
+        )
 
     def test_global_agent_chat_executes_explicit_safe_changes(self):
         observed = {}

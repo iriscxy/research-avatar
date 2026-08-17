@@ -1301,6 +1301,13 @@ def _start_worker(
     *,
     demo_mode: bool = False,
 ) -> tuple[subprocess.Popen[bytes], int]:
+    skill_source = (
+        Path(__file__).resolve().parents[2] / ".agents/skills/paperstudio"
+    )
+    if not (skill_source / "SKILL.md").is_file():
+        raise OnlineStudioError("线上 Agent 的 Paper Studio 契约尚未安装。")
+    skill_target = root / ".agents/skills/paperstudio"
+    shutil.copytree(skill_source, skill_target, dirs_exist_ok=True)
     port = _available_port()
     environment = dict(os.environ)
     for name in KEY_ENVIRONMENTS:

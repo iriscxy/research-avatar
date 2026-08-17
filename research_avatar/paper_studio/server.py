@@ -2630,6 +2630,30 @@ def requests_reference_expansion(instruction: str) -> bool:
     return any(marker in lowered for marker in markers)
 
 
+def local_agent_environment() -> dict[str, str]:
+    """Build a Codex environment without exposing the writing-provider secrets."""
+    environment = dict(os.environ)
+    online_codex_key = environment.get("OPENAI_API_KEY", "") if ONLINE_PROJECT_MODE else ""
+    for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
+        environment.pop(secret_name, None)
+    if ONLINE_PROJECT_MODE:
+        if not online_codex_key:
+            raise StudioError("线上 Agent 需要当前写作会话的 OpenAI API Key。")
+        environment["CODEX_API_KEY"] = online_codex_key
+    return environment
+
+
+def local_agent_auth_args() -> list[str]:
+    """Keep an online session key out of every command spawned by Codex."""
+    if not ONLINE_PROJECT_MODE:
+        return []
+    return [
+        "--ignore-user-config",
+        "--config",
+        "shell_environment_policy.ignore_default_excludes=false",
+    ]
+
+
 def require_substantive_table_revision(
     current: str, revised: str, instruction: str
 ) -> None:
@@ -2705,9 +2729,7 @@ def edit_table_with_local_agent(
 {latex.strip()}
 </current_table_latex>
 """
-    environment = dict(os.environ)
-    for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
-        environment.pop(secret_name, None)
+    environment = local_agent_environment()
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=f"agent-table-{table_id.lower()}-", dir=STATE_DIR
@@ -2717,6 +2739,7 @@ def edit_table_with_local_agent(
             codex,
             "exec",
             "--ephemeral",
+            *local_agent_auth_args(),
             "--sandbox",
             "read-only",
             "--color",
@@ -5176,9 +5199,7 @@ GPT Image 草图绝对路径：{paths['draft']}
 5. 忠实于机制要求和 Prompt，不增加结果数字、攻击细节或未经论文支持的主张。
 6. 不得加入 raster/background/image 元素；最终每个对象都必须能在 PowerPoint 中单独编辑。
 """
-    environment = dict(os.environ)
-    for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
-        environment.pop(secret_name, None)
+    environment = local_agent_environment()
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=f"agent-mechanism-{figure_id.lower()}-", dir=STATE_DIR
@@ -5188,6 +5209,7 @@ GPT Image 草图绝对路径：{paths['draft']}
             codex,
             "exec",
             "--ephemeral",
+            *local_agent_auth_args(),
             "--sandbox",
             "read-only",
             "--color",
@@ -5876,9 +5898,7 @@ def create_data_figure_code_with_local_agent(
 </traceable_results>
 {revision_block}
 """
-    environment = dict(os.environ)
-    for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
-        environment.pop(secret_name, None)
+    environment = local_agent_environment()
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=f"agent-figure-{figure_id.lower()}-", dir=STATE_DIR
@@ -5888,6 +5908,7 @@ def create_data_figure_code_with_local_agent(
             codex,
             "exec",
             "--ephemeral",
+            *local_agent_auth_args(),
             "--sandbox",
             "read-only",
             "--color",
@@ -6200,9 +6221,7 @@ def ask_studio_local_agent(
 </researcher_message>
 """
     before = chat_source_snapshot() if not confirmation_required else {}
-    environment = dict(os.environ)
-    for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
-        environment.pop(secret_name, None)
+    environment = local_agent_environment()
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix="agent-chat-", dir=STATE_DIR
@@ -6231,6 +6250,7 @@ def ask_studio_local_agent(
             codex,
             "exec",
             "--ephemeral",
+            *local_agent_auth_args(),
             "--skip-git-repo-check",
             "--sandbox",
             "read-only" if confirmation_required else "workspace-write",
@@ -6663,9 +6683,7 @@ def create_data_figure_layout_with_local_agent(
    不要提出 PNG 拼接、栅格化或修改实验数据。
 5. 无法表达的装饰性要求应忽略，不得增加 schema 外字段。
 """
-    environment = dict(os.environ)
-    for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
-        environment.pop(secret_name, None)
+    environment = local_agent_environment()
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=f"agent-layout-{figure_id.lower()}-", dir=STATE_DIR
@@ -6675,6 +6693,7 @@ def create_data_figure_layout_with_local_agent(
             codex,
             "exec",
             "--ephemeral",
+            *local_agent_auth_args(),
             "--sandbox",
             "read-only",
             "--color",

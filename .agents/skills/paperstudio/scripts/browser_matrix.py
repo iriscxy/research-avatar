@@ -1298,6 +1298,9 @@ class Matrix:
         fixture["pdf"]["page_count"] = max(2, int(fixture["pdf"].get("page_count") or 0))
         page, errors, posts = self.page(fixture)
         self.visit(page, f"/?view=writing&section={first}", "document.querySelectorAll('.pdf-page').length > 0")
+        assert page.locator("#pdf-download").is_visible()
+        assert page.locator("#pdf-download").get_attribute("href") == fixture["pdf"]["url"]
+        assert page.locator("#pdf-download").get_attribute("download").endswith(".pdf")
         assert page.locator("#pdf-navigation").is_hidden()
         page.locator("#pdf-navigation-toggle").click()
         assert page.locator("#pdf-navigation").is_visible()

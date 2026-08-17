@@ -25,6 +25,9 @@ class DemoSyncTests(unittest.TestCase):
             self.assertTrue(state["tables"][table_id]["latex"].strip())
         self.assertTrue((project / "paper/main.pdf").is_file())
         self.assertTrue((project / "paper/fig/typo_margin/F1_motivation.pptx").is_file())
+        self.assertTrue(
+            (project / "paper/figsrc/motivation.bg.png").is_file()
+        )
         self.assertTrue((project / "paper/fig/typo_margin/actual/F2_confirmation.png").is_file())
         self.assertTrue((project / "paper/fig/typo_margin/actual/F3_budget.png").is_file())
         stale = [path for path in project.rglob("*") if "typo_basis" in path.as_posix() or "micro_typo_intent" in path.as_posix()]
@@ -68,6 +71,9 @@ class DemoSyncTests(unittest.TestCase):
             "/usr/local/lib/python3.12/site-packages/research_avatar/paper_studio/",
             dockerfile,
         )
+        self.assertIn("ARG CODEX_CLI_VERSION=", dockerfile)
+        self.assertIn("codex --version", dockerfile)
+        self.assertIn("COPY .agents/skills/paperstudio/", dockerfile)
 
     def test_demo_copy_has_a_legacy_fallback_and_plan_is_sampled(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
