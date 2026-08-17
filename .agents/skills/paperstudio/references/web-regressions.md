@@ -144,27 +144,43 @@
 - When both mechanism candidates exist, default the main preview to the final paper-sized PPT/PDF rendering and reveal a single toggle labelled `显示 GPT 原图`; in GPT mode relabel it `显示 PPT/PDF 版`. Switch the existing preview surface rather than stacking two previews. Hide the toggle unless both versions belong to the current completed build, and never let the preview choice affect insertion or persisted manuscript state.
 - Pass configured placement/canvas values into GPT prompt generation without inferring a figure's rhetorical role in the web engine. Browser-test both supported widths and their LaTeX mappings; `$paperwrite` owns which width a particular artifact receives.
 
-## Global local-Agent chat
+## Removed: global local-Agent chat
 
-- Keep a fixed `?` launcher visible at the lower-right of the webpage in writing, figure, and table views.
-- Open a modal chat on click; support close button, backdrop click, and Escape. Restore the launcher after closing and focus the input after opening.
-- Maintain one global chat history and send the current section, view, and selected artifact as context. During a read-only question/advice turn, the local Agent must not claim it clicked buttons or changed files.
-- The global chat is executable whenever the researcher gives an action command such as add, modify, move, fix, generate, compile, delete, clear, or overwrite. Use Codex when the owning session is Codex; otherwise use Claude Code. Give the selected Agent write access, require it to read this skill and contract, make real repository changes, validate them, reload Paper Studio state in the same response, and record the exact changed source files. Questions and requests for advice remain read-only. The explicit operation request itself is authorization; never insert a second `等待确认` turn.
-- Let the selected project Agent classify each ordinary turn semantically from the current message and recent history, returning structured `read_only` or `execute` intent. Do not use an action-verb whitelist to decide whether natural imperatives, indirect requests, examples, questions, or retry turns may write. Give turns a write-capable sandbox so the Agent can act when its semantic judgment is `execute`; require it to make no changes when its judgment is `read_only`. For destructive operations, strictly limit changes to the explicit target and preserve the existing prohibition on destructive git commands.
-- Execution provenance must fingerprint researcher-visible PNG/PDF/PPTX/SVG outputs under `paper/` as well as text sources, so an artifact-only operation is not mislabelled as unchanged. Run each Codex turn in a separate process group; on timeout, terminate the entire group before reporting failure so no orphaned subprocess can finish a supposedly failed edit later. If an idempotent execution finds that the requested state already exists, label it `已处理 · 无文件变更` rather than falling back to read-only or claiming failure.
-- Show deterministic execution provenance on every new Agent bubble: `仅回答`, `已执行 · N 个文件`, `已处理 · 无文件变更`, or `未执行成功`. Never label a turn executed unless source fingerprints prove that files changed; if an explicit action produces no source change, say so rather than presenting advice as execution. Structural manuscript actions must update `paper/paragraph_plan.json` (and use valid unique IDs, grouping styles, and reference ranges) so the browser immediately exposes the new work item; never edit `.paper_studio/state.json` directly.
-- Keep structural Agent edits canonical and non-duplicating. Adding a planned paragraph/subsection must update `paper/paragraph_plan.json` and let the normal candidate → Accept workflow render section LaTeX; do not also append the same prose directly to `paper/sections/*.tex` while leaving that plan item pending. If an Agent changes manuscript source explicitly, reload and reconcile the browser plan/status before reporting success so a later Accept cannot duplicate or overwrite the change.
-- Run executable global-chat turns as persisted background jobs. The POST must return immediately, append the user turn once, show an in-round `执行中` Agent bubble, poll state until completion, and keep the modal closable and the rest of the webpage responsive. Disable duplicate sends only while that job is running. After a server restart, mark an orphaned running job failed with an actionable retry message instead of leaving the browser permanently busy.
-- Never resume a project-Agent CLI thread across a detected server restart. Clear its persisted thread ID while preserving recent visible chat context. If an apparently live resume still returns a thread-store/active-writer conflict, retry the same turn exactly once as a fresh thread automatically; do not expose the conflict or require another researcher click. Any failed Agent invocation clears its resumable thread before the next retry.
-- Mark every project-Agent subprocess with `PAPER_STUDIO_AGENT_CHILD=1`. A nested Agent must never execute `research_studio.server --ensure-studios`, start/stop/restart Paper Studio, or bind a second Studio port; it is already inside the live server whose job it owns. Regression-test both the environment marker and the explicit prompt prohibition, because a nested bootstrap falsely marks its own parent job interrupted and leaves a conflicting CLI thread writer.
-- Enforce one terminal Agent response for every accepted user turn. Completion, no-op/idempotent execution, read-only answers, confirmation gates, failures, cancellation, timeout, and server-restart recovery must all append exactly one nonempty assistant bubble with the matching provenance badge. Persist a reply marker so refresh and repeated recovery never duplicate the terminal response.
-- While a global local-Agent job is running, show `⏸ 停止` beside the disabled send action. Clicking it must persist a `cancelled` job plus one `已停止` assistant bubble, terminate the entire Codex process group, stop polling, re-enable input/send, and discard any late worker completion. Hide the stop action whenever no job is running.
-- Make multi-turn structure visually unambiguous. Group each user message and following Agent response into a numbered round, separate rounds with a divider and spacing, show explicit `你`/`本地 Agent` labels plus distinct avatars, and use right-aligned teal user bubbles versus left-aligned purple Agent bubbles. Preserve multiline content and scroll to the newest round.
+A fixed `?` launcher used to open a free-form modal chat (any section/view/
+artifact context, `/api/agent-chat`) that could execute arbitrary local-Agent
+edits, with its own CLI-thread resume/retry logic across server restarts. It
+was removed entirely (not merely hidden) after a researcher reported it
+silently failing to make a requested figure deletion visible. Diagnosis
+found a real, separately-fixed bug (FIGURES/FIGURE_ORDER/TABLES/TABLE_ORDER
+are module-level globals loaded once at process startup and never reloaded
+after the Agent edited `paper/paper_studio.json` on disk — see
+`reload_figure_and_table_definitions_if_paper_studio_json_changed` in
+`research_avatar/paper_studio/server.py`), not a defect specific to the
+free-form chat surface or its thread-resume machinery. Do not reintroduce a
+global chat launcher, its overlay/dialog, `/api/agent-chat`/
+`/api/agent-chat/cancel`, or per-turn CLI thread persistence; the local
+Agent's writable capabilities live in per-artifact, stateless (no
+cross-turn thread resume) controls instead: table `/api/table/agent-edit`,
+per-figure panel generation, mechanism figure reconstruction. The one
+remaining always-reachable, secret-bearing control outside the writing/
+figure workflow — "安全更换 API Key" (`#runtime-key-open` →
+`#runtime-key-dialog`, `/api/runtime-key`) — stays a standalone sidebar
+button; it is unrelated to the removed chat and must not be folded back
+into a re-added chat surface.
+
+Every remaining local-Agent subprocess (figure/table editing) still marks
+its environment with `PAPER_STUDIO_AGENT_CHILD=1` (`local_agent_environment`
+in `research_avatar/paper_studio/server.py`) and must still never execute
+`research_studio.server --ensure-studios` or start/stop/restart a Studio
+server from inside an already-live server whose job it owns — that
+nested-restart prohibition is general to any local-Agent subprocess, not
+specific to the removed chat, and remains regression-tested via the
+environment marker and the explicit prompt prohibition.
 
 ## Browser and state regression checks
 
-- Keep the initial HTML shell non-interactive until the first `/api/state` response is rendered: hide both workspaces and the Agent launcher, and disable model, reset, view-switch, and compile controls. A slow or failed initial state request must leave a readable loading/error shell without any null-state JavaScript exception; successful project or empty-shell render explicitly enables only its valid controls.
-- Dispatch every mutation control twice in the same JavaScript task against a delayed response and assert exactly one request. Cover Accept, mechanism Prompt/Image/build, Caption generation/save/approval, panel generation/composition, table generation/edit/save/approval, placement changes, and Agent chat send/cancel. A foreground request must lock all conflicting controls synchronously and restore them on success or failure; an already-running background job remains cancellable through its dedicated stop control.
+- Keep the initial HTML shell non-interactive until the first `/api/state` response is rendered: hide both workspaces and disable model, reset, runtime-key, view-switch, and compile controls. A slow or failed initial state request must leave a readable loading/error shell without any null-state JavaScript exception; successful project or empty-shell render explicitly enables only its valid controls.
+- Dispatch every mutation control twice in the same JavaScript task against a delayed response and assert exactly one request. Cover Accept, mechanism Prompt/Image/build, Caption generation/save/approval, panel generation/composition, table generation/edit/save/approval, and placement changes. A foreground request must lock all conflicting controls synchronously and restore them on success or failure; an already-running background job remains cancellable through its dedicated stop control.
 - Treat `generation_ready: false` as a hard gate for both visible controls and automatic timers. Opening a blocked mechanism or data figure tab must remain request-free after the auto-generation delay; recheck the gate inside the timer callback because state may change after scheduling.
 - Never treat an iframe `load` event as proof that a figure PDF exists: HTTP error pages also load. Before revealing data-figure confirmation, require a successful same-origin fetch whose first five bytes are `%PDF-`; use iframe load only to trigger or retry that verification. Bind the confirmation button's disabled state to the exact verified preview URL as well as hiding its container. A 404, HTML response, or stale URL must remain both hidden and non-invocable.
 - Treat browser-cancelled SVG/PDF/static responses as normal transport teardown. Catch `BrokenPipeError` and `ConnectionResetError` at the response-body write boundary, close that connection, and do not emit handler tracebacks that obscure genuine server failures.

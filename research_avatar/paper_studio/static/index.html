@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Paper Studio</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="static/style.css?v=20260817.9">
+  <link rel="stylesheet" href="static/style.css?v=20260817.10">
 </head>
 <body>
   <div class="app">
@@ -33,6 +33,7 @@
           </div>
           <small id="model-provider-note">可自行输入模型名称</small>
         </div>
+        <button id="runtime-key-open" class="ghost" disabled>安全更换 API Key</button>
         <button id="reset" class="ghost" disabled>重置当前 section 对话</button>
         <button id="reset-generated" class="ghost danger" disabled>清空生成内容</button>
       </div>
@@ -375,26 +376,6 @@
       <button id="reset-generated-confirm" class="danger" type="button">确认清空</button>
     </div>
   </dialog>
-  <button id="agent-chat-launcher" class="agent-chat-launcher" aria-label="打开 Agent 对话" title="Agent 对话" hidden>?</button>
-  <div id="agent-chat-overlay" class="agent-chat-overlay" hidden>
-    <section class="agent-chat-dialog" role="dialog" aria-modal="true" aria-labelledby="agent-chat-title">
-      <div class="figure-agent-chat-head">
-        <div>
-          <strong id="agent-chat-title">Codex</strong>
-          <span id="agent-chat-context">当前页面</span>
-        </div>
-        <button id="agent-chat-close" class="agent-chat-close" aria-label="关闭 Agent 对话">×</button>
-      </div>
-      <div id="figure-agent-chat-history" class="figure-agent-chat-history">
-        <p class="figure-agent-chat-empty">还没有对话。可以询问论文、图表、排版或下一步怎么做。</p>
-      </div>
-      <textarea id="figure-agent-chat-input" rows="3" placeholder="询问 Agent，或让它直接修改当前项目…"></textarea>
-      <div class="agent-chat-actions">
-        <button id="figure-agent-chat-send" class="agent-action">发送给 Codex</button>
-        <button id="agent-chat-cancel" class="danger" hidden>⏸ 停止</button>
-      </div>
-    </section>
-  </div>
   <dialog id="runtime-key-dialog" class="runtime-key-dialog">
     <form id="runtime-key-form">
       <button id="runtime-key-close" class="agent-chat-close" type="button" aria-label="关闭安全密钥输入">×</button>
@@ -415,6 +396,6 @@
       </div>
     </form>
   </dialog>
-  <script src="static/app.js?v=20260817.9"></script>
+  <script src="static/app.js?v=20260817.10"></script>
 </body>
 </html>

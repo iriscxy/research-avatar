@@ -107,9 +107,6 @@ STATE_LOCK = threading.RLock()
 FIGURE_PROCESS_LOCK = threading.RLock()
 RUNNING_FIGURE_PROCESSES: dict[str, subprocess.Popen[str]] = {}
 CANCELLED_FIGURE_JOBS: set[str] = set()
-AGENT_CHAT_PROCESS_LOCK = threading.RLock()
-RUNNING_AGENT_CHAT_PROCESSES: dict[str, subprocess.Popen[str]] = {}
-CANCELLED_AGENT_CHAT_JOBS: set[str] = set()
 FULL_DRAFT_JOB_LOCK = threading.RLock()
 CANCELLED_FULL_DRAFT_JOBS: set[str] = set()
 SERVER_INSTANCE_TOKEN = uuid.uuid4().hex
@@ -1199,10 +1196,6 @@ def _default_state() -> dict[str, Any]:
             "previous_response_id": None,
             "last_message": "",
         },
-        "agent_chat_history": [],
-        "agent_chat_thread_id": None,
-        "agent_chat_provider": None,
-        "agent_chat_job": None,
         "full_draft_job": None,
         "updated_at": None,
         "sections": {
@@ -1232,7 +1225,6 @@ def _default_state() -> dict[str, Any]:
                 "prompt_history": [],
                 "agent_prompt": "",
                 "agent_history": [],
-                "agent_chat_history": [],
                 "layout_prompt": "",
                 "layout_prompt_is_default": False,
                 "layout_plan": {},
@@ -1378,71 +1370,6 @@ def load_state() -> dict[str, Any]:
         title_editor = state.setdefault("title_editor", default["title_editor"])
         for field, value in default["title_editor"].items():
             title_editor.setdefault(field, value)
-        state.setdefault("agent_chat_history", [])
-        state.setdefault("agent_chat_thread_id", None)
-        state.setdefault("agent_chat_provider", None)
-        job = state.setdefault("agent_chat_job", None)
-        if (
-            isinstance(job, dict)
-            and job.get("status") == "running"
-            and job.get("server_instance") != SERVER_INSTANCE_TOKEN
-        ):
-            baseline = job.get("source_snapshot")
-            changed_files: list[str] = []
-            if isinstance(baseline, dict):
-                current_snapshot = chat_source_snapshot()
-                changed_files = sorted(
-                    path
-                    for path in set(baseline) | set(current_snapshot)
-                    if baseline.get(path) != current_snapshot.get(path)
-                )
-            progress_message = (
-                f"服务重启中断了 Agent 回复，但检测到 {len(changed_files)} 个项目文件已变更；"
-                "请续做并核验任务是否完整。"
-                if changed_files
-                else "服务已重启；上一次 Agent 任务已终止，请续做。"
-            )
-            state["agent_chat_job"] = {
-                **job,
-                "status": "failed",
-                "progress_message": progress_message,
-                "changed_files": changed_files,
-            }
-            # A restarted server cannot safely resume a CLI thread whose prior
-            # writer may still be draining. Recent chat history already carries
-            # the semantic context, so the next retry starts a clean thread.
-            state["agent_chat_thread_id"] = None
-            state["agent_chat_provider"] = None
-            job = state["agent_chat_job"]
-        if (
-            isinstance(job, dict)
-            and job.get("status") == "failed"
-            and not job.get("reply_recorded")
-        ):
-            history = list(state.get("agent_chat_history", []))[-40:]
-            message = str(job.get("message", "")).strip()
-            if history and history[-1].get("role") == "user" and (
-                not message or str(history[-1].get("content", "")).strip() == message
-            ):
-                history.append(
-                    {
-                        "role": "assistant",
-                        "content": str(
-                            job.get("progress_message")
-                            or "项目 Agent 任务未完成，请续做。"
-                        ),
-                        "execution": (
-                            "interrupted_changes"
-                            if job.get("changed_files")
-                            else "failed"
-                        ),
-                        "changed_files": list(job.get("changed_files") or []),
-                        "action": "retry_agent_job",
-                        "retry_message": message,
-                    }
-                )
-                state["agent_chat_history"] = history[-40:]
-                job["reply_recorded"] = True
         draft_job = state.setdefault("full_draft_job", None)
         if (
             isinstance(draft_job, dict)
@@ -1889,7 +1816,6 @@ def figure_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
                 "draw_prompt": stored.get("draw_prompt", ""),
                 "prompt_instruction": stored.get("prompt_instruction", ""),
                 "agent_prompt": stored.get("agent_prompt", ""),
-                "agent_chat_history": stored.get("agent_chat_history", [])[-40:],
                 "layout_prompt": stored.get("layout_prompt", ""),
                 "layout_prompt_is_default": False,
                 "layout_plan": stored.get("layout_plan", {}),
@@ -2837,24 +2763,6 @@ def requests_reference_expansion(instruction: str) -> bool:
     return any(marker in lowered for marker in markers)
 
 
-def project_agent_provider() -> str:
-    """Select the CLI that owns this Paper Studio session."""
-    configured = os.environ.get("PAPER_STUDIO_PROJECT_AGENT", "").strip().lower()
-    if configured in {"codex", "claude"}:
-        return configured
-    if ONLINE_PROJECT_MODE:
-        return "codex"
-    if os.environ.get("CLAUDECODE") or os.environ.get("CLAUDE_CODE_ENTRYPOINT"):
-        return "claude"
-    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_CI"):
-        return "codex"
-    return "codex" if shutil_which("codex") else "claude"
-
-
-def project_agent_label(provider: str | None = None) -> str:
-    return "Claude Code" if (provider or project_agent_provider()) == "claude" else "Codex"
-
-
 def local_agent_environment(provider: str = "codex") -> dict[str, str]:
     """Build an Agent environment without exposing unrelated writing secrets."""
     environment = dict(os.environ)
@@ -2916,30 +2824,6 @@ def claude_result(output: str) -> tuple[str, str | None]:
         )
     session_id = str(payload.get("session_id") or "").strip() or None
     return str(result).strip(), session_id
-
-
-def api_key_change_request(message: str) -> bool:
-    """Route only explicit API-key replacement requests to the secret-safe UI."""
-    compact = re.sub(r"[\s_-]+", "", message).casefold()
-    mentions_key = any(
-        marker in compact for marker in ("apikey", "api密钥", "接口密钥")
-    )
-    requests_change = any(
-        marker in compact
-        for marker in (
-            "更换",
-            "修改",
-            "替换",
-            "更新",
-            "设置",
-            "配置",
-            "change",
-            "replace",
-            "update",
-            "set",
-        )
-    )
-    return mentions_key and requests_change
 
 
 def require_substantive_table_revision(
@@ -5971,32 +5855,6 @@ def recover_interrupted_table_jobs() -> None:
         save_state(state)
 
 
-def recover_interrupted_agent_chat_job() -> None:
-    """Persist a visible failure reply for a chat interrupted by server restart."""
-    if not STATE_FILE.exists():
-        return
-    try:
-        stored = json.loads(STATE_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return
-    job = stored.get("agent_chat_job") or {}
-    history = list(stored.get("agent_chat_history", []))
-    interrupted = (
-        job.get("status") == "running"
-        and job.get("server_instance") != SERVER_INSTANCE_TOKEN
-    )
-    if interrupted:
-        terminate_stale_agent_process_group(job)
-    missing_failure_reply = (
-        job.get("status") == "failed"
-        and not job.get("reply_recorded")
-        and history
-        and history[-1].get("role") == "user"
-    )
-    if interrupted or missing_failure_reply:
-        save_state(load_state())
-
-
 def validate_editable_shape_deliverables(
     shape_spec: dict[str, Any], pptx: Path, pdf: Path
 ) -> None:
@@ -6347,541 +6205,6 @@ def default_data_figure_layout_prompt(figure_id: str) -> str:
         f"子图之间不留间距；左上角依次添加 {labels}，角标字体 8 pt；"
         "输出可编辑 PPTX 与同布局矢量 PDF。"
     )
-
-
-CHAT_SOURCE_SUFFIXES = {
-    ".bib",
-    ".css",
-    ".html",
-    ".js",
-    ".json",
-    ".md",
-    ".py",
-    ".tex",
-    ".txt",
-    ".yaml",
-    ".yml",
-}
-CHAT_ARTIFACT_SUFFIXES = {".pdf", ".png", ".pptx", ".svg"}
-
-
-def parse_local_agent_answer(raw: str) -> tuple[str, str]:
-    """Return the Codex semantic intent and user-facing answer."""
-    try:
-        payload = json.loads(raw)
-    except json.JSONDecodeError:
-        return "unknown", raw.strip()
-    if not isinstance(payload, dict):
-        return "unknown", raw.strip()
-    intent = str(payload.get("intent", "unknown"))
-    if intent not in {"read_only", "execute"}:
-        intent = "unknown"
-    answer = str(payload.get("answer", "")).strip()
-    return intent, answer or raw.strip()
-
-
-def agent_thread_store_conflict(diagnostic: str) -> bool:
-    """Recognize a stale resumable thread without depending on one CLI version."""
-    lowered = diagnostic.casefold()
-    return "thread-store conflict" in lowered or (
-        "thread/resume" in lowered and "active writer" in lowered
-    )
-
-
-def agent_api_key_failure(error: Exception | str) -> bool:
-    """Recognize Codex authentication failures without exposing diagnostics."""
-    diagnostic = str(error).lower()
-    return any(
-        marker in diagnostic
-        for marker in (
-            "invalid_api_key",
-            "incorrect api key",
-            "authentication_error",
-            "401 unauthorized",
-        )
-    )
-
-
-def chat_source_snapshot() -> dict[str, str]:
-    """Fingerprint editable sources and researcher-visible paper artifacts."""
-    snapshot: dict[str, str] = {}
-    roots = [
-        PAPER,
-        ROOT / "results",
-        Path(__file__).resolve().parent,
-        ROOT / ".agents" / "skills" / "paperstudio",
-    ]
-    for base in roots:
-        if not base.exists():
-            continue
-        for path in base.rglob("*"):
-            if not path.is_file() or STATE_DIR in path.parents:
-                continue
-            suffix = path.suffix.lower()
-            source = suffix in CHAT_SOURCE_SUFFIXES
-            artifact = suffix in CHAT_ARTIFACT_SUFFIXES and (
-                path == PAPER or PAPER in path.parents
-            )
-            if not source and not artifact:
-                continue
-            stat = path.stat()
-            if source and stat.st_size > 2_000_000:
-                continue
-            try:
-                relative = path.relative_to(ROOT).as_posix()
-            except ValueError:
-                relative = (
-                    Path("research_avatar") / path.relative_to(PACKAGE_ROOT)
-                ).as_posix()
-            if stat.st_size <= 4_000_000:
-                snapshot[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
-            else:
-                snapshot[relative] = f"{stat.st_size}:{stat.st_mtime_ns}"
-    return snapshot
-
-
-def run_local_agent_process(
-    command: list[str],
-    *,
-    input: str,
-    env: dict[str, str],
-    timeout: int = 600,
-    job_token: str | None = None,
-) -> subprocess.CompletedProcess[str]:
-    """Run Codex in an isolated process group so a timeout leaves no child work behind."""
-    process = subprocess.Popen(
-        command,
-        cwd=ROOT,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=env,
-        start_new_session=True,
-    )
-    cancelled = False
-    if job_token:
-        with AGENT_CHAT_PROCESS_LOCK:
-            cancelled = job_token in CANCELLED_AGENT_CHAT_JOBS
-            if not cancelled:
-                RUNNING_AGENT_CHAT_PROCESSES[job_token] = process
-        if not cancelled:
-            persist_agent_process_group(job_token, process.pid)
-    if cancelled:
-        _terminate_process_group(process)
-    try:
-        stdout, stderr = process.communicate(input=input, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        _terminate_process_group(process)
-        process.communicate()
-        raise
-    finally:
-        if job_token:
-            with AGENT_CHAT_PROCESS_LOCK:
-                if RUNNING_AGENT_CHAT_PROCESSES.get(job_token) is process:
-                    RUNNING_AGENT_CHAT_PROCESSES.pop(job_token, None)
-                CANCELLED_AGENT_CHAT_JOBS.discard(job_token)
-    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
-
-
-def persist_agent_process_group(job_token: str, process_group_id: int) -> None:
-    """Make an Agent child discoverable if its owning server is killed abruptly."""
-    if not STATE_FILE.exists():
-        return
-    with STATE_LOCK:
-        state = load_state()
-        job = state.get("agent_chat_job") or {}
-        if job.get("token") != job_token or job.get("status") != "running":
-            return
-        job["process_group_id"] = int(process_group_id)
-        save_state(state)
-
-
-def terminate_stale_agent_process_group(job: dict[str, Any]) -> bool:
-    """Terminate only a recent recorded Codex/Claude process group after restart."""
-    try:
-        process_group_id = int(job.get("process_group_id") or 0)
-        started_at = int(job.get("started_at") or 0)
-    except (TypeError, ValueError):
-        return False
-    if process_group_id <= 1 or not started_at or time.time() - started_at > 3600:
-        return False
-    ps = shutil_which("ps")
-    if not ps:
-        return False
-    try:
-        inspected = subprocess.run(
-            [ps, "-p", str(process_group_id), "-o", "command="],
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    command = inspected.stdout.casefold()
-    if inspected.returncode or not any(name in command for name in ("codex", "claude")):
-        return False
-    try:
-        os.killpg(process_group_id, signal.SIGTERM)
-    except ProcessLookupError:
-        return True
-    deadline = time.monotonic() + 2
-    while time.monotonic() < deadline:
-        try:
-            os.killpg(process_group_id, 0)
-        except ProcessLookupError:
-            return True
-        time.sleep(0.05)
-    try:
-        os.killpg(process_group_id, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    return True
-
-
-def terminate_running_agent_chat_processes() -> None:
-    """Stop every Codex process group before this server instance exits."""
-    with AGENT_CHAT_PROCESS_LOCK:
-        running = list(RUNNING_AGENT_CHAT_PROCESSES.items())
-        for token, _process in running:
-            CANCELLED_AGENT_CHAT_JOBS.add(token)
-    for _token, process in running:
-        _terminate_process_group(process)
-
-
-def ask_studio_local_agent(
-    message: str,
-    history: list[dict[str, str]] | None = None,
-    *,
-    section: str = "",
-    view: str = "writing",
-    artifact_id: str = "",
-    return_details: bool = False,
-    job_token: str | None = None,
-    thread_id: str | None = None,
-) -> str | dict[str, Any]:
-    """Answer or execute one global Paper Studio browser-chat turn with its owning Agent."""
-    agent_provider = project_agent_provider()
-    agent_label = project_agent_label(agent_provider)
-    agent_cli = shutil_which(agent_provider)
-    if not agent_cli:
-        raise StudioError(f"未找到项目 Agent 所需的 {agent_label} CLI。")
-    message = message.strip()
-    if not message:
-        raise StudioError("请输入要问项目 Agent 的内容。")
-    artifact_context = "当前没有选中的图表。"
-    if artifact_id in FIGURES:
-        definition = FIGURES[artifact_id]
-        artifact_context = (
-            f"当前图：{artifact_id} · {definition['title']}\n"
-            f"图类型：{definition['kind']}\n"
-            f"图用途：{definition['description']}"
-        )
-    elif artifact_id in TABLES:
-        definition = TABLES[artifact_id]
-        artifact_context = (
-            f"当前表：{artifact_id} · {definition['title']}\n"
-            f"表用途：{definition['description']}"
-        )
-    recent_history = (history or [])[-12:]
-    mode_instruction = f"""你就是当前项目中可执行的 {agent_label} Agent，而不是只提供建议的客服。你具备当前项目内的文件读取与编辑、shell 命令、测试、编译和网络访问能力；对研究者授权的普通任务，像直接 {agent_label} 一样自行完成从检查到修改再到验证的闭环。不得仅因为自己由网页启动，就声称沙箱禁止写文件、运行命令、访问网络或绑定测试端口；只有实际命令失败后，才能准确报告具体限制并继续采用可行替代方案。
-你必须根据研究者本轮消息和最近对话的语义，自行判断 intent，不使用关键词或动词白名单：
-- 如果研究者在提问、讨论、征求建议或举例，返回 intent=read_only，只读检查并回答，不修改文件。
-- 如果研究者要求完成、继续或重试一项具体工作，返回 intent=execute，并现在真实执行；不要只给建议，也不要要求切换模式。
-- 研究者发出的删除、清空、覆盖等明确操作指令本身就是授权，直接执行，不得再要求回复“确认执行”。仍须把影响严格限定在明确目标内，并避免破坏性 git 命令。
-你是由已经运行中的 Paper Studio 服务启动的嵌套 Agent。绝对不要运行 `research_avatar.research_studio.server --ensure-studios`，不要启动、停止或重启 Research Studio/Paper Studio，也不要绑定第二个 Studio 端口；直接处理项目文件并在现有服务中完成核验。
-执行时先完整阅读 .agents/skills/paperstudio/SKILL.md 及其 references/web-regressions.md，并遵守产品契约。
-使用仓库内工具检查上下文并修改所需文件；不得修改 paper/.paper_studio/state.json，不得编造实验数据，
-不得使用破坏性 git 命令。论文结构变化必须同步到 paper/paragraph_plan.json；增加新段落或分组时使用唯一段落 ID、
-正确 heading/heading_style 和有效 reference_lines。修改 LaTeX 后编译验证；修改网页后运行规定测试并更新静态版本。
-保持执行有界：先完成研究者要求的最小改动，只读取直接相关文件，做与风险相称的验证；不要扫描或重做无关工作。
-完成后在 answer 中简洁说明检查、修改和验证结果。若实际修改了文件，绝不能声称“未修改任何文件”；若没有修改，也绝不能虚构已修改。"""
-    prompt = f"""你是 Paper Studio 中始终可用的项目 {agent_label} Agent。请直接使用简洁中文处理研究者请求。
-不要要求研究者切换只读/可编辑/执行模式；普通轮次由你结合消息与历史语义决定，服务端核验真实文件变化。
-
-<operation_mode>
-{mode_instruction}
-</operation_mode>
-
-当前页面：{view}
-当前 section：{section or '未知'}
-{artifact_context}
-
-<recent_chat_history>
-{json.dumps(recent_history, ensure_ascii=False, indent=2)}
-</recent_chat_history>
-
-<researcher_message>
-{message}
-</researcher_message>
-"""
-    before = chat_source_snapshot()
-    environment = local_agent_environment(agent_provider)
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(
-        prefix="agent-chat-", dir=STATE_DIR
-    ) as temporary_name:
-        output = Path(temporary_name) / "last_message.txt"
-        schema = Path(temporary_name) / "answer_schema.json"
-        schema.write_text(
-            json.dumps(
-                {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "intent": {
-                            "type": "string",
-                            "enum": ["read_only", "execute"],
-                        },
-                        "answer": {"type": "string"},
-                    },
-                    "required": ["intent", "answer"],
-                },
-                ensure_ascii=False,
-            ),
-            encoding="utf-8",
-        )
-        def agent_command(resume_id: str | None) -> list[str]:
-            if agent_provider == "claude":
-                built = [
-                    agent_cli,
-                    "-p",
-                    "--output-format",
-                    "json",
-                    "--permission-mode",
-                    "bypassPermissions",
-                    "--dangerously-skip-permissions",
-                ]
-                if resume_id:
-                    built.extend(["--resume", resume_id])
-                return built
-            built = [agent_cli, "exec"]
-            if resume_id:
-                built.append("resume")
-            built.extend(local_agent_auth_args())
-            built.extend(["--skip-git-repo-check", "--json"])
-            if ONLINE_PROJECT_MODE:
-                built.extend(
-                    [
-                        "--config",
-                        'sandbox_mode="workspace-write"',
-                        "--config",
-                        "sandbox_workspace_write.network_access=true",
-                    ]
-                )
-            else:
-                built.append("--dangerously-bypass-approvals-and-sandbox")
-            built.extend(
-                [
-                    "--output-schema",
-                    str(schema),
-                    "--output-last-message",
-                    str(output),
-                ]
-            )
-            if not resume_id:
-                built.extend(["--color", "never", "--cd", str(ROOT)])
-            else:
-                built.append(resume_id)
-            built.append("-")
-            return built
-
-        active_resume_id = thread_id
-        command = agent_command(active_resume_id)
-        try:
-            process = run_local_agent_process(
-                command,
-                input=prompt,
-                timeout=600,
-                env=environment,
-                job_token=job_token,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise StudioError("项目 Agent 对话超时。") from exc
-        diagnostic = (process.stdout + "\n" + process.stderr).strip()
-        if (
-            process.returncode
-            and active_resume_id
-            and agent_thread_store_conflict(diagnostic)
-        ):
-            # The prompt already contains recent history. Starting a new thread
-            # therefore preserves task context without contending for the stale
-            # thread-store writer left by an interrupted server.
-            active_resume_id = None
-            output.unlink(missing_ok=True)
-            command = agent_command(None)
-            try:
-                process = run_local_agent_process(
-                    command,
-                    input=prompt,
-                    timeout=600,
-                    env=environment,
-                    job_token=job_token,
-                )
-            except subprocess.TimeoutExpired as exc:
-                raise StudioError("项目 Agent 新会话重试超时。") from exc
-            diagnostic = (process.stdout + "\n" + process.stderr).strip()
-        if process.returncode:
-            raise StudioError(
-                f"{agent_label} 对话失败。\n"
-                + (diagnostic[-2400:] or f"{agent_provider} returned a non-zero status.")
-            )
-        if agent_provider == "claude":
-            raw_answer, active_thread_id = claude_result(process.stdout)
-        else:
-            if not output.exists():
-                raise StudioError("项目 Agent 没有返回回复。")
-            raw_answer = output.read_text(encoding="utf-8", errors="replace").strip()
-            active_thread_id = active_resume_id or codex_thread_id(process.stdout)
-        declared_intent, answer = parse_local_agent_answer(raw_answer)
-    if not answer:
-        raise StudioError("项目 Agent 返回了空回复。")
-    after = chat_source_snapshot()
-    changed_files = sorted(
-        path for path in set(before) | set(after) if before.get(path) != after.get(path)
-    )
-    if changed_files:
-        execution = "executed"
-        verified_paths = "、".join(changed_files[:8])
-        if len(changed_files) > 8:
-            verified_paths += f" 等 {len(changed_files)} 个文件"
-        answer = (
-            f"系统核验：已实际变更 {len(changed_files)} 个项目文件：{verified_paths}。\n\n"
-            + answer
-        )
-    elif declared_intent == "execute":
-        execution = "no_changes"
-        answer += "\n\n系统检查：本轮已进入执行模式，但未检测到源文件变化；目标可能已经满足，请以回复中的检查结果为准。"
-    else:
-        execution = "read_only"
-    details = {
-        "answer": answer,
-        "execution": execution,
-        "changed_files": changed_files,
-        "thread_id": active_thread_id,
-        "provider": agent_provider,
-    }
-    return details if return_details else answer
-
-
-def ask_figure_local_agent(
-    figure_id: str, message: str, history: list[dict[str, str]] | None = None
-) -> str:
-    """Backward-compatible figure-scoped wrapper for tests and integrations."""
-    definition = FIGURES[figure_id]
-    return ask_studio_local_agent(
-        message,
-        history,
-        section=definition.get("source_sections", [""])[0],
-        view="figures",
-        artifact_id=figure_id,
-    )
-
-
-def agent_chat_worker(
-    token: str,
-    message: str,
-    history: list[dict[str, Any]],
-    section: str,
-    view: str,
-    artifact_id: str,
-    thread_id: str | None,
-) -> None:
-    """Run one global-chat turn without blocking its HTTP request."""
-    try:
-        result = ask_studio_local_agent(
-            message,
-            history,
-            section=section,
-            view=view,
-            artifact_id=artifact_id,
-            return_details=True,
-            job_token=token,
-            thread_id=thread_id,
-        )
-        assert isinstance(result, dict)
-        answer = str(result["answer"])
-        execution = str(result["execution"])
-        changed_files = list(result["changed_files"])
-        reload_figure_and_table_definitions_if_paper_studio_json_changed(changed_files)
-        active_thread_id = result.get("thread_id")
-        active_provider = str(result.get("provider") or project_agent_provider())
-        status = "completed"
-        progress_message = f"{project_agent_label()} 已完成。"
-    except Exception as exc:  # pragma: no cover - final worker safety net
-        invalid_key = agent_api_key_failure(exc)
-        answer = (
-            f"{project_agent_label()} 无法连接 OpenAI：当前 API Key 无效或已失效。"
-            "请点击“安全更换 API Key”，更新后再续做此任务。"
-            if invalid_key
-            else f"{project_agent_label()} 执行失败：{exc}"
-        )
-        execution = "action_required" if invalid_key else "failed"
-        changed_files = []
-        active_thread_id = None
-        active_provider = project_agent_provider()
-        status = "failed"
-        progress_message = (
-            "当前 API Key 无效或已失效，请安全更换后续做。"
-            if invalid_key
-            else str(exc)
-        )
-    with STATE_LOCK:
-        state = load_state()
-        job = state.get("agent_chat_job") or {}
-        if job.get("token") != token or job.get("status") != "running":
-            return
-        if execution == "failed" and isinstance(job.get("source_snapshot"), dict):
-            current_snapshot = chat_source_snapshot()
-            baseline = job["source_snapshot"]
-            changed_files = sorted(
-                path
-                for path in set(baseline) | set(current_snapshot)
-                if baseline.get(path) != current_snapshot.get(path)
-            )
-            reload_figure_and_table_definitions_if_paper_studio_json_changed(changed_files)
-            if changed_files:
-                execution = "interrupted_changes"
-                answer = (
-                    f"项目 Agent 未能返回完整结果，但系统检测到 {len(changed_files)} "
-                    "个项目文件已变更；请续做并核验任务是否完整。\n\n"
-                    + answer
-                )
-        chat_history = list(state.get("agent_chat_history", []))[-40:]
-        chat_history.append(
-            {
-                "role": "assistant",
-                "content": answer,
-                "execution": execution,
-                "changed_files": changed_files,
-                **(
-                    {"action": "retry_agent_job", "retry_message": message}
-                    if execution in {"failed", "interrupted_changes"}
-                    else (
-                        {"action": "replace_api_key", "retry_message": message}
-                        if execution == "action_required"
-                        else {}
-                    )
-                ),
-            }
-        )
-        state["agent_chat_history"] = chat_history[-40:]
-        if active_thread_id:
-            state["agent_chat_thread_id"] = active_thread_id
-            state["agent_chat_provider"] = active_provider
-        elif status == "failed":
-            state["agent_chat_thread_id"] = None
-            state["agent_chat_provider"] = None
-        state["agent_chat_job"] = {
-            **job,
-            "status": status,
-            "progress_message": progress_message,
-            "finished_at": int(time.time()),
-            "reply_recorded": True,
-        }
-        state["agent_chat_job"].pop("source_snapshot", None)
-        state["agent_chat_job"].pop("process_group_id", None)
-        save_state(state)
 
 
 def generate_data_figure_agent_worker(
@@ -7517,12 +6840,6 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
             "api_key_configured": api_key_configured,
             "api_key_setup": api_key_setup,
             "api_usage": usage_summary(API_USAGE_FILE),
-            "project_agent": {
-                "provider": project_agent_provider(),
-                "label": project_agent_label(),
-            },
-            "agent_chat_history": [],
-            "agent_chat_job": None,
             "full_draft": {
                 "available": False,
                 "pending_paragraphs": 0,
@@ -7532,11 +6849,6 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
             },
         }
     result = json.loads(json.dumps(state))
-    result.pop("agent_chat_thread_id", None)
-    result.pop("agent_chat_provider", None)
-    if isinstance(result.get("agent_chat_job"), dict):
-        result["agent_chat_job"].pop("source_snapshot", None)
-        result["agent_chat_job"].pop("process_group_id", None)
     result["project"] = {
         "id": PROJECT_ID,
         "name": str(PROJECT_METADATA.get("name", "")),
@@ -7651,10 +6963,6 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
     result["api_key_configured"] = api_key_configured
     result["api_key_setup"] = api_key_setup
     result["api_usage"] = usage_summary(API_USAGE_FILE)
-    result["project_agent"] = {
-        "provider": project_agent_provider(),
-        "label": project_agent_label(),
-    }
     result["figures"] = figure_public_state(state)
     result["tables"] = table_public_state(state)
     return result
@@ -7926,14 +7234,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.handle_figure_generate(body)
             elif self.path == "/api/figure/compose":
                 self.handle_figure_compose(body)
-            elif self.path == "/api/agent-chat":
-                self.handle_agent_chat(body)
-            elif self.path == "/api/agent-chat/cancel":
-                self.handle_agent_chat_cancel(body)
             elif self.path == "/api/runtime-key":
                 self.handle_runtime_key(body)
-            elif self.path == "/api/figure/agent-chat":
-                self.handle_figure_agent_chat(body)
             elif self.path == "/api/figure/build":
                 self.handle_figure_build(body)
             elif self.path == "/api/figure/placement":
@@ -8554,86 +7856,6 @@ class Handler(BaseHTTPRequestHandler):
         save_state(state)
         self.send_json({"ok": True, "message": message, "state": public_state(state)})
 
-    def handle_agent_chat(self, body: dict[str, Any]) -> None:
-        message = str(body.get("message", "")).strip()
-        if len(message) > 8000:
-            raise StudioError("对话内容过长，请压缩到 8000 字符以内。")
-        section = str(body.get("section", "")).strip()
-        if section not in SECTION_MAP:
-            section = ""
-        view = str(body.get("view", "writing")).strip()
-        if view not in {"writing", "figures", "tables"}:
-            view = "writing"
-        artifact_id = str(body.get("artifact_id", "")).strip()
-        if artifact_id not in FIGURES and artifact_id not in TABLES:
-            artifact_id = ""
-        with STATE_LOCK:
-            state = load_state()
-            current_job = state.get("agent_chat_job") or {}
-            if current_job.get("status") == "running":
-                raise StudioError(f"{project_agent_label()} 正在执行上一条消息，请等待完成后再发送。")
-            history = list(state.get("agent_chat_history", []))[-40:]
-            if api_key_change_request(message):
-                if DEMO_MODE:
-                    raise StudioError("只读 Demo 不能更换 API Key；请先创建私有可编辑副本。")
-                state["agent_chat_history"] = [
-                    *history,
-                    {"role": "user", "content": "更换 API Key"},
-                    {
-                        "role": "assistant",
-                        "content": "请使用安全输入框更换 API Key；密钥不会进入聊天记录、项目文件或浏览器存储。",
-                        "execution": "action_required",
-                        "action": "replace_api_key",
-                        "changed_files": [],
-                    },
-                ][-40:]
-                state["agent_chat_job"] = None
-                save_state(state)
-                self.send_json(
-                    {
-                        "ok": True,
-                        "message": "请安全输入 API Key。",
-                        "state": public_state(state),
-                    }
-                )
-                return
-            token = uuid.uuid4().hex
-            state["agent_chat_history"] = [
-                *history,
-                {"role": "user", "content": message},
-            ][-40:]
-            state["agent_chat_job"] = {
-                "token": token,
-                "status": "running",
-                "server_instance": SERVER_INSTANCE_TOKEN,
-                "started_at": int(time.time()),
-                "progress_message": f"{project_agent_label()} 正在读取上下文并执行…",
-                "message": message,
-                "source_snapshot": chat_source_snapshot(),
-            }
-            save_state(state)
-            active_provider = project_agent_provider()
-            stored_provider = str(state.get("agent_chat_provider") or "codex")
-            thread_id = (
-                str(state.get("agent_chat_thread_id") or "").strip() or None
-                if stored_provider == active_provider
-                else None
-            )
-        threading.Thread(
-            target=agent_chat_worker,
-            args=(token, message, history, section, view, artifact_id, thread_id),
-            daemon=True,
-            name=f"agent-chat-{token[:8]}",
-        ).start()
-        self.send_json(
-            {
-                "ok": True,
-                "message": f"{project_agent_label()} 任务已启动。",
-                "state": public_state(state),
-            },
-            status=HTTPStatus.ACCEPTED,
-        )
-
     def handle_runtime_key(self, body: dict[str, Any]) -> None:
         if DEMO_MODE:
             raise StudioError("只读 Demo 不能更换 API Key；请先创建私有可编辑副本。")
@@ -8648,102 +7870,11 @@ class Handler(BaseHTTPRequestHandler):
         with STATE_LOCK:
             state = load_state()
             select_llm_provider(state, provider)
-            state["agent_chat_thread_id"] = None
-            state["agent_chat_provider"] = None
-            history = list(state.get("agent_chat_history", []))[-40:]
-            for turn in reversed(history):
-                if turn.get("action") == "replace_api_key":
-                    retry_message = str(turn.get("retry_message") or "").strip()
-                    turn.update(
-                        {
-                            "content": (
-                                "API Key 已在当前 Paper Studio 运行内存中安全更新；"
-                                "请点击“续做并核验此任务”。"
-                                if retry_message
-                                else "API Key 已在当前 Paper Studio 运行内存中安全更新；"
-                                "未写入聊天、浏览器存储或项目文件。"
-                            ),
-                            "execution": "runtime_action",
-                            "action": (
-                                "retry_agent_job"
-                                if retry_message
-                                else "replace_api_key_completed"
-                            ),
-                        }
-                    )
-                    break
-            state["agent_chat_history"] = history
             save_state(state)
         self.send_json(
             {
                 "ok": True,
                 "message": "API Key 已安全更新。",
-                "state": public_state(state),
-            }
-        )
-
-    def handle_agent_chat_cancel(self, body: dict[str, Any]) -> None:
-        del body
-        with STATE_LOCK:
-            state = load_state()
-            job = state.get("agent_chat_job") or {}
-            if job.get("status") != "running":
-                raise StudioError("当前没有正在运行的项目 Agent 任务。")
-            token = str(job.get("token", ""))
-            history = list(state.get("agent_chat_history", []))[-40:]
-            history.append(
-                {
-                    "role": "assistant",
-                    "content": "已停止本次项目 Agent 调用。",
-                    "execution": "cancelled",
-                    "changed_files": [],
-                }
-            )
-            state["agent_chat_history"] = history[-40:]
-            state["agent_chat_job"] = {
-                **job,
-                "status": "cancelled",
-                "progress_message": "项目 Agent 调用已停止。",
-                "finished_at": int(time.time()),
-                "reply_recorded": True,
-            }
-            state["agent_chat_job"].pop("source_snapshot", None)
-            state["agent_chat_job"].pop("process_group_id", None)
-            save_state(state)
-        with AGENT_CHAT_PROCESS_LOCK:
-            CANCELLED_AGENT_CHAT_JOBS.add(token)
-            process = RUNNING_AGENT_CHAT_PROCESSES.get(token)
-        if process is not None:
-            _terminate_process_group(process)
-        self.send_json(
-            {
-                "ok": True,
-                "message": "已停止本次项目 Agent 调用。",
-                "state": public_state(state),
-            }
-        )
-
-    def handle_figure_agent_chat(self, body: dict[str, Any]) -> None:
-        figure_id = self.require_figure(body)
-        message = str(body.get("message", "")).strip()
-        if len(message) > 8000:
-            raise StudioError("对话内容过长，请压缩到 8000 字符以内。")
-        state = load_state()
-        figure_state = state["figures"][figure_id]
-        history = list(figure_state.get("agent_chat_history", []))[-40:]
-        answer = ask_figure_local_agent(figure_id, message, history)
-        history.extend(
-            [
-                {"role": "user", "content": message},
-                {"role": "assistant", "content": answer},
-            ]
-        )
-        figure_state["agent_chat_history"] = history[-40:]
-        save_state(state)
-        self.send_json(
-            {
-                "ok": True,
-                "message": answer,
                 "state": public_state(state),
             }
         )
@@ -9477,7 +8608,6 @@ def main() -> None:
         if args.model:
             state["model"] = args.model.strip()
         save_state(state)
-    recover_interrupted_agent_chat_job()
     if not EMPTY_PROJECT_MODE:
         recover_interrupted_figure_jobs()
         recover_interrupted_table_jobs()
@@ -9507,7 +8637,6 @@ def main() -> None:
     except KeyboardInterrupt:
         print("\nPaper Studio stopped.")
     finally:
-        terminate_running_agent_chat_processes()
         server.server_close()
         signal.signal(signal.SIGTERM, previous_sigterm)
 

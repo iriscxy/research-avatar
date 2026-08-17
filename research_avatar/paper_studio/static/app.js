@@ -78,7 +78,6 @@ const autoAttempted = new Set();
 const autoFigurePromptAttempted = new Set();
 const autoDataPanelAttempted = new Set();
 let figurePollTimer = null;
-let agentChatPollTimer = null;
 let fullDraftPollTimer = null;
 let titleBusy = false;
 let acceptRequestBusy = false;
@@ -86,7 +85,6 @@ let proseRequestBusy = false;
 let paragraphRequestBusy = false;
 let compileRequestBusy = false;
 let conversationResetBusy = false;
-let agentChatRequestBusy = false;
 let figureRequestBusy = false;
 let generatedResetBusy = false;
 let fullDraftRequestBusy = false;
@@ -1177,171 +1175,6 @@ function scheduleAutomaticDataPanel(figure) {
   }, 50);
 }
 
-function renderAgentChat() {
-  const root = $("figure-agent-chat-history");
-  root.replaceChildren();
-  const history = state.agent_chat_history || [];
-  const agentName = state.project_agent?.label || "Codex";
-  $("agent-chat-title").textContent = agentName;
-  $("agent-chat-launcher").title = `${agentName} 对话`;
-  $("agent-chat-launcher").setAttribute("aria-label", `打开 ${agentName} 对话`);
-  const artifact = ["figures", "tables"].includes(activeView) ? selectedFigure() : null;
-  const viewLabel = activeView === "figures" ? "图" : activeView === "tables" ? "表" : "正文";
-  const sectionTitle = (state.sections[activeSection] || {}).title || activeSection;
-  $("agent-chat-context").textContent = artifact
-    ? `${sectionTitle} · ${viewLabel} · ${artifact.id}`
-    : `${sectionTitle} · ${viewLabel}`;
-  const job = state.agent_chat_job || null;
-  if (!history.length && (!job || job.status !== "running")) {
-    const empty = document.createElement("p");
-    empty.className = "figure-agent-chat-empty";
-    empty.textContent = "还没有对话。可以询问图意、数据来源、排版或下一步怎么做。";
-    root.appendChild(empty);
-    updateAgentChatControls();
-    ensureAgentChatPolling();
-    return;
-  }
-  let round = 0;
-  let roundElement = null;
-  history.forEach((turn) => {
-    const user = turn.role === "user";
-    if (user || !roundElement) {
-      round += 1;
-      roundElement = document.createElement("section");
-      roundElement.className = "agent-chat-round";
-      const roundLabel = document.createElement("div");
-      roundLabel.className = "agent-chat-round-label";
-      roundLabel.textContent = `第 ${round} 轮`;
-      roundElement.appendChild(roundLabel);
-      root.appendChild(roundElement);
-    }
-    const message = document.createElement("div");
-    message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`;
-    const header = document.createElement("div");
-    header.className = "agent-chat-message-head";
-    const avatar = document.createElement("span");
-    avatar.className = "agent-chat-avatar";
-    avatar.textContent = user ? "你" : "A";
-    const label = document.createElement("strong");
-    label.textContent = user ? "你" : agentName;
-    header.append(avatar, label);
-    if (!user && turn.execution) {
-      const execution = document.createElement("span");
-      execution.className = `agent-chat-execution ${turn.execution}`;
-      const changedCount = (turn.changed_files || []).length;
-      execution.textContent = turn.execution === "executed"
-        ? `已执行 · ${changedCount} 个文件`
-        : turn.execution === "interrupted_changes"
-          ? `已变更 · ${changedCount} 个文件待核验`
-        : turn.execution === "action_required"
-            ? "需要安全输入"
-            : turn.execution === "runtime_action"
-              ? "已更新运行环境"
-          : turn.execution === "no_changes"
-            ? "已处理 · 无文件变更"
-            : turn.execution === "failed"
-              ? "未执行成功"
-              : turn.execution === "cancelled"
-                ? "已停止"
-              : "仅回答";
-      if (changedCount) execution.title = turn.changed_files.join("\n");
-      header.appendChild(execution);
-    }
-    const content = document.createElement("p");
-    content.textContent = turn.content || "";
-    message.append(header, content);
-    if (!user && turn.action === "replace_api_key") {
-      const action = document.createElement("button");
-      action.type = "button";
-      action.className = "agent-action agent-chat-runtime-key";
-      action.textContent = "安全更换 API Key";
-      action.addEventListener("click", openRuntimeKeyDialog);
-      message.appendChild(action);
-    }
-    if (!user && turn.action === "retry_agent_job" && turn.retry_message) {
-      const action = document.createElement("button");
-      action.type = "button";
-      action.className = "agent-action agent-chat-retry";
-      action.textContent = "续做并核验此任务";
-      action.addEventListener("click", () => {
-        const input = $("figure-agent-chat-input");
-        input.value = `继续完成并核验上次任务，避免重复已有改动。原请求：${turn.retry_message}`;
-        sendFigureAgentChat();
-      });
-      message.appendChild(action);
-    }
-    roundElement.appendChild(message);
-  });
-  if (job && job.status === "running") {
-    if (!roundElement) {
-      roundElement = document.createElement("section");
-      roundElement.className = "agent-chat-round";
-      root.appendChild(roundElement);
-    }
-    const pending = document.createElement("div");
-    pending.className = "figure-agent-chat-message agent pending";
-    const header = document.createElement("div");
-    header.className = "agent-chat-message-head";
-    const avatar = document.createElement("span");
-    avatar.className = "agent-chat-avatar";
-    avatar.textContent = "A";
-    const label = document.createElement("strong");
-    label.textContent = agentName;
-    const execution = document.createElement("span");
-    execution.className = "agent-chat-execution running";
-    execution.textContent = "执行中";
-    const content = document.createElement("p");
-    const spinner = document.createElement("span");
-    spinner.className = "agent-chat-spinner";
-    spinner.setAttribute("aria-hidden", "true");
-    content.append(spinner, document.createTextNode(job.progress_message || `${agentName} 正在执行…`));
-    header.append(avatar, label, execution);
-    pending.append(header, content);
-    roundElement.appendChild(pending);
-  }
-  root.scrollTop = root.scrollHeight;
-  updateAgentChatControls();
-  ensureAgentChatPolling();
-}
-
-function updateAgentChatControls() {
-  const running = Boolean(state && state.agent_chat_job && state.agent_chat_job.status === "running");
-  const input = $("figure-agent-chat-input");
-  const button = $("figure-agent-chat-send");
-  const cancel = $("agent-chat-cancel");
-  input.disabled = running;
-  button.disabled = running;
-  const agentName = state?.project_agent?.label || "Codex";
-  button.textContent = running ? `${agentName} 执行中…` : `发送给 ${agentName}`;
-  cancel.hidden = !running;
-  cancel.disabled = false;
-}
-
-async function pollAgentChatJob() {
-  agentChatPollTimer = null;
-  const wasRunning = Boolean(state && state.agent_chat_job && state.agent_chat_job.status === "running");
-  try {
-    state = normalizeStateUrls(await request("/api/state"));
-    const stillRunning = Boolean(state.agent_chat_job && state.agent_chat_job.status === "running");
-    if (wasRunning && !stillRunning) render();
-    else renderAgentChat();
-  } catch (error) {
-    showMessage(`${state?.project_agent?.label || "Agent"} 状态刷新失败：${error.message}`, true);
-  } finally {
-    ensureAgentChatPolling();
-  }
-}
-
-function ensureAgentChatPolling() {
-  const running = Boolean(state && state.agent_chat_job && state.agent_chat_job.status === "running");
-  if (running && !agentChatPollTimer) {
-    agentChatPollTimer = setTimeout(pollAgentChatJob, 1000);
-  } else if (!running && agentChatPollTimer) {
-    clearTimeout(agentChatPollTimer);
-    agentChatPollTimer = null;
-  }
-}
-
 function renderLayoutPrompt(figure) {
   const input = $("data-layout-prompt");
   const singlePanel = (figure.panels || []).length === 1;
@@ -1443,7 +1276,6 @@ function renderFigures() {
   const figure = selectedFigure();
   if (!figure) return;
   const isTable = figure.kind === "table";
-  renderAgentChat();
   $("figure-phase").textContent = `PHASE ${figure.phase} · ${figure.kind === "table" ? "EDITABLE TABLE" : figure.kind === "mechanism" ? "EDITABLE SCHEMATIC" : "DATA FIGURE"}`;
   $("figure-title").textContent = `${figure.id} · ${figure.title}`;
   $("figure-description").textContent = `${figure.description} · ${figure.width} · ${figure.label}`;
@@ -1721,18 +1553,15 @@ function render() {
     $("figures-workspace").hidden = true;
     $("section-kicker").textContent = "EMPTY STUDIO";
     $("section-title").textContent = "尚未载入论文";
-    ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model", "model-apply"].forEach((id) => {
+    ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model", "model-apply", "runtime-key-open"].forEach((id) => {
       $(id).disabled = true;
     });
-    $("agent-chat-launcher").hidden = true;
     return;
   }
-  $("agent-chat-launcher").hidden = false;
-  ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model"].forEach((id) => {
+  ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model", "runtime-key-open"].forEach((id) => {
     $(id).disabled = false;
   });
   updateModelApplyButton();
-  renderAgentChat();
   const artifactMode = ["figures", "tables"].includes(activeView);
   $("writing-workspace").hidden = artifactMode;
   $("figures-workspace").hidden = !artifactMode;
@@ -2797,82 +2626,6 @@ $("data-compose").onclick = () => runFigureAction(
   "本地 Agent 正在解释组合 Prompt；随后将在 PPT 中排版并导出、裁剪 PDF…",
 );
 
-async function sendFigureAgentChat() {
-  if (agentChatRequestBusy) return;
-  const input = $("figure-agent-chat-input");
-  const button = $("figure-agent-chat-send");
-  const message = input.value.trim();
-  if (!message) return;
-  agentChatRequestBusy = true;
-  const originalLabel = button.textContent;
-  try {
-    button.disabled = true;
-    input.disabled = true;
-    button.textContent = "正在提交…";
-    const payload = await request("/api/agent-chat", {
-      method: "POST",
-      body: JSON.stringify({
-        message,
-        section: activeSection,
-        view: activeView,
-        artifact_id: ["figures", "tables"].includes(activeView) ? activeFigure : "",
-      }),
-    });
-    state = payload.state;
-    input.value = "";
-    render();
-  } catch (error) {
-    showMessage(error.message, true);
-  } finally {
-    agentChatRequestBusy = false;
-    updateAgentChatControls();
-    if (!input.disabled) input.focus();
-  }
-}
-
-$("figure-agent-chat-send").onclick = sendFigureAgentChat;
-$("agent-chat-cancel").onclick = async () => {
-  if (agentChatRequestBusy) return;
-  agentChatRequestBusy = true;
-  const button = $("agent-chat-cancel");
-  button.disabled = true;
-  try {
-    const payload = await request("/api/agent-chat/cancel", {
-      method: "POST",
-      body: "{}",
-    });
-    state = payload.state;
-    render();
-  } catch (error) {
-    showMessage(error.message, true);
-  } finally {
-    agentChatRequestBusy = false;
-    updateAgentChatControls();
-  }
-};
-$("figure-agent-chat-input").addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-    event.preventDefault();
-    sendFigureAgentChat();
-  }
-});
-
-function setAgentChatOpen(open) {
-  if (!state) return;
-  $("agent-chat-overlay").hidden = !open;
-  $("agent-chat-launcher").hidden = open;
-  if (open) {
-    renderAgentChat();
-    setTimeout(() => $("figure-agent-chat-input").focus(), 0);
-  }
-}
-
-$("agent-chat-launcher").onclick = () => setAgentChatOpen(true);
-$("agent-chat-close").onclick = () => setAgentChatOpen(false);
-$("agent-chat-overlay").addEventListener("click", (event) => {
-  if (event.target === $("agent-chat-overlay")) setAgentChatOpen(false);
-});
-
 function openRuntimeKeyDialog() {
   const dialog = $("runtime-key-dialog");
   $("runtime-key-message").textContent = "";
@@ -2886,6 +2639,7 @@ function closeRuntimeKeyDialog() {
   $("runtime-key-dialog").close();
 }
 
+$("runtime-key-open").onclick = openRuntimeKeyDialog;
 $("runtime-key-close").onclick = closeRuntimeKeyDialog;
 $("runtime-key-cancel").onclick = closeRuntimeKeyDialog;
 $("runtime-key-dialog").addEventListener("click", (event) => {
@@ -2917,12 +2671,6 @@ $("runtime-key-form").addEventListener("submit", async (event) => {
     submit.disabled = false;
   }
 });
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !$("agent-chat-overlay").hidden) {
-    setAgentChatOpen(false);
-  }
-});
-
 $("data-layout-prompt").addEventListener("input", (event) => {
   const figure = selectedFigure();
   event.currentTarget.dataset.dirty = "true";

@@ -67,12 +67,11 @@ class Matrix:
         controls = (
             "llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view",
             "figures-view", "tables-view", "compile", "full-draft-start",
-            "full-draft-cancel",
+            "full-draft-cancel", "runtime-key-open",
         )
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()
-        assert page.locator("#agent-chat-launcher").is_hidden()
         expected_banner = not bool(self.state.get("api_key_configured"))
         assert page.locator("#api-key-setup").is_visible() == expected_banner
         assert not posts and not errors, {"posts": posts, "errors": errors}
@@ -140,11 +139,10 @@ class Matrix:
             ),
         )
         self.visit(page, "", "!document.querySelector('#load-error').hidden")
-        controls = ("llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "full-draft-start", "full-draft-cancel")
+        controls = ("llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "full-draft-start", "full-draft-cancel", "runtime-key-open")
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()
-        assert page.locator("#agent-chat-launcher").is_hidden()
         assert not errors, errors
         self.results["initial_failure"] = True
         page.close()
@@ -165,14 +163,23 @@ class Matrix:
             "node => getComputedStyle(node).gridTemplateColumns"
         )
         assert len(desktop_columns.split()) >= 2, desktop_columns
-        page.locator("#agent-chat-launcher").click()
+        page.locator("#runtime-key-open").click()
         page.wait_for_timeout(20)
-        assert page.evaluate("document.activeElement.id") == "figure-agent-chat-input"
-        page.locator("#agent-chat-close").click()
-        assert page.locator("#agent-chat-overlay").is_hidden()
-        page.locator("#agent-chat-launcher").click()
+        assert page.evaluate("document.activeElement.id") == "runtime-key-input"
+        page.locator("#runtime-key-close").click()
+        assert page.locator("#runtime-key-dialog").is_hidden()
+        page.locator("#runtime-key-open").click()
         page.keyboard.press("Escape")
-        assert page.locator("#agent-chat-overlay").is_hidden()
+        assert page.locator("#runtime-key-dialog").is_hidden()
+        page.locator("#runtime-key-open").click()
+        page.locator("#runtime-key-provider").select_option("deepseek")
+        page.locator("#runtime-key-input").fill("sk-matrix-runtime-key-000000")
+        page.locator("#runtime-key-submit").click()
+        page.wait_for_timeout(100)
+        assert any(item.endswith("/api/runtime-key") for item in posts), posts
+        posts.clear()
+        page.locator("#runtime-key-cancel").click()
+        assert page.locator("#runtime-key-dialog").is_hidden()
         page.locator("#reset-generated").click()
         selection = page.locator("#reset-project-id").evaluate(
             "node => [node.selectionStart, node.selectionEnd, node.value.length]"
@@ -464,15 +471,6 @@ class Matrix:
             lambda page: page.evaluate("window.confirm = () => true"),
         )
         run_case(
-            "agent_send",
-            "#figure-agent-chat-send",
-            "/api/agent-chat",
-            lambda page: (
-                page.locator("#agent-chat-launcher").click(),
-                page.locator("#figure-agent-chat-input").fill("Matrix message"),
-            ),
-        )
-        run_case(
             "accept",
             "#accept",
             "/api/accept",
@@ -494,7 +492,7 @@ class Matrix:
                 "/api/select-paragraph",
                 path=f"/?view=writing&section={navigation_section}",
             )
-        self.results["foreground_double_dispatch"] = 8 if navigation_section else 7
+        self.results["foreground_double_dispatch"] = 7 if navigation_section else 6
 
     def title_and_prose_transactions(self) -> None:
         title_fixture = safe_fixture(self.state)
@@ -747,67 +745,6 @@ class Matrix:
                 "#figure-message",
             )
         self.results["failure_restores_visible_drafts"] = 2 + int(bool(figure)) + int(bool(table))
-
-    def agent_cancel_terminal_state(self) -> None:
-        fixture = safe_fixture(self.state)
-        fixture["agent_chat_history"] = [
-            {"role": "user", "content": "Run the matrix task."},
-        ]
-        fixture["agent_chat_job"] = {
-            "token": "matrix-job",
-            "status": "running",
-            "progress_message": "Matrix agent is running…",
-        }
-        page = self.browser.new_page()
-        errors: list[str] = []
-        posts: list[str] = []
-        page.on("pageerror", lambda error: errors.append(str(error)))
-
-        def api(route) -> None:
-            if route.request.method == "GET":
-                route.fulfill(status=200, content_type="application/json", body=json.dumps(fixture))
-                return
-            posts.append(route.request.url)
-            assert route.request.url.endswith("/api/agent-chat/cancel"), route.request.url
-            fixture["agent_chat_job"] = {
-                "token": "matrix-job",
-                "status": "cancelled",
-                "progress_message": "本地 Agent 调用已停止。",
-            }
-            fixture["agent_chat_history"].append(
-                {
-                    "role": "assistant",
-                    "content": "已停止本次本地 Agent 调用。",
-                    "execution": "cancelled",
-                    "changed_files": [],
-                }
-            )
-            route.fulfill(
-                status=200,
-                content_type="application/json",
-                body=json.dumps({"ok": True, "state": fixture}),
-            )
-
-        page.route("**/api/**", api)
-        self.visit(page, "/?view=writing&section=abstract", "document.querySelector('#section-title').textContent !== 'Loading…'")
-        page.locator("#agent-chat-launcher").click()
-        assert page.locator("#figure-agent-chat-input").is_disabled()
-        assert page.locator("#figure-agent-chat-send").is_disabled()
-        assert page.locator("#agent-chat-cancel").is_visible()
-        page.eval_on_selector(
-            "#agent-chat-cancel",
-            "node => { node.dispatchEvent(new MouseEvent('click', {bubbles: true})); "
-            "node.dispatchEvent(new MouseEvent('click', {bubbles: true})); }",
-        )
-        page.wait_for_timeout(100)
-        assert len(posts) == 1, posts
-        assert page.locator("#agent-chat-cancel").is_hidden()
-        assert page.locator("#figure-agent-chat-input").is_enabled()
-        assert "已停止本次本地 Agent 调用" in page.locator("#figure-agent-chat-history").inner_text()
-        assert "已停止" in page.locator("#figure-agent-chat-history").inner_text()
-        assert not errors, errors
-        self.results["agent_cancel_terminal_state"] = True
-        page.close()
 
     def generated_reset_dialog(self) -> None:
         fixture = safe_fixture(self.state)
@@ -1478,7 +1415,6 @@ class Matrix:
             self.title_and_prose_transactions,
             self.approved_table_update,
             self.failure_restores_visible_drafts,
-            self.agent_cancel_terminal_state,
             self.generated_reset_dialog,
             self.artifact_double_dispatch,
             self.automatic_generation_sequence,

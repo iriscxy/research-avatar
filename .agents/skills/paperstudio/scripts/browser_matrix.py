@@ -67,14 +67,11 @@ class Matrix:
         controls = (
             "llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view",
             "figures-view", "tables-view", "compile", "full-draft-start",
-            "full-draft-cancel",
+            "full-draft-cancel", "runtime-key-open",
         )
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()
-        assert page.locator("#agent-chat-launcher").is_hidden()
-        assert page.locator("#paper-contract").count() == 0
-        assert page.locator("#project-export").is_hidden()
         expected_banner = not bool(self.state.get("api_key_configured"))
         assert page.locator("#api-key-setup").is_visible() == expected_banner
         assert not posts and not errors, {"posts": posts, "errors": errors}
@@ -124,10 +121,6 @@ class Matrix:
                 assert page.locator("#llm-runtime-config").is_hidden()
                 assert page.locator("#model-runtime-config").is_visible()
                 assert page.locator("#model-suggestions option").count() >= 2
-                assert page.locator("#paper-contract").count() == 0
-                assert page.locator("#api-usage").count() == 0
-                assert page.locator("#conversation-status").count() == 0
-                assert page.locator("#project-export").is_visible() == bool(fixture["project"].get("export_url"))
         assert not posts, posts
         assert not errors, errors
         self.results["all_views"] = len(visited)
@@ -146,11 +139,10 @@ class Matrix:
             ),
         )
         self.visit(page, "", "!document.querySelector('#load-error').hidden")
-        controls = ("llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "full-draft-start", "full-draft-cancel")
+        controls = ("llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "full-draft-start", "full-draft-cancel", "runtime-key-open")
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()
-        assert page.locator("#agent-chat-launcher").is_hidden()
         assert not errors, errors
         self.results["initial_failure"] = True
         page.close()
@@ -171,14 +163,23 @@ class Matrix:
             "node => getComputedStyle(node).gridTemplateColumns"
         )
         assert len(desktop_columns.split()) >= 2, desktop_columns
-        page.locator("#agent-chat-launcher").click()
+        page.locator("#runtime-key-open").click()
         page.wait_for_timeout(20)
-        assert page.evaluate("document.activeElement.id") == "figure-agent-chat-input"
-        page.locator("#agent-chat-close").click()
-        assert page.locator("#agent-chat-overlay").is_hidden()
-        page.locator("#agent-chat-launcher").click()
+        assert page.evaluate("document.activeElement.id") == "runtime-key-input"
+        page.locator("#runtime-key-close").click()
+        assert page.locator("#runtime-key-dialog").is_hidden()
+        page.locator("#runtime-key-open").click()
         page.keyboard.press("Escape")
-        assert page.locator("#agent-chat-overlay").is_hidden()
+        assert page.locator("#runtime-key-dialog").is_hidden()
+        page.locator("#runtime-key-open").click()
+        page.locator("#runtime-key-provider").select_option("deepseek")
+        page.locator("#runtime-key-input").fill("sk-matrix-runtime-key-000000")
+        page.locator("#runtime-key-submit").click()
+        page.wait_for_timeout(100)
+        assert any(item.endswith("/api/runtime-key") for item in posts), posts
+        posts.clear()
+        page.locator("#runtime-key-cancel").click()
+        assert page.locator("#runtime-key-dialog").is_hidden()
         page.locator("#reset-generated").click()
         selection = page.locator("#reset-project-id").evaluate(
             "node => [node.selectionStart, node.selectionEnd, node.value.length]"
@@ -470,15 +471,6 @@ class Matrix:
             lambda page: page.evaluate("window.confirm = () => true"),
         )
         run_case(
-            "agent_send",
-            "#figure-agent-chat-send",
-            "/api/agent-chat",
-            lambda page: (
-                page.locator("#agent-chat-launcher").click(),
-                page.locator("#figure-agent-chat-input").fill("Matrix message"),
-            ),
-        )
-        run_case(
             "accept",
             "#accept",
             "/api/accept",
@@ -500,7 +492,7 @@ class Matrix:
                 "/api/select-paragraph",
                 path=f"/?view=writing&section={navigation_section}",
             )
-        self.results["foreground_double_dispatch"] = 8 if navigation_section else 7
+        self.results["foreground_double_dispatch"] = 7 if navigation_section else 6
 
     def title_and_prose_transactions(self) -> None:
         title_fixture = safe_fixture(self.state)
@@ -753,184 +745,6 @@ class Matrix:
                 "#figure-message",
             )
         self.results["failure_restores_visible_drafts"] = 2 + int(bool(figure)) + int(bool(table))
-
-    def agent_cancel_terminal_state(self) -> None:
-        fixture = safe_fixture(self.state)
-        fixture["agent_chat_history"] = [
-            {"role": "user", "content": "Run the matrix task."},
-        ]
-        fixture["agent_chat_job"] = {
-            "token": "matrix-job",
-            "status": "running",
-            "progress_message": "Matrix agent is running…",
-        }
-        page = self.browser.new_page()
-        errors: list[str] = []
-        posts: list[str] = []
-        page.on("pageerror", lambda error: errors.append(str(error)))
-
-        def api(route) -> None:
-            if route.request.method == "GET":
-                route.fulfill(status=200, content_type="application/json", body=json.dumps(fixture))
-                return
-            posts.append(route.request.url)
-            assert route.request.url.endswith("/api/agent-chat/cancel"), route.request.url
-            fixture["agent_chat_job"] = {
-                "token": "matrix-job",
-                "status": "cancelled",
-                "progress_message": "项目 Agent 调用已停止。",
-            }
-            fixture["agent_chat_history"].append(
-                {
-                    "role": "assistant",
-                    "content": "已停止本次项目 Agent 调用。",
-                    "execution": "cancelled",
-                    "changed_files": [],
-                }
-            )
-            route.fulfill(
-                status=200,
-                content_type="application/json",
-                body=json.dumps({"ok": True, "state": fixture}),
-            )
-
-        page.route("**/api/**", api)
-        self.visit(page, "/?view=writing&section=abstract", "document.querySelector('#section-title').textContent !== 'Loading…'")
-        page.locator("#agent-chat-launcher").click()
-        assert page.locator("#figure-agent-chat-input").is_disabled()
-        assert page.locator("#figure-agent-chat-send").is_disabled()
-        assert page.locator("#agent-chat-cancel").is_visible()
-        page.eval_on_selector(
-            "#agent-chat-cancel",
-            "node => { node.dispatchEvent(new MouseEvent('click', {bubbles: true})); "
-            "node.dispatchEvent(new MouseEvent('click', {bubbles: true})); }",
-        )
-        page.wait_for_timeout(100)
-        assert len(posts) == 1, posts
-        assert page.locator("#agent-chat-cancel").is_hidden()
-        assert page.locator("#figure-agent-chat-input").is_enabled()
-        assert "已停止本次项目 Agent 调用" in page.locator("#figure-agent-chat-history").inner_text()
-        assert "已停止" in page.locator("#figure-agent-chat-history").inner_text()
-        assert not errors, errors
-        self.results["agent_cancel_terminal_state"] = True
-        page.close()
-
-    def runtime_key_safe_action(self) -> None:
-        fixture = safe_fixture(self.state)
-        fixture["agent_chat_history"] = [
-            {"role": "user", "content": "更换 API Key"},
-            {
-                "role": "assistant",
-                "content": "请使用安全输入框更换 API Key。",
-                "execution": "action_required",
-                "action": "replace_api_key",
-                "changed_files": [],
-            },
-        ]
-        fixture["agent_chat_job"] = None
-        page = self.browser.new_page()
-        errors: list[str] = []
-        posts: list[str] = []
-        page.on("pageerror", lambda error: errors.append(str(error)))
-
-        def api(route) -> None:
-            if route.request.method == "GET":
-                route.fulfill(status=200, content_type="application/json", body=json.dumps(fixture))
-                return
-            posts.append(route.request.url)
-            assert route.request.url.endswith("/api/runtime-key"), route.request.url
-            fixture["agent_chat_history"][-1].update(
-                content="API Key 已在当前运行内存中安全更新。",
-                execution="runtime_action",
-                action="replace_api_key_completed",
-            )
-            route.fulfill(
-                status=200,
-                content_type="application/json",
-                body=json.dumps({"ok": True, "state": fixture}),
-            )
-
-        page.route("**/api/**", api)
-        self.visit(page, "/?view=writing", "document.querySelector('#section-title').textContent !== 'Loading…'")
-        page.locator("#agent-chat-launcher").click()
-        page.locator(".agent-chat-runtime-key").click()
-        assert page.locator("#runtime-key-dialog").is_visible()
-        page.locator("#runtime-key-cancel").click()
-        assert page.locator("#runtime-key-dialog").is_hidden()
-        page.locator(".agent-chat-runtime-key").click()
-        page.locator("#runtime-key-close").click()
-        assert page.locator("#runtime-key-dialog").is_hidden()
-        page.locator(".agent-chat-runtime-key").click()
-        page.locator("#runtime-key-provider").select_option("openai")
-        page.locator("#runtime-key-input").fill("sk-matrix-secret")
-        page.locator("#runtime-key-submit").click()
-        page.wait_for_function("!document.querySelector('#runtime-key-dialog').open")
-        assert page.locator("#runtime-key-input").input_value() == ""
-        assert "sk-matrix-secret" not in page.locator("#figure-agent-chat-history").inner_text()
-        assert "已更新运行环境" in page.locator("#figure-agent-chat-history").inner_text()
-        assert len(posts) == 1 and not errors, {"posts": posts, "errors": errors}
-        self.results["runtime_key_safe_action"] = True
-        page.close()
-
-    def agent_restart_retry_action(self) -> None:
-        fixture = safe_fixture(self.state)
-        original = "experiment 插入一个段"
-        fixture["agent_chat_history"] = [
-            {"role": "user", "content": original},
-            {
-                "role": "assistant",
-                "content": "服务重启中断了 Agent 回复，但检测到 1 个项目文件已变更。",
-                "execution": "interrupted_changes",
-                "changed_files": ["paper/paragraph_plan.json"],
-                "action": "retry_agent_job",
-                "retry_message": original,
-            },
-        ]
-        fixture["agent_chat_job"] = {"status": "failed"}
-        page = self.browser.new_page()
-        errors: list[str] = []
-        posts: list[dict[str, Any]] = []
-        page.on("pageerror", lambda error: errors.append(str(error)))
-
-        def api(route) -> None:
-            if route.request.method == "GET":
-                route.fulfill(status=200, content_type="application/json", body=json.dumps(fixture))
-                return
-            body = route.request.post_data_json
-            posts.append({"url": route.request.url, "body": body})
-            assert route.request.url.endswith("/api/agent-chat"), route.request.url
-            assert body["message"].startswith("继续完成并核验上次任务"), body
-            assert original in body["message"], body
-            fixture["agent_chat_history"].extend(
-                [
-                    {"role": "user", "content": body["message"]},
-                    {
-                        "role": "assistant",
-                        "content": "已续做并核验完成。",
-                        "execution": "no_changes",
-                        "changed_files": [],
-                    },
-                ]
-            )
-            fixture["agent_chat_job"] = {"status": "completed"}
-            route.fulfill(
-                status=202,
-                content_type="application/json",
-                body=json.dumps({"ok": True, "state": fixture}),
-            )
-
-        page.route("**/api/**", api)
-        self.visit(page, "/?view=writing", "document.querySelector('#section-title').textContent !== 'Loading…'")
-        page.locator("#agent-chat-launcher").click()
-        assert "已变更 · 1 个文件待核验" in page.locator("#figure-agent-chat-history").inner_text()
-        page.locator(".agent-chat-retry").click()
-        page.wait_for_timeout(100)
-        assert len(posts) == 1, posts
-        assert "已续做并核验完成" in page.locator("#figure-agent-chat-history").inner_text()
-        assert page.locator("#figure-agent-chat-input").input_value() == ""
-        assert not errors, errors
-        self.results["agent_restart_retry_action"] = True
-        page.close()
 
     def generated_reset_dialog(self) -> None:
         fixture = safe_fixture(self.state)
@@ -1335,7 +1149,6 @@ class Matrix:
                 ready=True,
                 status="built",
                 gpt_preview_url="/static/matrix-reference.png",
-                gpt_preview_no_text=True,
                 paper_preview_url="/paper.pdf",
                 preview_url="/paper.pdf",
                 preview_type="pdf",
@@ -1345,11 +1158,10 @@ class Matrix:
             card = page.locator(".figure-card", has_text=target["id"])
             if card.count() and "selected" not in (card.get_attribute("class") or ""):
                 card.click()
-            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示 GPT 构图底图（无文字）"
-            assert "可编辑 PPT/PDF 完整版" in page.locator("#mechanism-preview-note").inner_text()
+            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示 GPT 原图"
             assert page.locator("#figure-preview-pdf").is_visible()
             page.locator("#mechanism-preview-toggle").click()
-            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示可编辑 PPT/PDF 完整版"
+            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示 PPT/PDF 版"
             assert page.locator("#figure-preview-image").is_visible()
             page.locator("#mechanism-preview-toggle").click()
             assert page.locator("#figure-preview-pdf").is_visible()
@@ -1423,9 +1235,6 @@ class Matrix:
         fixture["pdf"]["page_count"] = max(2, int(fixture["pdf"].get("page_count") or 0))
         page, errors, posts = self.page(fixture)
         self.visit(page, f"/?view=writing&section={first}", "document.querySelectorAll('.pdf-page').length > 0")
-        assert page.locator("#pdf-download").is_visible()
-        assert page.locator("#pdf-download").get_attribute("href") == fixture["pdf"]["url"]
-        assert page.locator("#pdf-download").get_attribute("download").endswith(".pdf")
         assert page.locator("#pdf-navigation").is_hidden()
         page.locator("#pdf-navigation-toggle").click()
         assert page.locator("#pdf-navigation").is_visible()
@@ -1606,9 +1415,6 @@ class Matrix:
             self.title_and_prose_transactions,
             self.approved_table_update,
             self.failure_restores_visible_drafts,
-            self.runtime_key_safe_action,
-            self.agent_cancel_terminal_state,
-            self.agent_restart_retry_action,
             self.generated_reset_dialog,
             self.artifact_double_dispatch,
             self.automatic_generation_sequence,
