@@ -79,6 +79,14 @@ export class OnlineStudioContainerV10 extends OnlineStudioContainer {}
 // pre-review static bundle from an already-running V10 container.
 export class OnlineStudioContainerV11 extends OnlineStudioContainer {}
 
+// Refresh-resume release: an in-place image edit under V11 left the already
+// -running instance serving the pre-fix app.js (confirmed byte-for-byte
+// against the pushed image) even after the Container app config, the Worker
+// deployment, and a brand-new Worker-version-scoped instance name all showed
+// the new image — rotate the pool once more, per the same pattern as every
+// release above.
+export class OnlineStudioContainerV12 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
