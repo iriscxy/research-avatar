@@ -103,6 +103,11 @@ class Session:
     model: str
     process: subprocess.Popen[bytes]
     port: int
+    # In-memory only, exactly like the child process's own environment
+    # variable copy of the same value: never logged, persisted, or returned
+    # to the browser. Kept so a crashed child (see _ensure_session_alive)
+    # can be respawned without asking the researcher to re-enter it.
+    api_key: str = ""
     kind: str = "user"
     created_at: float = field(default_factory=time.time)
     last_access: float = field(default_factory=time.time)
@@ -1513,7 +1518,7 @@ def create_session(payload: dict[str, Any], *, user_id: str) -> Session:
         if root.exists():
             shutil.rmtree(root)
         raise
-    session = Session(session_id, user_id, root, provider, model, process, port)
+    session = Session(session_id, user_id, root, provider, model, process, port, api_key)
     with SESSIONS_LOCK:
         SESSIONS[session_id] = session
     return session
@@ -1553,6 +1558,7 @@ def demo_session() -> Session:
             "gpt-5-nano",
             process,
             port,
+            "demo-read-only-no-api-calls",
             kind="demo",
         )
         return DEMO_SESSION
@@ -1600,11 +1606,51 @@ def create_demo_copy_session(payload: dict[str, Any], *, user_id: str) -> Sessio
         "gpt-5-nano",
         process,
         port,
+        api_key,
         kind="demo-copy",
     )
     with SESSIONS_LOCK:
         SESSIONS[session_id] = session
     return session
+
+
+def _ensure_session_alive(session: Session) -> bool:
+    """Respawn a session's writer process if it died underneath it.
+
+    A live batch full-draft job runs almost entirely in a background thread
+    with no inbound HTTP request in flight; a container platform hiccup or
+    an unexpected child-process death otherwise strands the researcher with
+    a permanent "会话不存在或已过期" even though every accepted paragraph
+    was already durably written to paper/sections/*.tex and
+    paper/.paper_studio/state.json. research_avatar.paper_studio.server
+    already has dedicated recovery logic for exactly this — a fresh process
+    pointed at the same root detects a stale full_draft_job from a
+    different SERVER_INSTANCE_TOKEN at startup and turns it into a clean
+    "服务已重启...可从未完成段落继续" state — but only if something actually
+    restarts the child. This is that something.
+    """
+    if session.process.poll() is None:
+        return True
+    if not session.api_key:
+        return False
+    try:
+        process, port = _start_worker(
+            session.root,
+            session.provider,
+            session.model,
+            session.api_key,
+            demo_mode=(session.kind == "demo"),
+        )
+    except Exception:
+        return False
+    with SESSIONS_LOCK:
+        if session.process.poll() is None:
+            # Another thread already respawned this session first.
+            process.terminate()
+            return True
+        session.process = process
+        session.port = port
+    return True
 
 
 def _session_from_cookie(header: str | None, *, user_id: str) -> Session | None:
@@ -1613,14 +1659,14 @@ def _session_from_cookie(header: str | None, *, user_id: str) -> Session | None:
         return None
     with SESSIONS_LOCK:
         session = SESSIONS.get(session_id)
-        if (
-            session
-            and session.user_id == user_id
-            and session.process.poll() is None
-        ):
-            session.last_access = time.time()
-            return session
-    return None
+        if session is None or session.user_id != user_id:
+            return None
+    if not _ensure_session_alive(session):
+        with SESSIONS_LOCK:
+            SESSIONS.pop(session_id, None)
+        return None
+    session.last_access = time.time()
+    return session
 
 
 def close_session(header: str | None, *, user_id: str) -> bool:
