@@ -82,6 +82,18 @@ the temporary Paper Studio process. Copy the example config to the ignored local
 `wrangler.jsonc`, create the D1 database, apply its migrations, push the amd64
 container image to Cloudflare Registry, and run `npm run deploy`.
 
+The container config pins `constraints.regions` to `WNAM`/`ENAM`/`WEUR`. Every
+OpenAI (and DeepSeek) call is made from inside the Container's own network
+egress, not the researcher's browser, so Cloudflare's default nearest-to-requester
+placement can schedule the Container in a region whose egress IP OpenAI
+classifies as an unsupported country/region/territory (HTTP 403,
+`unsupported_country_region_territory`) — every request then fails immediately,
+independent of the researcher's own account or location, and retrying or
+resuming the batch job cannot help until placement changes. Keep the regions
+list restricted to geographies OpenAI reliably serves; do not add `APAC` or `ME`
+without confirming the actual Cloudflare Container point of presence in that
+constraint is not itself in an embargoed/unsupported territory.
+
 To enable Google login on the public deployment, create a Google OAuth 2.0 Web
 application with this exact authorized redirect URI:
 

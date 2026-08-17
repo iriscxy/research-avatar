@@ -13,7 +13,10 @@
       "class_name": "OnlineStudioContainerV11",
       "image": "registry.cloudflare.com/CLOUDFLARE_ACCOUNT_ID/research-avatar-studio-onlinestudiocontainer:REPLACE_WITH_IMAGE_TAG",
       "instance_type": "basic",
-      "max_instances": 6
+      "max_instances": 6,
+      "constraints": {
+        "regions": ["WNAM", "ENAM", "WEUR"]
+      }
     }
   ],
   "durable_objects": {
