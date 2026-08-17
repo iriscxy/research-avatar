@@ -1684,7 +1684,7 @@ function render() {
   $("project-subtitle").textContent = project.subtitle || "逐段对话、确认后写入 LaTeX";
   const target = project.target || {};
   const referencePaper = project.reference_paper || {};
-  const contractReady = Boolean(target.venue && referencePaper.title);
+  const contractReady = Boolean(target.venue && referencePaper.title && !state.demo_mode);
   $("paper-contract").hidden = !contractReady;
   $("target-conference").textContent = [target.venue, target.track]
     .filter(Boolean)

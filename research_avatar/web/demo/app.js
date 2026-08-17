@@ -154,8 +154,13 @@ const paperStudioScreenshots = () => `<section class="paper-studio-live">
   <p class="artifact-kicker">论文写作工作区</p>
   <h4>这就是完成论文后的真实 Paper Studio</h4>
   <p>下面加载固定应用本身，而不是截图或重新绘制的假界面。可以切换正文、图和表，浏览每个已写段落、生成历史、可编辑图表与最终 PDF；Demo 使用完成态项目的只读副本，不会产生 API 费用。</p>
+  <a class="paper-studio-open-callout" href="/demo-studio/" target="_blank" rel="noopener">
+    <span>建议在新页面打开</span>
+    <strong>打开完整 Paper Studio →</strong>
+    <small>使用更大的窗口查看论文正文、图表和 PDF，体验会更清楚。</small>
+  </a>
   <div class="paper-studio-frame-shell">
-    <div class="paper-studio-frame-bar"><span>完成态 Demo · 只读</span><a href="/demo-studio/" target="_blank" rel="noopener">在新页面打开</a></div>
+    <div class="paper-studio-frame-bar"><span>完成态 Demo · 只读</span></div>
     <iframe src="/demo-studio/" title="完成态 Paper Studio 交互 Demo" loading="lazy"></iframe>
   </div>
 </section>`;

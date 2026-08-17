@@ -1964,11 +1964,13 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get("Content-Type"):
             headers["Content-Type"] = self.headers["Content-Type"]
         connection = http.client.HTTPConnection("127.0.0.1", session.port, timeout=300)
+        response_started = False
         try:
             connection.request(self.command, path, body=body, headers=headers)
             response = connection.getresponse()
             data = response.read()
             self.send_response(response.status)
+            response_started = True
             for name, value in response.getheaders():
                 if name.lower() not in {"connection", "server", "date", "transfer-encoding", "content-length"}:
                     self.send_header(name, value)
@@ -1976,8 +1978,13 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
         except (OSError, http.client.HTTPException):
-            self._json({"ok": False, "error": "写作进程暂时不可用。"}, 502)
+            if response_started:
+                self.close_connection = True
+            else:
+                self._json({"ok": False, "error": "写作进程暂时不可用。"}, 502)
         finally:
             connection.close()
 
