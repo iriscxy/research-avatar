@@ -1181,6 +1181,10 @@ function renderAgentChat() {
   const root = $("figure-agent-chat-history");
   root.replaceChildren();
   const history = state.agent_chat_history || [];
+  const agentName = state.project_agent?.label || "Codex";
+  $("agent-chat-title").textContent = agentName;
+  $("agent-chat-launcher").title = `${agentName} 对话`;
+  $("agent-chat-launcher").setAttribute("aria-label", `打开 ${agentName} 对话`);
   const artifact = ["figures", "tables"].includes(activeView) ? selectedFigure() : null;
   const viewLabel = activeView === "figures" ? "图" : activeView === "tables" ? "表" : "正文";
   const sectionTitle = (state.sections[activeSection] || {}).title || activeSection;
@@ -1219,7 +1223,7 @@ function renderAgentChat() {
     avatar.className = "agent-chat-avatar";
     avatar.textContent = user ? "你" : "A";
     const label = document.createElement("strong");
-    label.textContent = user ? "你" : "项目 Agent";
+    label.textContent = user ? "你" : agentName;
     header.append(avatar, label);
     if (!user && turn.execution) {
       const execution = document.createElement("span");
@@ -1229,9 +1233,7 @@ function renderAgentChat() {
         ? `已执行 · ${changedCount} 个文件`
         : turn.execution === "interrupted_changes"
           ? `已变更 · ${changedCount} 个文件待核验`
-        : turn.execution === "confirmation_required"
-          ? "等待确认"
-          : turn.execution === "action_required"
+        : turn.execution === "action_required"
             ? "需要安全输入"
             : turn.execution === "runtime_action"
               ? "已更新运行环境"
@@ -1284,7 +1286,7 @@ function renderAgentChat() {
     avatar.className = "agent-chat-avatar";
     avatar.textContent = "A";
     const label = document.createElement("strong");
-    label.textContent = "项目 Agent";
+    label.textContent = agentName;
     const execution = document.createElement("span");
     execution.className = "agent-chat-execution running";
     execution.textContent = "执行中";
@@ -1292,7 +1294,7 @@ function renderAgentChat() {
     const spinner = document.createElement("span");
     spinner.className = "agent-chat-spinner";
     spinner.setAttribute("aria-hidden", "true");
-    content.append(spinner, document.createTextNode(job.progress_message || "项目 Agent 正在执行…"));
+    content.append(spinner, document.createTextNode(job.progress_message || `${agentName} 正在执行…`));
     header.append(avatar, label, execution);
     pending.append(header, content);
     roundElement.appendChild(pending);
@@ -1309,7 +1311,8 @@ function updateAgentChatControls() {
   const cancel = $("agent-chat-cancel");
   input.disabled = running;
   button.disabled = running;
-  button.textContent = running ? "项目 Agent 执行中…" : "发送给项目 Agent";
+  const agentName = state?.project_agent?.label || "Codex";
+  button.textContent = running ? `${agentName} 执行中…` : `发送给 ${agentName}`;
   cancel.hidden = !running;
   cancel.disabled = false;
 }
@@ -1323,7 +1326,7 @@ async function pollAgentChatJob() {
     if (wasRunning && !stillRunning) render();
     else renderAgentChat();
   } catch (error) {
-    showMessage(`项目 Agent 状态刷新失败：${error.message}`, true);
+    showMessage(`${state?.project_agent?.label || "Agent"} 状态刷新失败：${error.message}`, true);
   } finally {
     ensureAgentChatPolling();
   }
@@ -1444,13 +1447,6 @@ function renderFigures() {
   $("figure-phase").textContent = `PHASE ${figure.phase} · ${figure.kind === "table" ? "EDITABLE TABLE" : figure.kind === "mechanism" ? "EDITABLE SCHEMATIC" : "DATA FIGURE"}`;
   $("figure-title").textContent = `${figure.id} · ${figure.title}`;
   $("figure-description").textContent = `${figure.description} · ${figure.width} · ${figure.label}`;
-  $("figure-conversation-status").style.display = figure.kind === "table" ? "none" : "";
-  $("figure-conversation-status").textContent = figure.conversation_active
-    ? `${figure.id} conversation active`
-    : `New ${figure.id} conversation`;
-  $("figure-conversation-status").className = `status ${figure.conversation_active ? "ok" : ""}`;
-  $("figure-status").textContent = figure.status;
-  $("figure-status").className = `status ${figure.status === "approved" ? "ok" : figure.ready ? "" : "warn"}`;
   const gate = $("figure-gate");
   const insertionBlocked = figure.insertion_ready === false;
   gate.textContent = !figure.ready
@@ -1713,19 +1709,6 @@ function render() {
   $("project-eyebrow").textContent = project.eyebrow || project.name || "PAPER PROJECT";
   $("studio-title").textContent = project.studio_title || "Paper Studio";
   $("project-subtitle").textContent = project.subtitle || "逐段对话、确认后写入 LaTeX";
-  const target = project.target || {};
-  const referencePaper = project.reference_paper || {};
-  const contractReady = Boolean(target.venue && referencePaper.title && !state.demo_mode);
-  $("paper-contract").hidden = !contractReady;
-  $("target-conference").textContent = [target.venue, target.track]
-    .filter(Boolean)
-    .join(" · ") || "—";
-  $("reference-paper").textContent = [referencePaper.title, referencePaper.venue]
-    .filter(Boolean)
-    .join(" · ") || "—";
-  $("paper-contract-source").textContent = project.decision_source
-    ? `已从 ${project.decision_source} 继承；写作阶段无需重新选择。`
-    : "已从批准的前置计划继承；写作阶段无需重新选择。";
   const projectExport = $("project-export");
   projectExport.hidden = !project.export_url;
   if (project.export_url) projectExport.href = studioPath(project.export_url);
@@ -1738,9 +1721,6 @@ function render() {
     $("figures-workspace").hidden = true;
     $("section-kicker").textContent = "EMPTY STUDIO";
     $("section-title").textContent = "尚未载入论文";
-    $("api-status").textContent = apiKeyReady ? "Shell ready · API key ready" : "Shell ready · API key missing";
-    $("api-status").className = "status " + (apiKeyReady ? "ok" : "warn");
-    $("conversation-status").style.display = "none";
     ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model", "model-apply"].forEach((id) => {
       $(id).disabled = true;
     });
@@ -1759,7 +1739,6 @@ function render() {
   $("writing-view").classList.toggle("active", !artifactMode);
   $("figures-view").classList.toggle("active", activeView === "figures");
   $("tables-view").classList.toggle("active", activeView === "tables");
-  $("conversation-status").style.display = artifactMode ? "none" : "";
   if (artifactMode) {
     $("section-kicker").textContent = activeView === "tables" ? "TABLE WORKFLOW" : "FIGURE WORKFLOW";
     $("section-title").textContent = activeView === "tables" ? "Tables" : "Figures";
@@ -1769,14 +1748,6 @@ function render() {
   $("section-kicker").textContent = "SECTION";
   const section = state.sections[activeSection];
   $("section-title").textContent = section.title;
-  $("api-status").textContent = `${apiKeySetup.provider_label || "LLM"} · ${state.api_key_configured ? "API ready" : "API missing"}`;
-  $("api-status").className = "status " + (state.api_key_configured ? "ok" : "warn");
-  const usage = state.api_usage || {};
-  const costPrefix = usage.is_complete_estimate ? "" : "≥ ";
-  $("api-usage").textContent = `${Number(usage.total_tokens || 0).toLocaleString()} tokens · ${costPrefix}$${Number(usage.estimated_cost_usd || 0).toFixed(4)}`;
-  $("api-usage").title = `${usage.api_calls || 0} API calls；input ${usage.input_tokens || 0}，cached ${usage.cached_input_tokens || 0}，output ${usage.output_tokens || 0}。费用是按调用当日价目估算；未识别价格的调用不计入金额。`;
-  $("conversation-status").textContent = section.conversation_active ? "Conversation active" : "New conversation";
-  $("conversation-status").className = "status " + (section.conversation_active ? "ok" : "");
   $("title-editor").hidden = activeSection !== "abstract";
   if (activeSection === "abstract") renderTitleEditor();
   renderParagraphNavigation(section);
@@ -3038,8 +3009,6 @@ $("table-approve").onclick = () => runFigureAction(
 
 refresh().catch((error) => {
   $("section-title").textContent = "加载失败";
-  $("api-status").textContent = "State unavailable";
-  $("api-status").className = "status warn";
   $("load-error-message").textContent = error.message;
   $("load-error").hidden = false;
 });

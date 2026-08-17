@@ -438,6 +438,13 @@ export default {
         return logout(request, env);
       }
       const user = await currentUser(request, env);
+      if (
+        request.method === "GET"
+        && !user
+        && (path === "/studio" || path === "/demo-studio" || path.startsWith("/demo-studio/"))
+      ) {
+        return Response.redirect(new URL("/?login_required=1", request.url), 302);
+      }
       if (request.method === "GET" && path === "/api/auth/session") {
         return json({
           ok: true,

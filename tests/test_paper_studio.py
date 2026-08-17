@@ -1381,13 +1381,13 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260817.8"', html)
+        self.assertIn('src="static/app.js?v=20260817.9"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
         self.assertIn('id="figures-view" disabled', html)
         self.assertIn('id="compile" class="secondary" disabled', html)
-        self.assertIn('title="项目 Agent 对话" hidden', html)
+        self.assertIn('id="agent-chat-title">Codex</strong>', html)
         self.assertIn('id="load-error" class="empty-project" hidden', html)
         self.assertIn('id="load-error-message"', html)
         self.assertIn('id="project-eyebrow"', html)
@@ -1521,7 +1521,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260817.8"', html)
+        self.assertIn('src="static/app.js?v=20260817.9"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1531,7 +1531,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('roundLabel.textContent = `第 ${round} 轮`', source)
         self.assertIn('message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`', source)
         self.assertIn("agent-chat-round", source)
-        self.assertIn('href="static/style.css?v=20260817.8"', html)
+        self.assertIn('href="static/style.css?v=20260817.9"', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)
@@ -1549,7 +1549,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn("&& !nextParagraph.accepted_text", source)
         self.assertIn("agent-chat-execution", source)
         self.assertIn("已执行 · ${changedCount} 个文件", source)
-        self.assertIn("等待确认", source)
+        self.assertNotIn("等待确认", source)
         self.assertIn("已处理 · 无文件变更", source)
         self.assertIn('id="pdf-viewer"', html)
         self.assertIn('id="pdf-pages"', html)
@@ -1564,10 +1564,13 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('id="pdf-navigation-toggle"', html)
         self.assertIn('id="pdf-download"', html)
         self.assertIn('id="project-export"', html)
-        self.assertIn('id="paper-contract"', html)
-        self.assertIn("target.venue && referencePaper.title && !state.demo_mode", source)
-        self.assertIn('id="target-conference"', html)
-        self.assertIn('id="reference-paper"', html)
+        self.assertNotIn('id="paper-contract"', html)
+        self.assertNotIn("INHERITED FROM APPROVED PLAN", html)
+        self.assertNotIn("写作阶段无需重新选择", source)
+        self.assertNotIn('id="api-usage"', html)
+        self.assertNotIn('id="api-status"', html)
+        self.assertNotIn('id="conversation-status"', html)
+        self.assertNotIn("New conversation", html)
         self.assertIn('projectExport.hidden = !project.export_url', source)
         self.assertIn('download.hidden = false', source)
         self.assertIn('download.href = studioPath(state.pdf.url || "/paper.pdf")', source)
@@ -3375,6 +3378,7 @@ args = parser.parse_args()
         self.assertIsNone(state["agent_chat_thread_id"])
         self.assertEqual(state["agent_chat_history"][-1]["execution"], "runtime_action")
         self.assertNotIn("agent_chat_thread_id", visible)
+        self.assertNotIn("agent_chat_provider", visible)
         self.assertNotIn("sk-test-runtime-secret", json.dumps(visible))
         save.assert_called_once_with(state)
 
@@ -3800,14 +3804,72 @@ args = parser.parse_args()
             )
         save.assert_not_called()
 
-    def test_global_agent_chat_requires_confirmation_for_destructive_changes(self):
-        self.assertFalse(studio.chat_confirmation_required("那就照你刚才说的办"))
-        self.assertTrue(studio.chat_confirmation_required("删除整个 Related Work"))
-        history = [
-            {"role": "user", "content": "删除整个 Related Work"},
-            {"role": "assistant", "content": "请回复确认执行。"},
-        ]
-        self.assertFalse(studio.chat_confirmation_required("确认执行", history))
+    def test_global_agent_chat_executes_destructive_requests_without_second_confirmation(self):
+        observed = {}
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paper = root / "paper"
+            state_dir = paper / ".paper_studio"
+            paper.mkdir()
+            target = paper / "obsolete.md"
+            target.write_text("remove me\n", encoding="utf-8")
+
+            def fake_run(command, **kwargs):
+                observed["command"] = command
+                observed["prompt"] = kwargs["input"]
+                target.unlink()
+                output = Path(command[command.index("--output-last-message") + 1])
+                output.write_text(
+                    '{"intent":"execute","answer":"已删除指定文件。"}',
+                    encoding="utf-8",
+                )
+                return CompletedProcess(command, 0, "", "")
+
+            with (
+                patch.object(studio, "ROOT", root),
+                patch.object(studio, "PAPER", paper),
+                patch.object(studio, "STATE_DIR", state_dir),
+                patch.object(studio, "shutil_which", return_value="/usr/bin/codex"),
+                patch.object(studio, "run_local_agent_process", side_effect=fake_run),
+            ):
+                result = studio.ask_studio_local_agent(
+                    "删除 obsolete.md", return_details=True
+                )
+        self.assertEqual(result["execution"], "executed")
+        self.assertNotIn("read-only", observed["command"])
+        self.assertIn("--dangerously-bypass-approvals-and-sandbox", observed["command"])
+        self.assertIn("直接执行", observed["prompt"])
+        self.assertNotIn("返回 intent=confirmation_required", observed["prompt"])
+
+    def test_project_agent_uses_claude_code_for_claude_session(self):
+        observed = {}
+
+        def fake_run(command, **kwargs):
+            observed["command"] = command
+            observed["prompt"] = kwargs["input"]
+            return CompletedProcess(
+                command,
+                0,
+                json.dumps(
+                    {
+                        "result": '{"intent":"read_only","answer":"Claude 已检查。"}',
+                        "session_id": "claude-session-1",
+                    }
+                ),
+                "",
+            )
+
+        with (
+            patch.object(studio, "shutil_which", return_value="/usr/bin/claude"),
+            patch.object(studio, "run_local_agent_process", side_effect=fake_run),
+            patch.dict(studio.os.environ, {"CLAUDECODE": "1"}),
+        ):
+            result = studio.ask_studio_local_agent("检查论文", return_details=True)
+        self.assertEqual(result["answer"], "Claude 已检查。")
+        self.assertEqual(result["thread_id"], "claude-session-1")
+        self.assertEqual(observed["command"][:2], ["/usr/bin/claude", "-p"])
+        self.assertIn("--dangerously-skip-permissions", observed["command"])
+        self.assertIn("Claude Code", observed["prompt"])
 
     def test_global_agent_chat_retry_recovers_prior_action_in_writable_prompt(self):
         observed = {}

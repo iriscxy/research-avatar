@@ -1103,6 +1103,7 @@ def _default_state() -> dict[str, Any]:
         },
         "agent_chat_history": [],
         "agent_chat_thread_id": None,
+        "agent_chat_provider": None,
         "agent_chat_job": None,
         "full_draft_job": None,
         "updated_at": None,
@@ -1281,6 +1282,7 @@ def load_state() -> dict[str, Any]:
             title_editor.setdefault(field, value)
         state.setdefault("agent_chat_history", [])
         state.setdefault("agent_chat_thread_id", None)
+        state.setdefault("agent_chat_provider", None)
         job = state.setdefault("agent_chat_job", None)
         if (
             isinstance(job, dict)
@@ -2732,13 +2734,31 @@ def requests_reference_expansion(instruction: str) -> bool:
     return any(marker in lowered for marker in markers)
 
 
-def local_agent_environment() -> dict[str, str]:
-    """Build a Codex environment without exposing the writing-provider secrets."""
+def project_agent_provider() -> str:
+    """Select the CLI that owns this Paper Studio session."""
+    configured = os.environ.get("PAPER_STUDIO_PROJECT_AGENT", "").strip().lower()
+    if configured in {"codex", "claude"}:
+        return configured
+    if ONLINE_PROJECT_MODE:
+        return "codex"
+    if os.environ.get("CLAUDECODE") or os.environ.get("CLAUDE_CODE_ENTRYPOINT"):
+        return "claude"
+    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_CI"):
+        return "codex"
+    return "codex" if shutil_which("codex") else "claude"
+
+
+def project_agent_label(provider: str | None = None) -> str:
+    return "Claude Code" if (provider or project_agent_provider()) == "claude" else "Codex"
+
+
+def local_agent_environment(provider: str = "codex") -> dict[str, str]:
+    """Build an Agent environment without exposing unrelated writing secrets."""
     environment = dict(os.environ)
     online_codex_key = environment.get("OPENAI_API_KEY", "") if ONLINE_PROJECT_MODE else ""
     for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
         environment.pop(secret_name, None)
-    if ONLINE_PROJECT_MODE:
+    if ONLINE_PROJECT_MODE and provider == "codex":
         if not online_codex_key:
             raise StudioError("线上 Agent 需要当前写作会话的 OpenAI API Key。")
         environment["CODEX_API_KEY"] = online_codex_key
@@ -2774,6 +2794,24 @@ def codex_thread_id(output: str) -> str | None:
         if re.fullmatch(r"[0-9a-fA-F-]{16,64}", candidate):
             return candidate
     return None
+
+
+def claude_result(output: str) -> tuple[str, str | None]:
+    """Extract the structured answer and resumable session id from Claude JSON."""
+    try:
+        payload = json.loads(output)
+    except json.JSONDecodeError:
+        return output.strip(), None
+    if not isinstance(payload, dict):
+        return output.strip(), None
+    result = payload.get("result", "")
+    if isinstance(result, list):
+        result = "\n".join(
+            str(item.get("text", "")) if isinstance(item, dict) else str(item)
+            for item in result
+        )
+    session_id = str(payload.get("session_id") or "").strip() or None
+    return str(result).strip(), session_id
 
 
 def api_key_change_request(message: str) -> bool:
@@ -6161,14 +6199,6 @@ def default_data_figure_layout_prompt(figure_id: str) -> str:
     )
 
 
-CHAT_DESTRUCTIVE_PATTERN = re.compile(
-    r"(?:删除|移除|清空|覆盖|全部重写|delete|remove|clear|overwrite|rewrite all)",
-    re.IGNORECASE,
-)
-CHAT_CONFIRM_PATTERN = re.compile(
-    r"(?:确认执行|确定执行|直接删除|确认删除|我确认|yes,? execute|confirm)",
-    re.IGNORECASE,
-)
 CHAT_SOURCE_SUFFIXES = {
     ".bib",
     ".css",
@@ -6185,30 +6215,6 @@ CHAT_SOURCE_SUFFIXES = {
 CHAT_ARTIFACT_SUFFIXES = {".pdf", ".png", ".pptx", ".svg"}
 
 
-def chat_confirmation_required(
-    message: str, history: list[dict[str, Any]] | None = None
-) -> bool:
-    """Keep only the deterministic destructive-action confirmation boundary."""
-    text = message.strip()
-    previous_user = next(
-        (
-            str(turn.get("content", ""))
-            for turn in reversed(history or [])
-            if turn.get("role") == "user"
-        ),
-        "",
-    )
-    confirmed_previous = bool(
-        CHAT_CONFIRM_PATTERN.search(text) and CHAT_DESTRUCTIVE_PATTERN.search(previous_user)
-    )
-    if confirmed_previous:
-        return False
-    return bool(
-        CHAT_DESTRUCTIVE_PATTERN.search(text)
-        and not CHAT_CONFIRM_PATTERN.search(text)
-    )
-
-
 def parse_local_agent_answer(raw: str) -> tuple[str, str]:
     """Return the Codex semantic intent and user-facing answer."""
     try:
@@ -6218,7 +6224,7 @@ def parse_local_agent_answer(raw: str) -> tuple[str, str]:
     if not isinstance(payload, dict):
         return "unknown", raw.strip()
     intent = str(payload.get("intent", "unknown"))
-    if intent not in {"read_only", "execute", "confirmation_required"}:
+    if intent not in {"read_only", "execute"}:
         intent = "unknown"
     answer = str(payload.get("answer", "")).strip()
     return intent, answer or raw.strip()
@@ -6339,10 +6345,12 @@ def ask_studio_local_agent(
     job_token: str | None = None,
     thread_id: str | None = None,
 ) -> str | dict[str, Any]:
-    """Answer or execute one global Paper Studio browser-chat turn with local Codex."""
-    codex = shutil_which("codex")
-    if not codex:
-        raise StudioError("未找到项目 Agent 所需的 codex CLI。")
+    """Answer or execute one global Paper Studio browser-chat turn with its owning Agent."""
+    agent_provider = project_agent_provider()
+    agent_label = project_agent_label(agent_provider)
+    agent_cli = shutil_which(agent_provider)
+    if not agent_cli:
+        raise StudioError(f"未找到项目 Agent 所需的 {agent_label} CLI。")
     message = message.strip()
     if not message:
         raise StudioError("请输入要问项目 Agent 的内容。")
@@ -6361,23 +6369,19 @@ def ask_studio_local_agent(
             f"表用途：{definition['description']}"
         )
     recent_history = (history or [])[-12:]
-    confirmation_required = chat_confirmation_required(message, recent_history)
-    if confirmation_required:
-        mode_instruction = """服务端检测到这可能删除、清空或覆盖内容。本轮处于只读沙箱，不要修改文件。明确复述将受影响的内容，要求研究者回复“确认执行”。返回 intent=confirmation_required。"""
-    else:
-        mode_instruction = """你就是当前项目中可执行的 Codex Agent，而不是只提供建议的客服。你具备当前项目内的文件读取与编辑、shell 命令、测试、编译和网络访问能力；对研究者授权的普通任务，像直接 Codex 一样自行完成从检查到修改再到验证的闭环。不得仅因为自己由网页启动，就声称沙箱禁止写文件、运行命令、访问网络或绑定测试端口；只有实际命令失败后，才能准确报告具体限制并继续采用可行替代方案。
+    mode_instruction = f"""你就是当前项目中可执行的 {agent_label} Agent，而不是只提供建议的客服。你具备当前项目内的文件读取与编辑、shell 命令、测试、编译和网络访问能力；对研究者授权的普通任务，像直接 {agent_label} 一样自行完成从检查到修改再到验证的闭环。不得仅因为自己由网页启动，就声称沙箱禁止写文件、运行命令、访问网络或绑定测试端口；只有实际命令失败后，才能准确报告具体限制并继续采用可行替代方案。
 你必须根据研究者本轮消息和最近对话的语义，自行判断 intent，不使用关键词或动词白名单：
 - 如果研究者在提问、讨论、征求建议或举例，返回 intent=read_only，只读检查并回答，不修改文件。
 - 如果研究者要求完成、继续或重试一项具体工作，返回 intent=execute，并现在真实执行；不要只给建议，也不要要求切换模式。
-- 如果语义涉及删除、清空、广泛覆盖或其他难恢复操作且尚未明确确认，不修改文件，返回 intent=confirmation_required。
+- 研究者发出的删除、清空、覆盖等明确操作指令本身就是授权，直接执行，不得再要求回复“确认执行”。仍须把影响严格限定在明确目标内，并避免破坏性 git 命令。
 执行时先完整阅读 .agents/skills/paperstudio/SKILL.md 及其 references/web-regressions.md，并遵守产品契约。
 使用仓库内工具检查上下文并修改所需文件；不得修改 paper/.paper_studio/state.json，不得编造实验数据，
 不得使用破坏性 git 命令。论文结构变化必须同步到 paper/paragraph_plan.json；增加新段落或分组时使用唯一段落 ID、
 正确 heading/heading_style 和有效 reference_lines。修改 LaTeX 后编译验证；修改网页后运行规定测试并更新静态版本。
 保持执行有界：先完成研究者要求的最小改动，只读取直接相关文件，做与风险相称的验证；不要扫描或重做无关工作。
 完成后在 answer 中简洁说明检查、修改和验证结果。若实际修改了文件，绝不能声称“未修改任何文件”；若没有修改，也绝不能虚构已修改。"""
-    prompt = f"""你是 Paper Studio 中始终可用的项目 Codex Agent。请直接使用简洁中文处理研究者请求。
-不要要求研究者切换只读/可编辑/执行模式；普通轮次由你结合消息与历史语义决定，服务端只保留危险操作确认边界并核验真实文件变化。
+    prompt = f"""你是 Paper Studio 中始终可用的项目 {agent_label} Agent。请直接使用简洁中文处理研究者请求。
+不要要求研究者切换只读/可编辑/执行模式；普通轮次由你结合消息与历史语义决定，服务端核验真实文件变化。
 
 <operation_mode>
 {mode_instruction}
@@ -6395,8 +6399,8 @@ def ask_studio_local_agent(
 {message}
 </researcher_message>
 """
-    before = chat_source_snapshot() if not confirmation_required else {}
-    environment = local_agent_environment()
+    before = chat_source_snapshot()
+    environment = local_agent_environment(agent_provider)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix="agent-chat-", dir=STATE_DIR
@@ -6411,7 +6415,7 @@ def ask_studio_local_agent(
                     "properties": {
                         "intent": {
                             "type": "string",
-                            "enum": ["read_only", "execute", "confirmation_required"],
+                            "enum": ["read_only", "execute"],
                         },
                         "answer": {"type": "string"},
                     },
@@ -6421,17 +6425,25 @@ def ask_studio_local_agent(
             ),
             encoding="utf-8",
         )
-        command = [codex, "exec"]
-        if thread_id:
-            command.append("resume")
-        command.extend(local_agent_auth_args())
-        command.extend(["--skip-git-repo-check", "--json"])
-        if confirmation_required:
+        if agent_provider == "claude":
+            command = [
+                agent_cli,
+                "-p",
+                "--output-format",
+                "json",
+                "--permission-mode",
+                "bypassPermissions",
+                "--dangerously-skip-permissions",
+            ]
             if thread_id:
-                command.extend(["--config", 'sandbox_mode="read-only"'])
-            else:
-                command.extend(["--sandbox", "read-only"])
-        elif ONLINE_PROJECT_MODE:
+                command.extend(["--resume", thread_id])
+        else:
+            command = [agent_cli, "exec"]
+            if thread_id:
+                command.append("resume")
+            command.extend(local_agent_auth_args())
+            command.extend(["--skip-git-repo-check", "--json"])
+        if agent_provider == "codex" and ONLINE_PROJECT_MODE:
             command.extend(
                 [
                     "--config",
@@ -6440,21 +6452,22 @@ def ask_studio_local_agent(
                     "sandbox_workspace_write.network_access=true",
                 ]
             )
-        else:
+        elif agent_provider == "codex":
             command.append("--dangerously-bypass-approvals-and-sandbox")
-        command.extend(
-            [
-                "--output-schema",
-                str(schema),
-                "--output-last-message",
-                str(output),
-            ]
-        )
-        if not thread_id:
-            command.extend(["--color", "never", "--cd", str(ROOT)])
-        if thread_id:
-            command.append(thread_id)
-        command.append("-")
+        if agent_provider == "codex":
+            command.extend(
+                [
+                    "--output-schema",
+                    str(schema),
+                    "--output-last-message",
+                    str(output),
+                ]
+            )
+            if not thread_id:
+                command.extend(["--color", "never", "--cd", str(ROOT)])
+            if thread_id:
+                command.append(thread_id)
+            command.append("-")
         try:
             process = run_local_agent_process(
                 command,
@@ -6468,17 +6481,20 @@ def ask_studio_local_agent(
         if process.returncode:
             diagnostic = (process.stdout + "\n" + process.stderr).strip()
             raise StudioError(
-                "项目 Agent 对话失败。\n"
-                + (diagnostic[-2400:] or "codex exec returned a non-zero status.")
+                f"{agent_label} 对话失败。\n"
+                + (diagnostic[-2400:] or f"{agent_provider} returned a non-zero status.")
             )
-        if not output.exists():
-            raise StudioError("项目 Agent 没有返回回复。")
-        raw_answer = output.read_text(encoding="utf-8", errors="replace").strip()
+        if agent_provider == "claude":
+            raw_answer, active_thread_id = claude_result(process.stdout)
+        else:
+            if not output.exists():
+                raise StudioError("项目 Agent 没有返回回复。")
+            raw_answer = output.read_text(encoding="utf-8", errors="replace").strip()
+            active_thread_id = thread_id or codex_thread_id(process.stdout)
         declared_intent, answer = parse_local_agent_answer(raw_answer)
-        active_thread_id = thread_id or codex_thread_id(process.stdout)
     if not answer:
         raise StudioError("项目 Agent 返回了空回复。")
-    after = chat_source_snapshot() if not confirmation_required else {}
+    after = chat_source_snapshot()
     changed_files = sorted(
         path for path in set(before) | set(after) if before.get(path) != after.get(path)
     )
@@ -6491,8 +6507,6 @@ def ask_studio_local_agent(
             f"系统核验：已实际变更 {len(changed_files)} 个项目文件：{verified_paths}。\n\n"
             + answer
         )
-    elif confirmation_required or declared_intent == "confirmation_required":
-        execution = "confirmation_required"
     elif declared_intent == "execute":
         execution = "no_changes"
         answer += "\n\n系统检查：本轮已进入执行模式，但未检测到源文件变化；目标可能已经满足，请以回复中的检查结果为准。"
@@ -6503,6 +6517,7 @@ def ask_studio_local_agent(
         "execution": execution,
         "changed_files": changed_files,
         "thread_id": active_thread_id,
+        "provider": agent_provider,
     }
     return details if return_details else answer
 
@@ -6547,19 +6562,21 @@ def agent_chat_worker(
         execution = str(result["execution"])
         changed_files = list(result["changed_files"])
         active_thread_id = result.get("thread_id")
+        active_provider = str(result.get("provider") or project_agent_provider())
         status = "completed"
-        progress_message = "项目 Agent 已完成。"
+        progress_message = f"{project_agent_label()} 已完成。"
     except Exception as exc:  # pragma: no cover - final worker safety net
         invalid_key = agent_api_key_failure(exc)
         answer = (
-            "项目 Agent 无法连接 OpenAI：当前 API Key 无效或已失效。"
+            f"{project_agent_label()} 无法连接 OpenAI：当前 API Key 无效或已失效。"
             "请点击“安全更换 API Key”，更新后再续做此任务。"
             if invalid_key
-            else f"项目 Agent 执行失败：{exc}"
+            else f"{project_agent_label()} 执行失败：{exc}"
         )
         execution = "action_required" if invalid_key else "failed"
         changed_files = []
         active_thread_id = thread_id
+        active_provider = project_agent_provider()
         status = "failed"
         progress_message = (
             "当前 API Key 无效或已失效，请安全更换后续做。"
@@ -6607,6 +6624,7 @@ def agent_chat_worker(
         state["agent_chat_history"] = chat_history[-40:]
         if active_thread_id:
             state["agent_chat_thread_id"] = active_thread_id
+            state["agent_chat_provider"] = active_provider
         state["agent_chat_job"] = {
             **job,
             "status": status,
@@ -7251,6 +7269,10 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
             "api_key_configured": api_key_configured,
             "api_key_setup": api_key_setup,
             "api_usage": usage_summary(API_USAGE_FILE),
+            "project_agent": {
+                "provider": project_agent_provider(),
+                "label": project_agent_label(),
+            },
             "agent_chat_history": [],
             "agent_chat_job": None,
             "full_draft": {
@@ -7263,6 +7285,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         }
     result = json.loads(json.dumps(state))
     result.pop("agent_chat_thread_id", None)
+    result.pop("agent_chat_provider", None)
     if isinstance(result.get("agent_chat_job"), dict):
         result["agent_chat_job"].pop("source_snapshot", None)
     result["project"] = {
@@ -7379,6 +7402,10 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
     result["api_key_configured"] = api_key_configured
     result["api_key_setup"] = api_key_setup
     result["api_usage"] = usage_summary(API_USAGE_FILE)
+    result["project_agent"] = {
+        "provider": project_agent_provider(),
+        "label": project_agent_label(),
+    }
     result["figures"] = figure_public_state(state)
     result["tables"] = table_public_state(state)
     return result
@@ -8295,7 +8322,7 @@ class Handler(BaseHTTPRequestHandler):
             state = load_state()
             current_job = state.get("agent_chat_job") or {}
             if current_job.get("status") == "running":
-                raise StudioError("项目 Agent 正在执行上一条消息，请等待完成后再发送。")
+                raise StudioError(f"{project_agent_label()} 正在执行上一条消息，请等待完成后再发送。")
             history = list(state.get("agent_chat_history", []))[-40:]
             if api_key_change_request(message):
                 if DEMO_MODE:
@@ -8331,12 +8358,18 @@ class Handler(BaseHTTPRequestHandler):
                 "status": "running",
                 "server_instance": SERVER_INSTANCE_TOKEN,
                 "started_at": int(time.time()),
-                "progress_message": "项目 Agent 正在读取上下文并执行…",
+                "progress_message": f"{project_agent_label()} 正在读取上下文并执行…",
                 "message": message,
                 "source_snapshot": chat_source_snapshot(),
             }
             save_state(state)
-            thread_id = str(state.get("agent_chat_thread_id") or "").strip() or None
+            active_provider = project_agent_provider()
+            stored_provider = str(state.get("agent_chat_provider") or "codex")
+            thread_id = (
+                str(state.get("agent_chat_thread_id") or "").strip() or None
+                if stored_provider == active_provider
+                else None
+            )
         threading.Thread(
             target=agent_chat_worker,
             args=(token, message, history, section, view, artifact_id, thread_id),
@@ -8346,7 +8379,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "项目 Agent 任务已启动。",
+                "message": f"{project_agent_label()} 任务已启动。",
                 "state": public_state(state),
             },
             status=HTTPStatus.ACCEPTED,
@@ -8367,6 +8400,7 @@ class Handler(BaseHTTPRequestHandler):
             state = load_state()
             select_llm_provider(state, provider)
             state["agent_chat_thread_id"] = None
+            state["agent_chat_provider"] = None
             history = list(state.get("agent_chat_history", []))[-40:]
             for turn in reversed(history):
                 if turn.get("action") == "replace_api_key":

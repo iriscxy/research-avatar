@@ -73,7 +73,7 @@ class Matrix:
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()
         assert page.locator("#agent-chat-launcher").is_hidden()
-        assert page.locator("#paper-contract").is_hidden()
+        assert page.locator("#paper-contract").count() == 0
         assert page.locator("#project-export").is_hidden()
         expected_banner = not bool(self.state.get("api_key_configured"))
         assert page.locator("#api-key-setup").is_visible() == expected_banner
@@ -124,9 +124,9 @@ class Matrix:
                 assert page.locator("#llm-runtime-config").is_hidden()
                 assert page.locator("#model-runtime-config").is_visible()
                 assert page.locator("#model-suggestions option").count() >= 2
-                assert page.locator("#paper-contract").is_visible()
-                assert fixture["project"]["target"]["venue"] in page.locator("#target-conference").inner_text()
-                assert fixture["project"]["reference_paper"]["title"] in page.locator("#reference-paper").inner_text()
+                assert page.locator("#paper-contract").count() == 0
+                assert page.locator("#api-usage").count() == 0
+                assert page.locator("#conversation-status").count() == 0
                 assert page.locator("#project-export").is_visible() == bool(fixture["project"].get("export_url"))
         assert not posts, posts
         assert not errors, errors

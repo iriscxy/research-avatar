@@ -1706,6 +1706,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": False, "error": "会话不存在或已过期，请重新上传资料。"}, 401)
         return session
 
+    def _clear_paper_session_cookie(self) -> str:
+        cookie = f"{COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"
+        if _secure_cookies():
+            cookie += "; Secure"
+        return cookie
+
     def do_GET(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0]
         if path == "/":
@@ -1801,7 +1807,21 @@ class Handler(BaseHTTPRequestHandler):
         else:
             user = self._require_user()
             if user:
-                session = self._require_session(user)
+                session = _session_from_cookie(
+                    self.headers.get("Cookie"), user_id=user["id"]
+                )
+                if session is None and path == "/studio":
+                    self._redirect(
+                        "/?session_expired=1",
+                        cookies=[self._clear_paper_session_cookie()],
+                    )
+                    return
+                if session is None:
+                    self._json(
+                        {"ok": False, "error": "会话不存在或已过期，请重新上传资料。"},
+                        401,
+                    )
+                    return
                 if session:
                     upstream = "/" if path == "/studio" else self.path
                     self._proxy(session, upstream)

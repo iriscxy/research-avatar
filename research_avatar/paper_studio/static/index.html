@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Paper Studio</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="static/style.css?v=20260817.8">
+  <link rel="stylesheet" href="static/style.css?v=20260817.9">
 </head>
 <body>
   <div class="app">
@@ -15,14 +15,6 @@
         <h1 id="studio-title">Paper Studio</h1>
         <p id="project-subtitle">逐段对话、确认后写入 LaTeX</p>
       </div>
-      <section id="paper-contract" class="paper-contract" aria-label="已继承的论文写作契约" hidden>
-        <span>INHERITED FROM APPROVED PLAN</span>
-        <dl>
-          <div><dt>Target conference</dt><dd id="target-conference">—</dd></div>
-          <div><dt>Reference paper</dt><dd id="reference-paper">—</dd></div>
-        </dl>
-        <small id="paper-contract-source">写作阶段直接继承，无需重新选择。</small>
-      </section>
       <div id="sections" class="sections"></div>
       <div class="sidebar-foot">
         <div id="llm-runtime-config" hidden aria-hidden="true">
@@ -58,9 +50,6 @@
             <button id="figures-view" disabled>图</button>
             <button id="tables-view" disabled>表</button>
           </div>
-          <span id="api-usage" class="status">0 tokens · $0.0000</span>
-          <span id="api-status" class="status">API</span>
-          <span id="conversation-status" class="status">Conversation</span>
           <button id="compile" class="secondary" disabled>编译 PDF</button>
           <a id="project-export" class="secondary project-export" href="/api/online/export" download="paper-studio-project.zip" hidden>下载项目 ZIP</a>
         </div>
@@ -197,7 +186,6 @@
               <span id="figure-phase">PHASE</span>
               <h3 id="figure-title">选择一张图</h3>
             </div>
-            <span id="figure-status" class="status">pending</span>
           </div>
           <div id="figure-gate" class="gate"></div>
           <p id="figure-description" class="figure-description"></p>
@@ -206,7 +194,6 @@
             <textarea id="table-agent-prompt" rows="5" placeholder="例如：把两个 benchmark 做成分组表头；我们的方法放最后并加粗；在 caption 中说明 ASR 和 StrongREJECT 都是跨模型平均值。不要改变任何数值。"></textarea>
             <button id="table-agent-edit" class="agent-action">调用本地 Agent</button>
           </div>
-          <span id="figure-conversation-status" class="status">New figure conversation</span>
           <div id="figure-progress" class="figure-progress" hidden>
             <div class="figure-progress-main">
               <div class="figure-progress-track">
@@ -388,22 +375,22 @@
       <button id="reset-generated-confirm" class="danger" type="button">确认清空</button>
     </div>
   </dialog>
-  <button id="agent-chat-launcher" class="agent-chat-launcher" aria-label="打开项目 Agent 对话" title="项目 Agent 对话" hidden>?</button>
+  <button id="agent-chat-launcher" class="agent-chat-launcher" aria-label="打开 Agent 对话" title="Agent 对话" hidden>?</button>
   <div id="agent-chat-overlay" class="agent-chat-overlay" hidden>
     <section class="agent-chat-dialog" role="dialog" aria-modal="true" aria-labelledby="agent-chat-title">
       <div class="figure-agent-chat-head">
         <div>
-          <strong id="agent-chat-title">项目 Agent</strong>
+          <strong id="agent-chat-title">Codex</strong>
           <span id="agent-chat-context">当前页面</span>
         </div>
-        <button id="agent-chat-close" class="agent-chat-close" aria-label="关闭项目 Agent 对话">×</button>
+        <button id="agent-chat-close" class="agent-chat-close" aria-label="关闭 Agent 对话">×</button>
       </div>
       <div id="figure-agent-chat-history" class="figure-agent-chat-history">
         <p class="figure-agent-chat-empty">还没有对话。可以询问论文、图表、排版或下一步怎么做。</p>
       </div>
-      <textarea id="figure-agent-chat-input" rows="3" placeholder="询问项目 Agent，或让它协助修改当前项目…"></textarea>
+      <textarea id="figure-agent-chat-input" rows="3" placeholder="询问 Agent，或让它直接修改当前项目…"></textarea>
       <div class="agent-chat-actions">
-        <button id="figure-agent-chat-send" class="agent-action">发送给项目 Agent</button>
+        <button id="figure-agent-chat-send" class="agent-action">发送给 Codex</button>
         <button id="agent-chat-cancel" class="danger" hidden>⏸ 停止</button>
       </div>
     </section>
@@ -428,6 +415,6 @@
       </div>
     </form>
   </dialog>
-  <script src="static/app.js?v=20260817.8"></script>
+  <script src="static/app.js?v=20260817.9"></script>
 </body>
 </html>

@@ -9,6 +9,25 @@ const demoKeyDialog = document.querySelector('#demo-key-dialog');
 const demoKeyForm = document.querySelector('#demo-key-form');
 const demoKeyMessage = document.querySelector('#demo-key-message');
 const demoKeySubmit = document.querySelector('#demo-key-submit');
+const sessionNotice = document.querySelector('#session-notice');
+
+function showNavigationNotice(authenticated) {
+  const url = new URL(window.location.href);
+  const expired = url.searchParams.get('session_expired') === '1';
+  const loginRequired = url.searchParams.get('login_required') === '1';
+  if (expired && authenticated) {
+    sessionNotice.textContent = '上一次临时写作会话已结束。请重新创建 Demo 写作副本，或在 Use it 上传项目包。';
+    sessionNotice.classList.remove('hidden');
+  } else if (loginRequired && !authenticated) {
+    authMessage.className = 'error';
+    authMessage.textContent = '请先登录，再打开 Paper Studio。';
+  }
+  if (expired || loginRequired) {
+    url.searchParams.delete('session_expired');
+    url.searchParams.delete('login_required');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+}
 
 function openDemoKeyDialog() {
   demoKeyMessage.className = '';
@@ -45,6 +64,7 @@ async function showAuthenticated(user) {
   document.body.classList.add('workspace-authenticated');
   authCard.classList.add('hidden');
   workspaceShell.classList.remove('hidden');
+  showNavigationNotice(true);
   selectProductPanel('demo-panel');
   const demoFrame = document.querySelector('#demo-frame');
   demoFrame.src = '/demo/?authenticated=' + Date.now();
@@ -76,6 +96,7 @@ async function initializeAuth() {
       await showAuthenticated(state.user);
       return;
     }
+    showNavigationNotice(false);
     const params = new URLSearchParams(window.location.search);
     if (params.get('auth_error') === 'google') {
       authMessage.className = 'error';

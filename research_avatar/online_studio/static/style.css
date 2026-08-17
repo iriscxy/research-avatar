@@ -16,6 +16,7 @@ code { color: #1d6845; }
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #d5dbd6; }
 .google-login { display: block; border: 1px solid #bcc6bf; border-radius: 999px; padding: 12px 18px; text-align: center; color: #243b31; font-weight: 800; text-decoration: none; background: white; }
 .account-bar { display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin-bottom: 22px; color: #59655f; font-size: 13px; }
+.session-notice{margin:0 4px 8px;padding:10px 13px;border:1px solid #d7b45f;border-radius:10px;background:#fff8df;color:#6b5012;font-size:13px;font-weight:700}
 .product-tabs { display: inline-flex; gap: 6px; margin: 0 0 24px; padding: 6px; border: 1px solid #cdd4ce; border-radius: 999px; background: rgba(255,255,255,.72); }
 .product-tab { min-width: 112px; padding: 10px 20px; color: #496056; background: transparent; }
 .product-tab.active { color: white; background: #173f2d; }

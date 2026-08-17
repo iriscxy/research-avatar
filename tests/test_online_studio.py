@@ -561,6 +561,20 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("demo_key_required", script)
         self.assertIn("openRequestedDemoKeyDialog();", script)
 
+    def test_studio_navigation_redirects_to_html_with_actionable_notice(self):
+        html = (online.STATIC / "index.html").read_text(encoding="utf-8")
+        script = (online.STATIC / "app.js").read_text(encoding="utf-8")
+        worker = (
+            Path(__file__).resolve().parents[1] / "deploy/cloudflare/index.ts"
+        ).read_text(encoding="utf-8")
+        self.assertIn('id="session-notice"', html)
+        self.assertIn("session_expired", script)
+        self.assertIn("login_required", script)
+        self.assertIn("上一次临时写作会话已结束", script)
+        self.assertIn('new URL("/?login_required=1", request.url)', worker)
+        self.assertIn('path === "/studio"', worker)
+        self.assertIn('"/?session_expired=1"', Path(online.__file__).read_text(encoding="utf-8"))
+
     def test_cloudflare_release_uses_version_scoped_container(self):
         """A deploy must not keep serving the prior image's demo snapshot."""
         root = Path(__file__).resolve().parents[1]
