@@ -87,6 +87,11 @@ export class OnlineStudioContainerV11 extends OnlineStudioContainer {}
 // release above.
 export class OnlineStudioContainerV12 extends OnlineStudioContainer {}
 
+// Table-placeholder release: rotate proactively on every deploy rather than
+// debugging the same in-place staleness again — V12 was hit by exactly the
+// same symptom described above on its very first release.
+export class OnlineStudioContainerV13 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
