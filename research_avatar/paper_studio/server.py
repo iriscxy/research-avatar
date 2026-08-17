@@ -1507,6 +1507,35 @@ def figure_paths(figure_id: str) -> dict[str, Path]:
     }
 
 
+def mechanism_spec_path(figure_id: str) -> Path:
+    """Resolve a mechanism spec across canonical and reorganized source trees."""
+    paths = figure_paths(figure_id)
+    if paths["spec"].exists():
+        return paths["spec"]
+    deliverable_stem = str(FIGURES[figure_id].get("deliverable_stem") or "").strip()
+    relocated = FIGURE_SOURCE_DIR / f"{deliverable_stem}_spec.json"
+    return relocated if deliverable_stem and relocated.exists() else paths["spec"]
+
+
+def mechanism_draft_path(figure_id: str) -> Path:
+    """Resolve the canonical GPT draft or the latest prompt-backed archive."""
+    paths = figure_paths(figure_id)
+    if paths["draft"].exists() or FIGURES[figure_id]["kind"] != "mechanism":
+        return paths["draft"]
+    spec_path = mechanism_spec_path(figure_id)
+    if not spec_path.exists():
+        return paths["draft"]
+    try:
+        spec = json.loads(spec_path.read_text(encoding="utf-8"))
+        iteration_dir = spec_path.parent / "iterations" / str(spec["figure_id"])
+    except (OSError, KeyError, json.JSONDecodeError):
+        return paths["draft"]
+    for candidate in reversed(sorted(iteration_dir.glob("round_*.png"))):
+        if candidate.with_suffix(".prompt.txt").is_file():
+            return candidate
+    return paths["draft"]
+
+
 def data_panel_paths(figure_id: str, panel_id: str) -> dict[str, Path]:
     """Return the independently generated artifacts for one atomic data panel."""
     if panel_id not in {item["id"] for item in FIGURES[figure_id].get("panels", [])}:
@@ -1645,9 +1674,10 @@ def figure_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
             figure_id, state, metrics
         )
         paths = figure_paths(figure_id)
+        mechanism_draft = mechanism_draft_path(figure_id)
         is_data = definition["kind"] == "data"
-        preview_kind = "draft" if paths["draft"].exists() else "preview"
-        preview_path = paths[preview_kind]
+        preview_kind = "draft" if mechanism_draft.exists() else "preview"
+        preview_path = mechanism_draft if preview_kind == "draft" else paths["preview"]
         composition_ready = bool(stored.get("composed_at") and paths["pdf"].exists())
         if is_data:
             if composition_ready:
@@ -1771,8 +1801,8 @@ def figure_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
                 ),
                 "gpt_preview_url": (
                     f"/figure-file/{figure_id}/draft"
-                    f"?v={int(paths['draft'].stat().st_mtime)}"
-                    if not is_data and paths["draft"].exists()
+                    f"?v={int(mechanism_draft.stat().st_mtime)}"
+                    if not is_data and mechanism_draft.exists()
                     else None
                 ),
                 "paper_preview_url": (
@@ -5117,11 +5147,12 @@ MECHANISM_SHAPE_KINDS = {
 
 def mechanism_shape_provenance(figure_id: str) -> dict[str, str]:
     paths = figure_paths(figure_id)
-    if not paths["draft"].exists():
+    draft = mechanism_draft_path(figure_id)
+    if not draft.exists():
         raise StudioError("请先生成并检查机制图草稿。")
-    prompt = read_text(paths["spec"], 200000)
+    prompt = read_text(mechanism_spec_path(figure_id), 200000)
     return {
-        "draft_sha256": hashlib.sha256(paths["draft"].read_bytes()).hexdigest(),
+        "draft_sha256": hashlib.sha256(draft.read_bytes()).hexdigest(),
         "prompt_spec_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
     }
 
@@ -5623,11 +5654,13 @@ def completed_mechanism_draft_matches_job(
     if FIGURES[figure_id]["kind"] != "mechanism":
         return False
     paths = figure_paths(figure_id)
-    if not paths["draft"].exists() or not paths["spec"].exists():
+    draft = mechanism_draft_path(figure_id)
+    spec_path = mechanism_spec_path(figure_id)
+    if not draft.exists() or not spec_path.exists():
         return False
     try:
-        spec = json.loads(paths["spec"].read_text(encoding="utf-8"))
-        iteration_dir = paths["spec"].parent / "iterations" / str(spec["figure_id"])
+        spec = json.loads(spec_path.read_text(encoding="utf-8"))
+        iteration_dir = spec_path.parent / "iterations" / str(spec["figure_id"])
         prompt_files = sorted(iteration_dir.glob("round_*.prompt.txt"))
         latest_prompt = prompt_files[-1].read_text(encoding="utf-8").strip()
     except (OSError, KeyError, IndexError, json.JSONDecodeError):
@@ -5635,18 +5668,18 @@ def completed_mechanism_draft_matches_job(
     approved_at = int(figure_state.get("prompt_approved_at") or 0)
     return (
         latest_prompt == str(figure_state.get("draw_prompt", "")).strip()
-        and int(paths["draft"].stat().st_mtime) >= approved_at
+        and int(draft.stat().st_mtime) >= approved_at
     )
 
 
 def completed_mechanism_draft_matches_prompt(figure_id: str, prompt: str) -> bool:
     """Return true only when the current draft came from this exact prompt."""
-    paths = figure_paths(figure_id)
-    if not paths["draft"].exists() or not paths["spec"].exists():
+    spec_path = mechanism_spec_path(figure_id)
+    if not mechanism_draft_path(figure_id).exists() or not spec_path.exists():
         return False
     try:
-        spec = json.loads(paths["spec"].read_text(encoding="utf-8"))
-        iteration_dir = paths["spec"].parent / "iterations" / str(spec["figure_id"])
+        spec = json.loads(spec_path.read_text(encoding="utf-8"))
+        iteration_dir = spec_path.parent / "iterations" / str(spec["figure_id"])
         prompt_files = sorted(iteration_dir.glob("round_*.prompt.txt"))
         latest_prompt = prompt_files[-1].read_text(encoding="utf-8").strip()
     except (OSError, KeyError, IndexError, json.JSONDecodeError):
@@ -5769,7 +5802,7 @@ def build_mechanism_figure(
     figure_id: str, *, job_token: str | None = None
 ) -> str:
     paths = figure_paths(figure_id)
-    if not paths["draft"].exists():
+    if not mechanism_draft_path(figure_id).exists():
         raise StudioError("请先生成并检查机制图草稿。")
     FIGURE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
@@ -7658,7 +7691,11 @@ class Handler(BaseHTTPRequestHandler):
         }:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
-        target = figure_paths(figure_id)[kind]
+        target = (
+            mechanism_draft_path(figure_id)
+            if kind == "draft"
+            else figure_paths(figure_id)[kind]
+        )
         content_types = {
             "draft": "image/png",
             "preview": "image/png",

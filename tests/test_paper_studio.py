@@ -4075,6 +4075,42 @@ args = parser.parse_args()
         self.assertEqual(figure["preview_type"], "pdf")
         self.assertIn("/pdf?", figure["preview_url"])
 
+    def test_archived_gpt_iteration_restores_mechanism_preview_toggle(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_dir = root / "figsrc"
+            figure_dir = root / "fig"
+            with (
+                patch.object(studio, "FIGURE_SOURCE_DIR", source_dir),
+                patch.object(studio, "FIGURE_DIR", figure_dir),
+            ):
+                paths = studio.figure_paths("F1")
+                relocated_spec = source_dir / (
+                    str(studio.FIGURES["F1"]["deliverable_stem"]) + "_spec.json"
+                )
+                relocated_spec.parent.mkdir(parents=True)
+                relocated_spec.write_text(
+                    json.dumps({"figure_id": "archived-f1"}), encoding="utf-8"
+                )
+                iteration = relocated_spec.parent / "iterations" / "archived-f1"
+                iteration.mkdir(parents=True)
+                archived = iteration / "round_03.png"
+                archived.write_bytes(b"archived gpt image")
+                archived.with_suffix(".prompt.txt").write_text(
+                    "approved prompt", encoding="utf-8"
+                )
+                paths["pdf"].parent.mkdir(parents=True)
+                paths["pdf"].write_bytes(b"%PDF final")
+                paths["pptx"].write_bytes(b"editable pptx")
+                state = _default_state()
+                state["figures"]["F1"]["status"] = "built"
+                resolved = studio.mechanism_draft_path("F1")
+                figure = figure_public_state(state)[0]
+
+        self.assertEqual(resolved, archived)
+        self.assertIn("/figure-file/F1/draft?", figure["gpt_preview_url"])
+        self.assertIn("/figure-file/F1/pdf?", figure["paper_preview_url"])
+
     def test_f6_requires_explicitly_marked_synthetic_layerwise_curves(self):
         state = _default_state()
         state["figures"]["F1"]["status"] = "approved"
