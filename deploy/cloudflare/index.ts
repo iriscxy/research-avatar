@@ -92,6 +92,9 @@ export class OnlineStudioContainerV12 extends OnlineStudioContainer {}
 // same symptom described above on its very first release.
 export class OnlineStudioContainerV13 extends OnlineStudioContainer {}
 
+// Figure-reload release: rotate proactively per the established pattern.
+export class OnlineStudioContainerV14 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
