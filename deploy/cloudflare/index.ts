@@ -55,6 +55,10 @@ export class OnlineStudioContainerV4 extends OnlineStudioContainer {}
 // containers immediately instead of waiting for their two-hour idle timeout.
 export class OnlineStudioContainerV5 extends OnlineStudioContainer {}
 
+// Agent-recovery release: start from a clean pool so no pre-fix Codex worker
+// can survive behind an already-running container instance.
+export class OnlineStudioContainerV6 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
