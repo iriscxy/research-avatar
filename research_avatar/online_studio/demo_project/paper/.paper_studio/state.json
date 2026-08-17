@@ -9,8 +9,6 @@
     "previous_response_id": null,
     "last_message": ""
   },
-  "agent_chat_history": [],
-  "agent_chat_job": null,
   "full_draft_job": {
     "status": "completed",
     "progress": 100,
@@ -517,7 +515,6 @@
         }
       ],
       "agent_history": [],
-      "agent_chat_history": [],
       "layout_prompt": "",
       "layout_prompt_is_default": false,
       "layout_plan": {},
@@ -552,7 +549,6 @@
         }
       ],
       "agent_history": [],
-      "agent_chat_history": [],
       "layout_prompt": "",
       "layout_prompt_is_default": false,
       "layout_plan": {},
@@ -597,7 +593,6 @@
         }
       ],
       "agent_history": [],
-      "agent_chat_history": [],
       "layout_prompt": "",
       "layout_prompt_is_default": false,
       "layout_plan": {},
