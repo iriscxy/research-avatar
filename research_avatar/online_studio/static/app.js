@@ -61,6 +61,28 @@ document.querySelectorAll('.product-tab').forEach((tab) => {
 });
 
 async function showAuthenticated(user) {
+  // A refresh (or reopening the bare site URL) always lands here first,
+  // even for a researcher mid-way through a real "Use it" writing session:
+  // this landing page has no memory of which tab they were last on, so
+  // without checking for an active session first it always reset them to
+  // the Demo tab and buried the "继续当前写作会话" resume link one click
+  // away inside the Use it tab. Check first and, if a real writing session
+  // is active, go straight back into it — only a researcher with no active
+  // session (or who was just browsing the read-only Demo) sees this
+  // landing shell at all, which is exactly the Demo case staying on Demo.
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('demo_key_required') !== '1') {
+    try {
+      const response = await fetch('/api/online/session', { cache: 'no-store' });
+      const state = await response.json();
+      if (state.active) {
+        window.location.assign('/studio');
+        return;
+      }
+    } catch (_) {
+      // Fall through to the normal landing shell below.
+    }
+  }
   document.body.classList.add('workspace-authenticated');
   authCard.classList.add('hidden');
   workspaceShell.classList.remove('hidden');
@@ -70,13 +92,7 @@ async function showAuthenticated(user) {
   demoFrame.src = '/demo/?authenticated=' + Date.now();
   document.querySelector('#account-label').textContent =
     user.email + ' · ' + (user.provider === 'google' ? 'Google' : '邮箱账户');
-  try {
-    const response = await fetch('/api/online/session', { cache: 'no-store' });
-    const state = await response.json();
-    document.querySelector('#session-actions').classList.toggle('hidden', !state.active);
-  } catch (_) {
-    document.querySelector('#session-actions').classList.add('hidden');
-  }
+  document.querySelector('#session-actions').classList.add('hidden');
   openRequestedDemoKeyDialog();
 }
 

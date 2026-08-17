@@ -690,6 +690,32 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("demo_key_required", script)
         self.assertIn("openRequestedDemoKeyDialog();", script)
 
+    def test_page_refresh_returns_to_the_researchers_own_active_session(self):
+        # A refresh (or reopening the bare site URL) always re-runs the
+        # landing page's own auth bootstrap first, even for a researcher
+        # mid-way through a real "Use it" writing session — that landing
+        # page has no memory of which tab was last selected. Without
+        # checking for an active per-user session before rendering, it
+        # always reset to the Demo tab and buried the resume link one click
+        # away inside the Use it tab instead of returning the researcher
+        # straight to /studio. A researcher with no active session (just
+        # browsing the read-only Demo, which never creates a per-user
+        # session) correctly keeps landing on the Demo tab by default.
+        script = (online.STATIC / "app.js").read_text(encoding="utf-8")
+        session_check = script.index("fetch('/api/online/session'")
+        redirect = script.index("window.location.assign('/studio')")
+        demo_panel_select = script.rindex("selectProductPanel('demo-panel')")
+        self.assertLess(
+            session_check, redirect,
+            "must check for an active session before deciding to redirect",
+        )
+        self.assertLess(
+            redirect, demo_panel_select,
+            "the active-session redirect must be checked before falling "
+            "back to rendering the Demo tab",
+        )
+        self.assertIn("if (state.active)", script)
+
     def test_studio_navigation_redirects_to_html_with_actionable_notice(self):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
         script = (online.STATIC / "app.js").read_text(encoding="utf-8")
