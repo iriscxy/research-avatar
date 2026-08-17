@@ -71,6 +71,10 @@ export class OnlineStudioContainerV8 extends OnlineStudioContainer {}
 // automatically retries resume conflicts in a fresh Agent thread.
 export class OnlineStudioContainerV9 extends OnlineStudioContainer {}
 
+// Nested-Agent release: prevent the project Agent from bootstrapping a second
+// Studio process that would falsely interrupt its own background job.
+export class OnlineStudioContainerV10 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",

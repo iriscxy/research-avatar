@@ -3192,6 +3192,9 @@ args = parser.parse_args()
         self.assertIn("--dangerously-bypass-approvals-and-sandbox", observed["command"])
         self.assertIn("--output-schema", observed["command"])
         self.assertNotIn("OPENAI_API_KEY", observed["env"])
+        self.assertEqual(observed["env"]["PAPER_STUDIO_AGENT_CHILD"], "1")
+        self.assertIn("绝对不要运行", observed["prompt"])
+        self.assertIn("--ensure-studios", observed["prompt"])
 
     def test_online_global_agent_uses_single_invocation_codex_key(self):
         observed = {}

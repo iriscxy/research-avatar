@@ -2763,6 +2763,7 @@ def local_agent_environment(provider: str = "codex") -> dict[str, str]:
     online_codex_key = environment.get("OPENAI_API_KEY", "") if ONLINE_PROJECT_MODE else ""
     for secret_name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY"):
         environment.pop(secret_name, None)
+    environment["PAPER_STUDIO_AGENT_CHILD"] = "1"
     if ONLINE_PROJECT_MODE and provider == "codex":
         if not online_codex_key:
             raise StudioError("线上 Agent 需要当前写作会话的 OpenAI API Key。")
@@ -6446,6 +6447,7 @@ def ask_studio_local_agent(
 - 如果研究者在提问、讨论、征求建议或举例，返回 intent=read_only，只读检查并回答，不修改文件。
 - 如果研究者要求完成、继续或重试一项具体工作，返回 intent=execute，并现在真实执行；不要只给建议，也不要要求切换模式。
 - 研究者发出的删除、清空、覆盖等明确操作指令本身就是授权，直接执行，不得再要求回复“确认执行”。仍须把影响严格限定在明确目标内，并避免破坏性 git 命令。
+你是由已经运行中的 Paper Studio 服务启动的嵌套 Agent。绝对不要运行 `research_avatar.research_studio.server --ensure-studios`，不要启动、停止或重启 Research Studio/Paper Studio，也不要绑定第二个 Studio 端口；直接处理项目文件并在现有服务中完成核验。
 执行时先完整阅读 .agents/skills/paperstudio/SKILL.md 及其 references/web-regressions.md，并遵守产品契约。
 使用仓库内工具检查上下文并修改所需文件；不得修改 paper/.paper_studio/state.json，不得编造实验数据，
 不得使用破坏性 git 命令。论文结构变化必须同步到 paper/paragraph_plan.json；增加新段落或分组时使用唯一段落 ID、

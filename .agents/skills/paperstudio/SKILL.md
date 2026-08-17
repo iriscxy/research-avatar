@@ -5,12 +5,19 @@ description: Internally maintain, debug, or regression-test this repository's fi
 
 # Paper Studio
 
-At the first Skill action in this Codex project session, run
-`python3 -m research_avatar.research_studio.server --ensure-studios` before substantive work.
+At the first host-maintenance Skill action in this Codex project session, run
+`python3 -m research_avatar.research_studio.server --ensure-studios` before substantive work,
+unless `PAPER_STUDIO_AGENT_CHILD=1` or `PAPER_STUDIO_ONLINE=1` is present.
 This idempotent bootstrap starts or reuses both local Studio servers and opens
 Research Studio (`http://127.0.0.1:8780`) plus Paper Studio
 (`http://127.0.0.1:8765`). Run it once per session, never launch duplicates,
 and surface any startup error.
+
+A Codex/Claude process launched by the Paper Studio project-Agent chat is a nested
+child of an already-running server. It must never run `--ensure-studios`, start a
+Studio server, stop one, or restart one. Doing so corrupts background-job ownership
+and can create a false restart plus a stale thread writer. Inspect and mutate the
+project directly, then validate without changing the serving process.
 
 Maintain the local research-paper editor as an evidence-preserving browser workflow. Read [references/web-regressions.md](references/web-regressions.md) before changing `research_avatar/paper_studio/`; it is the product contract accumulated from researcher feedback.
 
