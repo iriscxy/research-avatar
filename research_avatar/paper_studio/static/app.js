@@ -1229,6 +1229,10 @@ function renderAgentChat() {
         ? `已执行 · ${changedCount} 个文件`
         : turn.execution === "confirmation_required"
           ? "等待确认"
+          : turn.execution === "action_required"
+            ? "需要安全输入"
+            : turn.execution === "runtime_action"
+              ? "已更新运行环境"
           : turn.execution === "no_changes"
             ? "已处理 · 无文件变更"
             : turn.execution === "failed"
@@ -1242,6 +1246,14 @@ function renderAgentChat() {
     const content = document.createElement("p");
     content.textContent = turn.content || "";
     message.append(header, content);
+    if (!user && turn.action === "replace_api_key") {
+      const action = document.createElement("button");
+      action.type = "button";
+      action.className = "agent-action agent-chat-runtime-key";
+      action.textContent = "安全更换 API Key";
+      action.addEventListener("click", openRuntimeKeyDialog);
+      message.appendChild(action);
+    }
     roundElement.appendChild(message);
   });
   if (job && job.status === "running") {
@@ -2869,6 +2881,51 @@ $("agent-chat-launcher").onclick = () => setAgentChatOpen(true);
 $("agent-chat-close").onclick = () => setAgentChatOpen(false);
 $("agent-chat-overlay").addEventListener("click", (event) => {
   if (event.target === $("agent-chat-overlay")) setAgentChatOpen(false);
+});
+
+function openRuntimeKeyDialog() {
+  const dialog = $("runtime-key-dialog");
+  $("runtime-key-message").textContent = "";
+  $("runtime-key-provider").value = state.llm_provider || "openai";
+  if (!dialog.open) dialog.showModal();
+  setTimeout(() => $("runtime-key-input").focus(), 0);
+}
+
+function closeRuntimeKeyDialog() {
+  $("runtime-key-input").value = "";
+  $("runtime-key-dialog").close();
+}
+
+$("runtime-key-close").onclick = closeRuntimeKeyDialog;
+$("runtime-key-cancel").onclick = closeRuntimeKeyDialog;
+$("runtime-key-dialog").addEventListener("click", (event) => {
+  if (event.target === $("runtime-key-dialog")) closeRuntimeKeyDialog();
+});
+$("runtime-key-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const submit = $("runtime-key-submit");
+  const status = $("runtime-key-message");
+  submit.disabled = true;
+  status.textContent = "正在安全更新…";
+  try {
+    const payload = await request("/api/runtime-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: $("runtime-key-provider").value,
+        api_key: $("runtime-key-input").value,
+      }),
+    });
+    $("runtime-key-input").value = "";
+    state = payload.state;
+    render();
+    $("runtime-key-dialog").close();
+  } catch (error) {
+    $("runtime-key-input").value = "";
+    status.textContent = error.message;
+  } finally {
+    submit.disabled = false;
+  }
 });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !$("agent-chat-overlay").hidden) {

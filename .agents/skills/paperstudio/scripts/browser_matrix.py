@@ -815,6 +815,63 @@ class Matrix:
         self.results["agent_cancel_terminal_state"] = True
         page.close()
 
+    def runtime_key_safe_action(self) -> None:
+        fixture = safe_fixture(self.state)
+        fixture["agent_chat_history"] = [
+            {"role": "user", "content": "更换 API Key"},
+            {
+                "role": "assistant",
+                "content": "请使用安全输入框更换 API Key。",
+                "execution": "action_required",
+                "action": "replace_api_key",
+                "changed_files": [],
+            },
+        ]
+        fixture["agent_chat_job"] = None
+        page = self.browser.new_page()
+        errors: list[str] = []
+        posts: list[str] = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+
+        def api(route) -> None:
+            if route.request.method == "GET":
+                route.fulfill(status=200, content_type="application/json", body=json.dumps(fixture))
+                return
+            posts.append(route.request.url)
+            assert route.request.url.endswith("/api/runtime-key"), route.request.url
+            fixture["agent_chat_history"][-1].update(
+                content="API Key 已在当前运行内存中安全更新。",
+                execution="runtime_action",
+                action="replace_api_key_completed",
+            )
+            route.fulfill(
+                status=200,
+                content_type="application/json",
+                body=json.dumps({"ok": True, "state": fixture}),
+            )
+
+        page.route("**/api/**", api)
+        self.visit(page, "/?view=writing", "document.querySelector('#section-title').textContent !== 'Loading…'")
+        page.locator("#agent-chat-launcher").click()
+        page.locator(".agent-chat-runtime-key").click()
+        assert page.locator("#runtime-key-dialog").is_visible()
+        page.locator("#runtime-key-cancel").click()
+        assert page.locator("#runtime-key-dialog").is_hidden()
+        page.locator(".agent-chat-runtime-key").click()
+        page.locator("#runtime-key-close").click()
+        assert page.locator("#runtime-key-dialog").is_hidden()
+        page.locator(".agent-chat-runtime-key").click()
+        page.locator("#runtime-key-provider").select_option("openai")
+        page.locator("#runtime-key-input").fill("sk-matrix-secret")
+        page.locator("#runtime-key-submit").click()
+        page.wait_for_function("!document.querySelector('#runtime-key-dialog').open")
+        assert page.locator("#runtime-key-input").input_value() == ""
+        assert "sk-matrix-secret" not in page.locator("#figure-agent-chat-history").inner_text()
+        assert "已更新运行环境" in page.locator("#figure-agent-chat-history").inner_text()
+        assert len(posts) == 1 and not errors, {"posts": posts, "errors": errors}
+        self.results["runtime_key_safe_action"] = True
+        page.close()
+
     def generated_reset_dialog(self) -> None:
         fixture = safe_fixture(self.state)
         project_id = fixture["project"]["id"]
@@ -1487,6 +1544,7 @@ class Matrix:
             self.title_and_prose_transactions,
             self.approved_table_update,
             self.failure_restores_visible_drafts,
+            self.runtime_key_safe_action,
             self.agent_cancel_terminal_state,
             self.generated_reset_dialog,
             self.artifact_double_dispatch,

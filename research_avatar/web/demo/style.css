@@ -84,3 +84,8 @@ footer{display:flex;justify-content:space-between;padding:23px clamp(24px,6vw,90
 @media(max-width:600px){.demo-current-goal{grid-column:1/-1}.demo-current-goal dl{grid-template-columns:1fr}.demo-current-goal dd{padding-top:2px;border-top:0}}
 @media(max-width:600px){.execution-mode-options{grid-template-columns:1fr}}
 .setting-label{fill:#536970;font:10px system-ui,sans-serif}.ci-line{stroke:#203f4d;stroke-width:2}
+
+/* The iframe document owns the only vertical track; stage panes never nest-scroll. */
+.journey-section{padding:10px clamp(10px,2vw,30px) 28px}.journey-nav{position:sticky;top:0;z-index:50;margin-bottom:10px;border-radius:12px}.journey-step{min-height:76px;padding:12px 16px}.journey-step span{margin-bottom:4px}.demo-browser{border-radius:12px}.browser-body,.browser-body.comparing{height:auto;min-height:calc(100dvh - 110px)}.stage-content{min-height:calc(100dvh - 153px);max-height:none;overflow:visible;padding:24px 32px 54px}.compare-panel{max-height:none;overflow:visible}.demo-sidebar{overflow:visible}
+@media(max-width:1000px){.browser-body,.browser-body.comparing{height:auto}.stage-content{max-height:none;overflow:visible}.compare-panel{max-height:none;overflow:visible}}
+@media(max-width:680px){.journey-section{padding:6px 7px 18px}.journey-nav{top:0;margin-bottom:7px}.journey-step{min-height:58px;padding:8px 10px}.journey-step span{font-size:11px}.journey-step strong{font-size:13px}.stage-content{min-height:calc(100dvh - 140px);padding:18px 13px 42px}}

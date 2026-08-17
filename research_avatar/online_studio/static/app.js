@@ -42,6 +42,7 @@ document.querySelectorAll('.product-tab').forEach((tab) => {
 });
 
 async function showAuthenticated(user) {
+  document.body.classList.add('workspace-authenticated');
   authCard.classList.add('hidden');
   workspaceShell.classList.remove('hidden');
   selectProductPanel('demo-panel');

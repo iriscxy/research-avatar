@@ -647,7 +647,11 @@ class OnlineStudioTests(unittest.TestCase):
         style = (online.STATIC / "style.css").read_text(encoding="utf-8")
         self.assertIn("width: min(1500px, calc(100% - 32px))", style)
         self.assertIn("#setup-form { max-width: 1180px; }", style)
+        self.assertIn("body.workspace-authenticated{height:100dvh", style)
+        self.assertIn("#use-panel{overflow-y:auto", style)
+        self.assertIn("#demo-panel{overflow:hidden", style)
         self.assertIn("selectProductPanel('demo-panel')", app)
+        self.assertIn("document.body.classList.add('workspace-authenticated')", app)
         self.assertIn('name="project_package"', source)
         self.assertNotIn('name="profile_file"', source)
         self.assertNotIn('name="plan_file"', source)
@@ -656,6 +660,14 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertNotIn('name="project_name"', source)
         self.assertNotIn('name="outline"', source)
         self.assertNotIn('name="model"', source)
+
+    def test_demo_uses_sticky_six_stage_header_and_one_vertical_scroll(self):
+        root = Path(__file__).resolve().parents[1]
+        style = (root / "research_avatar/web/demo/style.css").read_text(encoding="utf-8")
+        html = (root / "research_avatar/web/demo/index.html").read_text(encoding="utf-8")
+        self.assertIn(".journey-nav{position:sticky;top:0", style)
+        self.assertIn(".stage-content{min-height:calc(100dvh - 153px);max-height:none;overflow:visible", style)
+        self.assertIn("style.css?v=20260817-single-scroll", html)
 
 
 if __name__ == "__main__":

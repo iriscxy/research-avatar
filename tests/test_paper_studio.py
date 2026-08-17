@@ -462,6 +462,8 @@ class PaperStudioTests(unittest.TestCase):
             "reset-generated-cancel", "reset-generated-confirm", "agent-chat-launcher",
             "agent-chat-close", "figure-agent-chat-input", "figure-agent-chat-send",
             "agent-chat-cancel", "full-draft-start", "full-draft-cancel",
+            "runtime-key-close", "runtime-key-provider", "runtime-key-input",
+            "runtime-key-cancel", "runtime-key-submit",
         }
         self.assertEqual(set(parser.control_ids), expected_controls)
         self.assertEqual(len(parser.control_ids), len(expected_controls))
@@ -496,6 +498,7 @@ class PaperStudioTests(unittest.TestCase):
                 "/api/figure/placement", "/api/figure/prompt", "/api/generate",
                 "/api/llm-provider", "/api/llm-model",
                 "/api/pdf/locate", "/api/reset-conversation",
+                "/api/runtime-key",
                 "/api/reset-generated-paper", "/api/select-paragraph", "/api/state",
                 "/api/table/agent-edit", "/api/table/approve", "/api/table/generate",
                 "/api/table/placement", "/api/table/save", "/api/title/generate",
@@ -1378,7 +1381,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260817.5"', html)
+        self.assertIn('src="static/app.js?v=20260817.6"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1515,7 +1518,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260817.5"', html)
+        self.assertIn('src="static/app.js?v=20260817.6"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -1525,7 +1528,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('roundLabel.textContent = `第 ${round} 轮`', source)
         self.assertIn('message.className = `figure-agent-chat-message ${user ? "user" : "agent"}`', source)
         self.assertIn("agent-chat-round", source)
-        self.assertIn('href="static/style.css?v=20260817.5"', html)
+        self.assertIn('href="static/style.css?v=20260817.6"', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)
@@ -3178,8 +3181,7 @@ args = parser.parse_args()
         self.assertIn("手动合成", answer)
         self.assertIn("两张图分开生成吗", observed["prompt"])
         self.assertIn("下一步怎么办", observed["prompt"])
-        self.assertIn("workspace-write", observed["command"])
-        self.assertIn("sandbox_workspace_write.network_access=true", observed["command"])
+        self.assertIn("--dangerously-bypass-approvals-and-sandbox", observed["command"])
         self.assertIn("--output-schema", observed["command"])
         self.assertNotIn("OPENAI_API_KEY", observed["env"])
 
@@ -3268,7 +3270,7 @@ args = parser.parse_args()
         self.assertEqual(result["execution"], "executed")
         self.assertEqual(result["changed_files"], ["paper/paragraph_plan.json"])
         self.assertIn("系统核验：已实际变更 1 个项目文件", result["answer"])
-        self.assertIn("workspace-write", observed["command"])
+        self.assertIn("--dangerously-bypass-approvals-and-sandbox", observed["command"])
         self.assertIn("自行判断 intent", observed["prompt"])
         self.assertIn("像直接 Codex 一样", observed["prompt"])
 
@@ -3285,6 +3287,93 @@ args = parser.parse_args()
             ),
             ("read_only", "这是一个问题。"),
         )
+
+    def test_global_agent_chat_persists_and_resumes_codex_thread(self):
+        commands = []
+        thread_id = "019c1234-5678-7abc-8def-0123456789ab"
+
+        def fake_run(command, **kwargs):
+            commands.append(command)
+            output = Path(command[command.index("--output-last-message") + 1])
+            output.write_text(
+                '{"intent":"read_only","answer":"连续会话已响应。"}',
+                encoding="utf-8",
+            )
+            stdout = (
+                json.dumps({"type": "thread.started", "thread_id": thread_id})
+                if "resume" not in command
+                else ""
+            )
+            return CompletedProcess(command, 0, stdout, "")
+
+        with (
+            patch.object(studio, "shutil_which", return_value="/usr/bin/codex"),
+            patch.object(studio, "run_local_agent_process", side_effect=fake_run),
+        ):
+            first = studio.ask_studio_local_agent("先检查", return_details=True)
+            second = studio.ask_studio_local_agent(
+                "继续", return_details=True, thread_id=first["thread_id"]
+            )
+
+        self.assertEqual(first["thread_id"], thread_id)
+        self.assertEqual(second["thread_id"], thread_id)
+        self.assertNotIn("resume", commands[0])
+        self.assertEqual(commands[1][1:3], ["exec", "resume"])
+        self.assertIn(thread_id, commands[1])
+
+    def test_api_key_change_request_uses_secret_safe_action(self):
+        state = _default_state()
+        response = {}
+        handler = object.__new__(Handler)
+        handler.send_json = lambda payload, status=200: response.update(
+            {"payload": payload, "status": status}
+        )
+        with (
+            patch.object(studio, "load_state", return_value=state),
+            patch.object(studio, "save_state") as save,
+            patch.object(studio, "public_state", side_effect=lambda current: current),
+            patch.object(studio.threading, "Thread") as thread,
+        ):
+            handler.handle_agent_chat({"message": "帮我更换APIkey"})
+
+        self.assertEqual(response["status"], 200)
+        self.assertEqual(state["agent_chat_history"][-1]["action"], "replace_api_key")
+        self.assertEqual(state["agent_chat_job"], None)
+        thread.assert_not_called()
+        save.assert_called_once_with(state)
+
+    def test_runtime_key_updates_memory_without_exposing_thread_or_secret(self):
+        state = _default_state()
+        state["agent_chat_thread_id"] = "019c1234-5678-7abc-8def-0123456789ab"
+        state["agent_chat_history"] = [
+            {
+                "role": "assistant",
+                "content": "请安全输入。",
+                "execution": "action_required",
+                "action": "replace_api_key",
+            }
+        ]
+        response = {}
+        handler = object.__new__(Handler)
+        handler.send_json = lambda payload, status=200: response.update(
+            {"payload": payload, "status": status}
+        )
+        with (
+            patch.object(studio, "load_state", return_value=state),
+            patch.object(studio, "save_state") as save,
+            patch.object(studio, "public_state", wraps=studio.public_state),
+            patch.dict(studio.os.environ, {}, clear=False),
+        ):
+            handler.handle_runtime_key(
+                {"provider": "openai", "api_key": "sk-test-runtime-secret"}
+            )
+
+        visible = response["payload"]["state"]
+        self.assertIsNone(state["agent_chat_thread_id"])
+        self.assertEqual(state["agent_chat_history"][-1]["execution"], "runtime_action")
+        self.assertNotIn("agent_chat_thread_id", visible)
+        self.assertNotIn("sk-test-runtime-secret", json.dumps(visible))
+        save.assert_called_once_with(state)
 
     def test_global_agent_chat_uses_codex_semantics_without_action_whitelist(self):
         with TemporaryDirectory() as temporary:
@@ -3412,7 +3501,7 @@ args = parser.parse_args()
             ),
         ):
             studio.agent_chat_worker(
-                "job-1", "再试", [], "related_work", "writing", ""
+                "job-1", "再试", [], "related_work", "writing", "", None
             )
 
         self.assertEqual(state["agent_chat_job"]["status"], "completed")
@@ -3482,7 +3571,7 @@ args = parser.parse_args()
                     ),
                 ):
                     studio.agent_chat_worker(
-                        f"job-{index}", prompt, [], "introduction", "writing", ""
+                        f"job-{index}", prompt, [], "introduction", "writing", "", None
                     )
                 self.assertEqual(state["agent_chat_job"]["status"], "completed")
                 self.assertTrue(state["agent_chat_job"]["reply_recorded"])
@@ -3543,7 +3632,7 @@ args = parser.parse_args()
             ),
         ):
             studio.agent_chat_worker(
-                "job-1", "继续", [], "related_work", "writing", ""
+                "job-1", "继续", [], "related_work", "writing", "", None
             )
         save.assert_not_called()
 
@@ -3590,7 +3679,7 @@ args = parser.parse_args()
                     "再试", history, return_details=True
                 )
         self.assertEqual(result["execution"], "executed")
-        self.assertIn("workspace-write", observed["command"])
+        self.assertIn("--dangerously-bypass-approvals-and-sandbox", observed["command"])
         self.assertIn("related work再加一节", observed["prompt"])
         self.assertIn("最近对话的语义", observed["prompt"])
 

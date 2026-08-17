@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Paper Studio</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="static/style.css?v=20260817.5">
+  <link rel="stylesheet" href="static/style.css?v=20260817.6">
 </head>
 <body>
   <div class="app">
@@ -407,6 +407,26 @@
       </div>
     </section>
   </div>
-  <script src="static/app.js?v=20260817.5"></script>
+  <dialog id="runtime-key-dialog" class="runtime-key-dialog">
+    <form id="runtime-key-form">
+      <button id="runtime-key-close" class="agent-chat-close" type="button" aria-label="关闭安全密钥输入">×</button>
+      <span class="eyebrow dark">SECURE RUNTIME KEY</span>
+      <h3>安全更换 API Key</h3>
+      <p>密钥只写入当前 Paper Studio 进程内存，不进入聊天记录、浏览器存储或项目文件。</p>
+      <label for="runtime-key-provider">服务商</label>
+      <select id="runtime-key-provider" name="provider">
+        <option value="openai">OpenAI</option>
+        <option value="deepseek">DeepSeek</option>
+      </select>
+      <label for="runtime-key-input">API Key</label>
+      <input id="runtime-key-input" name="api_key" type="password" required minlength="8" maxlength="512" autocomplete="off" spellcheck="false">
+      <p id="runtime-key-message" class="message" role="status" aria-live="polite"></p>
+      <div class="runtime-key-actions">
+        <button id="runtime-key-cancel" class="secondary" type="button">取消</button>
+        <button id="runtime-key-submit" class="primary" type="submit">安全更新</button>
+      </div>
+    </form>
+  </dialog>
+  <script src="static/app.js?v=20260817.6"></script>
 </body>
 </html>

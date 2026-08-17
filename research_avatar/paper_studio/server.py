@@ -1102,6 +1102,7 @@ def _default_state() -> dict[str, Any]:
             "last_message": "",
         },
         "agent_chat_history": [],
+        "agent_chat_thread_id": None,
         "agent_chat_job": None,
         "full_draft_job": None,
         "updated_at": None,
@@ -1279,6 +1280,7 @@ def load_state() -> dict[str, Any]:
         for field, value in default["title_editor"].items():
             title_editor.setdefault(field, value)
         state.setdefault("agent_chat_history", [])
+        state.setdefault("agent_chat_thread_id", None)
         job = state.setdefault("agent_chat_job", None)
         if (
             isinstance(job, dict)
@@ -2672,6 +2674,9 @@ def local_agent_environment() -> dict[str, str]:
         if not online_codex_key:
             raise StudioError("线上 Agent 需要当前写作会话的 OpenAI API Key。")
         environment["CODEX_API_KEY"] = online_codex_key
+        codex_home = STATE_DIR / "codex-runtime"
+        codex_home.mkdir(parents=True, exist_ok=True)
+        environment["CODEX_HOME"] = str(codex_home)
     return environment
 
 
@@ -2684,6 +2689,47 @@ def local_agent_auth_args() -> list[str]:
         "--config",
         "shell_environment_policy.ignore_default_excludes=false",
     ]
+
+
+def codex_thread_id(output: str) -> str | None:
+    """Read the persisted Codex thread id from JSONL without trusting prose."""
+    for line in output.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("type") != "thread.started":
+            continue
+        candidate = str(
+            event.get("thread_id") or event.get("thread", {}).get("id") or ""
+        ).strip()
+        if re.fullmatch(r"[0-9a-fA-F-]{16,64}", candidate):
+            return candidate
+    return None
+
+
+def api_key_change_request(message: str) -> bool:
+    """Route only explicit API-key replacement requests to the secret-safe UI."""
+    compact = re.sub(r"[\s_-]+", "", message).casefold()
+    mentions_key = any(
+        marker in compact for marker in ("apikey", "api密钥", "接口密钥")
+    )
+    requests_change = any(
+        marker in compact
+        for marker in (
+            "更换",
+            "修改",
+            "替换",
+            "更新",
+            "设置",
+            "配置",
+            "change",
+            "replace",
+            "update",
+            "set",
+        )
+    )
+    return mentions_key and requests_change
 
 
 def require_substantive_table_revision(
@@ -6196,6 +6242,7 @@ def ask_studio_local_agent(
     artifact_id: str = "",
     return_details: bool = False,
     job_token: str | None = None,
+    thread_id: str | None = None,
 ) -> str | dict[str, Any]:
     """Answer or execute one global Paper Studio browser-chat turn with local Codex."""
     codex = shutil_which("codex")
@@ -6279,29 +6326,40 @@ def ask_studio_local_agent(
             ),
             encoding="utf-8",
         )
-        command = [
-            codex,
-            "exec",
-            "--ephemeral",
-            *local_agent_auth_args(),
-            "--skip-git-repo-check",
-            *(
-                ["--config", "sandbox_workspace_write.network_access=true"]
-                if not confirmation_required
-                else []
-            ),
-            "--sandbox",
-            "read-only" if confirmation_required else "workspace-write",
-            "--output-schema",
-            str(schema),
-            "--color",
-            "never",
-            "--cd",
-            str(ROOT),
-            "--output-last-message",
-            str(output),
-            "-",
-        ]
+        command = [codex, "exec"]
+        if thread_id:
+            command.append("resume")
+        command.extend(local_agent_auth_args())
+        command.extend(["--skip-git-repo-check", "--json"])
+        if confirmation_required:
+            if thread_id:
+                command.extend(["--config", 'sandbox_mode="read-only"'])
+            else:
+                command.extend(["--sandbox", "read-only"])
+        elif ONLINE_PROJECT_MODE:
+            command.extend(
+                [
+                    "--config",
+                    'sandbox_mode="workspace-write"',
+                    "--config",
+                    "sandbox_workspace_write.network_access=true",
+                ]
+            )
+        else:
+            command.append("--dangerously-bypass-approvals-and-sandbox")
+        command.extend(
+            [
+                "--output-schema",
+                str(schema),
+                "--output-last-message",
+                str(output),
+            ]
+        )
+        if not thread_id:
+            command.extend(["--color", "never", "--cd", str(ROOT)])
+        if thread_id:
+            command.append(thread_id)
+        command.append("-")
         try:
             process = run_local_agent_process(
                 command,
@@ -6322,6 +6380,7 @@ def ask_studio_local_agent(
             raise StudioError("项目 Agent 没有返回回复。")
         raw_answer = output.read_text(encoding="utf-8", errors="replace").strip()
         declared_intent, answer = parse_local_agent_answer(raw_answer)
+        active_thread_id = thread_id or codex_thread_id(process.stdout)
     if not answer:
         raise StudioError("项目 Agent 返回了空回复。")
     after = chat_source_snapshot() if not confirmation_required else {}
@@ -6348,6 +6407,7 @@ def ask_studio_local_agent(
         "answer": answer,
         "execution": execution,
         "changed_files": changed_files,
+        "thread_id": active_thread_id,
     }
     return details if return_details else answer
 
@@ -6373,6 +6433,7 @@ def agent_chat_worker(
     section: str,
     view: str,
     artifact_id: str,
+    thread_id: str | None,
 ) -> None:
     """Run one global-chat turn without blocking its HTTP request."""
     try:
@@ -6384,17 +6445,20 @@ def agent_chat_worker(
             artifact_id=artifact_id,
             return_details=True,
             job_token=token,
+            thread_id=thread_id,
         )
         assert isinstance(result, dict)
         answer = str(result["answer"])
         execution = str(result["execution"])
         changed_files = list(result["changed_files"])
+        active_thread_id = result.get("thread_id")
         status = "completed"
         progress_message = "项目 Agent 已完成。"
     except Exception as exc:  # pragma: no cover - final worker safety net
         answer = f"项目 Agent 执行失败：{exc}"
         execution = "failed"
         changed_files = []
+        active_thread_id = thread_id
         status = "failed"
         progress_message = str(exc)
     with STATE_LOCK:
@@ -6412,6 +6476,8 @@ def agent_chat_worker(
             }
         )
         state["agent_chat_history"] = chat_history[-40:]
+        if active_thread_id:
+            state["agent_chat_thread_id"] = active_thread_id
         state["agent_chat_job"] = {
             **job,
             "status": status,
@@ -7066,6 +7132,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
             },
         }
     result = json.loads(json.dumps(state))
+    result.pop("agent_chat_thread_id", None)
     result["project"] = {
         "id": PROJECT_ID,
         "name": str(PROJECT_METADATA.get("name", "")),
@@ -7455,6 +7522,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.handle_agent_chat(body)
             elif self.path == "/api/agent-chat/cancel":
                 self.handle_agent_chat_cancel(body)
+            elif self.path == "/api/runtime-key":
+                self.handle_runtime_key(body)
             elif self.path == "/api/figure/agent-chat":
                 self.handle_figure_agent_chat(body)
             elif self.path == "/api/figure/build":
@@ -8092,6 +8161,30 @@ class Handler(BaseHTTPRequestHandler):
             if current_job.get("status") == "running":
                 raise StudioError("项目 Agent 正在执行上一条消息，请等待完成后再发送。")
             history = list(state.get("agent_chat_history", []))[-40:]
+            if api_key_change_request(message):
+                if DEMO_MODE:
+                    raise StudioError("只读 Demo 不能更换 API Key；请先创建私有可编辑副本。")
+                state["agent_chat_history"] = [
+                    *history,
+                    {"role": "user", "content": "更换 API Key"},
+                    {
+                        "role": "assistant",
+                        "content": "请使用安全输入框更换 API Key；密钥不会进入聊天记录、项目文件或浏览器存储。",
+                        "execution": "action_required",
+                        "action": "replace_api_key",
+                        "changed_files": [],
+                    },
+                ][-40:]
+                state["agent_chat_job"] = None
+                save_state(state)
+                self.send_json(
+                    {
+                        "ok": True,
+                        "message": "请安全输入 API Key。",
+                        "state": public_state(state),
+                    }
+                )
+                return
             token = uuid.uuid4().hex
             state["agent_chat_history"] = [
                 *history,
@@ -8106,9 +8199,10 @@ class Handler(BaseHTTPRequestHandler):
                 "message": message,
             }
             save_state(state)
+            thread_id = str(state.get("agent_chat_thread_id") or "").strip() or None
         threading.Thread(
             target=agent_chat_worker,
-            args=(token, message, history, section, view, artifact_id),
+            args=(token, message, history, section, view, artifact_id, thread_id),
             daemon=True,
             name=f"agent-chat-{token[:8]}",
         ).start()
@@ -8119,6 +8213,42 @@ class Handler(BaseHTTPRequestHandler):
                 "state": public_state(state),
             },
             status=HTTPStatus.ACCEPTED,
+        )
+
+    def handle_runtime_key(self, body: dict[str, Any]) -> None:
+        if DEMO_MODE:
+            raise StudioError("只读 Demo 不能更换 API Key；请先创建私有可编辑副本。")
+        provider = str(body.get("provider", "openai")).strip().lower()
+        key = str(body.get("api_key", ""))
+        configuration = provider_configuration(provider)
+        if not 8 <= len(key) <= 512 or any(
+            character.isspace() or ord(character) < 32 for character in key
+        ):
+            raise StudioError("API Key 格式无效，请检查后重试。")
+        os.environ[configuration["environment_variable"]] = key
+        with STATE_LOCK:
+            state = load_state()
+            select_llm_provider(state, provider)
+            state["agent_chat_thread_id"] = None
+            history = list(state.get("agent_chat_history", []))[-40:]
+            for turn in reversed(history):
+                if turn.get("action") == "replace_api_key":
+                    turn.update(
+                        {
+                            "content": "API Key 已在当前 Paper Studio 运行内存中安全更新；未写入聊天、浏览器存储或项目文件。",
+                            "execution": "runtime_action",
+                            "action": "replace_api_key_completed",
+                        }
+                    )
+                    break
+            state["agent_chat_history"] = history
+            save_state(state)
+        self.send_json(
+            {
+                "ok": True,
+                "message": "API Key 已安全更新。",
+                "state": public_state(state),
+            }
         )
 
     def handle_agent_chat_cancel(self, body: dict[str, Any]) -> None:
