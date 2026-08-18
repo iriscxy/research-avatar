@@ -37,7 +37,7 @@ export class OnlineStudioContainer extends Container<Env> {
     ONLINE_STUDIO_PUBLIC_REGISTRATION: "1",
     ONLINE_STUDIO_TRUST_PROXY_AUTH: "1",
     ONLINE_STUDIO_IDLE_SECONDS: "5400",
-    ONLINE_STUDIO_MAX_SESSIONS: "2",
+    ONLINE_STUDIO_MAX_SESSIONS: "10",
   };
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -104,6 +104,11 @@ export class OnlineStudioContainerV35 extends OnlineStudioContainer {}
 // value baked into envVars, so a fresh class is needed to pick up the new
 // secret.
 export class OnlineStudioContainerV36 extends OnlineStudioContainer {}
+
+// Raised ONLINE_STUDIO_MAX_SESSIONS 2 -> 10: the old cap counted any
+// session with a live child process, not just active ones, and my own
+// verification testing alone was enough to fill it and block a real user.
+export class OnlineStudioContainerV37 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
