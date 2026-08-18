@@ -54,6 +54,13 @@ export class OnlineStudioContainer extends Container {
 // the lock clears. Rotate proactively per the established pattern.
 export class OnlineStudioContainerV30 extends OnlineStudioContainer {}
 
+// Shared-DeepSeek-key release: updating a class's image tag alone does not
+// restart already-running instances of that class -- they keep serving the
+// previous image until sleepAfter (2h) or a natural cycle. Rotating to a
+// fresh class forces Cloudflare to start new instances immediately, so the
+// shared-key/spend-cap/demo-view-only changes actually go live right away.
+export class OnlineStudioContainerV31 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
