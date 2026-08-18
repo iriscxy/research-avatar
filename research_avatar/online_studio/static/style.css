@@ -25,7 +25,7 @@ code { color: #1d6845; }
 .demo-heading h1 { max-width: 760px; margin-bottom: 0; }
 .demo-heading > p { margin: 0 0 8px; color: #59655f; font-size: 16px; line-height: 1.65; }
 .demo-frame { display: block; width: 100%; min-height: 780px; border: 1px solid #cdd4ce; border-radius: 22px; background: white; box-shadow: 0 22px 70px rgba(42,58,50,.1); }
-#setup-form { max-width: 1180px; }
+.use-columns { max-width: 1500px; align-items: start; }
 .link-button { padding: 0; color: #1d6845; background: transparent; }
 .grid { display: grid; gap: 18px; }
 .two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -33,7 +33,6 @@ code { color: #1d6845; }
 .setup-heading h2 { margin: 0 0 5px; font: 600 25px/1.15 Georgia, serif; }
 .setup-heading p { margin: 0; color: #68736d; line-height: 1.5; }
 .step-index { display: grid; place-items: center; flex: 0 0 42px; height: 42px; border-radius: 50%; color: white !important; background: #28704d; font-size: 12px; font-weight: 900; letter-spacing: .08em; }
-.key-heading { margin-top: 34px; padding-top: 30px; border-top: 1px solid #dce1dd; }
 .upload-grid { margin-bottom: 4px; }
 .upload-field { min-height: 154px; align-content: start; padding: 18px; border: 1px dashed #aab8ae; border-radius: 14px; background: #f7faf7; }
 .upload-field input { margin-top: 5px; background: white; }
@@ -58,7 +57,6 @@ button:disabled { opacity: .55; cursor: wait; }
 .security { margin-top: 18px; font-size: 12px; }
 .hidden { display: none; }
 @media (max-width: 680px) { .shell { padding-top: 26px; } .two, .demo-heading { grid-template-columns: 1fr; gap: 0; } .card, .demo-frame { border-radius: 16px; } .demo-frame { min-height: 700px; } }
-.demo-key-dialog{width:min(520px,calc(100vw - 32px));padding:0;border:0;border-radius:18px;box-shadow:0 24px 80px #0f26364d}.demo-key-dialog::backdrop{background:#0b2432a6;backdrop-filter:blur(3px)}.demo-key-dialog form{position:relative;display:grid;gap:14px;padding:28px}.demo-key-dialog h2,.demo-key-dialog p{margin:0}.dialog-close{position:absolute;top:12px;right:12px;width:34px;height:34px;padding:0;border-radius:50%;background:#edf4f3;color:#173847}.demo-key-dialog label{display:grid;gap:7px}.demo-key-dialog input{width:100%;box-sizing:border-box}.demo-key-dialog .security{font-size:12px;color:#647982}.demo-key-dialog .error{color:#a43c32}
 .package-output-hint{display:block;margin-top:10px;padding:10px 12px;border:1px solid #a9cec0;border-radius:9px;background:#eff8f4;color:#245b47;font-size:13px;line-height:1.55}.package-output-hint code{color:#174a38}
 
 /* Authenticated workspace: fixed product controls and exactly one content scroller. */

@@ -47,6 +47,7 @@
           <a class="export" href="/api/online/export">导出项目 ZIP</a>
         </div>
 
+        <div class="grid two use-columns">
         <form id="setup-form" class="card">
       <div class="setup-heading">
         <p class="step-index">01</p>
@@ -57,32 +58,38 @@
         <small>在项目根目录运行 <code>python3 -m research_avatar.online_studio.package</code> 生成；最多 32 MB。系统会逐项核验 03 approval、05 完整度与 results provenance。</small>
         <strong class="package-output-hint">生成位置：<code>outputs/paper-studio-evidence.zip</code>。点击上方选择框上传这个文件。</strong>
       </label>
-
-      <div class="setup-heading key-heading">
-        <p class="step-index">02</p>
-        <div><h2>连接 OpenAI</h2><p>Key 仅进入当前隔离会话的服务器内存，不写入文件、浏览器存储或导出项目。</p></div>
-      </div>
-      <label>OpenAI API key<input name="api_key" type="password" required autocomplete="off" spellcheck="false" placeholder="sk-…"></label>
       <label id="access-wrap" class="optional">部署访问口令（若管理员启用）<input name="access_token" type="password" autocomplete="off"></label>
       <p id="message" role="status" aria-live="polite"></p>
       <button id="submit" type="submit">进入 Paper Studio →</button>
-      <p class="security">在线写作会话是临时工作区。关闭或超时前请从写作台导出项目 ZIP；你的 API key 不会写入导出文件。</p>
+      <p class="security">在线写作会话是临时工作区，统一使用共享 DeepSeek API；关闭或超时前请从写作台导出项目 ZIP。</p>
         </form>
+
+        <form id="lightweight-form" class="card">
+      <div class="setup-heading">
+        <p class="step-index">01</p>
+        <div><h2>没有 Research Avatar 项目？直接用原始材料开始</h2><p>不需要 ZIP 包：提供你的 Google Scholar 主页、参考文献和实验结果，就能进入 Paper Studio 个性化写作。仅支持纯文字段落写作与从数据自动生成的一张结果表和一张结果图；机制图仍需完整项目包中的绘图 Agent。</p></div>
+      </div>
+      <label>目标会议 / 期刊（venue）<input name="venue" required placeholder="例如 ACL 2027、EMNLP 2026 Findings"></label>
+      <label>论文标题<input name="title" required maxlength="300"></label>
+      <label class="upload-field">Google Scholar 个人主页（HTML，可选）
+        <input name="scholar_file" type="file" accept=".html,.htm">
+        <small>另存网页为 HTML 后上传；用作写作背景参考，不作为可核验引用来源。</small>
+      </label>
+      <label class="upload-field">参考文献（HTML，可多选，可选）
+        <input name="reference_files" type="file" accept=".html,.htm" multiple>
+      </label>
+      <label class="upload-field">实验结果数据（JSON，可选）
+        <input name="results_file" type="file" accept="application/json,.json">
+        <small>格式：<code>{"caption": "...", "columns": [{"key","label"}, ...], "rows": [{...}, ...]}</code>；提供后会自动生成一张确定性表格和一张柱状图，绑定到 Experiments。</small>
+      </label>
+      <p id="lightweight-message" role="status" aria-live="polite"></p>
+      <button id="lightweight-submit" type="submit">进入 Paper Studio →</button>
+      <p class="security">在线写作会话是临时工作区，统一使用共享 DeepSeek API；关闭或超时前请从写作台导出项目 ZIP。</p>
+        </form>
+        </div>
       </section>
     </div>
   </main>
-  <dialog id="demo-key-dialog" class="demo-key-dialog">
-    <form id="demo-key-form" method="dialog">
-      <button id="demo-key-close" class="dialog-close" type="button" aria-label="关闭">×</button>
-      <p class="eyebrow">CONTINUE WITH THE DEMO</p>
-      <h2>输入 OpenAI API Key</h2>
-      <p>当前展示的是完整只读项目。输入 Key 后会创建你的私有可编辑副本，保留全部正文、图表和 Prompt。</p>
-      <label>OpenAI API key<input name="api_key" type="password" required autocomplete="off" spellcheck="false" placeholder="sk-…"></label>
-      <p id="demo-key-message" role="status" aria-live="polite"></p>
-      <button id="demo-key-submit" type="submit">进入可编辑 Paper Studio →</button>
-      <p class="security">Key 只进入当前隔离会话的服务器内存，不写入浏览器存储或导出文件。</p>
-    </form>
-  </dialog>
-  <script src="/online-assets/app.js?v=20260817.8" defer></script>
+  <script src="/online-assets/app.js?v=20260818.1" defer></script>
 </body>
 </html>

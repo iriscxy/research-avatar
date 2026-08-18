@@ -77,9 +77,16 @@ ONLINE_DISABLED_ARTIFACT_AGENT_PATHS = {
     # stays blocked: it interprets an arbitrary free-text revision
     # instruction against already-approved LaTeX, which has no deterministic
     # substitute.
+    #
+    # "/api/figure/generate" and "/api/figure/panel/generate" are also
+    # deliberately absent for the same reason: a "data" kind figure's only
+    # job is one chart drawn straight from data_grid records, which
+    # render_data_figure_deterministic already does without any Agent or
+    # pdfcrop/node/latexmk composition toolchain. handle_figure_generate
+    # branches on ONLINE_PROJECT_MODE to use that path online. Mechanism
+    # figures (design-Prompt-driven PPTX reconstruction) and multi-panel
+    # composition have no deterministic substitute and stay blocked below.
     "/api/figure/build",
-    "/api/figure/generate",
-    "/api/figure/panel/generate",
     "/api/figure/compose",
     "/api/table/agent-edit",
 }
@@ -2074,6 +2081,25 @@ def parse_table_prompt(
     best_aliases = {"无": "none", "不加粗": "none", "最大": "max", "最小": "min"}
     best = best_aliases.get(best, best)
     if best not in {"none", "max", "min"}:
+        # The demo project's own default table briefs describe intent in
+        # natural English ("highest accuracy and lowest count") rather than
+        # this grammar's literal none/max/min tokens -- so a fresh project
+        # that never touches the table prompt would otherwise 400 on the
+        # very first generate. Recognize superlative wording instead of
+        # requiring the literal token.
+        wants_high = bool(re.search(r"\b(high(?:est)?|max(?:imum)?|greatest|largest|most)\b", best))
+        wants_low = bool(re.search(r"\b(low(?:est)?|min(?:imum)?|smallest|fewest|least)\b", best))
+        if wants_high and wants_low:
+            # Genuinely mixed per-column intent -- the renderer only
+            # supports one bolding direction for the whole table, and
+            # guessing either way would mislabel at least one column as
+            # "best" in the generated paper. Don't bold anything instead.
+            best = "none"
+        elif wants_high:
+            best = "max"
+        elif wants_low:
+            best = "min"
+    if best not in {"none", "max", "min"}:
         raise StudioError("最优值仅支持 none、max 或 min。")
     caption = directives.get("caption", TABLES[table_id]["caption"]).strip()
     if not caption:
@@ -2107,6 +2133,77 @@ def latex_escape_cell(value: str) -> str:
 def numeric_cell(value: str) -> float | None:
     match = re.search(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)", value)
     return float(match.group(0)) if match else None
+
+
+def figure_records_grid(figure_id: str, metrics: dict[str, Any]) -> tuple[list[str], list[list[str]]]:
+    """Records-shaped data_grid reader for deterministic (non-Agent) data figures."""
+    grid = FIGURES[figure_id]["data_grid"]
+    if str(grid.get("type", "")) != "records":
+        raise StudioError(f"{figure_id} 的确定性绘图仅支持 records 类型 data_grid。")
+    source = result_path_value(metrics, str(grid.get("path", "")))
+    if not isinstance(source, list):
+        raise StudioError(f"{figure_id} data_grid records path must resolve to a list")
+    columns = list(grid.get("columns", []))
+    headers = [str(column["label"]) for column in columns]
+    rows = [
+        [str(record.get(str(column["key"]), "—")) for column in columns]
+        for record in source
+        if isinstance(record, dict)
+    ]
+    return headers, rows
+
+
+def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pdf_path: Path, png_path: Path) -> None:
+    """Render one simple grouped-bar chart straight from data_grid, no Agent involved.
+
+    Lightweight (no-package) online projects auto-scaffold data figures
+    directly from uploaded records instead of an Agent-authored, multi-panel
+    PPTX composition (compose_data_figure) -- that pipeline needs a local
+    Codex CLI and pdfcrop/node/latexmk the shared online container never
+    runs. A plain grouped bar chart keeps figures reachable online without
+    any of that, the same way generate_table_latex already does for tables.
+    """
+    headers, rows = figure_records_grid(figure_id, metrics)
+    if not rows:
+        raise StudioError(f"{figure_id} 没有可绘图的数据行。")
+    numeric_headers = headers[1:]
+    if not numeric_headers:
+        raise StudioError(f"{figure_id} 至少需要一个标识列和一个数值列才能绘图。")
+    labels = [row[0] for row in rows]
+    series: list[tuple[str, list[float]]] = []
+    for column_index, label in enumerate(numeric_headers, start=1):
+        values = []
+        for row in rows:
+            value = numeric_cell(row[column_index])
+            if value is None:
+                raise StudioError(f"{figure_id} 的列“{label}”包含非数值内容，无法绘图。")
+            values.append(value)
+        series.append((label, values))
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    definition = FIGURES[figure_id]
+    figure, axes = plt.subplots(figsize=(3.32, 2.4))
+    positions = np.arange(len(labels))
+    width = 0.8 / max(len(series), 1)
+    for index, (label, values) in enumerate(series):
+        axes.bar(positions + index * width, values, width, label=label)
+    axes.set_xticks(positions + width * (len(series) - 1) / 2)
+    axes.set_xticklabels(labels, rotation=20, ha="right", fontsize=7)
+    axes.set_title(str(definition.get("caption", "")), fontsize=8, wrap=True)
+    axes.tick_params(axis="y", labelsize=7)
+    if len(series) > 1:
+        axes.legend(fontsize=6)
+    figure.tight_layout()
+    pdf_path.parent.mkdir(parents=True, exist_ok=True)
+    png_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(pdf_path, format="pdf")
+    figure.savefig(png_path, format="png", dpi=150)
+    plt.close(figure)
 
 
 def generate_table_latex(
@@ -3766,6 +3863,29 @@ def post_openai(
         raise StudioError(f"{config['label']} API request failed: {exc.reason}") from exc
 
 
+def mark_unverified_citations_as_needed(text: str) -> str:
+    """Convert \\cite{} keys the model invented (never verified against the
+    bibliography) into a plain-text [CITATION NEEDED] marker.
+
+    Used when the active provider cannot run resolve_citations's web-search
+    verification (any non-OpenAI provider). It reuses the same marker the
+    rest of the pipeline already knows how to narrow or drop, so an
+    unverifiable claim is never silently kept just because search wasn't
+    available to check it.
+    """
+    unverified = citation_keys(text) - bibliography_keys()
+    if not unverified:
+        return text
+
+    def replace(match: re.Match) -> str:
+        keys = [key.strip() for key in match.group(1).split(",")]
+        if any(key in unverified for key in keys):
+            return "[CITATION NEEDED]"
+        return match.group(0)
+
+    return re.sub(r"\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{([^}]+)\}", replace, text)
+
+
 def needs_citation_resolution(text: str) -> bool:
     return (
         "[CITATION NEEDED]" in text
@@ -4184,13 +4304,23 @@ instead of guessing."""
             raise StudioError("GPT 修正后仍然" + remaining_reference_error)
     added: list[str] = []
     if needs_citation_resolution(text):
-        response_id, text, added = resolve_citations(
-            model=model,
-            previous_response_id=response_id,
-            section=section_meta["title"],
-            purpose=purpose,
-            paragraph=text,
-        )
+        if active_llm_provider() == "openai":
+            response_id, text, added = resolve_citations(
+                model=model,
+                previous_response_id=response_id,
+                section=section_meta["title"],
+                purpose=purpose,
+                paragraph=text,
+            )
+        else:
+            # Citation search needs OpenAI's web_search tool, which other
+            # providers' APIs don't support (post_openai refuses to send
+            # `tools` to them). Route straight into the same "search
+            # couldn't verify every claim" narrowing/dropping fallback
+            # below, instead of hard-failing the whole draft -- and never
+            # let a model-invented \cite key survive un-narrowed just
+            # because there was no search available to check it.
+            text = mark_unverified_citations_as_needed(text)
     if "[CITATION NEEDED]" in text:
         correction = post_openai(
             {
@@ -4446,10 +4576,49 @@ def manuscript_entrypoint_errors(source: str | None = None) -> list[str]:
     return errors
 
 
+def sync_manuscript_bibliography_command() -> None:
+    """Keep main.tex's bibliography command in sync with whether the
+    manuscript currently cites anything.
+
+    Current online scaffolding always uses a conditional
+    \\input{sections/bibliography}, toggled between an inert comment and
+    \\bibliography{references} by accept/reset. A project scaffolded before
+    that pattern existed (the demo project) hardcodes
+    \\bibliography{references} directly in main.tex instead, so bibtex runs
+    unconditionally -- with zero citations that produces a genuinely empty
+    thebibliography environment and crashes compilation with "Something's
+    wrong--perhaps a missing \\item." (reachable by any real researcher who
+    resets, or starts fresh in, a project scaffolded this way). Toggling
+    both shapes here, on every compile, keeps that invariant true
+    regardless of which pattern a given project's main.tex uses and
+    regardless of what triggered this compile.
+    """
+    main_path = PAPER / "main.tex"
+    if not main_path.exists():
+        return
+    main_source = main_path.read_text(encoding="utf-8")
+    placeholder = "% Paper Studio enables the bibliography after the first accepted citation."
+    if manuscript_citation_keys():
+        updated = re.sub(
+            r"(?m)^" + re.escape(placeholder) + r"\s*$",
+            r"\\bibliography{references}",
+            main_source,
+        )
+    else:
+        updated = re.sub(
+            r"(?m)^\\bibliography\{[^}]*\}\s*$",
+            placeholder,
+            main_source,
+        )
+    if updated != main_source:
+        main_path.write_text(updated, encoding="utf-8")
+
+
 def compile_paper() -> CompileResult:
     main = PAPER / "main.tex"
     if not main.exists():
         return CompileResult(False, "paper/main.tex does not exist yet.")
+    sync_manuscript_bibliography_command()
     entrypoint_errors = manuscript_entrypoint_errors()
     if entrypoint_errors:
         return CompileResult(False, "\n".join(entrypoint_errors))
@@ -6903,6 +7072,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
             },
             "outline_confirmed": False,
             "demo_mode": DEMO_MODE,
+            "online_project": ONLINE_PROJECT_MODE,
             "api_key_configured": api_key_configured,
             "api_key_setup": api_key_setup,
             "api_usage": usage_summary(API_USAGE_FILE),
@@ -7023,6 +7193,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
     }
     result["outline_confirmed"] = outline_confirmed
     result["demo_mode"] = DEMO_MODE
+    result["online_project"] = ONLINE_PROJECT_MODE
     result["llm_provider"] = provider
     result["llm_provider_options"] = provider_options
     result["llm_model_options"] = model_options
@@ -7336,6 +7507,8 @@ class Handler(BaseHTTPRequestHandler):
         return section
 
     def handle_llm_provider(self, body: dict[str, Any]) -> None:
+        if ONLINE_PROJECT_MODE:
+            raise StudioError("在线写作会话统一使用共享 DeepSeek API，不支持切换服务商。")
         state = load_state()
         if full_draft_running(state):
             raise StudioError("全文初稿正在生成；请先停止任务再切换 LLM API。")
@@ -7345,6 +7518,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"ok": True, "state": public_state(state)})
 
     def handle_llm_model(self, body: dict[str, Any]) -> None:
+        if ONLINE_PROJECT_MODE:
+            raise StudioError("在线写作会话统一使用共享 DeepSeek API，不支持切换模型。")
         state = load_state()
         if full_draft_running(state):
             raise StudioError("全文初稿正在生成；请先停止任务再切换写作模型。")
@@ -7812,6 +7987,69 @@ class Handler(BaseHTTPRequestHandler):
         target = locate_pdf_source(page, x, y, load_state())
         self.send_json({"ok": True, "target": target})
 
+    def handle_figure_generate_deterministic(
+        self,
+        figure_id: str,
+        panel_id: str,
+        state: dict[str, Any],
+        figure_state: dict[str, Any],
+        body: dict[str, Any],
+    ) -> None:
+        """Render a "data" kind figure synchronously online, no Agent job needed.
+
+        A single deterministic chart is the whole figure (see
+        render_data_figure_deterministic), so unlike the local Agent path
+        there is no separate panel-then-compose job to track -- this
+        finishes in one request, the same way handle_table_generate's
+        online branch does for tables.
+        """
+        requested_width = str(body.get("layout_width", "single-column"))
+        if requested_width not in {"single-column", "two-column"}:
+            raise StudioError("插入论文宽度必须是单栏或双栏。")
+        paths = figure_paths(figure_id)
+        render_data_figure_deterministic(figure_id, metrics_bundle(), paths["pdf"], paths["preview"])
+        panel_paths = data_panel_paths(figure_id, panel_id)
+        panel_paths["pdf"].parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(paths["pdf"], panel_paths["pdf"])
+        shutil.copyfile(paths["preview"], panel_paths["preview"])
+        message = "已从上传数据确定性生成图表（无需 Agent）。"
+        panels = dict(figure_state.get("panels", {}))
+        panel_state = dict(panels.get(panel_id, {}))
+        panel_state.update(
+            status="built",
+            revision=int(panel_state.get("revision", 0)) + 1,
+            progress=100,
+            progress_message="图表已确定性生成。",
+            last_message=message,
+        )
+        panels[panel_id] = panel_state
+        figure_state.update(
+            status="built",
+            revision=int(figure_state.get("revision", 0)) + 1,
+            approved_at=None,
+            progress=100,
+            progress_message="最终单图已确定性生成。",
+            last_message=message,
+            panels=panels,
+            layout_mode=requested_width,
+            layout_width=requested_width,
+            requested_layout_width=requested_width,
+            layout_prompt="",
+            layout_prompt_is_default=True,
+            layout_plan={
+                "orientation": "horizontal",
+                "width": requested_width,
+                "panel_order": [panel_id],
+                "gap_pt": 0,
+                "crop_margins_pt": 0,
+                "labels": [],
+            },
+            composed_at=int(time.time()),
+            job_token=None,
+        )
+        save_state(state)
+        self.send_json({"ok": True, "message": message, "state": public_state(state)})
+
     def handle_figure_generate(self, body: dict[str, Any]) -> None:
         figure_id = self.require_figure(body)
         panel_id = self.require_panel(figure_id, body)
@@ -7821,9 +8059,14 @@ class Handler(BaseHTTPRequestHandler):
             raise StudioError(reason)
         figure_state = state["figures"][figure_id]
         if FIGURES[figure_id]["kind"] == "mechanism":
+            if ONLINE_PROJECT_MODE:
+                raise StudioError("在线会话当前不运行机制图设计 Agent；论文对话、正文、标题、Caption、表格与 LLM 写作功能仍可正常使用。")
             raise StudioError("机制图必须先生成并确认设计 Prompt，再调用 GPT Image。")
         if figure_state.get("status") in FIGURE_RUNNING_STATUSES:
             raise StudioError("该图已有任务正在运行。")
+        if ONLINE_PROJECT_MODE:
+            self.handle_figure_generate_deterministic(figure_id, panel_id, state, figure_state, body)
+            return
         instruction = str(body.get("agent_prompt", "")).strip()
         if len(instruction) > 8000:
             raise StudioError("数据图修改命令过长，请压缩到 8000 字符以内。")
@@ -7924,7 +8167,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_runtime_key(self, body: dict[str, Any]) -> None:
         if DEMO_MODE:
-            raise StudioError("只读 Demo 不能更换 API Key；请先创建私有可编辑副本。")
+            raise StudioError("只读 Demo 不能更换 API Key。")
+        if ONLINE_PROJECT_MODE:
+            # Every online session now shares one server-provisioned DeepSeek
+            # key (see online_studio.server.shared_deepseek_api_key); letting
+            # a request swap os.environ's key/provider for the whole child
+            # process would both defeat the per-user spend cap (which is
+            # keyed off DeepSeek usage) and let one session hijack another's
+            # credentials for the process's remaining lifetime.
+            raise StudioError("在线写作会话统一使用共享 DeepSeek API，不支持更换 Key 或服务商。")
         provider = str(body.get("provider", "openai")).strip().lower()
         key = str(body.get("api_key", ""))
         configuration = provider_configuration(provider)

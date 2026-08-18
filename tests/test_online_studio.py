@@ -597,6 +597,144 @@ class OnlineStudioTests(unittest.TestCase):
                 "reports/03_EXPERIMENT_PLAN.html",
             )
 
+    def test_lightweight_scaffold_is_a_valid_paper_studio_project(self):
+        # Regression coverage for the no-GitHub-repo onboarding path: a
+        # researcher who never ran package.py, has no approved 03/05
+        # contract, no RESULTS_LEDGER -- just a Scholar profile page, some
+        # reference papers, and a results table. This must still produce a
+        # project research_avatar.paper_studio.server accepts as valid,
+        # same bar as the full pipeline's scaffold.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scholar_html = [
+                (
+                    "scholar.html",
+                    "<html><body><h1>Jane Researcher</h1>"
+                    "<div>Prior work on margin-targeted augmentation.</div>"
+                    "</body></html>",
+                )
+            ]
+            reference_html = [
+                (
+                    "reference1.html",
+                    "<html><body><p>Typo robustness in intent classification "
+                    "has been studied extensively.</p></body></html>",
+                )
+            ]
+            results = {
+                "caption": "Primary accuracy comparison.",
+                "columns": [
+                    {"key": "method", "label": "Method"},
+                    {"key": "accuracy", "label": "Accuracy"},
+                ],
+                "rows": [
+                    {"method": "Baseline", "accuracy": "81.2"},
+                    {"method": "Ours", "accuracy": "84.5"},
+                ],
+            }
+            online._write_lightweight_workspace(
+                root,
+                venue="ACL 2027",
+                project_name="Margin Targeted Augmentation",
+                title="Margin-Targeted Augmentation for Robust Intent Classification",
+                scholar_files=scholar_html,
+                reference_files=reference_html,
+                results=results,
+            )
+            environment = {**os.environ, "RESEARCH_AVATAR_ROOT": str(root)}
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "research_avatar.paper_studio.server",
+                    "--validate-project",
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            main_tex = (root / "paper/main.tex").read_text()
+            self.assertIn(
+                r"\title{Margin-Targeted Augmentation for Robust Intent Classification}",
+                main_tex,
+            )
+            self.assertIn(r"\input{sections/bibliography}", main_tex)
+            plan = json.loads((root / "paper/paragraph_plan.json").read_text())
+            self.assertEqual(
+                set(plan["sections"]),
+                {
+                    "abstract", "introduction", "related_work", "method",
+                    "experiments", "discussion", "conclusion",
+                },
+            )
+            self.assertEqual(plan["sections"]["experiments"][0]["artifacts"], ["T1", "F1"])
+            config = json.loads((root / "paper/paper_studio.json").read_text())
+            self.assertEqual(config["table_order"], ["T1"])
+            self.assertEqual(config["figure_order"], ["F1"])
+            self.assertEqual(config["figures"]["F1"]["kind"], "data")
+            self.assertEqual(config["figures"]["F1"]["panels"][0]["id"], "a")
+            metrics = json.loads((root / "paper/metrics.json").read_text())
+            self.assertEqual(
+                metrics["lightweight_results"]["rows"],
+                [
+                    {"method": "Baseline", "accuracy": "81.2"},
+                    {"method": "Ours", "accuracy": "84.5"},
+                ],
+            )
+            reference_text = (root / "paper/uploaded_sources.txt").read_text()
+            self.assertIn("Jane Researcher", reference_text)
+            self.assertIn("Typo robustness", reference_text)
+
+    def test_lightweight_scaffold_without_results_has_no_figures_or_tables(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            online._write_lightweight_workspace(
+                root,
+                venue="ACL 2027",
+                project_name="Text Only Project",
+                title="A Text Only Paper",
+                scholar_files=[],
+                reference_files=[("ref.html", "<html><body>Some reference text.</body></html>")],
+                results=None,
+            )
+            environment = {**os.environ, "RESEARCH_AVATAR_ROOT": str(root)}
+            result = subprocess.run(
+                [
+                    sys.executable, "-m", "research_avatar.paper_studio.server",
+                    "--validate-project",
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            config = json.loads((root / "paper/paper_studio.json").read_text())
+            self.assertEqual(config["figures"], {})
+            self.assertEqual(config["tables"], {})
+            self.assertEqual(config["figure_order"], [])
+            self.assertEqual(config["table_order"], [])
+            plan = json.loads((root / "paper/paragraph_plan.json").read_text())
+            self.assertEqual(plan["sections"]["experiments"][0]["artifacts"], [])
+
+    def test_lightweight_scaffold_rejects_an_unrecognized_venue(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaises(online.OnlineStudioError):
+                online._write_lightweight_workspace(
+                    root,
+                    venue="Some Made Up Workshop",
+                    project_name="X",
+                    title="X",
+                    scholar_files=[],
+                    reference_files=[],
+                    results=None,
+                )
+
     def test_scaffold_uses_the_target_venues_real_official_latex_template(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -694,48 +832,19 @@ class OnlineStudioTests(unittest.TestCase):
             reference = (root / "paper/uploaded_sources.txt").read_text()
             self.assertNotIn("Concise, evidence-first prose", reference)
 
-    def test_demo_interaction_creates_private_writable_copy_after_key_entry(self):
-        with tempfile.TemporaryDirectory() as directory:
-            base = Path(directory)
-            demo = base / "demo-project"
-            (demo / "paper").mkdir(parents=True)
-            (demo / "paper/paper_studio.json").write_text(
-                json.dumps({"project": {"id": "demo-paper"}}), encoding="utf-8"
-            )
-            process = MagicMock()
-            process.poll.return_value = None
-            with (
-                patch.object(online, "DATA_ROOT", base / "runtime"),
-                patch.object(online, "DEMO_PROJECT", demo),
-                patch.object(
-                    online,
-                    "_start_worker",
-                    return_value=(process, 39001),
-                ) as start,
-                patch.dict(online.SESSIONS, {}, clear=True),
-            ):
-                session = online.create_demo_copy_session(
-                    {"api_key": "sk-test-demo-copy"}, user_id="demo-user"
-                )
-                self.assertEqual(session.kind, "demo-copy")
-                self.assertTrue((session.root / "paper/paper_studio.json").is_file())
-                start.assert_called_once_with(
-                    session.root,
-                    "openai",
-                    "gpt-5-nano",
-                    "sk-test-demo-copy",
-                    demo_mode=False,
-                )
-
-    def test_online_shell_defers_demo_key_prompt_until_interaction(self):
+    def test_online_shell_has_no_demo_interaction_or_key_prompt(self):
+        # Regression: the Demo tab used to let a visitor click an
+        # interactive control, fail, and get redirected into a "type your
+        # OpenAI key to get an editable copy" dialog. The demo is view-only
+        # now -- there is no key prompt to defer, and no route left that
+        # would create a private writable copy of it.
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
         script = (online.STATIC / "app.js").read_text(encoding="utf-8")
-        self.assertIn('id="demo-key-dialog"', html)
-        self.assertIn("paper-studio-demo-api-key-required", script)
-        self.assertIn("/api/online/demo-session", script)
-        self.assertIn("demoFrame.src = '/demo/?authenticated='", script)
-        self.assertIn("demo_key_required", script)
-        self.assertIn("openRequestedDemoKeyDialog();", script)
+        self.assertNotIn("demo-key-dialog", html)
+        self.assertNotIn("demo-key-dialog", script)
+        self.assertNotIn("paper-studio-demo-api-key-required", script)
+        self.assertNotIn("/api/online/demo-session", script)
+        self.assertFalse(hasattr(online, "create_demo_copy_session"))
 
     def test_page_refresh_returns_to_the_researchers_own_active_session(self):
         # A refresh (or reopening the bare site URL) always re-runs the
@@ -787,8 +896,8 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
-        self.assertIn('"class_name": "OnlineStudioContainerV29"', wrangler)
-        self.assertIn("export class OnlineStudioContainerV29", worker)
+        self.assertIn('"class_name": "OnlineStudioContainerV30"', wrangler)
+        self.assertIn("export class OnlineStudioContainerV30", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
 
     def test_container_image_installs_every_tool_compile_table_preview_requires(self):
@@ -865,14 +974,15 @@ class OnlineStudioTests(unittest.TestCase):
             for name, source in pipeline_files()
         ]
         encoded_archive = base64.b64encode(evidence_archive()).decode()
-        with tempfile.TemporaryDirectory() as directory, patch.object(
-            online, "DATA_ROOT", Path(directory)
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(online, "DATA_ROOT", Path(directory)),
+            patch.dict(os.environ, {"DEEPSEEK_API_KEY": key}),
         ):
             validator = subprocess.CompletedProcess([], 0, stdout="ok", stderr="")
             with patch.object(online.subprocess, "run", return_value=validator):
                 session = online.create_session(
                     {
-                        "api_key": key,
                         "files": encoded_files,
                         "evidence_archive": {"name": "evidence.zip", "data": encoded_archive},
                     },
@@ -897,6 +1007,64 @@ class OnlineStudioTests(unittest.TestCase):
                 if path.is_file():
                     self.assertNotIn(key.encode(), path.read_bytes(), path)
 
+    def test_create_session_fails_clearly_when_shared_key_is_unconfigured(self):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("DEEPSEEK_API_KEY", None)
+            with self.assertRaises(online.OnlineStudioError):
+                online.shared_deepseek_api_key()
+
+    def test_user_cumulative_cost_sums_every_session_ledger_for_that_user(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            online, "DATA_ROOT", Path(directory)
+        ):
+            user_root = online.user_project_root("cap-user")
+            for session_name, cost in (("session-a", 3.5), ("session-b", 4.0)):
+                ledger = user_root / session_name / "paper/.paper_studio/api_usage.jsonl"
+                ledger.parent.mkdir(parents=True)
+                ledger.write_text(
+                    json.dumps({"estimated_cost_usd": cost}) + "\n", encoding="utf-8"
+                )
+            self.assertAlmostEqual(
+                online.user_cumulative_cost_usd("cap-user"), 7.5
+            )
+            self.assertAlmostEqual(online.user_cumulative_cost_usd("other-user"), 0.0)
+
+    def test_spend_cap_blocks_new_sessions_once_a_user_is_over_the_rmb_limit(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            online, "DATA_ROOT", Path(directory)
+        ):
+            # USER_SPEND_CAP_RMB=200 / USD_TO_RMB_RATE=7.2 -> ~27.8 USD trips it.
+            ledger = (
+                online.user_project_root("over-cap-user")
+                / "session-a/paper/.paper_studio/api_usage.jsonl"
+            )
+            ledger.parent.mkdir(parents=True)
+            ledger.write_text(
+                json.dumps({"estimated_cost_usd": 30.0}) + "\n", encoding="utf-8"
+            )
+            with self.assertRaises(online.OnlineStudioError):
+                online.require_under_spend_cap("over-cap-user")
+            online.require_under_spend_cap("fresh-user")
+
+    def test_proxy_blocks_writes_once_a_user_session_is_over_the_spend_cap(self):
+        handler = object.__new__(online.Handler)
+        handler.command = "POST"
+        recorded = {}
+
+        def fake_json(payload, status=200, cookie=None):
+            recorded["payload"] = payload
+            recorded["status"] = status
+
+        handler._json = fake_json
+        session = online.Session(
+            "session-id", "over-cap-user", Path("/tmp/does-not-matter"),
+            "deepseek", "deepseek-v4-flash", MagicMock(), 0, kind="user",
+        )
+        with patch.object(online, "user_cumulative_cost_usd", return_value=1000.0):
+            handler._proxy(session, "/api/generate")
+        self.assertFalse(recorded["payload"]["ok"])
+        self.assertEqual(recorded["status"], 402)
+
     def test_setup_page_only_asks_for_generated_html_and_openai_key(self):
         source = (online.STATIC / "index.html").read_text(encoding="utf-8")
         app = (online.STATIC / "app.js").read_text(encoding="utf-8")
@@ -909,7 +1077,7 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertNotIn("上传由 Research Avatar 生成的必要研究证据。", source)
         style = (online.STATIC / "style.css").read_text(encoding="utf-8")
         self.assertIn("width: min(1500px, calc(100% - 32px))", style)
-        self.assertIn("#setup-form { max-width: 1180px; }", style)
+        self.assertIn(".use-columns { max-width: 1500px; align-items: start; }", style)
         self.assertIn("body.workspace-authenticated{height:100dvh", style)
         self.assertIn("#use-panel{overflow-y:auto", style)
         self.assertIn("#demo-panel{overflow:hidden", style)
@@ -919,10 +1087,19 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertNotIn('name="profile_file"', source)
         self.assertNotIn('name="plan_file"', source)
         self.assertNotIn('name="result_file"', source)
-        self.assertIn('name="api_key"', source)
+        self.assertNotIn('name="api_key"', source)
         self.assertNotIn('name="project_name"', source)
         self.assertNotIn('name="outline"', source)
         self.assertNotIn('name="model"', source)
+        # Every online session shares one server-held DeepSeek key now; the
+        # landing page never asks a researcher for their own key or lets
+        # them pick a provider.
+        self.assertNotIn("api_key", app)
+        self.assertNotIn("provider:", app)
+        self.assertIn('id="lightweight-form"', source)
+        self.assertIn('name="scholar_file"', source)
+        self.assertIn('name="reference_files"', source)
+        self.assertIn('name="results_file"', source)
 
     def test_demo_uses_sticky_six_stage_header_and_one_vertical_scroll(self):
         root = Path(__file__).resolve().parents[1]

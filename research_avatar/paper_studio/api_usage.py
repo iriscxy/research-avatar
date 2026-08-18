@@ -28,6 +28,19 @@ OPENAI_PRICING: dict[str, dict[str, Any]] = {
         "source": "https://developers.openai.com/api/docs/models/gpt-4o-mini",
     },
 }
+# DeepSeek publishes off-peak (01:00-04:00 and 06:00-10:00 UTC) rates at half
+# of peak; peak rates are used here so a spend cap computed from this table
+# never underestimates a real bill.
+DEEPSEEK_PRICING: dict[str, dict[str, Any]] = {
+    "deepseek-v4-flash": {
+        "input": 0.44, "cached_input": 0.014, "output": 1.32,
+        "source": "https://api-docs.deepseek.com/quick_start/pricing",
+    },
+    "deepseek-v4-pro": {
+        "input": 1.32, "cached_input": 0.044, "output": 3.96,
+        "source": "https://api-docs.deepseek.com/quick_start/pricing",
+    },
+}
 _LOCK = threading.RLock()
 
 
@@ -55,18 +68,25 @@ def token_usage(response: dict[str, Any]) -> dict[str, int]:
     }
 
 
+PROVIDER_PRICING: dict[str, dict[str, dict[str, Any]]] = {
+    "openai": OPENAI_PRICING,
+    "deepseek": DEEPSEEK_PRICING,
+}
+
+
 def usage_record(
     response: dict[str, Any], *, provider: str, requested_model: str, operation: str
 ) -> dict[str, Any]:
     tokens = token_usage(response)
     actual_model = str(response.get("model") or requested_model)
     price = None
-    if provider == "openai":
-        price = OPENAI_PRICING.get(actual_model)
+    table = PROVIDER_PRICING.get(provider)
+    if table is not None:
+        price = table.get(actual_model)
         if price is None:
-            for alias in sorted(OPENAI_PRICING, key=len, reverse=True):
+            for alias in sorted(table, key=len, reverse=True):
                 if actual_model.startswith(alias + "-"):
-                    price = OPENAI_PRICING[alias]
+                    price = table[alias]
                     break
     estimated_cost_usd = None
     if price is not None:

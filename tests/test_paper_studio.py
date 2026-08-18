@@ -313,7 +313,6 @@ class PaperStudioTests(unittest.TestCase):
         self.assertNotIn(secret, json.dumps(configured, ensure_ascii=False))
 
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
-        self.assertIn('id="llm-runtime-config" hidden', html)
         self.assertIn('id="model-runtime-config"', html)
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('id="api-key-setup"', html)
@@ -448,7 +447,7 @@ class PaperStudioTests(unittest.TestCase):
         parser = InteractionParser()
         parser.feed(html)
         expected_controls = {
-            "llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view",
+            "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view",
             "tables-view", "compile", "paper-title", "title-gpt-prompt",
             "title-generate", "title-save", "candidate", "comment", "generate",
             "accept", "pdf-navigation-toggle", "table-agent-prompt", "table-agent-edit",
@@ -496,7 +495,7 @@ class PaperStudioTests(unittest.TestCase):
                 "/api/figure/caption/generate", "/api/figure/compose",
                 "/api/figure/draw", "/api/figure/panel/generate",
                 "/api/figure/placement", "/api/figure/prompt", "/api/generate",
-                "/api/llm-provider", "/api/llm-model",
+                "/api/llm-model",
                 "/api/pdf/locate", "/api/reset-conversation",
                 "/api/runtime-key",
                 "/api/reset-generated-paper", "/api/select-paragraph", "/api/state",
@@ -2240,6 +2239,55 @@ args = parser.parse_args()
         self.assertIn("gan2024reasoning", final_bib)
         self.assertEqual(final_bib.count("{"), final_bib.count("}"))
 
+    def test_sync_bibliography_command_disables_and_reenables_a_hardcoded_bibliography(
+        self,
+    ):
+        # Regression: the demo project (and any project scaffolded before
+        # Paper Studio switched to the conditional \input{sections/
+        # bibliography} pattern) hardcodes \bibliography{references}
+        # directly in main.tex. Resetting such a project leaves zero
+        # citations, so bibtex still runs unconditionally and produces a
+        # genuinely empty thebibliography environment -- pdflatex then dies
+        # with "Something's wrong--perhaps a missing \item." on
+        # \end{thebibliography}. The sync helper must toggle main.tex's
+        # hardcoded command off when there are no citations, and must
+        # toggle it back on once a citation is accepted, so the
+        # bibliography never gets stuck disabled after a real writing
+        # session resumes.
+        with TemporaryDirectory() as directory:
+            paper = Path(directory)
+            (paper / "sections").mkdir()
+            main_path = paper / "main.tex"
+            main_path.write_text(
+                "\\documentclass{article}\n"
+                "\\begin{document}\n"
+                "\\bibliography{references}\n"
+                "\\end{document}\n",
+                encoding="utf-8",
+            )
+            section_path = paper / "sections" / "body.tex"
+            section_path.write_text("No citations yet.\n", encoding="utf-8")
+
+            with patch.object(studio, "PAPER", paper):
+                studio.sync_manuscript_bibliography_command()
+                disabled = main_path.read_text(encoding="utf-8")
+                self.assertNotIn("\\bibliography{references}", disabled)
+                self.assertIn(
+                    "% Paper Studio enables the bibliography after the first accepted citation.",
+                    disabled,
+                )
+
+                section_path.write_text(
+                    "See \\cite{smith2020} for details.\n", encoding="utf-8"
+                )
+                studio.sync_manuscript_bibliography_command()
+                reenabled = main_path.read_text(encoding="utf-8")
+                self.assertIn("\\bibliography{references}", reenabled)
+                self.assertNotIn(
+                    "% Paper Studio enables the bibliography after the first accepted citation.",
+                    reenabled,
+                )
+
     def test_abstract_starts_with_system_planned_paragraph(self):
         section = _default_state()["sections"]["abstract"]
         paragraph = current_paragraph(section)
@@ -2564,6 +2612,51 @@ args = parser.parse_args()
         resolver.assert_called_once()
         self.assertEqual((response_id, text), ("resp-narrow", "Narrow supported framing."))
         self.assertIn("Narrow or remove every unsupported clause", payloads[1]["instructions"])
+
+    def test_non_openai_provider_narrows_unverified_citations_instead_of_crashing(self):
+        # Regression: resolve_citations needs OpenAI's web_search tool, and
+        # post_openai refuses to send `tools` to any other provider. Before
+        # this fix, a DeepSeek-drafted paragraph that cited a key not yet in
+        # the bibliography (no literal [CITATION NEEDED] marker -- just an
+        # invented \cite{} key) hit that guard and 400'd the whole generate
+        # request, discarding an otherwise-usable draft. It must instead
+        # fall back to the same narrow-or-drop path already used when
+        # OpenAI's own search comes back empty.
+        payloads = []
+
+        def fake_post(payload):
+            payloads.append(payload)
+            if len(payloads) == 1:
+                return {
+                    "id": "resp-draft",
+                    "output_text": r"Broad claim \cite{invented2024}.",
+                }
+            return {"id": "resp-narrow", "output_text": "Narrow supported framing."}
+
+        with (
+            patch.object(studio, "post_openai", side_effect=fake_post),
+            patch.object(studio, "active_llm_provider", return_value="deepseek"),
+            patch.object(
+                studio,
+                "resolve_citations",
+                side_effect=AssertionError("resolve_citations must not be called"),
+            ),
+        ):
+            response_id, text, _ = call_openai(
+                section="related_work",
+                model="deepseek-v4-flash",
+                previous_response_id=None,
+                purpose="Position prior work.",
+                required_heading=None,
+                reference_paragraph="Reference prose.",
+                comment="",
+                current_text="",
+            )
+
+        self.assertEqual((response_id, text), ("resp-narrow", "Narrow supported framing."))
+        self.assertNotIn("invented2024", text)
+        self.assertIn("Narrow or remove every unsupported clause", payloads[1]["instructions"])
+        self.assertNotIn("tools", payloads[1])
 
     def test_unresolved_sentence_is_dropped_after_narrowing_still_leaves_marker(self):
         self.assertEqual(
@@ -3142,6 +3235,52 @@ args = parser.parse_args()
         self.assertLess(latex.index(r"B & \textbf{15.0}"), latex.index("A & 9.0"))
         self.assertNotIn("StrongREJECT", latex)
 
+    def test_table_prompt_accepts_natural_language_best_values_phrasing(self):
+        # Regression: the demo project's own default table briefs describe
+        # "best" in natural English ("highest accuracy", "highest accuracy
+        # and lowest count") instead of the grammar's literal none/max/min
+        # tokens. Before this fix, generating T1 or T2 with their untouched
+        # default prompt always 400'd with "最优值仅支持 none、max 或 min。"
+        # -- reachable by any fresh project that never customizes the table
+        # prompt.
+        metrics = {
+            "main_results": {
+                "benchmarks": {
+                    "AdvBench": {
+                        "rows": [
+                            {"method": "A", "mean_asr": 12.0, "mean_sr": 3.0},
+                            {"method": "B", "mean_asr": 20.0, "mean_sr": 4.0},
+                        ]
+                    },
+                    "TrustLLM": {
+                        "rows": [
+                            {"method": "A", "mean_asr": 9.0, "mean_sr": 2.0},
+                            {"method": "B", "mean_asr": 15.0, "mean_sr": 5.0},
+                        ]
+                    },
+                }
+            }
+        }
+        uniform_prompt = "\n".join(
+            [
+                "数据源: results/",
+                "列: Method | TrustLLM ASR | AdvBench ASR",
+                "行: B | A",
+                "Caption: Uniform best direction.",
+                "字号: footnotesize",
+                "最优值: highest accuracy",
+            ]
+        )
+        latex = generate_table_latex("T1", metrics, uniform_prompt)
+        self.assertIn(r"B & \textbf{15.0}", latex)
+
+        mixed_prompt = uniform_prompt.replace(
+            "最优值: highest accuracy",
+            "最优值: highest accuracy and lowest count",
+        )
+        mixed_latex = generate_table_latex("T1", metrics, mixed_prompt)
+        self.assertNotIn(r"\textbf", mixed_latex)
+
     def test_default_table_prompt_is_persisted_in_new_state(self):
         state = _default_state()
         self.assertEqual(
@@ -3580,6 +3719,51 @@ args = parser.parse_args()
         save.assert_called_once_with(state)
         thread.assert_not_called()
 
+    def test_online_data_figure_generates_deterministically_without_an_agent(self):
+        # Regression coverage for the lightweight (no-package) online
+        # onboarding path: a "data" kind figure with one panel must render
+        # straight from data_grid records with no Codex CLI Agent and no
+        # pdfcrop/node/latexmk composition toolchain, since the shared
+        # online container runs none of that.
+        state = _default_state()
+        figure_definition = dict(studio.FIGURES["F5"])
+        figure_definition["data_grid"] = {
+            "type": "records",
+            "path": "defenses.rows",
+            "columns": [
+                {"key": "defense", "label": "Defense"},
+                {"key": "residual_asr", "label": "Residual ASR"},
+            ],
+        }
+        handler = object.__new__(Handler)
+        handler.require_figure = lambda body: "F5"
+        handler.require_panel = lambda figure_id, body: "a"
+        response = {}
+        handler.send_json = lambda payload, status=200: response.update(
+            {"payload": payload, "status": status}
+        )
+        with (
+            patch.dict(studio.FIGURES, {"F5": figure_definition}),
+            patch.object(studio, "load_state", return_value=state),
+            patch.object(studio, "save_state") as save,
+            patch.object(studio, "figure_generation_gate", return_value=(True, "")),
+            patch.object(studio, "public_state", side_effect=lambda current: current),
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+        ):
+            handler.handle_figure_generate(
+                {"figure_id": "F5", "panel_id": "a", "layout_width": "single-column"}
+            )
+        self.assertEqual(response["status"], 200)
+        self.assertTrue(response["payload"]["ok"])
+        figure_state = state["figures"]["F5"]
+        self.assertEqual(figure_state["status"], "built")
+        self.assertEqual(figure_state["panels"]["a"]["status"], "built")
+        self.assertIsNotNone(figure_state["composed_at"])
+        pdf_path = studio.figure_paths("F5")["pdf"]
+        self.assertTrue(pdf_path.is_file())
+        self.assertGreater(pdf_path.stat().st_size, 0)
+        save.assert_called_once_with(state)
+
     def test_data_layout_width_controls_paper_float(self):
         wide = figure_latex("F4", {"layout_width": "two-column"})
         narrow = figure_latex("F4", {"layout_width": "single-column"})
@@ -3990,15 +4174,55 @@ args = parser.parse_args()
             with patch.object(studio, "PAPER", paper):
                 self.assertTrue(studio.outline_is_confirmed())
 
+    def test_online_project_flag_hides_provider_and_key_controls(self):
+        # Every online session (real or demo) now shares one server-held
+        # DeepSeek key -- there is nothing for that researcher to pick,
+        # rotate, or type a model name for, so the model input and the
+        # runtime-key dialog trigger stay hidden there. A local desktop
+        # install (online_project False) keeps both.
+        with patch.object(studio, "ONLINE_PROJECT_MODE", True):
+            online_state = public_state(_default_state())
+        with patch.object(studio, "ONLINE_PROJECT_MODE", False):
+            local_state = public_state(_default_state())
+        self.assertTrue(online_state["online_project"])
+        self.assertFalse(local_state["online_project"])
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn(
+            '$("model-runtime-config").hidden = Boolean(state.online_project);', source,
+        )
+        self.assertIn(
+            '$("runtime-key-open").hidden = Boolean(state.online_project);', source,
+        )
+
+    def test_read_only_demo_control_list_covers_every_mutating_action(self):
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        for control_id in (
+            "generate", "accept", "comment", "reset", "reset-generated",
+            "title-generate", "title-save", "figure-approve", "table-generate",
+            "table-approve",
+        ):
+            self.assertIn(f'"{control_id}"', source)
+        self.assertIn("const DEMO_READ_ONLY_CONTROL_IDS = [", source)
+        self.assertIn(
+            'document.querySelectorAll(".figure-card, .figure-actions button, .paragraph-nav button")',
+            source,
+        )
+
     def test_demo_mode_is_public_but_never_exposes_a_key(self):
         with patch.object(studio, "DEMO_MODE", True):
             visible = public_state(_default_state())
         self.assertTrue(visible["demo_mode"])
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
-        self.assertIn("paper-studio-demo-api-key-required", source)
-        self.assertIn("window.parent.postMessage", source)
-        self.assertIn('demo_key_required: "1"', source)
-        self.assertIn("window.location.assign(`/?${params.toString()}`)", source)
+        # Regression: the demo used to let a visitor click an interactive
+        # control, fail, and get redirected into a "bring your own key"
+        # dialog that no longer exists. The demo is view-only now -- no
+        # postMessage escape hatch, no redirect, just a disabled control
+        # surface and a plain blocked-request fallback.
+        self.assertNotIn("paper-studio-demo-api-key-required", source)
+        self.assertNotIn("window.parent.postMessage", source)
+        self.assertNotIn('demo_key_required: "1"', source)
+        self.assertIn("function applyReadOnlyDemoRestrictions()", source)
+        self.assertIn('if (!state || !state.demo_mode) return;', source)
         self.assertIn('$("figure-prompt").disabled = state.demo_mode', source)
 
     def test_each_figure_has_an_independent_hidden_conversation_id(self):

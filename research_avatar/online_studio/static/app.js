@@ -5,18 +5,17 @@ const authCard = document.querySelector('#auth-card');
 const authForm = document.querySelector('#auth-form');
 const authMessage = document.querySelector('#auth-message');
 const workspaceShell = document.querySelector('#workspace-shell');
-const demoKeyDialog = document.querySelector('#demo-key-dialog');
-const demoKeyForm = document.querySelector('#demo-key-form');
-const demoKeyMessage = document.querySelector('#demo-key-message');
-const demoKeySubmit = document.querySelector('#demo-key-submit');
 const sessionNotice = document.querySelector('#session-notice');
+const lightweightForm = document.querySelector('#lightweight-form');
+const lightweightMessage = document.querySelector('#lightweight-message');
+const lightweightSubmit = document.querySelector('#lightweight-submit');
 
 function showNavigationNotice(authenticated) {
   const url = new URL(window.location.href);
   const expired = url.searchParams.get('session_expired') === '1';
   const loginRequired = url.searchParams.get('login_required') === '1';
   if (expired && authenticated) {
-    sessionNotice.textContent = '上一次临时写作会话已结束。请重新创建 Demo 写作副本，或在 Use it 上传项目包。';
+    sessionNotice.textContent = '上一次临时写作会话已结束。请在 Use it 重新开始一个写作会话。';
     sessionNotice.classList.remove('hidden');
   } else if (loginRequired && !authenticated) {
     authMessage.className = 'error';
@@ -27,22 +26,6 @@ function showNavigationNotice(authenticated) {
     url.searchParams.delete('login_required');
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
   }
-}
-
-function openDemoKeyDialog() {
-  demoKeyMessage.className = '';
-  demoKeyMessage.textContent = '';
-  if (!demoKeyDialog.open) demoKeyDialog.showModal();
-  demoKeyForm.elements.api_key.focus();
-}
-
-function openRequestedDemoKeyDialog() {
-  const url = new URL(window.location.href);
-  if (url.searchParams.get('demo_key_required') !== '1') return;
-  openDemoKeyDialog();
-  url.searchParams.delete('demo_key_required');
-  url.searchParams.delete('demo_return');
-  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
 function selectProductPanel(panelId) {
@@ -70,18 +53,15 @@ async function showAuthenticated(user) {
   // is active, go straight back into it — only a researcher with no active
   // session (or who was just browsing the read-only Demo) sees this
   // landing shell at all, which is exactly the Demo case staying on Demo.
-  const url = new URL(window.location.href);
-  if (url.searchParams.get('demo_key_required') !== '1') {
-    try {
-      const response = await fetch('/api/online/session', { cache: 'no-store' });
-      const state = await response.json();
-      if (state.active) {
-        window.location.assign('/studio');
-        return;
-      }
-    } catch (_) {
-      // Fall through to the normal landing shell below.
+  try {
+    const response = await fetch('/api/online/session', { cache: 'no-store' });
+    const state = await response.json();
+    if (state.active) {
+      window.location.assign('/studio');
+      return;
     }
+  } catch (_) {
+    // Fall through to the normal landing shell below.
   }
   document.body.classList.add('workspace-authenticated');
   authCard.classList.add('hidden');
@@ -93,7 +73,6 @@ async function showAuthenticated(user) {
   document.querySelector('#account-label').textContent =
     user.email + ' · ' + (user.provider === 'google' ? 'Google' : '邮箱账户');
   document.querySelector('#session-actions').classList.add('hidden');
-  openRequestedDemoKeyDialog();
 }
 
 async function initializeAuth() {
@@ -163,42 +142,26 @@ document.querySelector('#logout').addEventListener('click', async () => {
 
 initializeAuth();
 
-window.addEventListener('message', (event) => {
-  const demoFrame = document.querySelector('#demo-frame');
-  if (
-    event.origin !== window.location.origin
-    || event.source !== demoFrame.contentWindow
-    || event.data?.type !== 'paper-studio-demo-api-key-required'
-  ) return;
-  openDemoKeyDialog();
-});
-
-document.querySelector('#demo-key-close').addEventListener('click', () => {
-  demoKeyForm.elements.api_key.value = '';
-  demoKeyDialog.close();
-});
-
-demoKeyForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  demoKeyMessage.className = '';
-  demoKeyMessage.textContent = '正在创建你的可编辑 Demo 副本…';
-  demoKeySubmit.disabled = true;
-  try {
-    const response = await fetch('/api/online/demo-session', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({api_key: demoKeyForm.elements.api_key.value}),
-    });
-    demoKeyForm.elements.api_key.value = '';
-    const result = await response.json();
-    if (!response.ok || !result.ok) throw new Error(result.error || '创建 Demo 副本失败。');
-    window.location.assign(result.redirect);
-  } catch (error) {
-    demoKeyMessage.className = 'error';
-    demoKeyMessage.textContent = error.message;
-    demoKeySubmit.disabled = false;
+async function encodeFile(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = '';
+  const chunk = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
   }
-});
+  return { name: file.name, data: btoa(binary) };
+}
+
+async function startSession(payload) {
+  const response = await fetch('/api/online/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || '创建会话失败。');
+  window.location.assign(result.redirect);
+}
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -213,35 +176,49 @@ form.addEventListener('submit', async (event) => {
     if (archiveFile.size > 32 * 1024 * 1024) {
       throw new Error('研究证据 ZIP 不能超过 32 MB。');
     }
-    const encodeFile = async (file) => {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      let binary = '';
-      const chunk = 0x8000;
-      for (let index = 0; index < bytes.length; index += chunk) {
-        binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
-      }
-      return { name: file.name, data: btoa(binary) };
-    };
-    const evidenceArchive = await encodeFile(archiveFile);
-    const payload = {
-      provider: 'openai',
-      api_key: form.elements.api_key.value,
+    await startSession({
+      mode: 'package',
       access_token: form.elements.access_token.value,
-      evidence_archive: evidenceArchive,
-    };
-    const response = await fetch('/api/online/session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      evidence_archive: await encodeFile(archiveFile),
     });
-    form.elements.api_key.value = '';
     form.elements.access_token.value = '';
-    const result = await response.json();
-    if (!response.ok || !result.ok) throw new Error(result.error || '创建会话失败。');
-    window.location.assign(result.redirect);
   } catch (error) {
     message.className = 'error';
     message.textContent = error.message;
     submit.disabled = false;
+  }
+});
+
+lightweightForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  lightweightMessage.className = '';
+  lightweightMessage.textContent = '正在读取材料并启动写作台…';
+  lightweightSubmit.disabled = true;
+  try {
+    const elements = lightweightForm.elements;
+    const scholarFile = elements.scholar_file.files[0];
+    const referenceFiles = Array.from(elements.reference_files.files);
+    const resultsFile = elements.results_file.files[0];
+    let results = null;
+    if (resultsFile) {
+      const text = await resultsFile.text();
+      try {
+        results = JSON.parse(text);
+      } catch (_) {
+        throw new Error('实验结果数据不是有效 JSON。');
+      }
+    }
+    await startSession({
+      mode: 'lightweight',
+      venue: elements.venue.value,
+      title: elements.title.value,
+      scholar_files: scholarFile ? [await encodeFile(scholarFile)] : [],
+      reference_files: await Promise.all(referenceFiles.map(encodeFile)),
+      results,
+    });
+  } catch (error) {
+    lightweightMessage.className = 'error';
+    lightweightMessage.textContent = error.message;
+    lightweightSubmit.disabled = false;
   }
 });

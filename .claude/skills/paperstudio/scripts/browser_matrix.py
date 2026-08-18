@@ -61,11 +61,10 @@ class Matrix:
         page, errors, posts = self.page(self.state)
         self.visit(page, "", "!document.querySelector('#empty-project').hidden")
         assert page.locator("#empty-project").is_visible()
-        assert page.locator("#llm-runtime-config").is_hidden()
         assert page.locator("#model-runtime-config").is_visible()
         assert page.locator("#model").input_value() == "gpt-5-nano"
         controls = (
-            "llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view",
+            "model", "model-apply", "reset", "reset-generated", "writing-view",
             "figures-view", "tables-view", "compile", "full-draft-start",
             "full-draft-cancel", "runtime-key-open",
         )
@@ -118,7 +117,6 @@ class Matrix:
                     "document.querySelector('#section-title').textContent !== 'Loading…'",
                 )
                 visited.append((section, view))
-                assert page.locator("#llm-runtime-config").is_hidden()
                 assert page.locator("#model-runtime-config").is_visible()
                 assert page.locator("#model-suggestions option").count() >= 2
         assert not posts, posts
@@ -139,7 +137,7 @@ class Matrix:
             ),
         )
         self.visit(page, "", "!document.querySelector('#load-error').hidden")
-        controls = ("llm-provider", "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "full-draft-start", "full-draft-cancel", "runtime-key-open")
+        controls = ("model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "full-draft-start", "full-draft-cancel", "runtime-key-open")
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()
@@ -1130,6 +1128,64 @@ class Matrix:
             page.close()
         self.results["automatic_generation_sequence"] = results
 
+    def table_generate_survives_a_busy_lock_race(self) -> None:
+        # Reported directly: navigating into one pending table (auto
+        # -generate fires) then immediately clicking a second pending table
+        # left the second stuck "pending" forever. Every figure/table
+        # action shares one JS-side busy lock; the second table's
+        # scheduled auto-generate call landed while the first's request was
+        # still in flight, silently no-op'd against that lock, but had
+        # already been marked "attempted" -- so it could never retry.
+        tables = [item for item in self.state.get("tables", []) if item.get("kind") == "table"]
+        if len(tables) < 2:
+            self.results["table_generate_survives_a_busy_lock_race"] = "skipped: needs 2+ tables"
+            return
+        fixture = copy.deepcopy(self.state)
+        for artifact in fixture.get("figures", []) + fixture.get("tables", []):
+            artifact.update(ready=False, status="failed")
+        first, second = tables[0]["id"], tables[1]["id"]
+        for table_id in (first, second):
+            target = next(item for item in fixture["tables"] if item["id"] == table_id)
+            target.update(ready=True, status="pending", latex="")
+        page = self.browser.new_page()
+        posts: list[str] = []
+        errors: list[str] = []
+        page.on("pageerror", lambda error, errors=errors: errors.append(str(error)))
+
+        def api(route, _request=None, *, fixture=fixture, posts=posts) -> None:
+            if route.request.method == "GET":
+                route.fulfill(status=200, content_type="application/json", body=json.dumps(fixture))
+                return
+            body = route.request.post_data_json
+            table_id = body.get("table_id")
+            posts.append(table_id)
+            if table_id == first:
+                # Hold the first table's response open long enough for the
+                # second table's own scheduled auto-generate to fire while
+                # this one is still in flight.
+                page.wait_for_timeout(400)
+            target = next(item for item in fixture["tables"] if item["id"] == table_id)
+            target.update(status="built", latex="\\begin{table}fixture\\end{table}")
+            route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True, "state": fixture}))
+
+        page.route("**/api/**", api)
+        section = next(item for item in fixture["tables"] if item["id"] == first)["source_sections"][0]
+        self.visit(page, f"/?view=tables&section={section}", "document.querySelector('#section-title').textContent !== 'Loading…'")
+        page.wait_for_timeout(80)
+        second_card = page.locator(".figure-card", has_text=second)
+        if second_card.count():
+            second_card.click()
+        page.wait_for_timeout(2000)
+        assert posts.count(first) == 1, posts
+        assert posts.count(second) == 1, posts
+        assert not errors, errors
+        final_first = next(item for item in fixture["tables"] if item["id"] == first)
+        final_second = next(item for item in fixture["tables"] if item["id"] == second)
+        assert final_first["status"] == "built", final_first
+        assert final_second["status"] == "built", final_second
+        self.results["table_generate_survives_a_busy_lock_race"] = True
+        page.close()
+
     def preview_validation_and_toggle(self) -> None:
         data = next((item for item in self.state.get("figures", []) if item.get("kind") == "data" and len(item.get("panels", [])) > 1), None)
         mechanism = next((item for item in self.state.get("figures", []) if item.get("kind") == "mechanism"), None)
@@ -1226,7 +1282,6 @@ class Matrix:
         page.locator(".section-button", has_text=fixture["sections"][first]["title"]).click()
         assert page.locator("#candidate").input_value() == prose_value
         assert page.locator("#comment").input_value() == comment_value
-        assert page.locator("#llm-runtime-config").is_hidden()
         if first == "abstract":
             assert page.locator("#paper-title").input_value() == "Unsaved navigation title"
             assert page.locator("#title-gpt-prompt").input_value() == "Unsaved navigation title prompt"
@@ -1452,6 +1507,7 @@ class Matrix:
             self.generated_reset_dialog,
             self.artifact_double_dispatch,
             self.automatic_generation_sequence,
+            self.table_generate_survives_a_busy_lock_race,
             self.preview_validation_and_toggle,
             self.navigation_and_draft_isolation,
             self.project_draft_isolation,

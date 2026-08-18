@@ -37,165 +37,22 @@ export class OnlineStudioContainer extends Container {
   };
 }
 
-// A new container class gives image rollouts a fresh application pool. Keeping
-// the previous export preserves Wrangler's Durable Object migration history.
-export class OnlineStudioContainerV2 extends OnlineStudioContainer {}
+// V2 through V29 (one per past rollout) were retired via a "v31"
+// deleted_classes migration in wrangler.jsonc/wrangler.example.jsonc --
+// each was an empty pass-through subclass with no traffic once superseded,
+// so their Durable Object storage was safe to reclaim. The base
+// OnlineStudioContainer class stays: V30 still extends it, and
+// deleted_classes only tears down the Durable Object namespace/data, not
+// the source class other exports depend on.
 
-// A fresh Durable Object class forces Cloudflare to start new container
-// instances when the application image changes; existing class instances may
-// otherwise keep serving the previous image until their idle timeout.
-export class OnlineStudioContainerV3 extends OnlineStudioContainer {}
-
-// Container applications can retain an earlier image even after an in-place
-// image edit. A new class creates a clean application and instance pool for
-// this release; the Worker-version-scoped instance name handles later deploys.
-export class OnlineStudioContainerV4 extends OnlineStudioContainer {}
-
-// Rotate the application pool when a release must evict already-running V4
-// containers immediately instead of waiting for their two-hour idle timeout.
-export class OnlineStudioContainerV5 extends OnlineStudioContainer {}
-
-// Agent-recovery release: start from a clean pool so no pre-fix Codex worker
-// can survive behind an already-running container instance.
-export class OnlineStudioContainerV6 extends OnlineStudioContainer {}
-
-// Key-recovery release: rotate once more so authentication failures use the
-// safe runtime-key action instead of exposing raw Codex diagnostics.
-export class OnlineStudioContainerV7 extends OnlineStudioContainer {}
-
-// Direct-Agent release: force the application to pull the new image instead
-// of retaining an already-running V7 container with the previous UI bundle.
-export class OnlineStudioContainerV8 extends OnlineStudioContainer {}
-
-// Thread-recovery release: pull the image that abandons stale CLI writers and
-// automatically retries resume conflicts in a fresh Agent thread.
-export class OnlineStudioContainerV9 extends OnlineStudioContainer {}
-
-// Nested-Agent release: prevent the project Agent from bootstrapping a second
-// Studio process that would falsely interrupt its own background job.
-export class OnlineStudioContainerV10 extends OnlineStudioContainer {}
-
-// Copy-review release: rotate the pool so the public Demo cannot retain a
-// pre-review static bundle from an already-running V10 container.
-export class OnlineStudioContainerV11 extends OnlineStudioContainer {}
-
-// Refresh-resume release: an in-place image edit under V11 left the already
-// -running instance serving the pre-fix app.js (confirmed byte-for-byte
-// against the pushed image) even after the Container app config, the Worker
-// deployment, and a brand-new Worker-version-scoped instance name all showed
-// the new image — rotate the pool once more, per the same pattern as every
-// release above.
-export class OnlineStudioContainerV12 extends OnlineStudioContainer {}
-
-// Table-placeholder release: rotate proactively on every deploy rather than
-// debugging the same in-place staleness again — V12 was hit by exactly the
-// same symptom described above on its very first release.
-export class OnlineStudioContainerV13 extends OnlineStudioContainer {}
-
-// Figure-reload release: rotate proactively per the established pattern.
-export class OnlineStudioContainerV14 extends OnlineStudioContainer {}
-
-// Chat-removed release: rotate proactively per the established pattern.
-export class OnlineStudioContainerV15 extends OnlineStudioContainer {}
-
-// Math-delimiter-preflight release: rotate proactively per the established
-// pattern.
-export class OnlineStudioContainerV16 extends OnlineStudioContainer {}
-
-// Caption-escaping release: a real batch-writing run crashed pdflatex on an
-// unescaped "%" in a figure/table caption reaching \caption{...} raw. Rotate
-// proactively per the established pattern.
-export class OnlineStudioContainerV17 extends OnlineStudioContainer {}
-
-// Export-artifact release: /api/online/export was zipping __pycache__/.pyc/
-// .git/.DS_Store byproducts straight into the user-facing download. Rotate
-// proactively per the established pattern.
-export class OnlineStudioContainerV18 extends OnlineStudioContainer {}
-
-// Raw-caret release: a real batch-writing run crashed pdflatex on GPT prose
-// that wrote a superscript ("y^{*}") outside math mode -- the preflight
-// caught raw "_" but was missing "^", exactly as unsafe. Rotate proactively
-// per the established pattern.
-export class OnlineStudioContainerV19 extends OnlineStudioContainer {}
-
-// Table-row-directive release: every online project's scaffolder hardcoded
-// a table row directive ("保持 05 的已验证顺序") that paper_studio's own
-// row-directive parser doesn't recognize as "keep everything", so the final
-// table-materialization step failed at the end of every full-draft batch
-// run, 100% reproducibly. Rotate proactively per the established pattern.
-export class OnlineStudioContainerV20 extends OnlineStudioContainer {}
-
-// Table-best-values release: the same scaffolder also hardcoded a
-// "best_values" phrase paper_studio's directive parser never recognizes, so
-// the final table-materialization step failed a second time even after the
-// row-directive fix. Rotate proactively per the established pattern.
-export class OnlineStudioContainerV21 extends OnlineStudioContainer {}
-
-// pdfcrop release: a real batch-writing run finished all 19 paragraphs, then
-// failed at the final table-materialization step with "缺少 pdfcrop." -- the
-// base container image installed poppler-utils and latexmk but never
-// texlive-extra-utils, which is what actually provides pdfcrop. Rotate
-// proactively per the established pattern.
-export class OnlineStudioContainerV22 extends OnlineStudioContainer {}
-
-// Ghostscript release: fixing pdfcrop surfaced a one-level-deeper failure --
-// pdfcrop itself shells out to `gs` to compute the bounding box, and
-// --no-install-recommends suppressed ghostscript, which texlive-extra-utils
-// only Recommends rather than Depends on. Rotate proactively per the
-// established pattern.
-export class OnlineStudioContainerV23 extends OnlineStudioContainer {}
-
-// Table-header-column release: a real full 19/19 batch run compiled a table
-// with its own scraped header row ("Method Swap Delete ...") rendered as a
-// data row, and the shifted-out last column label replaced by a meaningless
-// "Value N" -- _artifact_rows() always padded missing headers by appending
-// placeholders instead of recovering the real leading identifier-column
-// text already present in the scraped header. Rotate proactively per the
-// established pattern.
-export class OnlineStudioContainerV24 extends OnlineStudioContainer {}
-
-// Table-overflow release: a real full 19/19 batch run compiled a table
-// whose long row labels made it wider than its single-column width, so it
-// silently printed on top of adjacent body text. generate_table_latex now
-// measures the tabular and only shrinks it (never stretches) when it
-// actually overflows. Rotate proactively per the established pattern.
-export class OnlineStudioContainerV25 extends OnlineStudioContainer {}
-
-// Bibtex-brace-balance release: a real batch-writing run died on paragraph
-// 1 with "Latex failed to resolve 4 citation(s)" -- a citation-search
-// response returned a bibtex entry truncated mid-field, and
-// append_verified_citations() only checked that it *opened* correctly
-// before writing it to references.bib verbatim, corrupting bibtex's parse
-// of every entry after it. Rotate proactively per the established pattern.
-export class OnlineStudioContainerV26 extends OnlineStudioContainer {}
-
-// Table-generate-online release: a real user reported that clicking to
-// generate a table did nothing on the production site. "/api/table
-// /generate" was blanket-blocked online alongside every Agent-subprocess
-// endpoint, even though its default case only needs generate_table_latex's
-// deterministic structured-prompt parser -- online users had no way to
-// populate a table outside a full-batch completion. Rotate proactively per
-// the established pattern.
-export class OnlineStudioContainerV27 extends OnlineStudioContainer {}
-
-// Auto-table-generate release: a real user reported that navigating to an
-// empty table still didn't generate anything even after the V27 backend
-// fix -- the actual "generate" button was buried inside a collapsed
-// "高级" (Advanced) <details> disclosure. Data figures already
-// auto-generate their first panel the moment it's viewable; tables now
-// mirror that same pattern instead of requiring a manual click. Rotate
-// proactively per the established pattern.
-export class OnlineStudioContainerV28 extends OnlineStudioContainer {}
-
-// Fresh-compile release: a real project's very first PDF compile failed
-// with "I found no \citation commands" -- compile_paper() forced -g
-// (ignore timestamps, remake everything) whenever main.synctex.gz was
-// missing, but on a genuinely fresh checkout (no aux/bbl either) that
-// makes latexmk run bibtex before any pdflatex pass has produced a main
-// .aux with \citation commands in it. -g now only fires when there's
-// actual stale build state (an existing aux/bbl) to protect against.
-// Rotate proactively per the established pattern.
-export class OnlineStudioContainerV29 extends OnlineStudioContainer {}
+// Table-generate-race release: a real user reported clicking into a second
+// table right after the first left it stuck "pending" forever.
+// scheduleAutomaticTableGenerate marked a table "attempted" before learning
+// whether the shared figureRequestBusy lock (still held by another
+// in-flight table/figure request) silently dropped its own call -- so it
+// could never retry. Now un-marks it and lets a later render retry once
+// the lock clears. Rotate proactively per the established pattern.
+export class OnlineStudioContainerV30 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({

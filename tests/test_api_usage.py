@@ -33,7 +33,7 @@ class ApiUsageTests(unittest.TestCase):
         self.assertEqual(record["reasoning_tokens"], 25)
         self.assertNotIn("prompt", record)
 
-    def test_chat_usage_is_normalized_and_unknown_price_is_explicit(self):
+    def test_chat_usage_is_normalized_and_deepseek_price_is_applied(self):
         record = usage_record(
             {
                 "id": "chat_1",
@@ -50,6 +50,24 @@ class ApiUsageTests(unittest.TestCase):
             operation="test",
         )
         self.assertEqual(record["input_tokens"], 12)
+        # 10 uncached-input * 0.44 + 2 cached-input * 0.014 + 3 output * 1.32,
+        # per-million-token peak rates from api_usage.DEEPSEEK_PRICING.
+        self.assertAlmostEqual(record["estimated_cost_usd"], 8.388e-6)
+        summary = summarize_records([record])
+        self.assertTrue(summary["is_complete_estimate"])
+        self.assertEqual(summary["unpriced_calls"], 0)
+
+    def test_unrecognized_deepseek_model_stays_an_explicit_unpriced_call(self):
+        record = usage_record(
+            {
+                "id": "chat_2",
+                "model": "deepseek-v5-preview",
+                "usage": {"prompt_tokens": 12, "completion_tokens": 3},
+            },
+            provider="deepseek",
+            requested_model="deepseek-v5-preview",
+            operation="test",
+        )
         self.assertIsNone(record["estimated_cost_usd"])
         summary = summarize_records([record])
         self.assertFalse(summary["is_complete_estimate"])

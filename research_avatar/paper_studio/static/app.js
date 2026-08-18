@@ -407,21 +407,12 @@ function uniqueArtifacts(artifacts = []) {
 
 async function request(path, options = {}) {
   const method = String(options.method || "GET").toUpperCase();
+  // The gateway already refuses every non-GET/HEAD request against a demo
+  // session unconditionally; applyReadOnlyDemoRestrictions() keeps every
+  // mutating control disabled so this should be unreachable in normal use.
+  // This stays only as a defensive fallback -- no dialog to redirect into.
   if (state && state.demo_mode && !["GET", "HEAD"].includes(method)) {
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage(
-        {type: "paper-studio-demo-api-key-required"},
-        window.location.origin,
-      );
-    } else {
-      const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-      const params = new URLSearchParams({
-        demo_key_required: "1",
-        demo_return: returnTo,
-      });
-      window.location.assign(`/?${params.toString()}`);
-    }
-    throw new Error("请输入 OpenAI API Key 后进入可编辑的 Demo 副本。");
+    throw new Error("这是只读 Demo，无法生成或修改内容。");
   }
   const response = await fetch(studioPath(path), {
     headers: {"Content-Type": "application/json"},
@@ -457,7 +448,6 @@ function setBusy(busy, label = "") {
   $("reset").disabled = busy;
   $("candidate").disabled = busy;
   $("comment").disabled = busy;
-  $("llm-provider").disabled = busy;
   $("model").disabled = busy;
   $("model-apply").disabled = busy;
   if (busy) {
@@ -872,8 +862,7 @@ function updateFigureButtonStates() {
   const submittedPrompt = $("draw-prompt").value.trim();
   const promptInstruction = $("prompt-instruction").value.trim();
   $("figure-prompt").disabled = state.demo_mode
-    ? false
-    : !figure.ready || !generationReady || running || Boolean(submittedPrompt && !promptInstruction);
+    || !figure.ready || !generationReady || running || Boolean(submittedPrompt && !promptInstruction);
   $("figure-draw").disabled = !figure.ready || !generationReady || running || !submittedPrompt;
   const promptUnchanged = Boolean(
     figure.gpt_preview_url
@@ -1200,6 +1189,18 @@ function scheduleAutomaticTableGenerate(figure) {
       || current.status !== "pending"
       || figureIsRunning(current)
     ) return;
+    if (figureRequestBusy) {
+      // Reported directly: switching straight from one pending table to
+      // another (T1's auto-generate still in flight, then clicking into
+      // T2) made T2 stay "pending" forever. runFigureAction shares one
+      // global busy lock across every figure/table action and silently
+      // no-ops while it's held -- but this function had already marked
+      // T2 "attempted" before learning that, so it could never retry.
+      // Un-mark it so the next render (state polling already runs
+      // continuously) schedules a fresh attempt once the lock clears.
+      autoTableGenerateAttempted.delete(figure.id);
+      return;
+    }
     runFigureAction(
       "/api/table/generate",
       {
@@ -1540,6 +1541,31 @@ function renderFigures() {
   scheduleAutomaticTableGenerate(figure);
 }
 
+const DEMO_READ_ONLY_CONTROL_IDS = [
+  "generate", "accept", "candidate", "comment", "reset", "reset-generated",
+  "title-generate", "title-save", "paper-title", "title-gpt-prompt",
+  "figure-prompt", "draw-prompt", "prompt-instruction", "figure-draw",
+  "figure-cancel", "figure-build", "single-data-prompt", "single-data-generate",
+  "data-layout-prompt", "data-approve", "figure-caption-prompt",
+  "figure-caption-generate", "figure-placement", "figure-layout-mode",
+  "figure-approve", "table-agent-prompt", "table-agent-edit", "table-prompt",
+  "table-generate", "table-latex", "table-save", "table-approve",
+];
+
+function applyReadOnlyDemoRestrictions() {
+  // The gateway already refuses every non-GET/HEAD request against a demo
+  // session (server-side, unconditionally) -- this is UX only, so a demo
+  // visitor sees a clean read-only viewer instead of controls that look
+  // clickable and then dead-end in a network error.
+  if (!state || !state.demo_mode) return;
+  DEMO_READ_ONLY_CONTROL_IDS.forEach((id) => {
+    const element = $(id);
+    if (element) element.disabled = true;
+  });
+  document.querySelectorAll(".figure-card, .figure-actions button, .paragraph-nav button")
+    .forEach((element) => { element.disabled = true; });
+}
+
 function render() {
   syncProseDraftProject();
   syncTitleDraftProject();
@@ -1548,17 +1574,13 @@ function render() {
   const project = state.project || {};
   const apiKeySetup = state.api_key_setup || {};
   const apiKeyReady = Boolean(state.api_key_configured);
-  const providerSelect = $("llm-provider");
-  const providerOptions = state.llm_provider_options || [];
-  if (providerOptions.length) {
-    providerSelect.replaceChildren(...providerOptions.map((option) => {
-      const element = document.createElement("option");
-      element.value = option.id;
-      element.textContent = `${option.label}${option.configured ? " · 已配置" : ""}`;
-      return element;
-    }));
-  }
-  providerSelect.value = state.llm_provider || "openai";
+  // Every online session (real or demo) shares one server-held DeepSeek
+  // key; there is nothing for that researcher to pick, rotate, or type a
+  // model name for, so both controls stay hidden there. A local desktop
+  // install keeps them -- a solo researcher's own machine, their own key,
+  // switching providers/models deliberately is unaffected.
+  $("model-runtime-config").hidden = Boolean(state.online_project);
+  $("runtime-key-open").hidden = Boolean(state.online_project);
   const modelInput = $("model");
   const modelOptions = state.llm_model_options || [];
   $("model-suggestions").replaceChildren(...modelOptions.map((option) => {
@@ -1590,12 +1612,12 @@ function render() {
     $("figures-workspace").hidden = true;
     $("section-kicker").textContent = "EMPTY STUDIO";
     $("section-title").textContent = "尚未载入论文";
-    ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model", "model-apply", "runtime-key-open"].forEach((id) => {
+    ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "model", "model-apply", "runtime-key-open"].forEach((id) => {
       $(id).disabled = true;
     });
     return;
   }
-  ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "llm-provider", "model", "runtime-key-open"].forEach((id) => {
+  ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "model", "runtime-key-open"].forEach((id) => {
     $(id).disabled = false;
   });
   updateModelApplyButton();
@@ -1609,6 +1631,7 @@ function render() {
     $("section-kicker").textContent = activeView === "tables" ? "TABLE WORKFLOW" : "FIGURE WORKFLOW";
     $("section-title").textContent = activeView === "tables" ? "Tables" : "Figures";
     renderFigures();
+    applyReadOnlyDemoRestrictions();
     return;
   }
   $("section-kicker").textContent = "SECTION";
@@ -1670,13 +1693,21 @@ function render() {
   const fullDraftRunning = Boolean(
     state.full_draft && state.full_draft.job && state.full_draft.job.status === "running"
   );
-  if (activeView === "writing" && !fullDraftRunning && paragraph && !candidate && !paragraph.accepted_text) {
+  if (
+    !state.demo_mode
+    && activeView === "writing"
+    && !fullDraftRunning
+    && paragraph
+    && !candidate
+    && !paragraph.accepted_text
+  ) {
     const key = `${activeSection}:${paragraph.id}`;
     if (!autoAttempted.has(key)) {
       autoAttempted.add(key);
       setTimeout(() => generateCurrent(true), 50);
     }
   }
+  applyReadOnlyDemoRestrictions();
 }
 
 function renderFullDraft() {
@@ -1721,7 +1752,7 @@ function renderFullDraft() {
     ? `${Number(job.completed || 0)} / ${Number(job.total || pending)} · ${job.progress_message || job.status}`
     : "";
 
-  ["candidate", "comment", "generate", "accept", "paper-title", "title-gpt-prompt", "title-generate", "title-save", "llm-provider", "model", "reset", "reset-generated"].forEach((id) => {
+  ["candidate", "comment", "generate", "accept", "paper-title", "title-gpt-prompt", "title-generate", "title-save", "model", "reset", "reset-generated"].forEach((id) => {
     const element = $(id);
     if (element && running) element.disabled = true;
   });
@@ -1875,30 +1906,6 @@ $("model").addEventListener("keydown", (event) => {
 });
 
 $("model-apply").addEventListener("click", applyWritingModel);
-
-$("llm-provider").addEventListener("change", async (event) => {
-  if (proseRequestBusy || fullDraftRequestBusy || titleBusy) {
-    event.currentTarget.value = state.llm_provider || "openai";
-    return;
-  }
-  const provider = event.currentTarget.value;
-  try {
-    setBusy(true, "正在切换正文写作 API 并重置旧对话链…");
-    const payload = await request("/api/llm-provider", {
-      method: "POST",
-      body: JSON.stringify({provider}),
-    });
-    state = payload.state;
-    forgetTitleDraft("model");
-    render();
-    showMessage(`正文写作 API 已切换为 ${state.api_key_setup.provider_label}；模型为 ${state.model || "请填写模型名称"}。`);
-  } catch (error) {
-    event.currentTarget.value = state.llm_provider || "openai";
-    showMessage(error.message, true);
-  } finally {
-    setBusy(false);
-  }
-});
 
 $("paper-title").addEventListener("input", (event) => {
   event.currentTarget.dataset.dirty = "true";

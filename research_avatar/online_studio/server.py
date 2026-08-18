@@ -35,6 +35,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
+from research_avatar.paper_studio.api_usage import usage_summary
+
 
 STATIC = Path(__file__).resolve().parent / "static"
 DEMO_STATIC = Path(__file__).resolve().parents[1] / "web" / "demo"
@@ -61,6 +63,14 @@ PROVIDERS = {
     "openai": ("OPENAI_API_KEY", "gpt-5-nano"),
     "deepseek": ("DEEPSEEK_API_KEY", "deepseek-v4-flash"),
 }
+# Every online session shares one server-held DeepSeek key (no per-user
+# bring-your-own-key flow anymore); a hard per-user RMB cap bounds the
+# exposure from that shared credential. The USD->RMB rate is a fixed,
+# documented approximation, not a live quote -- it only needs to be roughly
+# right for a soft-landing spend cap, not exact billing reconciliation.
+SHARED_PROVIDER = "deepseek"
+USD_TO_RMB_RATE = float(os.environ.get("ONLINE_STUDIO_USD_TO_RMB_RATE", "7.2"))
+USER_SPEND_CAP_RMB = float(os.environ.get("ONLINE_STUDIO_SPEND_CAP_RMB", "200"))
 DEFAULT_SECTIONS = (
     ("abstract", "Abstract", "abstract", "Summarize the problem, approach, evidence, and main conclusion in one self-contained paragraph."),
     ("introduction", "Introduction", "section", "Motivate the research problem, identify the precise gap, and state the paper's contributions without overclaiming."),
@@ -1442,6 +1452,298 @@ def _write_workspace(
     )
 
 
+def _decode_results_records(
+    raw_results: Any,
+) -> tuple[str, list[dict[str, str]], list[dict[str, Any]]]:
+    """Validate the lightweight path's structured-results payload.
+
+    Returns (caption, columns, rows) where columns is
+    [{"key", "label"}, ...] and rows is a list of flat dicts keyed by
+    column key -- exactly the records-type data_grid shape
+    generate_table_latex/table_grid and render_data_figure_deterministic
+    already consume, so no new rendering logic is needed for this path.
+    """
+    if raw_results is None:
+        return "", [], []
+    if not isinstance(raw_results, dict):
+        raise OnlineStudioError("实验结果数据格式无效。")
+    caption = str(raw_results.get("caption") or "").strip()
+    if not caption or len(caption) > 400:
+        raise OnlineStudioError("实验结果数据必须包含 1-400 字符的 caption。")
+    columns = raw_results.get("columns")
+    if not isinstance(columns, list) or not 2 <= len(columns) <= 8:
+        raise OnlineStudioError("实验结果数据必须包含 2-8 列（第一列为标识列）。")
+    normalized_columns: list[dict[str, str]] = []
+    seen_keys: set[str] = set()
+    for item in columns:
+        if not isinstance(item, dict):
+            raise OnlineStudioError("实验结果列定义格式无效。")
+        key = str(item.get("key") or "").strip()
+        label = str(item.get("label") or "").strip()
+        if not key or not label or key in seen_keys:
+            raise OnlineStudioError("实验结果列必须有唯一且非空的 key 与 label。")
+        seen_keys.add(key)
+        normalized_columns.append({"key": key, "label": label})
+    rows = raw_results.get("rows")
+    if not isinstance(rows, list) or not 1 <= len(rows) <= 200:
+        raise OnlineStudioError("实验结果数据必须包含 1-200 行。")
+    normalized_rows: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise OnlineStudioError("实验结果行格式无效。")
+        normalized_rows.append(
+            {column["key"]: row.get(column["key"]) for column in normalized_columns}
+        )
+    return caption, normalized_columns, normalized_rows
+
+
+def _write_lightweight_workspace(
+    root: Path,
+    *,
+    venue: str,
+    project_name: str,
+    title: str,
+    scholar_files: list[tuple[str, str]],
+    reference_files: list[tuple[str, str]],
+    results: Any,
+) -> None:
+    """Scaffold a text-first Paper Studio project from raw materials only.
+
+    For researchers who never ran the full Research Avatar pipeline (no
+    approved 03/05 contract, no RESULTS_LEDGER, no PROFILE.html writing-
+    style analysis). Sections come straight from DEFAULT_SECTIONS -- one
+    paragraph each, matched against whatever reference text was uploaded
+    via the same keyword-similarity matching _write_workspace already uses
+    for the full pipeline. If structured results were uploaded, one
+    deterministic table and one deterministic data figure (both online-
+    safe -- no Agent, no pdfcrop/node/latexmk) are auto-bound to the
+    Experiments section.
+    """
+    paper = root / "paper"
+    sections_dir = paper / "sections"
+    sections_dir.mkdir(parents=True)
+
+    venue_template = _resolve_venue_template(venue)
+    if venue_template is None:
+        raise OnlineStudioError(
+            f"在线 Paper Studio 尚未内置目标会议“{venue}”的官方 LaTeX 模板，"
+            "不能用通用 article 模板顶替。请在 "
+            "research_avatar/online_studio/venue_templates/ 下添加该会议的官方 "
+            ".sty/.cls 与 template.json 后重试。"
+        )
+
+    title = title.strip()
+    if not title or len(title) > 300:
+        raise OnlineStudioError("论文标题必须为 1-300 个字符。")
+    project_name = project_name.strip() or title
+
+    reference_source_files = scholar_files + reference_files
+    reference = (
+        _source_text(reference_source_files)
+        if reference_source_files
+        else "No reference material was uploaded."
+    )
+    reference_chunks = _reference_chunks(reference)
+    (paper / "uploaded_sources.txt").write_text(
+        "\n".join(reference_chunks) + "\n", encoding="utf-8"
+    )
+
+    caption, columns, rows = _decode_results_records(results)
+    has_results = bool(rows)
+
+    sections = _validated_sections(None)
+    figures: dict[str, Any] = {}
+    tables: dict[str, Any] = {}
+    figure_order: list[str] = []
+    table_order: list[str] = []
+    if has_results:
+        data_grid = {
+            "type": "records",
+            "path": "lightweight_results.rows",
+            "columns": columns,
+        }
+        tables["T1"] = {
+            "title": caption,
+            "label": "tab:results",
+            "kind": "table",
+            "width": "single-column",
+            "source_sections": ["experiments"],
+            "description": caption,
+            "caption": caption,
+            "related_paragraphs": {"experiments": ["E1"]},
+            "data_grid": data_grid,
+            "prompt": {
+                "columns": " | ".join(column["label"] for column in columns),
+                "rows": "source",
+                "font_size": "small",
+                "best_values": "none",
+            },
+        }
+        table_order.append("T1")
+        figures["F1"] = {
+            "title": caption,
+            "label": "fig:results",
+            "kind": "data",
+            "width": "single-column",
+            "source_sections": ["experiments"],
+            "description": caption,
+            "caption": caption,
+            "result_keys": ["lightweight_results.rows"],
+            "depends_on_paragraphs": {"experiments": ["E1"]},
+            "panels": [
+                {
+                    "id": "a",
+                    "title": caption,
+                    "goal": caption,
+                    "result_keys": ["lightweight_results.rows"],
+                }
+            ],
+            "data_grid": data_grid,
+            "deliverable_stem": "lightweight_results",
+        }
+        figure_order.append("F1")
+
+    section_specs = []
+    plan_sections: dict[str, list[dict[str, Any]]] = {}
+    outline_lines = [f"Title: {title}", "", "Section plan:"]
+    experiments_artifacts = (["T1"] if has_results else []) + (
+        ["F1"] if has_results else []
+    )
+    for index, (section_id, section_title, render, purpose) in enumerate(sections, 1):
+        filename = f"{section_id}.tex"
+        section_specs.append(
+            {
+                "id": section_id,
+                "title": section_title,
+                "latex_title": "" if render == "abstract" else section_title,
+                "file": filename,
+                "render": render,
+                "result_keys": [],
+            }
+        )
+        reference_line = _matched_reference_line(
+            reference_chunks, " ".join([section_title, purpose])
+        )
+        paragraph_id = f"{section_id[:1].upper()}1"
+        artifacts = experiments_artifacts if section_id == "experiments" else []
+        plan_sections[section_id] = [
+            {
+                "id": paragraph_id,
+                "purpose": purpose,
+                "reference_lines": [reference_line, reference_line],
+                "artifacts": artifacts,
+            }
+        ]
+        outline_lines.append(f"{index}. {section_title}")
+        outline_lines.append(f"  - {paragraph_id}: {purpose}")
+        placeholder = "% Awaiting paragraph-level drafting in Paper Studio.\n"
+        if render != "abstract":
+            placeholder = f"\\section{{{_latex_escape(section_title)}}}\n\n" + placeholder
+        (sections_dir / filename).write_text(placeholder, encoding="utf-8")
+
+    main_inputs = []
+    for section_id, _title, render, _purpose in sections:
+        if render == "abstract":
+            main_inputs.append(
+                "\\begin{abstract}\n\\input{sections/abstract}\n\\end{abstract}"
+            )
+        else:
+            main_inputs.append(f"\\input{{sections/{section_id}}}")
+    for asset_name in venue_template.get("assets", []):
+        asset_source = Path(venue_template["_dir"]) / asset_name
+        if not asset_source.is_file():
+            raise OnlineStudioError(
+                f"内置模板“{venue_template['family']}”缺少必需资源文件：{asset_name}。"
+            )
+        shutil.copyfile(asset_source, paper / asset_name)
+    bibliography_lines = (
+        [r"\input{sections/bibliography}"]
+        if not venue_template.get("needs_bibliographystyle", True)
+        else [r"\bibliographystyle{plain}", r"\input{sections/bibliography}"]
+    )
+    main_tex = "\n".join(
+        [
+            str(venue_template["documentclass"]),
+            *[str(line) for line in venue_template.get("preamble", [])],
+            f"\\title{{{_latex_escape(title)}}}",
+            r"\author{Anonymous Author(s)}",
+            r"\date{}",
+            r"\begin{document}",
+            r"\maketitle",
+            *main_inputs,
+            *bibliography_lines,
+            r"\end{document}",
+            "",
+        ]
+    )
+    (paper / "main.tex").write_text(main_tex, encoding="utf-8")
+    (paper / "references.bib").write_text("", encoding="utf-8")
+    (sections_dir / "bibliography.tex").write_text(
+        "% Paper Studio enables the bibliography after the first accepted citation.\n",
+        encoding="utf-8",
+    )
+    metrics = (
+        {"lightweight_results": {"rows": rows}}
+        if has_results
+        else {"lightweight_project": {"has_structured_results": False}}
+    )
+    (paper / "metrics.json").write_text(
+        json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    (paper / "working_abstract.txt").write_text(
+        "Draft the abstract only from accepted manuscript evidence and uploaded sources.\n",
+        encoding="utf-8",
+    )
+    (paper / "outline.txt").write_text("\n".join(outline_lines) + "\n", encoding="utf-8")
+    (paper / ".outline-approved").write_text(
+        "Auto-approved for the lightweight onboarding path.\n", encoding="utf-8"
+    )
+    config = {
+        "schema_version": "1.0",
+        "project": {
+            "id": _safe_slug(project_name) + "-" + secrets.token_hex(4),
+            "name": project_name,
+            "initial_title": title,
+            "venue": venue,
+            "target": {"venue": venue},
+            "reference_paper": {
+                "title": (
+                    "Combined uploaded reference material "
+                    f"({len(reference_source_files)} file(s); no single "
+                    "structural reference paper was selected)"
+                ),
+            },
+            "decision_source": "lightweight-onboarding",
+            "eyebrow": "ONLINE PAPER STUDIO",
+            "studio_title": "Paper Studio",
+            "subtitle": "从上传的参考资料与实验结果直接开始写作",
+        },
+        "sections": section_specs,
+        "batch_writing_order": [item[0] for item in sections],
+        "figure_order": figure_order,
+        "figures": figures,
+        "table_order": table_order,
+        "tables": tables,
+        "paths": {
+            "metrics": "paper/metrics.json",
+            "main": "paper/main.tex",
+            "reference": "paper/uploaded_sources.txt",
+        },
+    }
+    (paper / "paper_studio.json").write_text(
+        json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    (paper / "paragraph_plan.json").write_text(
+        json.dumps(
+            {"reference_file": "paper/uploaded_sources.txt", "sections": plan_sections},
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def _available_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
@@ -1514,6 +1816,45 @@ def _start_worker(
     raise OnlineStudioError("Paper Studio 写作进程启动超时。")
 
 
+def shared_deepseek_api_key() -> str:
+    """The one server-held DeepSeek key every online session uses."""
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+    if not api_key:
+        raise OnlineStudioError("服务端尚未配置共享 DeepSeek API key，请联系管理员。")
+    return api_key
+
+
+def user_project_root(user_id: str) -> Path:
+    return DATA_ROOT / "projects" / hashlib.sha256(user_id.encode("utf-8")).hexdigest()
+
+
+def user_cumulative_cost_usd(user_id: str) -> float:
+    """Sum estimated cost across every session this user has ever created.
+
+    Each session is its own subprocess with its own project-scoped usage
+    ledger (paper/.paper_studio/api_usage.jsonl); this walks all of a
+    user's session directories under their stable per-user root so the
+    spend cap holds across sessions, not just within one.
+    """
+    total = 0.0
+    root = user_project_root(user_id)
+    if not root.is_dir():
+        return total
+    for ledger in root.glob("*/paper/.paper_studio/api_usage.jsonl"):
+        summary = usage_summary(ledger)
+        total += float(summary.get("estimated_cost_usd") or 0.0)
+    return total
+
+
+def require_under_spend_cap(user_id: str) -> None:
+    spent_rmb = user_cumulative_cost_usd(user_id) * USD_TO_RMB_RATE
+    if spent_rmb >= USER_SPEND_CAP_RMB:
+        raise OnlineStudioError(
+            f"当前账户共享额度已用满（上限 {USER_SPEND_CAP_RMB:.0f} 元），"
+            "暂时无法创建或继续写作会话。"
+        )
+
+
 def create_session(payload: dict[str, Any], *, user_id: str) -> Session:
     with SESSIONS_LOCK:
         active_sessions = sum(
@@ -1521,34 +1862,40 @@ def create_session(payload: dict[str, Any], *, user_id: str) -> Session:
         )
     if active_sessions >= MAX_ACTIVE_SESSIONS:
         raise OnlineStudioError("当前在线写作会话已满，请稍后重试。")
-    provider = str(payload.get("provider") or "openai").strip().lower()
-    if provider not in PROVIDERS:
-        raise OnlineStudioError("请选择 OpenAI 或 DeepSeek。")
-    api_key = str(payload.get("api_key") or "").strip()
-    if len(api_key) < 8 or len(api_key) > 512 or any(character.isspace() for character in api_key):
-        raise OnlineStudioError("API key 格式无效。")
+    require_under_spend_cap(user_id)
+    api_key = shared_deepseek_api_key()
+    provider = SHARED_PROVIDER
+    model = PROVIDERS[provider][1]
     access_token = os.environ.get("ONLINE_STUDIO_ACCESS_TOKEN")
     supplied_access_token = str(payload.get("access_token") or "")
     if access_token and not secrets.compare_digest(access_token, supplied_access_token):
         raise OnlineStudioError("部署访问口令不正确。")
-    model = str(payload.get("model") or PROVIDERS[provider][1]).strip()
-    if not model or len(model) > 128 or any(character.isspace() for character in model):
-        raise OnlineStudioError("模型名称格式无效。")
-    files = _decode_html_files(payload.get("files")) if payload.get("files") else []
-    archive = _decode_evidence_archive(payload.get("evidence_archive"))
     session_id = secrets.token_urlsafe(32)
-    root = (
-        DATA_ROOT
-        / "projects"
-        / hashlib.sha256(user_id.encode("utf-8")).hexdigest()
-        / hashlib.sha256(session_id.encode("utf-8")).hexdigest()
-    )
+    root = user_project_root(user_id) / hashlib.sha256(session_id.encode("utf-8")).hexdigest()
+    mode = str(payload.get("mode") or "package").strip().lower()
     try:
-        _write_workspace(
-            root,
-            files=files,
-            archive=archive,
-        )
+        if mode == "lightweight":
+            _write_lightweight_workspace(
+                root,
+                venue=str(payload.get("venue") or ""),
+                project_name=str(payload.get("project_name") or ""),
+                title=str(payload.get("title") or ""),
+                scholar_files=(
+                    _decode_html_files(payload["scholar_files"])
+                    if payload.get("scholar_files")
+                    else []
+                ),
+                reference_files=(
+                    _decode_html_files(payload["reference_files"])
+                    if payload.get("reference_files")
+                    else []
+                ),
+                results=payload.get("results"),
+            )
+        else:
+            files = _decode_html_files(payload.get("files")) if payload.get("files") else []
+            archive = _decode_evidence_archive(payload.get("evidence_archive"))
+            _write_workspace(root, files=files, archive=archive)
         process, port = _start_worker(root, provider, model, api_key)
     except Exception:
         if root.exists():
@@ -1598,56 +1945,6 @@ def demo_session() -> Session:
             kind="demo",
         )
         return DEMO_SESSION
-
-
-def create_demo_copy_session(payload: dict[str, Any], *, user_id: str) -> Session:
-    """Create a private writable copy of the completed demo after key entry."""
-    with SESSIONS_LOCK:
-        active_sessions = sum(
-            session.process.poll() is None for session in SESSIONS.values()
-        )
-    if active_sessions >= MAX_ACTIVE_SESSIONS:
-        raise OnlineStudioError("当前在线写作会话已满，请稍后重试。")
-    api_key = str(payload.get("api_key") or "").strip()
-    if len(api_key) < 8 or len(api_key) > 512 or any(character.isspace() for character in api_key):
-        raise OnlineStudioError("API key 格式无效。")
-    if not (DEMO_PROJECT / "paper/paper_studio.json").is_file():
-        raise OnlineStudioError("完成态 Demo 论文项目尚未安装。")
-    session_id = secrets.token_urlsafe(32)
-    root = (
-        DATA_ROOT
-        / "projects"
-        / hashlib.sha256(user_id.encode("utf-8")).hexdigest()
-        / hashlib.sha256(session_id.encode("utf-8")).hexdigest()
-    )
-    root.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        shutil.copytree(DEMO_PROJECT, root)
-        process, port = _start_worker(
-            root,
-            "openai",
-            "gpt-5-nano",
-            api_key,
-            demo_mode=False,
-        )
-    except Exception:
-        if root.exists():
-            shutil.rmtree(root)
-        raise
-    session = Session(
-        session_id,
-        user_id,
-        root,
-        "openai",
-        "gpt-5-nano",
-        process,
-        port,
-        api_key,
-        kind="demo-copy",
-    )
-    with SESSIONS_LOCK:
-        SESSIONS[session_id] = session
-    return session
 
 
 def _ensure_session_alive(session: Session) -> bool:
@@ -2004,21 +2301,6 @@ class Handler(BaseHTTPRequestHandler):
                 )
             except OnlineStudioError as exc:
                 self._json({"ok": False, "error": str(exc)}, 400)
-        elif path == "/api/online/demo-session":
-            user = self._require_user()
-            if not user:
-                return
-            try:
-                session = create_demo_copy_session(
-                    self._read_json(), user_id=user["id"]
-                )
-                cookie = (
-                    f"{COOKIE_NAME}={session.session_id}; Path=/; HttpOnly; SameSite=Strict"
-                    + ("; Secure" if _secure_cookies() else "")
-                )
-                self._json({"ok": True, "redirect": "/studio"}, cookie=cookie)
-            except OnlineStudioError as exc:
-                self._json({"ok": False, "error": str(exc)}, 400)
         elif path == "/api/auth/logout":
             revoke_auth_session(self.headers.get("Cookie"))
             self._json({"ok": True}, cookie=_auth_cookie("", clear=True))
@@ -2139,6 +2421,20 @@ class Handler(BaseHTTPRequestHandler):
     def _proxy(self, session: Session, path: str, *, read_only: bool = False) -> None:
         if read_only and self.command not in {"GET", "HEAD"}:
             self._json({"ok": False, "error": "完成态 Demo 为只读展示。"}, 405)
+            return
+        if (
+            session.kind == "user"
+            and self.command not in {"GET", "HEAD"}
+            and user_cumulative_cost_usd(session.user_id) * USD_TO_RMB_RATE >= USER_SPEND_CAP_RMB
+        ):
+            self._json(
+                {
+                    "ok": False,
+                    "error": f"当前账户共享额度已用满（上限 {USER_SPEND_CAP_RMB:.0f} 元），"
+                    "写作会话已切换为只读。",
+                },
+                402,
+            )
             return
         try:
             length = int(self.headers.get("Content-Length", "0") or "0")
