@@ -110,6 +110,10 @@ export class OnlineStudioContainerV36 extends OnlineStudioContainer {}
 // verification testing alone was enough to fill it and block a real user.
 export class OnlineStudioContainerV37 extends OnlineStudioContainer {}
 
+// Landing page no longer auto-redirects into /studio; Paper Studio's
+// sidebar now shows the project's structural reference paper.
+export class OnlineStudioContainerV38 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
