@@ -4,6 +4,7 @@ import os
 import re
 import signal
 import subprocess
+import threading
 import time
 import unittest
 from html.parser import HTMLParser
@@ -3358,6 +3359,49 @@ args = parser.parse_args()
             ):
                 studio.compile_paper()
             self.assertIn("-g", captured["command"])
+
+    def test_concurrent_compiles_are_serialized_not_interleaved(self):
+        # Regression: the HTTP server is threaded, and multiple callers can
+        # trigger compile_paper() concurrently (the compile button, the
+        # pdf/locate auto-rebuild fallback, a batch-writing job). On the
+        # shared, long-lived Demo session in particular, two overlapping
+        # latexmk/bibtex runs racing on the same main.aux/main.bbl can
+        # corrupt each other's intermediate files -- a real user hit a
+        # "missing \item" fatal error on an otherwise-correct manuscript
+        # after the read-only pdf/locate fix let a second, concurrent
+        # compile actually reach the container. compile_paper() must fully
+        # serialize instead of letting two subprocess.run calls overlap.
+        with TemporaryDirectory() as directory:
+            paper = Path(directory)
+            (paper / "main.tex").write_text("paper", encoding="utf-8")
+            active = 0
+            max_concurrent = 0
+            lock = threading.Lock()
+
+            def fake_run(command, **kwargs):
+                nonlocal active, max_concurrent
+                with lock:
+                    active += 1
+                    max_concurrent = max(max_concurrent, active)
+                time.sleep(0.05)
+                with lock:
+                    active -= 1
+                return CompletedProcess(command, 0, "ok", "")
+
+            with (
+                patch.object(studio, "PAPER", paper),
+                patch.object(studio, "manuscript_entrypoint_errors", return_value=[]),
+                patch.object(studio, "shutil_which", return_value="/usr/bin/latexmk"),
+                patch.object(studio.subprocess, "run", side_effect=fake_run),
+            ):
+                threads = [
+                    threading.Thread(target=studio.compile_paper) for _ in range(5)
+                ]
+                for thread in threads:
+                    thread.start()
+                for thread in threads:
+                    thread.join(timeout=5)
+            self.assertEqual(max_concurrent, 1)
 
     def test_table_preview_is_compiled_from_latex(self):
         required = ("pdflatex", "pdfcrop", "pdftoppm")

@@ -127,6 +127,14 @@ RUNNING_FIGURE_PROCESSES: dict[str, subprocess.Popen[str]] = {}
 CANCELLED_FIGURE_JOBS: set[str] = set()
 FULL_DRAFT_JOB_LOCK = threading.RLock()
 CANCELLED_FULL_DRAFT_JOBS: set[str] = set()
+# Serializes latexmk/bibtex runs against PAPER. The HTTP server is
+# threaded, and multiple callers can trigger a compile concurrently (the
+# explicit "编译 PDF" button, the pdf/locate auto-rebuild fallback, a
+# batch-writing job) -- on the shared, long-lived Demo session in
+# particular, two overlapping compiles racing on the same main.aux/main.bbl
+# can corrupt each other's intermediate files well enough to produce a
+# "missing \item" fatal error on an otherwise-correct manuscript.
+COMPILE_LOCK = threading.RLock()
 SERVER_INSTANCE_TOKEN = uuid.uuid4().hex
 REFERENCE_EXCERPT_MAX_CHARS = 6000
 BIBLIOGRAPHY_PROMPT_MAX_CHARS = 32000
@@ -4615,76 +4623,77 @@ def sync_manuscript_bibliography_command() -> None:
 
 
 def compile_paper() -> CompileResult:
-    main = PAPER / "main.tex"
-    if not main.exists():
-        return CompileResult(False, "paper/main.tex does not exist yet.")
-    sync_manuscript_bibliography_command()
-    entrypoint_errors = manuscript_entrypoint_errors()
-    if entrypoint_errors:
-        return CompileResult(False, "\n".join(entrypoint_errors))
-    if not shutil_which("latexmk"):
-        return CompileResult(False, "latexmk is not available on PATH.")
-    compile_environment = {
-        **os.environ,
-        "LC_ALL": "C",
-        "LANG": "C",
-    }
-    if ONLINE_PROJECT_MODE:
-        # Kpathsea paranoid mode confines TeX reads/writes to the paper tree.
-        compile_environment.update(
-            {"openin_any": "p", "openout_any": "p", "shell_escape": "0"}
-        )
-    command = [
-        "latexmk",
-        "-pdf",
-        "-synctex=1",
-        "-interaction=nonstopmode",
-        "-halt-on-error",
-    ]
-    if (
-        not (PAPER / "main.synctex.gz").exists()
-        and ((PAPER / "main.aux").exists() or (PAPER / "main.bbl").exists())
-    ):
-        # -g forces latexmk to ignore file timestamps and rebuild
-        # everything -- needed when a project directory was copied or
-        # restored and its existing main.aux/main.bbl carry stale or
-        # confusing mtimes relative to the real .tex sources. But on a
-        # genuinely from-scratch compile (no aux/bbl at all yet), -g makes
-        # latexmk run bibtex before any pdflatex pass has ever produced a
-        # main.aux with \citation/\bibdata commands in it, so bibtex reads
-        # an empty aux and fails outright ("I found no \citation commands").
-        # A real project's very first compile hit exactly this. latexmk's
-        # own default ordering (pdflatex, then bibtex, then pdflatex again)
-        # already handles a from-scratch compile correctly without -g.
-        command.append("-g")
-    command.append("main.tex")
-    process = subprocess.run(
-        command,
-        cwd=PAPER,
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=240,
-        env=compile_environment,
-    )
-    output = (process.stdout + "\n" + process.stderr).strip()
-    tail = "\n".join(output.splitlines()[-30:])
-    if process.returncode:
-        # latexmk reruns pdflatex multiple times; the actual fatal error (a
-        # line starting with "!") can appear many passes before the final
-        # one, so the last-30-lines tail alone often only shows trailing
-        # rerun/summary noise (e.g. a benign "undefined reference" warning)
-        # with no indication of what really failed. Surface every real
-        # pdflatex error line first, since those are what a researcher (or
-        # a retry) actually needs to act on.
-        error_lines = [
-            line for line in output.splitlines() if line.startswith("!")
+    with COMPILE_LOCK:
+        main = PAPER / "main.tex"
+        if not main.exists():
+            return CompileResult(False, "paper/main.tex does not exist yet.")
+        sync_manuscript_bibliography_command()
+        entrypoint_errors = manuscript_entrypoint_errors()
+        if entrypoint_errors:
+            return CompileResult(False, "\n".join(entrypoint_errors))
+        if not shutil_which("latexmk"):
+            return CompileResult(False, "latexmk is not available on PATH.")
+        compile_environment = {
+            **os.environ,
+            "LC_ALL": "C",
+            "LANG": "C",
+        }
+        if ONLINE_PROJECT_MODE:
+            # Kpathsea paranoid mode confines TeX reads/writes to the paper tree.
+            compile_environment.update(
+                {"openin_any": "p", "openout_any": "p", "shell_escape": "0"}
+            )
+        command = [
+            "latexmk",
+            "-pdf",
+            "-synctex=1",
+            "-interaction=nonstopmode",
+            "-halt-on-error",
         ]
-        if error_lines:
-            summary = "Error summary:\n" + "\n".join(error_lines)
-            return CompileResult(False, summary + "\n\n" + tail)
-        return CompileResult(False, tail or "LaTeX compilation failed.")
-    return CompileResult(True, tail or "Compilation succeeded.")
+        if (
+            not (PAPER / "main.synctex.gz").exists()
+            and ((PAPER / "main.aux").exists() or (PAPER / "main.bbl").exists())
+        ):
+            # -g forces latexmk to ignore file timestamps and rebuild
+            # everything -- needed when a project directory was copied or
+            # restored and its existing main.aux/main.bbl carry stale or
+            # confusing mtimes relative to the real .tex sources. But on a
+            # genuinely from-scratch compile (no aux/bbl at all yet), -g makes
+            # latexmk run bibtex before any pdflatex pass has ever produced a
+            # main.aux with \citation/\bibdata commands in it, so bibtex reads
+            # an empty aux and fails outright ("I found no \citation commands").
+            # A real project's very first compile hit exactly this. latexmk's
+            # own default ordering (pdflatex, then bibtex, then pdflatex again)
+            # already handles a from-scratch compile correctly without -g.
+            command.append("-g")
+        command.append("main.tex")
+        process = subprocess.run(
+            command,
+            cwd=PAPER,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=240,
+            env=compile_environment,
+        )
+        output = (process.stdout + "\n" + process.stderr).strip()
+        tail = "\n".join(output.splitlines()[-30:])
+        if process.returncode:
+            # latexmk reruns pdflatex multiple times; the actual fatal error (a
+            # line starting with "!") can appear many passes before the final
+            # one, so the last-30-lines tail alone often only shows trailing
+            # rerun/summary noise (e.g. a benign "undefined reference" warning)
+            # with no indication of what really failed. Surface every real
+            # pdflatex error line first, since those are what a researcher (or
+            # a retry) actually needs to act on.
+            error_lines = [
+                line for line in output.splitlines() if line.startswith("!")
+            ]
+            if error_lines:
+                summary = "Error summary:\n" + "\n".join(error_lines)
+                return CompileResult(False, summary + "\n\n" + tail)
+            return CompileResult(False, tail or "LaTeX compilation failed.")
+        return CompileResult(True, tail or "Compilation succeeded.")
 
 
 def full_draft_targets(state: dict[str, Any]) -> list[tuple[str, str]]:
