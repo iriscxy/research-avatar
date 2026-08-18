@@ -405,13 +405,23 @@ function uniqueArtifacts(artifacts = []) {
   });
 }
 
+// POST-shaped but read-only: the gateway lets these through on a demo
+// session too (see DEMO_SAFE_WRITE_PATHS in online_studio/server.py).
+const DEMO_SAFE_WRITE_PATHS = new Set(["/api/pdf/locate"]);
+
 async function request(path, options = {}) {
   const method = String(options.method || "GET").toUpperCase();
-  // The gateway already refuses every non-GET/HEAD request against a demo
-  // session unconditionally; applyReadOnlyDemoRestrictions() keeps every
-  // mutating control disabled so this should be unreachable in normal use.
-  // This stays only as a defensive fallback -- no dialog to redirect into.
-  if (state && state.demo_mode && !["GET", "HEAD"].includes(method)) {
+  // The gateway already refuses every other non-GET/HEAD request against a
+  // demo session unconditionally; applyReadOnlyDemoRestrictions() keeps
+  // every mutating control disabled so this should be unreachable in
+  // normal use. This stays only as a defensive fallback -- no dialog to
+  // redirect into.
+  if (
+    state
+    && state.demo_mode
+    && !["GET", "HEAD"].includes(method)
+    && !DEMO_SAFE_WRITE_PATHS.has(path)
+  ) {
     throw new Error("这是只读 Demo，无法生成或修改内容。");
   }
   const response = await fetch(studioPath(path), {

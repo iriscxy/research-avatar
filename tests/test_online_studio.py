@@ -1065,6 +1065,50 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertFalse(recorded["payload"]["ok"])
         self.assertEqual(recorded["status"], 402)
 
+    def test_demo_read_only_gate_still_blocks_generic_writes(self):
+        handler = object.__new__(online.Handler)
+        handler.command = "POST"
+        recorded = {}
+        handler._json = lambda payload, status=200, cookie=None: recorded.update(
+            {"payload": payload, "status": status}
+        )
+        session = online.Session(
+            "demo", "*", Path("/tmp/does-not-matter"),
+            "openai", "gpt-5-nano", MagicMock(), 0, kind="demo",
+        )
+        handler._proxy(session, "/api/generate", read_only=True)
+        self.assertFalse(recorded["payload"]["ok"])
+        self.assertEqual(recorded["status"], 405)
+
+    def test_pdf_locate_reaches_a_demo_session_despite_being_a_post(self):
+        # Regression: double-click-to-source-line on the PDF preview posts
+        # to /api/pdf/locate (click coordinates in the body), which is a
+        # pure lookup -- it never mutates the manuscript. The demo's
+        # blanket read_only=True gate blocked it like any other write, so
+        # the feature silently did nothing on the read-only Demo tab.
+        handler = object.__new__(online.Handler)
+        handler.command = "POST"
+        handler.headers = {}
+        handler.rfile = io.BytesIO(b"")
+        session = online.Session(
+            "demo", "*", Path("/tmp/does-not-matter"),
+            "openai", "gpt-5-nano", MagicMock(), 0, kind="demo",
+        )
+        with patch.object(online.http.client, "HTTPConnection") as connection_cls:
+            connection = connection_cls.return_value
+            response = MagicMock()
+            response.status = 200
+            response.read.return_value = b'{"ok": true}'
+            response.getheaders.return_value = []
+            connection.getresponse.return_value = response
+            handler.send_response = MagicMock()
+            handler.send_header = MagicMock()
+            handler.end_headers = MagicMock()
+            handler.wfile = MagicMock()
+            handler._proxy(session, "/api/pdf/locate", read_only=True)
+        connection.request.assert_called_once()
+        handler.send_response.assert_called_once_with(200)
+
     def test_setup_page_only_asks_for_generated_html_and_openai_key(self):
         source = (online.STATIC / "index.html").read_text(encoding="utf-8")
         app = (online.STATIC / "app.js").read_text(encoding="utf-8")

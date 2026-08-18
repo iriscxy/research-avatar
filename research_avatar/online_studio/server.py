@@ -45,6 +45,12 @@ VENUE_TEMPLATES_DIR = Path(__file__).resolve().parent / "venue_templates"
 COOKIE_NAME = "paper_studio_session"
 AUTH_COOKIE_NAME = "online_studio_auth"
 GOOGLE_STATE_COOKIE = "online_studio_google_state"
+# POST-shaped endpoints that only ever read (never mutate) manuscript state,
+# so they stay reachable on a read-only demo session despite using a
+# non-GET method. /api/pdf/locate is the double-click-PDF-to-source-line
+# lookup: it needs a POST body for click coordinates, but the response is
+# purely a computed location, nothing on disk changes.
+DEMO_SAFE_WRITE_PATHS = {"/api/pdf/locate"}
 # Base64 expands the three bounded HTML files plus the 32 MB ZIP by roughly 4/3.
 MAX_BODY_BYTES = 80 * 1024 * 1024
 MAX_FILE_BYTES = 8 * 1024 * 1024
@@ -2328,8 +2334,17 @@ class Handler(BaseHTTPRequestHandler):
             except OnlineStudioError as exc:
                 self._json({"ok": False, "error": str(exc)}, 400)
         elif path.startswith("/demo-studio/"):
-            if self._require_user():
+            if not self._require_user():
+                return
+            upstream = "/" + path[len("/demo-studio/") :]
+            if upstream not in DEMO_SAFE_WRITE_PATHS:
                 self._json({"ok": False, "error": "完成态 Demo 为只读展示。"}, 405)
+                return
+            try:
+                session = demo_session()
+                self._proxy(session, upstream, read_only=True)
+            except OnlineStudioError as exc:
+                self._json({"ok": False, "error": str(exc)}, 503)
         else:
             user = self._require_user()
             if user:
@@ -2419,7 +2434,11 @@ class Handler(BaseHTTPRequestHandler):
             self._redirect("/?auth_error=google", cookies=[clear_state_cookie])
 
     def _proxy(self, session: Session, path: str, *, read_only: bool = False) -> None:
-        if read_only and self.command not in {"GET", "HEAD"}:
+        if (
+            read_only
+            and self.command not in {"GET", "HEAD"}
+            and path.split("?", 1)[0] not in DEMO_SAFE_WRITE_PATHS
+        ):
             self._json({"ok": False, "error": "完成态 Demo 为只读展示。"}, 405)
             return
         if (
