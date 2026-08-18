@@ -1430,7 +1430,6 @@ def _write_workspace(
             "decision_source": "reports/03_EXPERIMENT_PLAN.html",
             "eyebrow": "ONLINE PAPER STUDIO",
             "studio_title": "Paper Studio",
-            "subtitle": "继承已批准 03、已验证 05 与 results 的隔离在线写作会话",
         },
         "sections": section_specs,
         "batch_writing_order": [item["id"] for item in sections],
