@@ -23,6 +23,20 @@ data
 paper
 !research_avatar/online_studio/demo_project/paper/
 !research_avatar/online_studio/demo_project/paper/**
+# LaTeX build byproducts: never tracked, but the blanket re-inclusion above
+# pulls in whatever a local `latexmk`/`pdflatex` run happened to leave
+# sitting in this real, tracked directory -- a stale main.aux/main.bbl from
+# local testing got baked into a shipped image this way and crashed every
+# fresh Demo session's first compile with a "missing \item" fatal error.
+research_avatar/online_studio/demo_project/paper/*.aux
+research_avatar/online_studio/demo_project/paper/*.bbl
+research_avatar/online_studio/demo_project/paper/*.blg
+research_avatar/online_studio/demo_project/paper/*.fdb_latexmk
+research_avatar/online_studio/demo_project/paper/*.fls
+research_avatar/online_studio/demo_project/paper/*.log
+research_avatar/online_studio/demo_project/paper/*.out
+research_avatar/online_studio/demo_project/paper/*.synctex.gz
+research_avatar/online_studio/demo_project/paper/.paper_studio/api_usage.jsonl
 outputs
 inputs
 tmp
