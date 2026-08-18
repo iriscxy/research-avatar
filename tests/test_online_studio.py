@@ -896,8 +896,8 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
-        self.assertIn('"class_name": "OnlineStudioContainerV32"', wrangler)
-        self.assertIn("export class OnlineStudioContainerV32", worker)
+        self.assertIn('"class_name": "OnlineStudioContainerV33"', wrangler)
+        self.assertIn("export class OnlineStudioContainerV33", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
 
     def test_container_image_installs_every_tool_compile_table_preview_requires(self):

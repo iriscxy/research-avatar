@@ -81,6 +81,10 @@ export class OnlineStudioContainerV31 extends OnlineStudioContainer {}
 // secret existed. Rotate again so the next instances actually pick it up.
 export class OnlineStudioContainerV32 extends OnlineStudioContainer {}
 
+// Demo double-click-to-source-line release: DEMO_SAFE_WRITE_PATHS lets
+// /api/pdf/locate through the demo's read-only gate.
+export class OnlineStudioContainerV33 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
