@@ -91,6 +91,14 @@ export class OnlineStudioContainerV33 extends OnlineStudioContainer {}
 // clearing any corruption left by the race this fixes.
 export class OnlineStudioContainerV34 extends OnlineStudioContainer {}
 
+// The V34 image still had the actual bug: a stale main.aux/main.bbl left
+// over from local latexmk testing in the tracked demo project directory
+// got baked into the image (see the .dockerignore fix), so every fresh
+// Demo session's first compile still hit "missing \item" regardless of
+// the compile lock. This rotation ships the image built after cleaning
+// those artifacts and closing the .dockerignore gap that let it recur.
+export class OnlineStudioContainerV35 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
