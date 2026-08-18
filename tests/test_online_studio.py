@@ -846,31 +846,25 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertNotIn("/api/online/demo-session", script)
         self.assertFalse(hasattr(online, "create_demo_copy_session"))
 
-    def test_page_refresh_returns_to_the_researchers_own_active_session(self):
-        # A refresh (or reopening the bare site URL) always re-runs the
-        # landing page's own auth bootstrap first, even for a researcher
-        # mid-way through a real "Use it" writing session — that landing
-        # page has no memory of which tab was last selected. Without
-        # checking for an active per-user session before rendering, it
-        # always reset to the Demo tab and buried the resume link one click
-        # away inside the Use it tab instead of returning the researcher
-        # straight to /studio. A researcher with no active session (just
-        # browsing the read-only Demo, which never creates a per-user
-        # session) correctly keeps landing on the Demo tab by default.
+    def test_page_refresh_always_shows_demo_use_it_not_an_auto_redirect(self):
+        # Regression: the landing page used to auto-redirect straight into
+        # /studio whenever a researcher had an active "Use it" session,
+        # which meant the site's root URL could never actually reach the
+        # Demo/Use it shell again once a session existed -- a real user
+        # reported this. The resume link inside the Use it tab
+        # (#session-actions) is now how you get back into an active
+        # session: an explicit choice, not automatic.
         script = (online.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertNotIn("window.location.assign('/studio')", script)
+        self.assertIn("selectProductPanel('demo-panel')", script)
         session_check = script.index("fetch('/api/online/session'")
-        redirect = script.index("window.location.assign('/studio')")
-        demo_panel_select = script.rindex("selectProductPanel('demo-panel')")
+        demo_panel_select = script.index("selectProductPanel('demo-panel')")
         self.assertLess(
-            session_check, redirect,
-            "must check for an active session before deciding to redirect",
+            demo_panel_select, session_check,
+            "the Demo tab must render unconditionally before the active-"
+            "session check only decides whether to reveal the resume link",
         )
-        self.assertLess(
-            redirect, demo_panel_select,
-            "the active-session redirect must be checked before falling "
-            "back to rendering the Demo tab",
-        )
-        self.assertIn("if (state.active)", script)
+        self.assertIn("if (state.active) sessionActions.classList.remove('hidden')", script)
 
     def test_studio_navigation_redirects_to_html_with_actionable_notice(self):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")

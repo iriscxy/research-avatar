@@ -44,25 +44,13 @@ document.querySelectorAll('.product-tab').forEach((tab) => {
 });
 
 async function showAuthenticated(user) {
-  // A refresh (or reopening the bare site URL) always lands here first,
-  // even for a researcher mid-way through a real "Use it" writing session:
-  // this landing page has no memory of which tab they were last on, so
-  // without checking for an active session first it always reset them to
-  // the Demo tab and buried the "继续当前写作会话" resume link one click
-  // away inside the Use it tab. Check first and, if a real writing session
-  // is active, go straight back into it — only a researcher with no active
-  // session (or who was just browsing the read-only Demo) sees this
-  // landing shell at all, which is exactly the Demo case staying on Demo.
-  try {
-    const response = await fetch('/api/online/session', { cache: 'no-store' });
-    const state = await response.json();
-    if (state.active) {
-      window.location.assign('/studio');
-      return;
-    }
-  } catch (_) {
-    // Fall through to the normal landing shell below.
-  }
+  // The landing page always shows Demo/Use it first, even for a
+  // researcher with an active "Use it" writing session -- it used to
+  // auto-redirect straight into /studio here, which meant the site's own
+  // root URL could never actually be used to reach the Demo/Use it shell
+  // once you had a session going. The "继续当前写作会话" resume link
+  // inside the Use it tab (#session-actions) is how you get back into an
+  // active session now; it's an explicit choice, not automatic.
   document.body.classList.add('workspace-authenticated');
   authCard.classList.add('hidden');
   workspaceShell.classList.remove('hidden');
@@ -72,7 +60,15 @@ async function showAuthenticated(user) {
   demoFrame.src = '/demo/?authenticated=' + Date.now();
   document.querySelector('#account-label').textContent =
     user.email + ' · ' + (user.provider === 'google' ? 'Google' : '邮箱账户');
-  document.querySelector('#session-actions').classList.add('hidden');
+  const sessionActions = document.querySelector('#session-actions');
+  sessionActions.classList.add('hidden');
+  try {
+    const response = await fetch('/api/online/session', { cache: 'no-store' });
+    const state = await response.json();
+    if (state.active) sessionActions.classList.remove('hidden');
+  } catch (_) {
+    // Leave the resume link hidden if the check fails.
+  }
 }
 
 async function initializeAuth() {
