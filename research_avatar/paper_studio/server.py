@@ -65,11 +65,22 @@ ONLINE_PROJECT_MODE = os.environ.get("PAPER_STUDIO_ONLINE", "").lower() in {
     "yes",
 }
 ONLINE_DISABLED_ARTIFACT_AGENT_PATHS = {
+    # These all spawn a local Codex CLI subprocess, which the shared online
+    # container never runs. "/api/table/generate" is deliberately absent:
+    # a real user reported that clicking to generate a table did nothing
+    # online, because it too routed through the Agent unconditionally even
+    # though its only real job (the default case) is generate_table_latex's
+    # deterministic structured-prompt parser -- the same safe, non-Agent
+    # path materialize_direct_full_draft_artifacts() already relies on.
+    # handle_table_generate branches on ONLINE_PROJECT_MODE to use that
+    # path directly online instead of the Agent. "/api/table/agent-edit"
+    # stays blocked: it interprets an arbitrary free-text revision
+    # instruction against already-approved LaTeX, which has no deterministic
+    # substitute.
     "/api/figure/build",
     "/api/figure/generate",
     "/api/figure/panel/generate",
     "/api/figure/compose",
-    "/api/table/generate",
     "/api/table/agent-edit",
 }
 DEMO_MODE = os.environ.get("PAPER_STUDIO_DEMO_MODE", "").lower() in {
@@ -4461,7 +4472,21 @@ def compile_paper() -> CompileResult:
         "-interaction=nonstopmode",
         "-halt-on-error",
     ]
-    if not (PAPER / "main.synctex.gz").exists():
+    if (
+        not (PAPER / "main.synctex.gz").exists()
+        and ((PAPER / "main.aux").exists() or (PAPER / "main.bbl").exists())
+    ):
+        # -g forces latexmk to ignore file timestamps and rebuild
+        # everything -- needed when a project directory was copied or
+        # restored and its existing main.aux/main.bbl carry stale or
+        # confusing mtimes relative to the real .tex sources. But on a
+        # genuinely from-scratch compile (no aux/bbl at all yet), -g makes
+        # latexmk run bibtex before any pdflatex pass has ever produced a
+        # main.aux with \citation/\bibdata commands in it, so bibtex reads
+        # an empty aux and fails outright ("I found no \citation commands").
+        # A real project's very first compile hit exactly this. latexmk's
+        # own default ordering (pdflatex, then bibtex, then pdflatex again)
+        # already handles a from-scratch compile correctly without -g.
         command.append("-g")
     command.append("main.tex")
     process = subprocess.run(
@@ -8346,6 +8371,34 @@ class Handler(BaseHTTPRequestHandler):
             raise StudioError("表格 Prompt 过长，请压缩到 8000 字符以内。")
         if table_state.get("status") == "agent_editing":
             raise StudioError("该表已有本地 Agent 任务正在运行。")
+        if ONLINE_PROJECT_MODE:
+            # No local Agent subprocess online -- generate_table_latex's
+            # deterministic structured-prompt parser already handles the
+            # exact same 数据源/列/行/Caption/字号/最优值 directives this
+            # prompt uses, so route there instead of the (blocked) Agent.
+            latex = validate_table_latex_source(
+                table_id, generate_table_latex(table_id, metrics_bundle(), prompt)
+            )
+            compile_table_preview(table_id, latex)
+            table_state.update(
+                {
+                    "generation_prompt": prompt,
+                    "status": "built",
+                    "latex": latex,
+                    "progress": 100,
+                    "progress_message": "表格已从可追溯结果生成并编译。",
+                    "last_message": "已按 Prompt 规格从可追溯结果确定性生成。",
+                    "revision": int(table_state.get("revision", 0)) + 1,
+                    "job_token": None,
+                    "job_started_at": None,
+                    "approved_at": None,
+                }
+            )
+            save_state(state)
+            self.send_json(
+                {"ok": True, "message": "表格已生成。", "state": public_state(state)}
+            )
+            return
         token = uuid.uuid4().hex
         latex = str(table_state.get("latex", ""))
         instruction = (

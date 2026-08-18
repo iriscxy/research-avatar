@@ -10,7 +10,7 @@
   },
   "containers": [
     {
-      "class_name": "OnlineStudioContainerV26",
+      "class_name": "OnlineStudioContainerV29",
       "image": "registry.cloudflare.com/CLOUDFLARE_ACCOUNT_ID/research-avatar-studio-onlinestudiocontainer:REPLACE_WITH_IMAGE_TAG",
       "instance_type": "standard-1",
       "max_instances": 6,
@@ -23,7 +23,7 @@
     "bindings": [
       {
         "name": "ONLINE_STUDIO",
-        "class_name": "OnlineStudioContainerV26"
+        "class_name": "OnlineStudioContainerV29"
       }
     ]
   },
@@ -139,6 +139,18 @@
     {
       "tag": "v26",
       "new_sqlite_classes": ["OnlineStudioContainerV26"]
+    },
+    {
+      "tag": "v27",
+      "new_sqlite_classes": ["OnlineStudioContainerV27"]
+    },
+    {
+      "tag": "v28",
+      "new_sqlite_classes": ["OnlineStudioContainerV28"]
+    },
+    {
+      "tag": "v29",
+      "new_sqlite_classes": ["OnlineStudioContainerV29"]
     }
   ]
 }

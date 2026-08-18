@@ -3152,6 +3152,21 @@ args = parser.parse_args()
         self.assertEqual(state["tables"]["T1"]["agent_prompt"], "")
         self.assertEqual(state["tables"]["T1"]["agent_history"], [])
 
+    def test_table_generate_stays_available_online_while_agent_edit_stays_blocked(self):
+        # Regression: reported live by a real user -- clicking to generate a
+        # table on the production site silently did nothing. "/api/table
+        # /generate" was blanket-blocked online alongside every Agent
+        # -subprocess endpoint, even though its default case only needs
+        # generate_table_latex's deterministic structured-prompt parser (the
+        # exact same safe, non-Agent path materialize_direct_full_draft
+        # _artifacts() already relies on at the end of a batch run). Online
+        # users had no way to populate a table outside that one full-batch
+        # completion path. "/api/table/agent-edit" -- free-text revision of
+        # already-approved LaTeX -- has no deterministic substitute and must
+        # stay blocked.
+        self.assertNotIn("/api/table/generate", studio.ONLINE_DISABLED_ARTIFACT_AGENT_PATHS)
+        self.assertIn("/api/table/agent-edit", studio.ONLINE_DISABLED_ARTIFACT_AGENT_PATHS)
+
     def test_table_prompt_rejects_unknown_directives(self):
         metrics = {
             "defenses": {
@@ -3162,6 +3177,48 @@ args = parser.parse_args()
         }
         with self.assertRaises(StudioError):
             generate_table_latex("T2", metrics, "请随意发挥: yes")
+
+    def test_compile_skips_force_rebuild_on_a_genuinely_fresh_checkout(self):
+        # Regression: reported live -- a real project's very first "编译
+        # PDF" click failed with "I found no \citation commands---while
+        # reading file main.aux". compile_paper() added -g (force everyone
+        # remade, ignoring timestamps) whenever main.synctex.gz was
+        # missing, to protect a copied/restored project whose stale
+        # main.aux/main.bbl might otherwise look falsely up-to-date. But on
+        # a project that has genuinely never been compiled (no aux/bbl
+        # either), -g makes latexmk run bibtex before any pdflatex pass has
+        # ever produced a main.aux with \citation commands in it, so bibtex
+        # reads an empty aux and fails outright. latexmk's own default
+        # ordering already handles a from-scratch compile correctly
+        # without -g; -g should only fire when there's actual stale state
+        # (an existing aux/bbl) to protect against.
+        with TemporaryDirectory() as directory:
+            paper = Path(directory)
+            (paper / "main.tex").write_text("paper", encoding="utf-8")
+            captured = {}
+
+            def fake_run(command, **kwargs):
+                captured["command"] = command
+                return CompletedProcess(command, 0, "ok", "")
+
+            with (
+                patch.object(studio, "PAPER", paper),
+                patch.object(studio, "manuscript_entrypoint_errors", return_value=[]),
+                patch.object(studio, "shutil_which", return_value="/usr/bin/latexmk"),
+                patch.object(studio.subprocess, "run", side_effect=fake_run),
+            ):
+                studio.compile_paper()
+            self.assertNotIn("-g", captured["command"])
+
+            (paper / "main.aux").write_text("% stale aux from a copy", encoding="utf-8")
+            with (
+                patch.object(studio, "PAPER", paper),
+                patch.object(studio, "manuscript_entrypoint_errors", return_value=[]),
+                patch.object(studio, "shutil_which", return_value="/usr/bin/latexmk"),
+                patch.object(studio.subprocess, "run", side_effect=fake_run),
+            ):
+                studio.compile_paper()
+            self.assertIn("-g", captured["command"])
 
     def test_table_preview_is_compiled_from_latex(self):
         required = ("pdflatex", "pdfcrop", "pdftoppm")

@@ -1099,6 +1099,35 @@ class Matrix:
                 results[label] = observed
             assert not errors, errors
             page.close()
+
+        table = next(iter(self.state.get("tables", [])), None)
+        if table:
+            fixture = isolated_fixture()
+            target = next(item for item in fixture["tables"] if item["id"] == table["id"])
+            target.update(ready=True, status="pending", latex="")
+            page = self.browser.new_page()
+            posts: list[str] = []
+            errors: list[str] = []
+            page.on("pageerror", lambda error, errors=errors: errors.append(str(error)))
+
+            def table_api(route, _request=None, *, fixture=fixture, posts=posts, target=target) -> None:
+                if route.request.method == "GET":
+                    route.fulfill(status=200, content_type="application/json", body=json.dumps(fixture))
+                    return
+                posts.append(route.request.url)
+                target.update(status="built", latex="\\begin{table}fixture\\end{table}")
+                route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True, "state": fixture}))
+
+            page.route("**/api/**", table_api)
+            self.visit(page, f"/?view=tables&section={target['source_sections'][0]}", "document.querySelector('#section-title').textContent !== 'Loading…'")
+            card = page.locator(".figure-card", has_text=target["id"])
+            if card.count() and "selected" not in (card.get_attribute("class") or ""):
+                card.click()
+            page.wait_for_timeout(180)
+            assert len([url for url in posts if url.endswith("/api/table/generate")]) == 1, posts
+            assert not errors, errors
+            results["table_generate"] = 1
+            page.close()
         self.results["automatic_generation_sequence"] = results
 
     def preview_validation_and_toggle(self) -> None:

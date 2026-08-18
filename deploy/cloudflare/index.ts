@@ -169,6 +169,34 @@ export class OnlineStudioContainerV25 extends OnlineStudioContainer {}
 // of every entry after it. Rotate proactively per the established pattern.
 export class OnlineStudioContainerV26 extends OnlineStudioContainer {}
 
+// Table-generate-online release: a real user reported that clicking to
+// generate a table did nothing on the production site. "/api/table
+// /generate" was blanket-blocked online alongside every Agent-subprocess
+// endpoint, even though its default case only needs generate_table_latex's
+// deterministic structured-prompt parser -- online users had no way to
+// populate a table outside a full-batch completion. Rotate proactively per
+// the established pattern.
+export class OnlineStudioContainerV27 extends OnlineStudioContainer {}
+
+// Auto-table-generate release: a real user reported that navigating to an
+// empty table still didn't generate anything even after the V27 backend
+// fix -- the actual "generate" button was buried inside a collapsed
+// "高级" (Advanced) <details> disclosure. Data figures already
+// auto-generate their first panel the moment it's viewable; tables now
+// mirror that same pattern instead of requiring a manual click. Rotate
+// proactively per the established pattern.
+export class OnlineStudioContainerV28 extends OnlineStudioContainer {}
+
+// Fresh-compile release: a real project's very first PDF compile failed
+// with "I found no \citation commands" -- compile_paper() forced -g
+// (ignore timestamps, remake everything) whenever main.synctex.gz was
+// missing, but on a genuinely fresh checkout (no aux/bbl either) that
+// makes latexmk run bibtex before any pdflatex pass has produced a main
+// .aux with \citation commands in it. -g now only fires when there's
+// actual stale build state (an existing aux/bbl) to protect against.
+// Rotate proactively per the established pattern.
+export class OnlineStudioContainerV29 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",

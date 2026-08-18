@@ -77,6 +77,7 @@ let activeFigure = (() => {
 const autoAttempted = new Set();
 const autoFigurePromptAttempted = new Set();
 const autoDataPanelAttempted = new Set();
+const autoTableGenerateAttempted = new Set();
 let figurePollTimer = null;
 let fullDraftPollTimer = null;
 let titleBusy = false;
@@ -1175,6 +1176,41 @@ function scheduleAutomaticDataPanel(figure) {
   }, 50);
 }
 
+function scheduleAutomaticTableGenerate(figure) {
+  // Reported directly: a researcher clicked into an empty table and nothing
+  // happened -- generating one required finding "table-generate", which
+  // sits inside a collapsed "高级" (Advanced) <details> disclosure. Data
+  // figures already auto-generate the moment their panel is viewable (see
+  // scheduleAutomaticDataPanel above); tables never had the equivalent, so
+  // this mirrors that same pattern instead of requiring a manual click.
+  if (
+    activeView !== "tables"
+    || figure.kind !== "table"
+    || !figure.ready
+    || figure.status !== "pending"
+    || figureIsRunning(figure)
+  ) return;
+  if (autoTableGenerateAttempted.has(figure.id)) return;
+  autoTableGenerateAttempted.add(figure.id);
+  setTimeout(() => {
+    const current = selectedFigure();
+    if (
+      !current
+      || current.id !== figure.id
+      || current.status !== "pending"
+      || figureIsRunning(current)
+    ) return;
+    runFigureAction(
+      "/api/table/generate",
+      {
+        table_id: current.id,
+        generation_prompt: $("table-prompt").value,
+      },
+      `正在自动生成 ${current.id} 表格初稿…`,
+    );
+  }, 50);
+}
+
 function renderLayoutPrompt(figure) {
   const input = $("data-layout-prompt");
   const singlePanel = (figure.panels || []).length === 1;
@@ -1501,6 +1537,7 @@ function renderFigures() {
     }, 50);
   }
   scheduleAutomaticDataPanel(figure);
+  scheduleAutomaticTableGenerate(figure);
 }
 
 function render() {
@@ -2153,6 +2190,7 @@ async function submitGeneratedReset(typed) {
     autoAttempted.clear();
     autoFigurePromptAttempted.clear();
     autoDataPanelAttempted.clear();
+    autoTableGenerateAttempted.clear();
     render();
     showMessage(payload.message);
   } catch (error) {
