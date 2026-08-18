@@ -76,12 +76,22 @@ class OnlineStudioError(RuntimeError):
     """A safe, user-facing online gateway error."""
 
 
+_EXPORT_EXCLUDED_DIR_NAMES = {"__pycache__", ".git"}
+_EXPORT_EXCLUDED_FILE_SUFFIXES = {".pyc", ".pyo"}
+_EXPORT_EXCLUDED_FILE_NAMES = {".DS_Store"}
+
+
 def _project_zip_bytes(root: Path) -> bytes:
     """Build a bounded project export without following Agent-created symlinks."""
     files: list[Path] = []
     total = 0
     for path in sorted(root.rglob("*")):
         if path.is_symlink() or not path.is_file():
+            continue
+        relative_parts = path.relative_to(root).parts
+        if _EXPORT_EXCLUDED_DIR_NAMES.intersection(relative_parts[:-1]):
+            continue
+        if path.suffix in _EXPORT_EXCLUDED_FILE_SUFFIXES or path.name in _EXPORT_EXCLUDED_FILE_NAMES:
             continue
         files.append(path)
         total += path.stat().st_size
@@ -975,6 +985,27 @@ def _artifact_rows(raw_rows: Any, labels: list[str]) -> tuple[list[dict[str, str
     rows = [list(map(str, row)) for row in raw_rows or [] if isinstance(row, list) and row]
     width = max([len(row) for row in rows] + [len(labels), 1])
     headers = [str(item).strip() for item in labels if str(item).strip()]
+    if len(headers) < width and rows and len(rows[0]) == width:
+        # The scraped table's own header row commonly has extra columns
+        # that 03's column_labels never declares -- most often a leading
+        # identifier column such as "Method" that every row already
+        # carries and 03 doesn't need to name separately. Locate the
+        # declared labels as a contiguous run inside the real header row
+        # and borrow its text for the missing slots, instead of always
+        # inventing "Value N" placeholders at the end: that silently
+        # shifted every declared header one column out of alignment with
+        # its data, and also broke the duplicate-header-row strip check
+        # below (a real batch-writing run compiled a table with its own
+        # "Method Swap Delete ..." header rendered as if it were a data
+        # row, with the label of the shifted-out last column replaced by
+        # a meaningless "Value N").
+        raw_header = [str(item).strip() for item in rows[0]]
+        folded_raw = [item.casefold() for item in raw_header]
+        folded_labels = [item.casefold() for item in headers]
+        for start in range(len(folded_raw) - len(folded_labels) + 1):
+            if folded_raw[start : start + len(folded_labels)] == folded_labels:
+                headers = raw_header[:start] + headers + raw_header[start + len(folded_labels) :]
+                break
     if len(headers) < width:
         headers.extend(f"Value {index}" for index in range(len(headers) + 1, width + 1))
     headers = headers[:width]
@@ -1081,9 +1112,14 @@ def _artifact_definitions(
                 "data_grid": {"type": "records", "path": result_path, "columns": columns},
                 "prompt": {
                     "columns": " | ".join(item["label"] for item in columns),
-                    "rows": "保持 05 的已验证顺序",
+                    "rows": "source",
                     "font_size": "small",
-                    "best_values": "仅按 03 指定的 metric direction 标记",
+                    # "03" never actually supplies a per-column metric
+                    # direction here (only caption/column_labels are read
+                    # above), so there is no verified signal to bold a
+                    # "best" value by. Default to "none" rather than
+                    # guessing a direction that could bold the wrong column.
+                    "best_values": "none",
                 },
             }
             continue

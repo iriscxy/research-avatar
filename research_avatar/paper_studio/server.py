@@ -711,7 +711,9 @@ def figure_latex(
     definition = FIGURES[figure_id]
     paths = figure_paths(figure_id)
     figure_state = figure_state or {}
-    caption = str(figure_state.get("caption") or definition["caption"]).strip()
+    caption = latex_escape_title(
+        str(figure_state.get("caption") or definition["caption"]).strip()
+    )
     mode = figure_state.get("layout_mode")
     stored_width = figure_state.get("layout_width")
     if mode == "wrapfigure":
@@ -790,7 +792,9 @@ def figure_placeholder_latex(
     """Return a compilable labelled float until the real figure is approved."""
     definition = FIGURES[figure_id]
     figure_state = figure_state or {}
-    caption = str(figure_state.get("caption") or definition["caption"]).strip()
+    caption = latex_escape_title(
+        str(figure_state.get("caption") or definition["caption"]).strip()
+    )
     mode = figure_state.get("layout_mode")
     wide = mode == "two-column" or (
         mode is None and definition["width"].startswith("two-column")
@@ -861,7 +865,9 @@ def table_placeholder_latex(
     """Return a compilable labelled float until the real table is approved."""
     definition = TABLES[table_id]
     table_state = table_state or {}
-    caption = str(table_state.get("caption") or definition["caption"]).strip()
+    caption = latex_escape_title(
+        str(table_state.get("caption") or definition["caption"]).strip()
+    )
     wide = str(definition.get("width", "")).startswith("two-column")
     environment = "table*" if wide else "table"
     box_width = r"0.94\textwidth" if wide else r"0.94\columnwidth"
@@ -2128,7 +2134,15 @@ def generate_table_latex(
         f"\\begin{{{environment}}}[{'t' if wide else 'tb'}]",
         "  \\centering",
         f"  \\{spec['size']}",
-        f"  \\begin{{tabular}}{{{alignment}}}",
+        # Long row labels (a common shape for method-comparison tables) can
+        # make the tabular wider than the column that holds it -- a single
+        # ("table", not "table*") environment does not know to reserve
+        # extra horizontal space for that overflow, so it silently prints
+        # on top of whatever body text the two-column layout already
+        # flowed alongside it. Measure the tabular's natural width and only
+        # shrink (never stretch a table that already fits) to guarantee it
+        # never bleeds into adjacent text.
+        r"  \sbox0{\begin{tabular}{" + alignment + "}",
         "    \\toprule",
         "    " + " & ".join(latex_escape_cell(item) for item in columns) + r" \\",
         "    \\midrule",
@@ -2146,7 +2160,8 @@ def generate_table_latex(
     lines.extend(
         [
             "    \\bottomrule",
-            "  \\end{tabular}",
+            "  \\end{tabular}}",
+            r"  \ifdim\wd0>\linewidth\resizebox{\linewidth}{!}{\usebox0}\else\usebox0\fi",
             f"  \\caption{{{latex_escape_cell(spec['caption'])}}}",
             f"  \\label{{{definition['label']}}}",
             f"\\end{{{environment}}}",
@@ -3243,6 +3258,21 @@ def latex_prose_issues(source: str) -> list[str]:
         masked = re.sub(pattern, "", masked)
 
     issues: list[str] = []
+
+    # Balance-check math delimiters on the raw (unmasked) source: the masking
+    # above only strips *correctly paired* math, so a stray or mismatched
+    # delimiter -- e.g. GPT opening "$" or "\(" without ever closing it --
+    # survives masking untouched and previously reached pdflatex undetected,
+    # crashing the whole document with "Missing $ inserted." on a real batch
+    # run (the error surfaced far from the actual cause, in whatever file
+    # happened to compile next).
+    if len(re.findall(r"(?<!\\)\$", source)) % 2 != 0:
+        issues.append("unbalanced $ math delimiters (odd count)")
+    if source.count("\\(") != source.count("\\)"):
+        issues.append("unbalanced \\( \\) math delimiters")
+    if source.count("\\[") != source.count("\\]"):
+        issues.append("unbalanced \\[ \\] math delimiters")
+
     unicode_math = sorted(
         {character for character in set(masked) if _is_latex_unsafe_unicode_math(character)}
     )
@@ -3253,6 +3283,7 @@ def latex_prose_issues(source: str) -> list[str]:
         "%": "raw percent sign",
         "&": "raw ampersand",
         "#": "raw hash sign",
+        "^": "raw caret (superscript outside math)",
     }
     for character, label in specials.items():
         if re.search(rf"(?<!\\){re.escape(character)}", masked):
@@ -3794,6 +3825,16 @@ def append_verified_citations(
         if normalize_url(source_url) not in normalized_sources:
             continue
         if not re.search(r"@\w+\s*\{\s*" + re.escape(key) + r"\s*,", bibtex):
+            continue
+        if bibtex.count("{") != bibtex.count("}"):
+            # A real batch-writing run hit a citation-search response that
+            # truncated mid-field (an accented author name cut off at
+            # "Nicol{\"), and this code appended it to references.bib
+            # verbatim -- the opening-pattern check above only validates the
+            # entry *starts* correctly, not that it is syntactically
+            # complete. One unbalanced entry corrupts bibtex's parse of
+            # every entry after it in the file, so several unrelated,
+            # perfectly well-formed citations all failed to resolve too.
             continue
         additions.append((key, bibtex, source_url))
         known.add(key)

@@ -1152,6 +1152,11 @@ class Matrix:
                 paper_preview_url="/paper.pdf",
                 preview_url="/paper.pdf",
                 preview_type="pdf",
+                # Pin explicitly rather than inherit whatever the live figure
+                # happens to have: a real project with gpt_preview_no_text
+                # already true made this fixture silently assume the wrong
+                # toggle-button copy and fail with an unhelpful bare assert.
+                gpt_preview_no_text=False,
             )
             page, errors, posts = self.page(fixture)
             self.visit(page, f"/?view=figures&section={target['source_sections'][0]}", "document.querySelector('#section-title').textContent !== 'Loading…'")
@@ -1161,7 +1166,7 @@ class Matrix:
             assert page.locator("#mechanism-preview-toggle").inner_text() == "显示 GPT 原图"
             assert page.locator("#figure-preview-pdf").is_visible()
             page.locator("#mechanism-preview-toggle").click()
-            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示 PPT/PDF 版"
+            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示可编辑 PPT/PDF 完整版"
             assert page.locator("#figure-preview-image").is_visible()
             page.locator("#mechanism-preview-toggle").click()
             assert page.locator("#figure-preview-pdf").is_visible()

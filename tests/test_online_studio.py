@@ -182,6 +182,35 @@ class OnlineStudioTests(unittest.TestCase):
             ("Evidence Writing · ACL 2027", "Evidence Writing"),
         )
 
+    def test_artifact_rows_recovers_a_leading_identifier_column_from_the_raw_header(self):
+        # Regression: a real batch-writing run completed all 19 paragraphs
+        # and compiled a full paper PDF, but Table 2 rendered with its own
+        # scraped header row ("Method Swap Delete Insert Keyboard") printed
+        # as if it were a data row, and the last declared column label
+        # replaced by a meaningless "Value 5". 03's column_labels for this
+        # table only names the four metric columns ("Swap", "Delete",
+        # "Insert", "Keyboard") since every row already carries the method
+        # name -- it never needs to declare that identifier column
+        # separately. The old code always padded *missing* headers by
+        # appending synthetic "Value N" placeholders at the end, silently
+        # shifting every declared label one column out of alignment with
+        # its data, and breaking the duplicate-header-row strip check
+        # (which compared against the wrong, shifted header list).
+        raw_rows = [
+            ["Method", "Swap", "Delete", "Insert", "Keyboard"],
+            ["Class-balanced random-budget augmentation", "0.8114", "0.8052", "0.7922", "0.7968"],
+            ["Our method — Margin-Targeted Typo Augmentation (MTA)", "0.8327", "0.8275", "0.8017", "0.8107"],
+        ]
+        records, columns = online._artifact_rows(raw_rows, ["Swap", "Delete", "Insert", "Keyboard"])
+        self.assertEqual(
+            [column["label"] for column in columns],
+            ["Method", "Swap", "Delete", "Insert", "Keyboard"],
+        )
+        self.assertEqual(len(records), 2, "the real header row must be stripped, not kept as data")
+        self.assertEqual(records[0]["method"], "Class-balanced random-budget augmentation")
+        self.assertEqual(records[0]["swap"], "0.8114")
+        self.assertEqual(records[0]["keyboard"], "0.7968")
+
     def test_pipeline_sources_require_profile_plan_and_results(self):
         sources = online._canonical_pipeline_sources(pipeline_files())
         self.assertEqual(set(sources), {
@@ -540,6 +569,24 @@ class OnlineStudioTests(unittest.TestCase):
             config = json.loads((root / "paper/paper_studio.json").read_text())
             self.assertEqual(config["table_order"], ["T1"])
             self.assertEqual(config["tables"]["T1"]["label"], "tab:main")
+            # Regression: a real full-draft batch run completed all 19
+            # paragraphs, then failed at the final table-materialization step
+            # with "表格 Prompt 含未知行：保持 05 的已验证顺序" -- the
+            # scaffolder hardcoded that phrase as the row directive, but
+            # paper_studio's row-directive parser (default_table_prompt /
+            # its "keep everything" branch) only recognizes the literal
+            # keywords "source"/"all"/"保持 results/ 顺序"/"全部", so it
+            # misread the phrase as a literal (unknown) row name and failed
+            # every online project's final materialization step.
+            self.assertEqual(config["tables"]["T1"]["prompt"]["rows"], "source")
+            # Regression: the same materialization step then failed a second
+            # time with "最优值仅支持 none、max 或 min。" -- the scaffolder
+            # also hardcoded a "best_values" phrase
+            # ("仅按 03 指定的 metric direction 标记") that the same parser's
+            # best-value directive never recognizes, and no per-column
+            # metric direction is actually read from "03" to derive a real
+            # one, so it must default to the verified-safe "none".
+            self.assertEqual(config["tables"]["T1"]["prompt"]["best_values"], "none")
             self.assertEqual(config["project"]["target"]["venue"], "ACL 2027")
             self.assertEqual(
                 config["project"]["reference_paper"]["title"],
@@ -740,9 +787,32 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
-        self.assertIn('"class_name": "OnlineStudioContainerV14"', wrangler)
-        self.assertIn("export class OnlineStudioContainerV14", worker)
+        self.assertIn('"class_name": "OnlineStudioContainerV26"', wrangler)
+        self.assertIn("export class OnlineStudioContainerV26", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
+
+    def test_container_image_installs_every_tool_compile_table_preview_requires(self):
+        # Regression: a real batch-writing run finished all 19 paragraphs,
+        # then failed at the final table-materialization step with "无法生成
+        # LaTeX 表格预览：缺少 pdfcrop。" -- the base container image
+        # installed poppler-utils (pdftoppm/pdfinfo/pdftocairo) and latexmk,
+        # but never texlive-extra-utils, which is what actually provides the
+        # pdfcrop binary compile_table_preview() shells out to. The
+        # application code already checked for and reported the missing
+        # tool correctly; the tool itself just wasn't installed.
+        #
+        # Fixing that surfaced a second, one-level-deeper failure: "LaTeX 表格
+        # 预览编译失败" / "Ghostscript exited with error code 127" --
+        # pdfcrop itself shells out to `gs` to compute the bounding box, and
+        # `--no-install-recommends` (set just above this loop's apt-get
+        # command) suppresses ghostscript, which texlive-extra-utils only
+        # Recommends rather than Depends on. Both must be installed
+        # explicitly.
+        dockerfile = (
+            Path(__file__).resolve().parents[1] / "deploy/online-paper-studio/Dockerfile"
+        ).read_text(encoding="utf-8")
+        for package in ("ghostscript", "texlive-extra-utils", "poppler-utils", "latexmk", "nodejs"):
+            self.assertIn(package, dockerfile)
 
     def test_upload_page_names_the_default_package_output(self):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
@@ -765,6 +835,28 @@ class OnlineStudioTests(unittest.TestCase):
             with zipfile.ZipFile(io.BytesIO(data)) as archive:
                 self.assertEqual(archive.namelist(), ["paper/main.tex"])
                 self.assertEqual(archive.read("paper/main.tex"), b"paper")
+
+    def test_project_export_excludes_build_and_cache_artifacts(self):
+        # Regression: a real production export downloaded by a researcher
+        # (via /api/online/export) contained a compiled
+        # ".agents/skills/paperstudio/scripts/__pycache__/*.pyc" file --
+        # _project_zip_bytes walked the whole session root with no
+        # exclusions, so any build/cache byproduct left in the workspace
+        # (from running local-Agent tooling inside the session) leaked
+        # straight into the user-facing ZIP.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "paper").mkdir()
+            (root / "paper/main.tex").write_text("paper", encoding="utf-8")
+            (root / "scripts/__pycache__").mkdir(parents=True)
+            (root / "scripts/__pycache__/tool.cpython-312.pyc").write_bytes(b"\x00")
+            (root / "scripts/tool.pyc").write_bytes(b"\x00")
+            (root / ".git").mkdir()
+            (root / ".git/HEAD").write_text("ref: refs/heads/main", encoding="utf-8")
+            (root / ".DS_Store").write_bytes(b"\x00")
+            data = online._project_zip_bytes(root)
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                self.assertEqual(archive.namelist(), ["paper/main.tex"])
 
     def test_live_worker_hides_root_and_never_persists_api_key(self):
         key = "sk-online-test-never-write-this"

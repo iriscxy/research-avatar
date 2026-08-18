@@ -98,6 +98,77 @@ export class OnlineStudioContainerV14 extends OnlineStudioContainer {}
 // Chat-removed release: rotate proactively per the established pattern.
 export class OnlineStudioContainerV15 extends OnlineStudioContainer {}
 
+// Math-delimiter-preflight release: rotate proactively per the established
+// pattern.
+export class OnlineStudioContainerV16 extends OnlineStudioContainer {}
+
+// Caption-escaping release: a real batch-writing run crashed pdflatex on an
+// unescaped "%" in a figure/table caption reaching \caption{...} raw. Rotate
+// proactively per the established pattern.
+export class OnlineStudioContainerV17 extends OnlineStudioContainer {}
+
+// Export-artifact release: /api/online/export was zipping __pycache__/.pyc/
+// .git/.DS_Store byproducts straight into the user-facing download. Rotate
+// proactively per the established pattern.
+export class OnlineStudioContainerV18 extends OnlineStudioContainer {}
+
+// Raw-caret release: a real batch-writing run crashed pdflatex on GPT prose
+// that wrote a superscript ("y^{*}") outside math mode -- the preflight
+// caught raw "_" but was missing "^", exactly as unsafe. Rotate proactively
+// per the established pattern.
+export class OnlineStudioContainerV19 extends OnlineStudioContainer {}
+
+// Table-row-directive release: every online project's scaffolder hardcoded
+// a table row directive ("保持 05 的已验证顺序") that paper_studio's own
+// row-directive parser doesn't recognize as "keep everything", so the final
+// table-materialization step failed at the end of every full-draft batch
+// run, 100% reproducibly. Rotate proactively per the established pattern.
+export class OnlineStudioContainerV20 extends OnlineStudioContainer {}
+
+// Table-best-values release: the same scaffolder also hardcoded a
+// "best_values" phrase paper_studio's directive parser never recognizes, so
+// the final table-materialization step failed a second time even after the
+// row-directive fix. Rotate proactively per the established pattern.
+export class OnlineStudioContainerV21 extends OnlineStudioContainer {}
+
+// pdfcrop release: a real batch-writing run finished all 19 paragraphs, then
+// failed at the final table-materialization step with "缺少 pdfcrop." -- the
+// base container image installed poppler-utils and latexmk but never
+// texlive-extra-utils, which is what actually provides pdfcrop. Rotate
+// proactively per the established pattern.
+export class OnlineStudioContainerV22 extends OnlineStudioContainer {}
+
+// Ghostscript release: fixing pdfcrop surfaced a one-level-deeper failure --
+// pdfcrop itself shells out to `gs` to compute the bounding box, and
+// --no-install-recommends suppressed ghostscript, which texlive-extra-utils
+// only Recommends rather than Depends on. Rotate proactively per the
+// established pattern.
+export class OnlineStudioContainerV23 extends OnlineStudioContainer {}
+
+// Table-header-column release: a real full 19/19 batch run compiled a table
+// with its own scraped header row ("Method Swap Delete ...") rendered as a
+// data row, and the shifted-out last column label replaced by a meaningless
+// "Value N" -- _artifact_rows() always padded missing headers by appending
+// placeholders instead of recovering the real leading identifier-column
+// text already present in the scraped header. Rotate proactively per the
+// established pattern.
+export class OnlineStudioContainerV24 extends OnlineStudioContainer {}
+
+// Table-overflow release: a real full 19/19 batch run compiled a table
+// whose long row labels made it wider than its single-column width, so it
+// silently printed on top of adjacent body text. generate_table_latex now
+// measures the tabular and only shrinks it (never stretches) when it
+// actually overflows. Rotate proactively per the established pattern.
+export class OnlineStudioContainerV25 extends OnlineStudioContainer {}
+
+// Bibtex-brace-balance release: a real batch-writing run died on paragraph
+// 1 with "Latex failed to resolve 4 citation(s)" -- a citation-search
+// response returned a bibtex entry truncated mid-field, and
+// append_verified_citations() only checked that it *opened* correctly
+// before writing it to references.bib verbatim, corrupting bibtex's parse
+// of every entry after it. Rotate proactively per the established pattern.
+export class OnlineStudioContainerV26 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",

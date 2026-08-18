@@ -522,6 +522,17 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn("raw hash sign", issues)
         self.assertTrue(any(item.startswith("Unicode math glyphs:") for item in issues))
 
+    def test_latex_prose_preflight_flags_raw_caret(self):
+        # Regression: a real batch-writing run crashed pdflatex with
+        # "! Missing $ inserted." from GPT prose that wrote a superscript
+        # outside math mode ("ground-truth label y^{*}" instead of
+        # "$y^{*}$"). The specials dict already caught raw "_" (subscript
+        # outside math) but was missing "^" (superscript outside math),
+        # which is exactly as unsafe.
+        issues = latex_prose_issues("the ground-truth label y^{*} is fixed")
+        self.assertIn("raw caret (superscript outside math)", issues)
+        self.assertEqual(latex_prose_issues(r"the label $y^{*}$ is fixed"), [])
+
     def test_latex_prose_preflight_accepts_safe_math_and_reference_keys(self):
         self.assertEqual(
             latex_prose_issues(
@@ -559,6 +570,26 @@ class PaperStudioTests(unittest.TestCase):
         # characters -- notably ~ in the common "Figure~\ref{}" convention.
         # Only non-ASCII glyphs are an actual rendering hazard.
         self.assertEqual(latex_prose_issues("a + b < c = d > e | f ~ g"), [])
+
+    def test_latex_prose_preflight_flags_unbalanced_math_delimiters(self):
+        # Regression: a live batch-writing run crashed pdflatex with
+        # "! Missing $ inserted." from GPT prose that opened a math
+        # delimiter and never closed it. Because the masking step only
+        # strips *correctly paired* math, a stray delimiter passed through
+        # untouched and reached pdflatex, which then reported the error in
+        # whatever file happened to compile next -- nowhere near the actual
+        # cause. The preflight must catch delimiter imbalance directly.
+        issues = latex_prose_issues(r"we compute $q = \lfloor B / |\mathcal{I}\rfloor")
+        self.assertIn("unbalanced $ math delimiters (odd count)", issues)
+
+        issues = latex_prose_issues(r"we compute \(q = \lfloor B / |\mathcal{I}\rfloor")
+        self.assertIn("unbalanced \\( \\) math delimiters", issues)
+
+        issues = latex_prose_issues(r"see \[x = y\] and also \[z = w")
+        self.assertIn("unbalanced \\[ \\] math delimiters", issues)
+
+        self.assertEqual(latex_prose_issues(r"a price of \$5 is fine"), [])
+        self.assertEqual(latex_prose_issues(r"\(H_s \in \mathbb{R}\) is balanced"), [])
 
     def test_latex_normalization_canonicalizes_decorated_citation_placeholder(self):
         self.assertEqual(
@@ -2157,6 +2188,58 @@ args = parser.parse_args()
             {"https://aclanthology.org/2023.emnlp-main.123"},
         )
 
+    def test_append_verified_citations_rejects_a_truncated_bibtex_entry(self):
+        # Regression: a real batch-writing run's citation search returned a
+        # bibtex string truncated mid-field (an accented author name cut
+        # off at "Nicol{\") for one citation. The only check here was that
+        # the string *opened* with a valid "@type{key," header; it never
+        # confirmed the entry was actually complete. That one unbalanced
+        # entry got written to references.bib verbatim and corrupted
+        # bibtex's parse of every entry after it in the file -- three
+        # unrelated, well-formed citations all failed to resolve too, and
+        # the whole batch job died on the very first paragraph.
+        with TemporaryDirectory() as directory:
+            paper = Path(directory)
+            paper.mkdir(exist_ok=True)
+            bib_path = paper / "references.bib"
+            bib_path.write_text(
+                "@article{existing2020,\n  title={Existing},\n}\n", encoding="utf-8"
+            )
+            truncated = (
+                "@article{bressan2024marginbased,\n"
+                "  title={Margin-Based Active Learning of Classifiers},\n"
+                "  author={Bressan, Marco and Cesa-Bianchi, Nicol{\\"
+            )
+            complete = (
+                "@article{gan2024reasoning,\n"
+                "  title={Reasoning Robustness},\n"
+                "  author={Gan, Esther},\n"
+                "  year={2024}\n"
+                "}"
+            )
+            with patch.object(studio, "PAPER", paper):
+                added = studio.append_verified_citations(
+                    [
+                        {
+                            "key": "bressan2024marginbased",
+                            "bibtex": truncated,
+                            "source_url": "https://example.org/bressan",
+                        },
+                        {
+                            "key": "gan2024reasoning",
+                            "bibtex": complete,
+                            "source_url": "https://example.org/gan",
+                        },
+                    ],
+                    {"https://example.org/bressan", "https://example.org/gan"},
+                )
+                final_bib = bib_path.read_text(encoding="utf-8")
+
+        self.assertEqual(added, ["gan2024reasoning"])
+        self.assertNotIn("bressan2024marginbased", final_bib)
+        self.assertIn("gan2024reasoning", final_bib)
+        self.assertEqual(final_bib.count("{"), final_bib.count("}"))
+
     def test_abstract_starts_with_system_planned_paragraph(self):
         section = _default_state()["sections"]["abstract"]
         paragraph = current_paragraph(section)
@@ -3106,6 +3189,51 @@ args = parser.parse_args()
             self.assertTrue(paths["pdf"].read_bytes().startswith(b"%PDF"))
             self.assertTrue(paths["preview"].read_bytes().startswith(b"\x89PNG"))
 
+    def test_generated_table_with_a_long_row_label_shrinks_to_fit_and_compiles(self):
+        # Regression: a real batch-writing run compiled a full 19/19 paper
+        # where a "single-column" table's own row labels (long method
+        # names) made the tabular wider than its column -- a plain "table"
+        # environment has no way to know it needs extra horizontal space,
+        # so it silently printed on top of the body text the two-column
+        # layout had already flowed alongside it. generate_table_latex now
+        # measures the tabular into a box and only \resizebox'es it down
+        # when it's actually too wide (never stretching one that fits).
+        required = ("pdflatex", "pdfcrop", "pdftoppm")
+        if not all(studio.shutil_which(command) for command in required):
+            self.skipTest("LaTeX preview toolchain is unavailable")
+        metrics = {
+            "main_results": {
+                "benchmarks": {
+                    "AdvBench": {
+                        "rows": [
+                            {
+                                "method": "A method name so long it would overflow a "
+                                "narrow single-column table width",
+                                "mean_asr": 12.0,
+                                "mean_sr": 3.0,
+                            }
+                        ]
+                    },
+                    "TrustLLM": {
+                        "rows": [
+                            {
+                                "method": "A method name so long it would overflow a "
+                                "narrow single-column table width",
+                                "mean_asr": 9.0,
+                                "mean_sr": 2.0,
+                            }
+                        ]
+                    },
+                }
+            }
+        }
+        latex = generate_table_latex("T1", metrics)
+        self.assertIn(r"\sbox0{", latex)
+        self.assertIn(r"\ifdim\wd0>\linewidth\resizebox{\linewidth}{!}{\usebox0}", latex)
+        with TemporaryDirectory() as directory:
+            paths = compile_table_preview("T1", latex, Path(directory))
+            self.assertTrue(paths["pdf"].read_bytes().startswith(b"%PDF"))
+
     def test_local_agent_table_edit_uses_codex_cli_without_api_key(self):
         current = "\n".join(
             [
@@ -3496,6 +3624,31 @@ args = parser.parse_args()
         self.assertIn(rf"\caption{{{studio.TABLES['T1']['caption']}}}", source)
         self.assertIn(r"\begin{table*}[t]", source)
         self.assertNotIn(r"\begin{tabular}", source)
+
+    def test_figure_and_table_captions_escape_raw_percent_signs(self):
+        # Regression: a real batch-writing run crashed pdflatex with
+        # "Runaway argument?" / "Missing $ inserted." because a figure
+        # caption like "accuracy at 10%, 25%, and 50% budgets" was written
+        # straight into `\caption{...}` unescaped -- the raw "%" turned the
+        # rest of the line (through `\label{}` and `\end{figure}`) into a
+        # LaTeX comment, corrupting the whole float. Table cell captions
+        # already escaped correctly (generate_table_latex uses
+        # latex_escape_cell); figure/table placeholders and the approved
+        # figure renderer did not.
+        raw_caption = "accuracy at 10%, 25%, and 50% budgets & 100% coverage"
+        escaped_caption = r"accuracy at 10\%, 25\%, and 50\% budgets \& 100\% coverage"
+
+        placeholder = studio.figure_placeholder_latex("F1", {"caption": raw_caption})
+        self.assertIn(rf"\caption{{{escaped_caption}}}", placeholder)
+        self.assertNotIn(raw_caption, placeholder)
+
+        approved = figure_latex("F1", {"caption": raw_caption})
+        self.assertIn(rf"\caption{{{escaped_caption}}}", approved)
+        self.assertNotIn(raw_caption, approved)
+
+        table_placeholder = studio.table_placeholder_latex("T1", {"caption": raw_caption})
+        self.assertIn(rf"\caption{{{escaped_caption}}}", table_placeholder)
+        self.assertNotIn(raw_caption, table_placeholder)
 
     def test_local_agent_figure_deletion_is_visible_without_a_server_restart(self):
         # Reported directly: asking the local Agent chat to delete a figure
@@ -3941,6 +4094,48 @@ args = parser.parse_args()
             self.assertEqual(accepted["accepted_text"], "Batch draft.")
             self.assertEqual(generate.call_count, 1)
             materialize.assert_called_once()
+
+    def test_stuck_running_job_from_a_dead_process_self_heals_on_next_load(self):
+        # Regression: a real production batch job hung mid-generation
+        # (progress silently froze for 7+ minutes with no failure) and the
+        # underlying container was later found to have restarted, orphaning
+        # the session -- exactly the scenario load_state()'s server_instance
+        # check exists to recover from, but it had zero test coverage. If a
+        # "running" job's server_instance token doesn't match the current
+        # process (a fresh SERVER_INSTANCE_TOKEN each process start), the
+        # very next load_state() call anywhere must turn it into a clean,
+        # actionable "服务已重启" failure instead of leaving it stuck at
+        # "running" forever with no way for the researcher to tell.
+        with TemporaryDirectory() as directory:
+            state_dir = Path(directory)
+            state_file = state_dir / "state.json"
+            with (
+                patch.object(studio, "STATE_DIR", state_dir),
+                patch.object(studio, "STATE_FILE", state_file),
+            ):
+                stuck = _default_state()
+                stuck["full_draft_job"] = {
+                    "token": "orphaned-token",
+                    "status": "running",
+                    "server_instance": "a-previous-process-instance",
+                    "total": 19,
+                    "completed": 13,
+                    "progress": 68,
+                    "progress_message": "正在生成 Experiments · E-P5",
+                }
+                studio.save_state(stuck)
+
+                recovered = studio.load_state()
+
+            job = recovered["full_draft_job"]
+            self.assertEqual(job["status"], "failed")
+            self.assertIsNone(job["token"])
+            self.assertIn("服务已重启", job["progress_message"])
+            self.assertIn("可从未完成段落继续", job["progress_message"])
+            # The 13 already-completed paragraphs are real accepted LaTeX
+            # (persisted per-paragraph as they land), not job-state --
+            # recovery must not touch or reset that count/progress.
+            self.assertEqual(job["completed"], 13)
 
     def test_direct_full_draft_uses_same_job_without_opening_browser(self):
         with TemporaryDirectory() as directory:

@@ -9,9 +9,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ghostscript \
         latexmk \
         nodejs \
         poppler-utils \
+        texlive-extra-utils \
         texlive-fonts-recommended \
         texlive-latex-base \
         texlive-latex-extra \
