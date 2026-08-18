@@ -1610,6 +1610,27 @@ function render() {
   $("project-eyebrow").textContent = project.eyebrow || project.name || "PAPER PROJECT";
   $("studio-title").textContent = project.studio_title || "Paper Studio";
   $("project-subtitle").textContent = project.subtitle || "逐段对话、确认后写入 LaTeX";
+  const referencePaper = project.reference_paper || {};
+  const referenceEl = $("project-reference-paper");
+  if (referencePaper.title) {
+    const meta = [referencePaper.authors, referencePaper.venue].filter(Boolean).join(" · ");
+    referenceEl.replaceChildren();
+    referenceEl.append("参考论文：");
+    if (referencePaper.url) {
+      const link = document.createElement("a");
+      link.href = referencePaper.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = referencePaper.title;
+      referenceEl.append(link);
+    } else {
+      referenceEl.append(referencePaper.title);
+    }
+    if (meta) referenceEl.append(`（${meta}）`);
+    referenceEl.hidden = false;
+  } else {
+    referenceEl.hidden = true;
+  }
   const projectExport = $("project-export");
   projectExport.hidden = !project.export_url;
   if (project.export_url) projectExport.href = studioPath(project.export_url);

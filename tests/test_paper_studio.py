@@ -4218,6 +4218,17 @@ args = parser.parse_args()
             with patch.object(studio, "PAPER", paper):
                 self.assertTrue(studio.outline_is_confirmed())
 
+    def test_sidebar_shows_the_structural_reference_paper(self):
+        html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn('id="project-reference-paper"', html)
+        self.assertIn('$("project-reference-paper")', source)
+        self.assertIn("project.reference_paper", source)
+        # A project with no reference_paper.title (e.g. the lightweight
+        # onboarding path with no single structural reference) must hide
+        # the line rather than show an empty "参考论文：".
+        self.assertIn("referenceEl.hidden = true", source)
+
     def test_online_project_flag_hides_provider_and_key_controls(self):
         # Every online session (real or demo) now shares one server-held
         # DeepSeek key -- there is nothing for that researcher to pick,
