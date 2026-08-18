@@ -99,6 +99,12 @@ export class OnlineStudioContainerV34 extends OnlineStudioContainer {}
 // those artifacts and closing the .dockerignore gap that let it recur.
 export class OnlineStudioContainerV35 extends OnlineStudioContainer {}
 
+// Rotated the DEEPSEEK_API_KEY secret (previous key was revoked/expired).
+// Same as before: already-running instances were constructed with the old
+// value baked into envVars, so a fresh class is needed to pick up the new
+// secret.
+export class OnlineStudioContainerV36 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
