@@ -16,6 +16,10 @@ interface Env {
   };
   GOOGLE_OAUTH_CLIENT_ID?: string;
   GOOGLE_OAUTH_CLIENT_SECRET?: string;
+  // Set with `wrangler secret put DEEPSEEK_API_KEY` -- never as a plain
+  // envVars literal below, which is baked into the deployed Worker script
+  // and would leak the key to anyone who can read the bundle.
+  DEEPSEEK_API_KEY?: string;
 }
 
 interface User {
@@ -24,7 +28,7 @@ interface User {
   provider: "local" | "google";
 }
 
-export class OnlineStudioContainer extends Container {
+export class OnlineStudioContainer extends Container<Env> {
   defaultPort = 8876;
   sleepAfter = "2h";
   envVars = {
@@ -35,6 +39,16 @@ export class OnlineStudioContainer extends Container {
     ONLINE_STUDIO_IDLE_SECONDS: "5400",
     ONLINE_STUDIO_MAX_SESSIONS: "2",
   };
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    // Merge the Wrangler secret into the container's process environment
+    // at construction time -- this is the only place DEEPSEEK_API_KEY's
+    // real value ever exists outside Cloudflare's encrypted secret store.
+    if (env.DEEPSEEK_API_KEY) {
+      this.envVars = { ...this.envVars, DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY };
+    }
+  }
 }
 
 // V2 through V29 (one per past rollout) were retired via a "v31"
@@ -60,6 +74,12 @@ export class OnlineStudioContainerV30 extends OnlineStudioContainer {}
 // fresh class forces Cloudflare to start new instances immediately, so the
 // shared-key/spend-cap/demo-view-only changes actually go live right away.
 export class OnlineStudioContainerV31 extends OnlineStudioContainer {}
+
+// The DEEPSEEK_API_KEY secret was only just set (wrangler secret put) and
+// OnlineStudioContainer's constructor only merges it into envVars once, at
+// construction time -- already-running V31 instances started before the
+// secret existed. Rotate again so the next instances actually pick it up.
+export class OnlineStudioContainerV32 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
