@@ -85,6 +85,12 @@ export class OnlineStudioContainerV32 extends OnlineStudioContainer {}
 // /api/pdf/locate through the demo's read-only gate.
 export class OnlineStudioContainerV33 extends OnlineStudioContainer {}
 
+// Compile-lock release: compile_paper() now serializes concurrent
+// latexmk/bibtex runs instead of letting them race on the same
+// main.aux/main.bbl. Also gives the shared Demo session a clean directory,
+// clearing any corruption left by the race this fixes.
+export class OnlineStudioContainerV34 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
