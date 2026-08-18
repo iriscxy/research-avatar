@@ -114,6 +114,10 @@ export class OnlineStudioContainerV37 extends OnlineStudioContainer {}
 // sidebar now shows the project's structural reference paper.
 export class OnlineStudioContainerV38 extends OnlineStudioContainer {}
 
+// Dropped the technical scaffold subtitle now that the sidebar shows the
+// reference paper directly.
+export class OnlineStudioContainerV39 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
