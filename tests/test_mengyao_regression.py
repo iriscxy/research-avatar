@@ -1,5 +1,6 @@
 import importlib.util
 import csv
+import hashlib
 import json
 import subprocess
 import tempfile
@@ -25,17 +26,13 @@ def load_module(name: str, relative: str):
 
 EXPPLAN = load_module(
     "mengyao_expplan_validator",
-    ".agents/skills/expplan/scripts/validate_experiment_plan.py",
+    "research_avatar/tools/validate_experiment_plan.py",
 )
 RUNPLAN = load_module(
     "mengyao_runplan_validator",
     ".agents/skills/runplan/scripts/validate_results_ledger.py",
 )
-PROVENANCE_RENDERER = load_module(
-    "mengyao_result_provenance_renderer",
-    ".agents/skills/runplan/scripts/render_result_provenance.py",
-)
-CONFORMANCE = ROOT / ".agents/skills/paperwrite/scripts/plan_conformance.py"
+CONFORMANCE = ROOT / "research_avatar/tools/plan_conformance.py"
 
 
 def write_plan(path: Path, contract: dict) -> None:
@@ -60,7 +57,9 @@ def write_profile_fixture(root: Path) -> None:
 
 
 def minimal_contract() -> dict:
+    source_hash = hashlib.sha256(b"owned paper").hexdigest()
     return {
+        "schema_version": "1.2",
         "approval_status": "pending",
         "profile_contract": {
             "profile_path": "researcher-profile/PROFILE.html",
@@ -70,11 +69,18 @@ def minimal_contract() -> dict:
             "structure_reference_key": "owned2026",
         },
         "generated_at": "2026-08-09",
-        "target": {"deadline_status": "upcoming", "confirmed_at": "2026-08-09"},
-        "references": {"confirmed_at": "2026-08-09", "researcher_owned_structure": {
+        "target": {"venue": "Fixture Venue", "submission_content_pages": 4,
+                   "deadline_status": "upcoming", "confirmed_at": "2026-08-09"},
+        "references": {"confirmed_at": "2026-08-09", "researcher_owned_logic": {
             "url": "https://example.org/owned", "local_full_text": "owned.txt",
             "publication_key": "owned2026",
         }},
+        "structure_reference_analysis": {
+            "publication_key": "owned2026", "local_full_text": "owned.txt",
+            "source_sha256": source_hash, "global_argument_arc": "problem to evidence",
+            "body_sections": [{"heading": "Introduction", "section_role": "motivate",
+                               "paragraph_count": 1}],
+        },
         "dataset_confirmation": {"confirmed": True, "confirmed_at": "2026-08-09"},
         "grounding": {}, "metric_contract": [], "claims": [],
         "decision_space_contract": [{
@@ -95,7 +101,7 @@ def minimal_contract() -> dict:
 
 
 class MengyaoRegressionTests(unittest.TestCase):
-    def test_expplan_rejects_temporary_or_missing_external_reference_text(self):
+    def test_expplan_rejects_a_second_external_reference(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             write_profile_fixture(root)
@@ -109,25 +115,21 @@ class MengyaoRegressionTests(unittest.TestCase):
             }
             write_plan(plan, contract)
             errors = EXPPLAN.validate(plan)
-            self.assertIn(
-                "external mechanism reference local full text must be project-relative",
-                errors,
-            )
+            self.assertIn("schema 1.2 references must contain exactly confirmed_at and researcher_owned_logic", errors)
 
             contract["references"]["external_mechanism"]["local_full_text"] = (
                 "reports/sources/external.txt"
             )
             write_plan(plan, contract)
             errors = EXPPLAN.validate(plan)
-            self.assertIn(
-                "external mechanism reference local full text does not exist", errors
-            )
+            self.assertIn("schema 1.2 references must contain exactly confirmed_at and researcher_owned_logic", errors)
 
             source = root / "reports/sources/external.txt"
             source.parent.mkdir(parents=True)
             source.write_text("retrieved primary source", encoding="utf-8")
             write_plan(plan, contract)
             errors = EXPPLAN.validate(plan)
+            self.assertIn("schema 1.2 references must contain exactly confirmed_at and researcher_owned_logic", errors)
             self.assertNotIn(
                 "external mechanism reference local full text does not exist", errors
             )
@@ -242,7 +244,7 @@ class MengyaoRegressionTests(unittest.TestCase):
             plan = Path(directory) / "03.html"
             contract = minimal_contract()
             contract.pop("profile_contract")
-            contract["references"]["researcher_owned_structure"]["publication_key"] = "external"
+            contract["references"]["researcher_owned_logic"]["publication_key"] = "external"
             write_plan(plan, contract)
             old_errors = EXPPLAN.validate(plan)
             self.assertTrue(any("profile_contract" in error for error in old_errors))
@@ -254,7 +256,7 @@ class MengyaoRegressionTests(unittest.TestCase):
             fake = minimal_contract()
             fake["profile_contract"]["researcher_identity"] = "Invented Person"
             fake["profile_contract"]["structure_reference_key"] = "invented2026"
-            fake["references"]["researcher_owned_structure"]["publication_key"] = "invented2026"
+            fake["references"]["researcher_owned_logic"]["publication_key"] = "invented2026"
             write_plan(plan, fake)
             fake_errors = EXPPLAN.validate(plan)
             self.assertTrue(any("identity is not present" in error for error in fake_errors))
@@ -306,59 +308,18 @@ class MengyaoRegressionTests(unittest.TestCase):
             self.assertFalse(any("atomic_or_aggregate" in error or "structured derivation" in error
                                  for error in RUNPLAN.validate(args)))
 
-    def test_4b_filled_result_jumps_to_exact_generation_process(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            raw = root / "metrics.json"
-            code = root / "run.py"
-            raw.write_text('{"score": 0.75}', encoding="utf-8")
-            code.write_text("# fixture\n", encoding="utf-8")
-            row = {column: "" for column in RUNPLAN.COLUMNS}
-            row.update({
-                "result_id": "R1", "goal_id": "G1.1", "artifact_id": "T1",
-                "target_id": "T1.score", "acquisition_id": "A1",
-                "source_type": "RUN_LOCAL", "status": "REAL", "metric": "ASR",
-                "value": "0.75", "unit": "%", "dimensions_json": '{"model":"M1"}',
-                "raw_artifact": str(raw), "raw_locator": "/score",
-                "command": "python run.py", "code_files": str(code),
-                "code_revision": "abc123", "obtained_at": "2026-08-09T00:00:00Z",
-                "verified_at": "2026-08-09T00:01:00Z",
-                "verification_status": "VERIFIED",
-            })
-            ledger = root / "RESULTS_LEDGER.csv"
-            with ledger.open("w", newline="", encoding="utf-8") as handle:
-                writer = csv.DictWriter(handle, fieldnames=RUNPLAN.COLUMNS)
-                writer.writeheader(); writer.writerow(row)
-            state = {"acquisition_contracts": [{
-                "id": "A1", "artifact_id": "T1", "target_id": "T1.score",
-                "source_type": "RUN_LOCAL", "producing_goal": "G1.1",
-                "atomic_or_aggregate": "atomic",
-            }]}
-            plan = root / "04_RUN_PLAN.html"
-            plan.write_text(
-                '<script type="application/json" id="run-plan-state">'
-                + json.dumps(state) + "</script>", encoding="utf-8"
-            )
-            report = root / "05_EXP_RESULT.html"
-            report.write_text(
-                '<html><body><table><tr><td data-target-id="T1.score" '
-                'data-result-id="R1">0.75</td></tr></table></body></html>',
-                encoding="utf-8",
-            )
-            self.assertEqual(PROVENANCE_RENDERER.update_report(report, ledger, plan), 1)
-            rendered = report.read_text(encoding="utf-8")
-            self.assertIn('href="#provenance-R1"', rendered)
-            self.assertIn('data-provenance-summary="生成过程', rendered)
-            self.assertIn(f"Raw: {raw} · /score", rendered)
-            self.assertIn("Command: python run.py", rendered)
-            self.assertIn(".result-value:hover::after", rendered)
-            self.assertIn(".result-value:focus-visible::after", rendered)
-            self.assertIn('id="result-provenance-index"', rendered)
-            self.assertIn("Command actually run", rendered)
-            args = SimpleNamespace(
-                ledger=ledger, plan=plan, report=report, goal=None, strict_report=True
-            )
-            self.assertEqual(RUNPLAN.validate(args), [])
+    def test_4b_skill_packages_have_no_canonical_html_mutators(self):
+        removed = [
+            ".agents/skills/researchlit/scripts/restructure_four_stage_html.py",
+            ".agents/skills/runplan/scripts/render_result_provenance.py",
+        ]
+        self.assertTrue(all(not (ROOT / relative).exists() for relative in removed))
+        skill_text = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (ROOT / ".agents/skills").rglob("*.md")
+        )
+        self.assertNotIn("scripts/render_result_provenance.py", skill_text)
+        self.assertNotIn("researcher edits `PROFILE.html` directly", skill_text)
 
     def test_5_paper_studio_preflight_rejects_missing_paths_and_bad_grid(self):
         config = {
@@ -392,39 +353,43 @@ class MengyaoRegressionTests(unittest.TestCase):
             path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(studio.ProjectConfigError, "paths.main is required"):
                 studio.load_project_config(path, root=root)
-            config["paths"].update({"main": "main.tex", "reference": "reference.txt"})
+            config["paths"].update({"main": "main.tex"})
             path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(studio.ProjectConfigError, "paths.main does not exist"):
                 studio.load_project_config(path, root=root)
             (root / "main.tex").write_text(r"\begin{document}\end{document}", encoding="utf-8")
             (root / "reference.txt").write_text("reference paper", encoding="utf-8")
             self.assertEqual(studio.load_project_config(path, root=root)["project"]["id"], "fixture")
-            config["paths"] = {"metrics": "results.json", "main": "results.json",
-                               "reference": "results.json"}
+            config["paths"] = {"metrics": "results.json", "main": "results.json"}
             path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(studio.ProjectConfigError, "must be distinct"):
                 studio.load_project_config(path, root=root)
-            config["paths"] = {"metrics": "empty.json", "main": "main.tex",
-                               "reference": "reference.txt"}
+            config["paths"] = {"metrics": "empty.json", "main": "main.tex"}
             (root / "empty.json").write_text("{}", encoding="utf-8")
             path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(studio.ProjectConfigError, "non-empty JSON"):
                 studio.load_project_config(path, root=root)
-            paragraph_plan = root / "paragraph_plan.json"
-            paragraph_plan.write_text(json.dumps({
-                "reference_file": "reference.txt",
-                "sections": {"method": [{"id": "M1", "reference_lines": [9, 2],
-                                            "artifacts": []}]},
-            }), encoding="utf-8")
+            section_specs = [{
+                "id": "method",
+                "title": "Method",
+                "file": "method.tex",
+                "result_keys": [],
+                "paragraphs": [{"id": "M1", "purpose": "Define the method.",
+                                "rhetorical_role": "definition",
+                                "relation_to_previous": "opening",
+                                "relation_to_next": "",
+                                "artifacts": []}],
+            }]
             with (
                 patch.object(studio, "EMPTY_PROJECT_MODE", False),
                 patch.object(studio, "SECTION_MAP", {"method": {}}),
+                patch.object(studio, "SECTION_SPECS", section_specs),
                 patch.object(studio, "FIGURES", {}),
                 patch.object(studio, "TABLES", {}),
-                patch.object(studio, "PROJECT_CONFIG", {"paths": {"reference": "reference.txt"}}),
-                patch.object(studio, "PARAGRAPH_PLAN_FILE", paragraph_plan),
+                patch.object(studio, "PROJECT_CONFIG", {"paths": {}}),
+                patch.object(studio, "REFERENCE_CONTEXT_FILE", root / "missing-reference-context.json"),
             ):
-                with self.assertRaisesRegex(studio.StudioError, "reference_lines"):
+                with self.assertRaisesRegex(studio.StudioError, "relation_to_next"):
                     studio.validate_project_workspace()
 
     def test_6_modular_latex_is_expanded_before_checks(self):

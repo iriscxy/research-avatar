@@ -1,3 +1,0 @@
-# Narrative logic map
-
-Introduction raises the fixed-budget allocation problem and previews the section path. Method defines the true-label score gap, preserves class balance, and cross-references the selection equation. Experiments first establish the primary comparison, then test breadth by setting, operator, and fixed-20-intent budget. Discussion separates the supported whole-selector claim from unresolved edit-severity and source-reuse mechanisms, and separates refit-data from compute efficiency. Conclusion closes on the same bounded decision problem; the appendix supplies derivation and verification scope. No unsupported mechanism branch remains.

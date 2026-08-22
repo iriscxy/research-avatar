@@ -1,35 +1,29 @@
-% Reference Conformance Block
-% Reference: Wang et al. (2025), Word Form Matters, Findings of ACL.
-% Ordered body: Introduction; Related Work; Problem Formulation; Dataset; metric definition/validation; word-form/context analysis; attention analysis; Conclusion; Limitations.
-% Reference body: 8 pages (Conclusion on p.8; references begin p.9). Target is an approved 4-page COLING short, so section cadence and figure order are mirrored within the official shorter limit.
-% Main figures: 4. Fig.1 validation curve in metric section; Fig.2 multi-panel main analysis; Fig.3 layer analysis; Fig.4 heatmap mechanism analysis. Tables: 0.
-% This paper: F1 motivation in Introduction; T1 primary comparison; F2 confirmation matrix; T2 operator analysis; F3 budget curve in Experiments. The approved five-artifact contract requires two tables in addition to three figures.
-% Figure style: lowercase panel labels where needed; semi-self-contained sentence captions below figures/tables; serif 9pt figure text; restrained teal/orange/blue colorblind-safe palette.
-\documentclass[11pt]{article}
-\usepackage{acl}
-\usepackage{times}
-\usepackage{latexsym}
-\usepackage{amsmath,amssymb,booktabs,graphicx,microtype,flafter}
+\documentclass[sigconf,review,anonymous]{acmart}
+\usepackage{graphicx}
+\usepackage{amsmath,booktabs,flafter,placeins}
 \usepackage{xurl}
-\usepackage[T1]{fontenc}
-\renewcommand{\UrlFont}{\ttfamily\small}
+\settopmatter{printacmref=true,printccs=true,printfolios=true}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\acmConference[KDD '26]{ACM SIGKDD Conference on Knowledge Discovery and Data Mining}{August 9--13, 2026}{Jeju, Republic of Korea}
 \widowpenalty=10000
 \clubpenalty=10000
-\title{Spend Typo Budget Where the Classifier Is Unsure: Class-Balanced Margin-Targeted Augmentation}
-\author{Anonymous COLING submission}
+\emergencystretch=2em
+\title{MORE: Adaptive Multi-Objective Learning for E-commerce Dialogue Systems}
+\author{Anonymous Author(s)}
+\date{}
 \begin{document}
-\maketitle
 \begin{abstract}
 \input{sections/abstract}
 \end{abstract}
+\keywords{task-oriented dialogue, multi-objective learning, reinforcement learning, e-commerce}
+\ccsdesc[500]{Computing methodologies~Natural language generation}
+\maketitle
 \input{sections/introduction}
 \input{sections/related_work}
 \input{sections/method}
 \input{sections/experiments}
-\input{sections/discussion}
+\input{sections/analysis}
 \input{sections/conclusion}
-\input{sections/limitations}
-\bibliography{references}
-\appendix
-\input{sections/appendix}
+\FloatBarrier
+\input{sections/bibliography}
 \end{document}

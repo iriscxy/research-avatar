@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>Online Paper Studio</title>
-  <link rel="stylesheet" href="/online-assets/style.css?v=20260817.8">
+  <link rel="stylesheet" href="/online-assets/style.css?v=20260819.1">
 </head>
 <body>
   <main class="shell">
@@ -34,62 +34,42 @@
       </div>
       <nav class="product-tabs" aria-label="Online Paper Studio">
         <button id="demo-tab" class="product-tab active" type="button" data-panel="demo-panel" aria-selected="true">Demo</button>
-        <button id="use-tab" class="product-tab" type="button" data-panel="use-panel" aria-selected="false">Use it</button>
+        <button id="use-tab" class="product-tab" type="button" data-panel="use-panel" aria-selected="false">免费纯文字 PaperWrite 版</button>
       </nav>
 
       <section id="demo-panel" class="product-panel">
-        <iframe id="demo-frame" class="demo-frame" src="/demo/" title="Research Avatar complete demo"></iframe>
+        <iframe id="demo-frame" class="demo-frame" src="about:blank" title="Research Avatar complete demo"></iframe>
       </section>
 
       <section id="use-panel" class="product-panel hidden">
         <div id="session-actions" class="session-actions hidden">
-          <a class="resume" href="/studio">继续当前写作会话 →</a>
-          <a class="export" href="/api/online/export">导出项目 ZIP</a>
+          <button id="resume-studio" class="resume" type="button">继续当前写作会话 →</button>
         </div>
 
-        <div class="grid two use-columns">
-        <form id="setup-form" class="card">
+        <div id="use-onboarding" class="use-columns">
+        <form id="setup-form" class="card unified-setup">
       <div class="setup-heading">
         <p class="step-index">01</p>
-        <div><h2>上传 Research Avatar 项目包</h2><p>一个 ZIP 包含 PROFILE、01–05 reports、契约选中的 results 与绘图源文件、出版记录和 03 选定的结构参考论文；不会打包整套 full text 或旧实验结果。</p></div>
+        <div><h2>上传论文写作材料</h2><p>只需提交科研项目主旨和结构参考论文。系统分析参考论文的章节与段落逻辑，并为目标论文逐段写作；实验部分写成待执行的实验设计，定量值统一使用 xx；Introduction 默认保留 Motivation 图位，其他计划图表也保留 placeholder，导出后可在本地终端继续完成。</p></div>
       </div>
-      <label class="upload-field project-package-field">完整项目 ZIP
-        <input id="project-package" name="project_package" type="file" accept=".zip,application/zip" required>
-        <small>在项目根目录运行 <code>python3 -m research_avatar.online_studio.package</code> 生成；最多 32 MB。系统会逐项核验 03 approval、05 完整度与 results provenance。</small>
-        <strong class="package-output-hint">生成位置：<code>outputs/paper-studio-evidence.zip</code>。点击上方选择框上传这个文件。</strong>
+      <label>目标会议 / 期刊（venue）<input name="venue" required placeholder="例如 ACL 2027、EMNLP 2026 Findings"></label>
+      <label>当前工作说明
+        <input name="project_brief_file" type="file" accept=".doc,.docx,.txt,.pdf,.md,.markdown,.json,.html,.htm" required>
+        <small>说明研究问题、方法、数据、当前进展、预期贡献和限制，让写作 API 明确项目在做什么。</small>
       </label>
-      <label id="access-wrap" class="optional">部署访问口令（若管理员启用）<input name="access_token" type="password" autocomplete="off"></label>
+      <label>结构参考论文
+        <input name="reference_paper_file" type="file" accept=".txt,.pdf,.md,.markdown,.html,.htm" required>
+        <small>上传一篇完整论文。系统只模仿它的章节组织和论证推进，不复制其研究主张、数字或措辞。</small>
+      </label>
       <p id="message" role="status" aria-live="polite"></p>
       <button id="submit" type="submit">进入 Paper Studio →</button>
       <p class="security">在线写作会话是临时工作区，统一使用共享 DeepSeek API；关闭或超时前请从写作台导出项目 ZIP。</p>
         </form>
-
-        <form id="lightweight-form" class="card">
-      <div class="setup-heading">
-        <p class="step-index">01</p>
-        <div><h2>没有 Research Avatar 项目？直接用原始材料开始</h2><p>不需要 ZIP 包：提供你的 Google Scholar 主页、参考文献和实验结果，就能进入 Paper Studio 个性化写作。仅支持纯文字段落写作与从数据自动生成的一张结果表和一张结果图；机制图仍需完整项目包中的绘图 Agent。</p></div>
-      </div>
-      <label>目标会议 / 期刊（venue）<input name="venue" required placeholder="例如 ACL 2027、EMNLP 2026 Findings"></label>
-      <label>论文标题<input name="title" required maxlength="300"></label>
-      <label class="upload-field">Google Scholar 个人主页（HTML，可选）
-        <input name="scholar_file" type="file" accept=".html,.htm">
-        <small>另存网页为 HTML 后上传；用作写作背景参考，不作为可核验引用来源。</small>
-      </label>
-      <label class="upload-field">参考文献（HTML，可多选，可选）
-        <input name="reference_files" type="file" accept=".html,.htm" multiple>
-      </label>
-      <label class="upload-field">实验结果数据（JSON，可选）
-        <input name="results_file" type="file" accept="application/json,.json">
-        <small>格式：<code>{"caption": "...", "columns": [{"key","label"}, ...], "rows": [{...}, ...]}</code>；提供后会自动生成一张确定性表格和一张柱状图，绑定到 Experiments。</small>
-      </label>
-      <p id="lightweight-message" role="status" aria-live="polite"></p>
-      <button id="lightweight-submit" type="submit">进入 Paper Studio →</button>
-      <p class="security">在线写作会话是临时工作区，统一使用共享 DeepSeek API；关闭或超时前请从写作台导出项目 ZIP。</p>
-        </form>
         </div>
+        <iframe id="studio-frame" class="studio-frame hidden" src="about:blank" title="论文写作界面"></iframe>
       </section>
     </div>
   </main>
-  <script src="/online-assets/app.js?v=20260818.1" defer></script>
+  <script src="/online-assets/app.js?v=20260822.1-paperwrite-label" defer></script>
 </body>
 </html>

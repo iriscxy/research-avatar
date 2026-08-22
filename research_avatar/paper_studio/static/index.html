@@ -5,15 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Paper Studio</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="static/style.css?v=20260817.10">
+  <link rel="stylesheet" href="static/style.css?v=20260820.5-terminal-help">
 </head>
 <body>
   <div class="app">
     <aside class="sidebar">
       <div class="brand">
-        <span id="project-eyebrow" class="eyebrow">PAPER PROJECT</span>
         <h1 id="studio-title">Paper Studio</h1>
-        <p id="project-subtitle">逐段对话、确认后写入 LaTeX</p>
         <p id="project-reference-paper" class="project-reference-paper" hidden></p>
       </div>
       <div id="sections" class="sections"></div>
@@ -25,11 +23,9 @@
             <datalist id="model-suggestions"></datalist>
             <button id="model-apply" class="secondary compact" disabled>应用</button>
           </div>
-          <small id="model-provider-note">可自行输入模型名称</small>
         </div>
         <button id="runtime-key-open" class="ghost" disabled>安全更换 API Key</button>
-        <button id="reset" class="ghost" disabled>重置当前 section 对话</button>
-        <button id="reset-generated" class="ghost danger" disabled>清空生成内容</button>
+        <p class="terminal-help-hint">网页未提供的功能或其他需求，请在本地终端运行 Code Agent。</p>
       </div>
     </aside>
 
@@ -46,6 +42,7 @@
             <button id="tables-view" disabled>表</button>
           </div>
           <button id="compile" class="secondary" disabled>编译 PDF</button>
+          <button id="reset-generated" class="reset-generated-trigger" disabled>清空生成内容</button>
           <a id="project-export" class="secondary project-export" href="/api/online/export" download="paper-studio-project.zip" hidden>下载项目 ZIP</a>
         </div>
       </header>
@@ -66,7 +63,7 @@
         <div>
           <span class="eyebrow dark">EMPTY STUDIO</span>
           <h3>Paper Studio 已启动，尚未载入论文</h3>
-          <p>运行 <code>$paperwrite</code> 后，它只会把项目配置、段落计划、LaTeX 与图表数据写入 <code>paper/</code>；固定网页会自动读取这些内容。</p>
+          <p>将项目配置、段落计划、LaTeX 与图表数据写入 <code>paper/</code> 后，固定网页会自动读取这些内容。</p>
           <p class="empty-command">空壳启动命令：<code>python3 -m research_avatar.paper_studio.server --empty</code></p>
         </div>
       </section>
@@ -84,7 +81,7 @@
           <section id="full-draft-card" class="full-draft-card" aria-labelledby="full-draft-title">
             <div class="full-draft-copy">
               <strong id="full-draft-title">直接生成全文初稿</strong>
-              <span id="full-draft-summary">复用当前计划、结果、reference 与逐段校验，只补齐尚未写入的段落。</span>
+              <span id="full-draft-summary">复用已批准的段落结构、结果与逐段校验，只补齐尚未写入的段落。</span>
             </div>
             <div class="full-draft-actions">
               <button id="full-draft-start" class="primary" type="button" disabled>直接生成全文初稿</button>
@@ -118,16 +115,33 @@
             <strong id="paragraph-progress">—</strong>
           </div>
           <div>
-            <label>选择当前编辑的自然段</label>
+            <div class="paragraph-selector-head">
+              <label>选择当前编辑的自然段</label>
+              <button id="section-draft-start" class="secondary" type="button">一键生成当前 Section</button>
+            </div>
+            <div id="section-draft-progress-row" class="section-draft-progress" hidden>
+              <progress id="section-draft-progress" max="100" value="0"></progress>
+              <span id="section-draft-progress-text" aria-live="polite"></span>
+            </div>
             <div id="paragraph-nav" class="paragraph-nav"></div>
           </div>
-          <details class="reference-card">
-            <summary>查看系统匹配的 reference paper 段落</summary>
-            <div id="reference"></div>
+          <details id="reference-context-card" class="reference-context-card" open hidden>
+            <summary id="reference-context-title">参考论文中对应的写法</summary>
+            <div class="reference-context-body">
+              <p id="reference-context-summary"></p>
+              <section class="structure-card">
+                <strong id="structure-title">目标段落规划（写作约束）</strong>
+                <div id="structure-blueprint"></div>
+              </section>
+              <details id="reference-excerpts-toggle" class="reference-excerpts-toggle">
+                <summary id="reference-excerpts-title">查看参考原文</summary>
+                <div id="reference-context-excerpts"></div>
+              </details>
+            </div>
           </details>
 
           <label id="candidate-label" for="candidate">当前候选段落</label>
-          <textarea id="candidate" rows="15" placeholder="系统正在结合 reference paragraph、working abstract 和实验结果生成当前段落…"></textarea>
+          <textarea id="candidate" rows="15" placeholder="系统正在结合已批准的段落结构、working abstract 和实验结果生成当前段落…"></textarea>
 
           <label for="comment">给 GPT 的修改意见</label>
           <textarea id="comment" rows="4" placeholder="例如：motivation 太泛；把三个 confound 说清楚，缩短最后一句。"></textarea>
@@ -170,7 +184,7 @@
               <span class="eyebrow dark">CLAIM → FIGURE / TABLE → PROSE</span>
               <h3>按论证依赖推进图表</h3>
             </div>
-            <p>机制图单独设计；数据图和表格都从 results/ 生成，确认后插入对应自然段。</p>
+            <p id="artifact-workflow-summary">机制图单独设计；数据图和表格都从 results/ 生成，确认后插入对应自然段。</p>
           </div>
           <div id="figure-cards" class="figure-cards"></div>
         </section>
@@ -184,6 +198,9 @@
           </div>
           <div id="figure-gate" class="gate"></div>
           <p id="figure-description" class="figure-description"></p>
+          <section id="online-figure-placeholder" class="online-figure-placeholder" hidden>
+            <p id="online-figure-placeholder-message"></p>
+          </section>
           <div id="table-agent-controls" class="local-agent-box" style="display:none">
             <label for="table-agent-prompt">修改命令</label>
             <textarea id="table-agent-prompt" rows="5" placeholder="例如：把两个 benchmark 做成分组表头；我们的方法放最后并加粗；在 caption 中说明 ASR 和 StrongREJECT 都是跨模型平均值。不要改变任何数值。"></textarea>
@@ -209,12 +226,12 @@
                 <header class="mechanism-card-head">
                   <span class="mechanism-step-number">1</span>
                   <div>
-                    <strong>BioRender 设计 Prompt</strong>
+                    <strong>画图 Prompt</strong>
                     <small>GPT Image 将按这里的完整描述绘制</small>
                   </div>
                 </header>
-                <label for="draw-prompt">GPT 生成的 BioRender 设计 Prompt</label>
-                <textarea id="draw-prompt" rows="11" placeholder="先生成设计 Prompt；可以直接修改左侧完整 Prompt，也可以在右侧输入修改指令。"></textarea>
+                <label for="draw-prompt">GPT 生成的画图 Prompt</label>
+                <textarea id="draw-prompt" rows="11" placeholder="先生成画图 Prompt；可以直接修改左侧完整 Prompt，也可以在右侧输入修改指令。"></textarea>
               </section>
 
               <section class="mechanism-editor-card mechanism-revision-card">
@@ -227,7 +244,7 @@
                 </header>
                 <label for="prompt-instruction">给 GPT 的 Prompt 修改指令</label>
                 <textarea id="prompt-instruction" rows="7" placeholder="例如：当前内容太多；改成适合单栏的简单图，只保留两个核心模块，减少文字。"></textarea>
-                <button id="figure-prompt" class="secondary mechanism-revise-action">GPT 生成设计 Prompt</button>
+                <button id="figure-prompt" class="secondary mechanism-revise-action">GPT 生成画图 Prompt</button>
               </section>
             </div>
 
@@ -241,7 +258,7 @@
               </header>
               <div class="mechanism-draw-flow" aria-label="机制图生成流程">
                 <div id="mechanism-flow-prompt" class="mechanism-flow-step">
-                  <strong>设计 Prompt</strong>
+                  <strong>画图 Prompt</strong>
                   <span id="mechanism-flow-prompt-status">待生成</span>
                 </div>
                 <span class="mechanism-flow-arrow" aria-hidden="true">→</span>
@@ -299,7 +316,7 @@
             <label for="figure-caption">图片 Caption</label>
             <textarea id="figure-caption" rows="3" placeholder="描述这张图所展示的内容和必要的实验条件。"></textarea>
             <label for="figure-caption-prompt">给 GPT 的 Caption 修改 Prompt</label>
-            <textarea id="figure-caption-prompt" rows="2" placeholder="例如：解释三条曲线分别对应什么；缩短到两句话；保留 synthetic 声明。"></textarea>
+            <textarea id="figure-caption-prompt" rows="2" placeholder="例如：解释三条曲线分别对应什么；压缩为一句短句；保留 synthetic 声明。"></textarea>
             <button id="figure-caption-generate" class="primary">GPT 生成 Caption candidate</button>
             <div class="figure-caption-actions">
               <span id="figure-caption-status">当前正文将使用此 Caption</span>
@@ -307,7 +324,7 @@
             </div>
           </section>
 
-          <div class="figure-placement-row">
+          <div id="figure-placement-row" class="figure-placement-row">
             <div class="figure-placement">
               <label for="figure-placement">插入正文位置</label>
               <select id="figure-placement"></select>
@@ -328,7 +345,7 @@
             <button id="figure-approve" class="accept">确认并插入正文</button>
           </div>
           <div id="table-controls" class="figure-controls" style="display:none">
-            <p class="data-note">上方图片由当前 LaTeX 真实编译。初稿与实验结果相关修改均由本地 Agent 完成。</p>
+            <p id="table-workflow-note" class="data-note">上方图片由当前 LaTeX 真实编译。初稿与实验结果相关修改均由本地 Agent 完成。</p>
             <details class="table-advanced">
               <summary>高级：生成新的表格初稿</summary>
               <label for="table-prompt">初始表格规格</label>
@@ -390,6 +407,6 @@
       </div>
     </form>
   </dialog>
-  <script src="static/app.js?v=20260817.10"></script>
+  <script src="static/app.js?v=20260821.3-abstracted-reference"></script>
 </body>
 </html>

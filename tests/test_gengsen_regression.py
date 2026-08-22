@@ -11,7 +11,7 @@ from research_avatar.tools import paper_checks, validate_ideagen_report
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
     "validate_experiment_plan",
-    ROOT / ".agents/skills/expplan/scripts/validate_experiment_plan.py",
+    ROOT / "research_avatar/tools/validate_experiment_plan.py",
 )
 EXPPLAN_VALIDATOR = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(EXPPLAN_VALIDATOR)

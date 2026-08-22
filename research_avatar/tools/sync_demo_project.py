@@ -37,9 +37,9 @@ FILES = (
     "paper/fig/typo_margin/actual/F2_confirmation.png",
     "paper/fig/typo_margin/actual/F3_budget.pdf",
     "paper/fig/typo_margin/actual/F3_budget.png",
-    "paper/figsrc/typo_margin/F1_motivation_shapes.json",
-    "paper/figsrc/typo_margin/F1_motivation_source.tex",
-    "paper/figsrc/typo_margin/F1_motivation_spec.json",
+    "paper/figsrc/motivation_shapes.json",
+    "paper/figsrc/motivation_source.txt",
+    "paper/figsrc/motivation_spec.json",
     "paper/figsrc/typo_margin/figure_schema.json",
     "paper/figsrc/typo_margin/make_projected_fixture.py",
     "paper/figsrc/typo_margin/projected_fixture.json",
@@ -47,10 +47,9 @@ FILES = (
     "paper/main.pdf",
     "paper/main.tex",
     "paper/official_acl_latex_template.tex",
-    "paper/outline.txt",
     "paper/outline_approval.json",
     "paper/paper_studio.json",
-    "paper/paragraph_plan.json",
+    "paper/reference_context.json",
     "paper/reference_wang2025word.txt",
     "paper/references.bib",
     "paper/scholarship_contract.json",
@@ -86,13 +85,45 @@ def sync(root: Path = ROOT, destination: Path = DESTINATION) -> dict[str, object
 
     state = json.loads((root / "paper/.paper_studio/state.json").read_text(encoding="utf-8"))
     config = json.loads((root / "paper/paper_studio.json").read_text(encoding="utf-8"))
-    expected_id = "margin-targeted-typo-coling-short-20260817"
-    if state.get("project_id") != expected_id or config.get("project", {}).get("id") != expected_id:
+    project_id = str(config.get("project", {}).get("id") or "").strip()
+    if not project_id or state.get("project_id") != project_id:
         raise SystemExit("Refusing to publish a stale or mismatched demo project")
+    reference_context = json.loads(
+        (root / "paper/reference_context.json").read_text(encoding="utf-8")
+    )
+    reference_paper = config.get("project", {}).get("reference_paper") or {}
+    if reference_context.get("reference_title") != reference_paper.get("title"):
+        raise SystemExit("Refusing to publish mismatched reference-paper context")
+    section_ids = [str(item.get("id") or "") for item in config.get("sections", [])]
+    contexts = reference_context.get("sections")
+    if not isinstance(contexts, dict) or set(contexts) != set(section_ids):
+        raise SystemExit("Refusing to publish incomplete section reference context")
+    for section_id in section_ids:
+        context = contexts[section_id]
+        excerpts = context.get("excerpts") if isinstance(context, dict) else None
+        if (
+            not str(context.get("source_heading") or "").strip()
+            or not str(context.get("logic_summary_zh") or "").strip()
+            or not isinstance(excerpts, list)
+            or not excerpts
+            or any(not str(item.get("text") or "").strip() for item in excerpts if isinstance(item, dict))
+            or any(not isinstance(item, dict) for item in excerpts)
+        ):
+            raise SystemExit(f"Refusing to publish invalid {section_id} reference context")
+    reference_source_name = str(reference_context.get("reference_source") or "").strip()
+    reference_source = (root / reference_source_name).resolve()
+    try:
+        reference_source.relative_to(root)
+    except ValueError as exc:
+        raise SystemExit("Reference source escapes the canonical project") from exc
+    if not reference_source.is_file():
+        raise SystemExit(f"Cannot sync demo; missing reference source: {reference_source_name}")
     for figure_id in ("F1", "F2", "F3"):
         figure = state.get("figures", {}).get(figure_id, {})
-        if figure.get("status") != "approved" or not str(figure.get("draw_prompt") or "").strip():
+        if figure.get("status") != "approved":
             raise SystemExit(f"Refusing to publish incomplete {figure_id} state")
+    if not str(state.get("figures", {}).get("F1", {}).get("draw_prompt") or "").strip():
+        raise SystemExit("Refusing to publish F1 without its archived drawing prompt")
 
     parent = destination.parent
     parent.mkdir(parents=True, exist_ok=True)
@@ -103,6 +134,10 @@ def sync(root: Path = ROOT, destination: Path = DESTINATION) -> dict[str, object
             target = staging / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+        reference_target = staging / reference_source_name
+        if reference_target.resolve() != (staging / "paper/reference_context.json").resolve():
+            reference_target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(reference_source, reference_target)
         sources = sorted((root / "paper/sources").glob("*.txt"))
         if not sources:
             raise SystemExit("Cannot sync demo without paper source evidence")
@@ -111,7 +146,7 @@ def sync(root: Path = ROOT, destination: Path = DESTINATION) -> dict[str, object
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
         mechanism_rounds = sorted(
-            (root / "paper/figsrc/typo_margin/iterations/F1_motivation").glob(
+            (root / "paper/figsrc/iterations/F1_motivation").glob(
                 "round_*.png"
             )
         )
@@ -144,7 +179,7 @@ def sync(root: Path = ROOT, destination: Path = DESTINATION) -> dict[str, object
     files = sorted(path.relative_to(destination).as_posix() for path in destination.rglob("*") if path.is_file())
     if any("typo_basis" in name or "micro_typo_intent" in name for name in files):
         raise SystemExit("Stale negative-study demo files survived synchronization")
-    return {"project_id": expected_id, "files": len(files), "sources": len(sources)}
+    return {"project_id": project_id, "files": len(files), "sources": len(sources)}
 
 
 def main() -> int:

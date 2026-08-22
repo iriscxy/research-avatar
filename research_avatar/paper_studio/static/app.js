@@ -1,8 +1,8 @@
 const $ = (id) => document.getElementById(id);
-const STUDIO_BASE_PATH = window.location.pathname === "/demo-studio"
-  || window.location.pathname.startsWith("/demo-studio/")
-  ? "/demo-studio"
-  : "";
+const STUDIO_BASE_PATH = ["/demo-studio", "/paper-studio"].find(
+  prefix => window.location.pathname === prefix
+    || window.location.pathname.startsWith(prefix + "/"),
+) || "";
 
 function studioPath(path) {
   const value = String(path || "");
@@ -25,8 +25,6 @@ function normalizeStateUrls(value, key = "") {
     || ["pdf", "png", "pptx", "preview", "draft"].includes(key);
   return typeof value === "string" && urlLikeKey ? studioPath(value) : value;
 }
-const ACTIVE_SECTION_KEY = "paper-studio.active-section";
-const ACTIVE_VIEW_KEY = "paper-studio.active-view";
 const ACTIVE_FIGURE_KEY = "paper-studio.active-figure";
 const PDF_NAVIGATION_KEY = "paper-studio.pdf-navigation-visible";
 const CAPTION_DRAFTS_KEY_PREFIX = "paper-studio.caption-drafts.";
@@ -52,20 +50,12 @@ let pdfNavigationVisible = (() => {
 let activeView = (() => {
   const requested = new URLSearchParams(window.location.search).get("view");
   if (["writing", "figures", "tables"].includes(requested)) return requested;
-  try {
-    return localStorage.getItem(ACTIVE_VIEW_KEY) || "writing";
-  } catch (_error) {
-    return "writing";
-  }
+  return "writing";
 })();
 let activeSection = (() => {
   const requested = new URLSearchParams(window.location.search).get("section");
   if (requested) return requested;
-  try {
-    return localStorage.getItem(ACTIVE_SECTION_KEY) || "abstract";
-  } catch (_error) {
-    return "abstract";
-  }
+  return "abstract";
 })();
 let activeFigure = (() => {
   try {
@@ -85,10 +75,11 @@ let acceptRequestBusy = false;
 let proseRequestBusy = false;
 let paragraphRequestBusy = false;
 let compileRequestBusy = false;
-let conversationResetBusy = false;
+let modelApplyBusy = false;
 let figureRequestBusy = false;
 let generatedResetBusy = false;
 let fullDraftRequestBusy = false;
+let queuedFullDraftStart = false;
 let pdfLocateRequestId = 0;
 let proseBaselineKey = "";
 let proseBaselineText = "";
@@ -113,7 +104,16 @@ function syncCaptionDraftProject() {
   try {
     const stored = JSON.parse(localStorage.getItem(CAPTION_DRAFTS_KEY_PREFIX + projectId) || "{}");
     Object.entries(stored).forEach(([figureId, value]) => {
-      if (typeof value === "string") captionDrafts.set(figureId, value);
+      if (typeof value === "string") {
+        // Legacy drafts predate generation-version tracking. Treat them as
+        // older than any server-generated caption.
+        captionDrafts.set(figureId, {value, generatedAt: ""});
+      } else if (value && typeof value.value === "string") {
+        captionDrafts.set(figureId, {
+          value: value.value,
+          generatedAt: String(value.generatedAt || ""),
+        });
+      }
     });
   } catch (_error) {
     // Ignore unavailable storage and malformed browser-local drafts.
@@ -134,7 +134,11 @@ function persistCaptionDrafts() {
 
 function rememberCaptionDraft(figureId, caption) {
   syncCaptionDraftProject();
-  captionDrafts.set(figureId, caption);
+  const figure = state && (state.figures || []).find((item) => item.id === figureId);
+  captionDrafts.set(figureId, {
+    value: caption,
+    generatedAt: String((figure && figure.caption_generated_at) || ""),
+  });
   persistCaptionDrafts();
 }
 
@@ -388,14 +392,6 @@ function clearBrowserDraftsForProject(projectId) {
   });
 }
 
-function rememberActiveSection(section) {
-  try {
-    localStorage.setItem(ACTIVE_SECTION_KEY, section);
-  } catch (_error) {
-    // Storage can be unavailable in strict browser privacy modes.
-  }
-}
-
 function uniqueArtifacts(artifacts = []) {
   const seen = new Set();
   return artifacts.filter((artifact) => {
@@ -435,12 +431,13 @@ async function request(path, options = {}) {
 
 function updateAcceptButton() {
   const section = state && state.sections && state.sections[activeSection];
+  const planningOnly = Boolean(section && section.writing_mode === "plan_only");
   const paragraph = section && section.current_paragraph;
   const candidate = paragraph && paragraph.candidate;
   const accepted = paragraph && paragraph.accepted_text;
   const visibleText = $("candidate").value.trim();
-  const manualRevision = Boolean(accepted) && visibleText !== proseBaselineText.trim();
-  const canAccept = Boolean(visibleText) && Boolean(candidate || manualRevision);
+  const manualRevision = visibleText !== proseBaselineText.trim();
+  const canAccept = !planningOnly && Boolean(visibleText) && Boolean(candidate || manualRevision);
   $("accept").disabled = !canAccept;
   $("accept").textContent = canAccept
     ? "Accept → LaTeX"
@@ -453,11 +450,14 @@ function updateAcceptButton() {
 }
 
 function setBusy(busy, label = "") {
-  $("generate").disabled = busy;
+  const planningOnly = Boolean(
+    state && state.sections && state.sections[activeSection]
+    && state.sections[activeSection].writing_mode === "plan_only"
+  );
+  $("generate").disabled = busy || planningOnly;
   $("compile").disabled = busy;
-  $("reset").disabled = busy;
-  $("candidate").disabled = busy;
-  $("comment").disabled = busy;
+  $("candidate").disabled = busy || planningOnly;
+  $("comment").disabled = busy || planningOnly;
   $("model").disabled = busy;
   $("model-apply").disabled = busy;
   if (busy) {
@@ -466,7 +466,7 @@ function setBusy(busy, label = "") {
       ? state.sections[activeSection].current_paragraph
       : null;
     if (paragraph && !$("candidate").value) {
-      $("candidate").placeholder = "正在结合 reference paragraph、working abstract 和实验结果生成当前段落…";
+      $("candidate").placeholder = "正在结合已批准的段落结构、working abstract 和实验结果生成当前段落…";
     }
     $("message").textContent = label || "Working…";
   } else {
@@ -494,7 +494,7 @@ function setBusy(busy, label = "") {
 
 function updateModelApplyButton() {
   const visibleModel = $("model").value.trim();
-  $("model-apply").disabled = conversationResetBusy
+  $("model-apply").disabled = modelApplyBusy
     || proseRequestBusy
     || fullDraftRequestBusy
     || titleBusy
@@ -559,10 +559,6 @@ function renderSections() {
     button.onclick = () => {
       activeSection = key;
       activeView = "writing";
-      rememberActiveSection(key);
-      try {
-        localStorage.setItem(ACTIVE_VIEW_KEY, activeView);
-      } catch (_error) {}
       render();
     };
     root.appendChild(button);
@@ -619,6 +615,50 @@ function renderParagraphNavigation(section) {
       }
     };
     root.appendChild(button);
+  });
+}
+
+function renderReferenceContext(section) {
+  const card = $("reference-context-card");
+  const context = section.reference_context || {};
+  const excerpts = Array.isArray(context.excerpts) ? context.excerpts : [];
+  const constraints = Array.isArray(context.writing_constraints) ? context.writing_constraints : [];
+  const abstracted = context.mode === "abstracted";
+  if (!context.source_heading || !context.logic_summary_zh || (!excerpts.length && !constraints.length)) {
+    card.hidden = true;
+    return;
+  }
+  card.hidden = false;
+  $("reference-context-title").textContent = abstracted
+    ? "提炼后的参考结构"
+    : "参考论文中对应的写法";
+  $("reference-context-summary").textContent = context.logic_summary_zh;
+  const toggle = $("reference-excerpts-toggle");
+  toggle.hidden = abstracted;
+  $("reference-excerpts-title").textContent = abstracted ? "" : "查看参考原文";
+  const root = $("reference-context-excerpts");
+  root.replaceChildren(...excerpts.map((excerpt) => {
+    const container = document.createElement("div");
+    container.className = "reference-excerpt";
+    const quote = document.createElement("blockquote");
+    quote.textContent = excerpt.text || "";
+    container.append(quote);
+    return container;
+  }));
+}
+
+function renderStructureBlueprint(section) {
+  const root = $("structure-blueprint");
+  root.innerHTML = "";
+  (section.structure_blueprint || []).forEach((paragraph) => {
+    const row = document.createElement("div");
+    row.className = `structure-row${section.current_paragraph && section.current_paragraph.id === paragraph.id ? " active" : ""}`;
+    const id = document.createElement("span");
+    id.textContent = paragraph.id;
+    const content = document.createElement("span");
+    content.textContent = paragraph.purpose;
+    row.append(id, content);
+    root.appendChild(row);
   });
 }
 
@@ -753,10 +793,6 @@ async function locatePdfEditTarget(event, pageElement) {
     const target = payload.target;
     activeSection = target.section;
     activeView = target.view;
-    rememberActiveSection(activeSection);
-    try {
-      localStorage.setItem(ACTIVE_VIEW_KEY, activeView);
-    } catch (_error) {}
     if (target.view === "writing") {
       const selected = await request("/api/select-paragraph", {
         method: "POST",
@@ -869,6 +905,7 @@ function updateFigureButtonStates() {
     ? figure.ready
     : figure.insertion_ready;
   const captionDirty = $("figure-caption").dataset.dirty === "true";
+  const captionNeedsBackfill = Boolean(figure.caption_needs_backfill);
   const submittedPrompt = $("draw-prompt").value.trim();
   const promptInstruction = $("prompt-instruction").value.trim();
   $("figure-prompt").disabled = state.demo_mode
@@ -900,7 +937,7 @@ function updateFigureButtonStates() {
     || !insertionReady
     || !(figure.downloads || {}).pdf
     || !(figure.downloads || {}).pptx
-    || (figure.status === "approved" && !captionDirty)
+    || (figure.status === "approved" && !captionDirty && !captionNeedsBackfill)
   );
   const panelsReady = (figure.panels || []).length > 0 && (figure.panels || []).every((panel) => panel.status === "built");
   const loadedCandidate = $("figure-preview-pdf").dataset.loaded;
@@ -928,10 +965,18 @@ function updateFigureButtonStates() {
   $("figure-placement").disabled = running || !hasPlacement;
   $("figure-layout-mode").disabled = running || table || !hasPlacement;
   $("figure-approve").textContent = figure.status === "approved"
-    ? (captionDirty ? "更新 Caption → PDF" : "已插入正文")
+    ? (captionDirty
+      ? "更新 Caption → PDF"
+      : captionNeedsBackfill
+        ? "补生成 Caption → PDF"
+        : "已插入正文")
     : "确认并插入正文";
   $("data-approve").textContent = figure.status === "approved"
-    ? (captionDirty ? "更新 Caption → PDF" : "重新插入")
+    ? (captionDirty
+      ? "更新 Caption → PDF"
+      : captionNeedsBackfill
+        ? "补生成 Caption → PDF"
+        : "重新插入")
     : "确认并插入正文";
   const visibleTableLatex = $("table-latex").value.trim();
   const tableLatexDirty = $("table-latex").dataset.dirty === "true";
@@ -981,9 +1026,10 @@ function renderSingleDataFigure(figure) {
   const input = $("single-data-prompt");
   renderFigureEditorInput(input, figure.id, `panel:${panel.id}`, panel.agent_prompt || "");
   const generate = $("single-data-generate");
+  const generatorName = state.online_project ? "Python" : "本地 Agent";
   generate.textContent = panel.preview_url
-    ? "本地 Agent 重新生成这张图"
-    : "本地 Agent 生成这张图";
+    ? `${generatorName} 重新生成这张图`
+    : `${generatorName} 生成这张图`;
   generate.onclick = () => startFigureJob(
     "/api/figure/panel/generate",
     {
@@ -1150,6 +1196,14 @@ function scheduleAutomaticDataPanel(figure) {
       (panel) => panel.status === "pending" && !panel.preview_url,
     );
     if (!currentNext || currentNext.id !== nextPanel.id) return;
+    if (figureRequestBusy) {
+      // Switching figures immediately after an approval can race with the
+      // previous request's finally block. Do not consume this figure's only
+      // automatic attempt while the shared request lock is still held.
+      autoDataPanelAttempted.delete(attemptKey);
+      setTimeout(() => scheduleAutomaticDataPanel(current), 100);
+      return;
+    }
     const singlePanel = (current.panels || []).length === 1;
     const card = [...$("data-panels").querySelectorAll(".data-panel")].find(
       (item) => item.dataset.panelId === currentNext.id,
@@ -1307,8 +1361,8 @@ function renderFigures() {
     button.className = `figure-card${figure.id === activeFigure ? " selected" : ""}${figure.ready ? "" : " blocked"}`;
     button.innerHTML = `
       <span class="figure-card-id">${figure.id}</span>
-      <span><strong>${figure.title}</strong><small>${figure.kind === "table" ? "结果表 · 可编辑 LaTeX" : figure.phase === 1 ? "机制图 · 先完成" : "数据图 · results/ 驱动"}</small></span>
-      <span class="figure-card-state ${figure.status}">${figure.ready ? figure.status : "locked"}</span>
+      <span><strong>${figure.title}</strong><small>${figure.placeholder_only ? "线上不提供画图表功能" : figure.kind === "table" ? "结果表 · 可编辑 LaTeX" : figure.kind === "source" ? "来源图 · 参考论文证据" : figure.kind === "mechanism" ? "机制图 · 先完成" : "数据图 · results/ 驱动"}</small></span>
+      <span class="figure-card-state ${figure.placeholder_only ? "placeholder" : figure.status}">${figure.placeholder_only ? "placeholder" : figure.ready ? figure.status : "locked"}</span>
     `;
     button.onclick = () => {
       activeFigure = figure.id;
@@ -1323,9 +1377,17 @@ function renderFigures() {
   const figure = selectedFigure();
   if (!figure) return;
   const isTable = figure.kind === "table";
-  $("figure-phase").textContent = `PHASE ${figure.phase} · ${figure.kind === "table" ? "EDITABLE TABLE" : figure.kind === "mechanism" ? "EDITABLE SCHEMATIC" : "DATA FIGURE"}`;
+  const sourceFigure = figure.kind === "source";
+  const placeholderOnly = Boolean(figure.placeholder_only);
+  $("figure-phase").textContent = placeholderOnly
+    ? "PHASE PLACEHOLDER"
+    : `PHASE ${figure.phase || "SOURCE"} · ${figure.kind === "table" ? "EDITABLE TABLE" : sourceFigure ? "VERIFIED SOURCE FIGURE" : figure.kind === "mechanism" ? "EDITABLE SCHEMATIC" : "DATA FIGURE"}`;
   $("figure-title").textContent = `${figure.id} · ${figure.title}`;
   $("figure-description").textContent = `${figure.description} · ${figure.width} · ${figure.label}`;
+  document.querySelector("#figure-detail .figure-detail-head").hidden = placeholderOnly;
+  $("figure-phase").hidden = placeholderOnly;
+  $("figure-title").hidden = placeholderOnly;
+  $("figure-description").hidden = placeholderOnly;
   const gate = $("figure-gate");
   const insertionBlocked = figure.insertion_ready === false;
   gate.textContent = !figure.ready
@@ -1333,12 +1395,18 @@ function renderFigures() {
     : insertionBlocked
       ? figure.insertion_gate_reason
       : "";
-  gate.classList.toggle("show", !figure.ready || insertionBlocked);
+  gate.hidden = placeholderOnly;
+  gate.classList.toggle("show", !placeholderOnly && (!figure.ready || insertionBlocked));
+  const onlinePlaceholder = $("online-figure-placeholder");
+  onlinePlaceholder.hidden = !placeholderOnly;
+  $("online-figure-placeholder-message").textContent = placeholderOnly
+    ? figure.placeholder_message
+    : "";
   const mechanismPrerequisite = $("mechanism-generation-prerequisite");
   const mechanismPrerequisiteBlocked = (
     figure.kind === "mechanism" && figure.generation_ready === false
   );
-  mechanismPrerequisite.hidden = !mechanismPrerequisiteBlocked;
+  mechanismPrerequisite.hidden = placeholderOnly || !mechanismPrerequisiteBlocked;
   $("mechanism-generation-prerequisite-text").textContent = mechanismPrerequisiteBlocked
     ? figure.generation_gate_reason
     : "";
@@ -1357,13 +1425,18 @@ function renderFigures() {
   const mechanismPreviewToggle = $("mechanism-preview-toggle");
   const mechanismPreviewNote = $("mechanism-preview-note");
   const mechanismBuildStatus = $("mechanism-build-status");
+  const paperVersionInserted = Boolean(
+    figure.status === "approved"
+    && figure.paper_preview_url
+  );
   const hasMechanismVersions = Boolean(
     figure.kind === "mechanism"
     && figure.gpt_preview_url
     && figure.paper_preview_url
+    && !paperVersionInserted
   );
   let mechanismPreviewMode = mechanismPreviewModes.get(figure.id) || "paper";
-  if (!hasMechanismVersions) {
+  if (!hasMechanismVersions || paperVersionInserted) {
     mechanismPreviewModes.delete(figure.id);
     mechanismPreviewMode = "paper";
   }
@@ -1385,13 +1458,21 @@ function renderFigures() {
   mechanismPreviewToggle.textContent = mechanismPreviewMode === "paper"
     ? (textFreeGptPreview ? "显示 GPT 构图底图（无文字）" : "显示 GPT 原图")
     : "显示可编辑 PPT/PDF 完整版";
-  mechanismPreviewNote.textContent = textFreeGptPreview
-    ? "GPT 图只提供构图参考；标题、标签和说明文字位于可编辑 PPT/PDF 完整版中。"
-    : "GPT 原图用于视觉对照；论文插入和下载仍以可编辑 PPT/PDF 版为准。";
-  const effectivePreviewUrl = hasMechanismVersions
+  mechanismPreviewNote.textContent = paperVersionInserted
+    ? "当前预览与正文 PDF 使用同一个图文件。"
+    : textFreeGptPreview
+      ? "GPT 图只提供构图参考；标题、标签和说明文字位于可编辑 PPT/PDF 完整版中。"
+      : "GPT 原图用于视觉对照；论文插入和下载仍以可编辑 PPT/PDF 版为准。";
+  const effectivePreviewUrl = placeholderOnly
+    ? null
+    : paperVersionInserted
+    ? figure.paper_preview_url
+    : hasMechanismVersions
     ? (mechanismPreviewMode === "gpt" ? figure.gpt_preview_url : figure.paper_preview_url)
     : figure.preview_url;
-  const effectivePreviewType = hasMechanismVersions
+  const effectivePreviewType = paperVersionInserted
+    ? "pdf"
+    : hasMechanismVersions
     ? (mechanismPreviewMode === "gpt" ? "image" : "pdf")
     : figure.preview_type;
 
@@ -1425,17 +1506,32 @@ function renderFigures() {
     pdf.style.display = "block";
   }
 
-  const mechanism = figure.kind === "mechanism";
+  const mechanism = figure.kind === "mechanism" && !placeholderOnly;
   const captionBox = $("figure-caption-box");
-  captionBox.hidden = isTable;
+  captionBox.hidden = isTable || placeholderOnly;
   const captionInput = $("figure-caption");
   const changedCaptionFigure = captionInput.dataset.figureId !== figure.id;
   const savedCaption = figure.caption || "";
-  const captionDraft = captionDrafts.get(figure.id);
+  const generatedAt = String(figure.caption_generated_at || "");
+  const captionDraftRecord = captionDrafts.get(figure.id);
+  const automaticCaptionChanged = Boolean(
+    captionDraftRecord
+    && figure.caption_source === "paragraph_accept"
+    && String(captionDraftRecord.generatedAt || "") !== generatedAt
+  );
+  if (automaticCaptionChanged) {
+    // A newly accepted citing paragraph owns the canonical caption. Discard an
+    // older browser draft so it cannot hide the caption that was just generated.
+    forgetCaptionDraft(figure.id);
+  }
+  const refreshedCaptionDraftRecord = captionDrafts.get(figure.id);
+  const captionDraft = refreshedCaptionDraftRecord
+    ? refreshedCaptionDraftRecord.value
+    : undefined;
   if (captionDraft === savedCaption) {
     forgetCaptionDraft(figure.id);
   }
-  if (changedCaptionFigure) {
+  if (changedCaptionFigure || automaticCaptionChanged) {
     captionInput.value = captionDraft !== undefined && captionDraft !== savedCaption
       ? captionDraft
       : savedCaption;
@@ -1445,21 +1541,33 @@ function renderFigures() {
     captionInput.value = savedCaption;
     captionInput.dataset.dirty = "false";
   }
+  captionInput.dataset.captionGeneratedAt = generatedAt;
   const captionPrompt = $("figure-caption-prompt");
   renderFigureEditorInput(captionPrompt, figure.id, "caption_prompt", "");
   const captionDirty = captionInput.dataset.dirty === "true";
+  const automaticCaptionStatus = figure.caption_last_error
+    ? `自动 Caption 生成失败：${figure.caption_last_error}`
+    : (figure.caption_source === "paragraph_accept"
+      ? `Caption 已在接受 ${figure.caption_generated_from_paragraph || "引用段落"} 时自动生成`
+      : "");
   $("figure-caption-status").textContent = captionDirty
     ? (figure.status === "approved"
       ? "Caption 已修改，尚未更新到正文与 PDF"
       : "Caption 已修改，尚未保存")
+    : automaticCaptionStatus
+      ? automaticCaptionStatus
     : (figure.status === "approved"
       ? "Caption 已写入正文与 PDF"
       : "当前正文将使用此 Caption");
   $("mechanism-controls").style.display = mechanism ? "grid" : "none";
   $("mechanism-approve-after-placement").style.display = mechanism ? "flex" : "none";
-  $("data-controls").style.display = !mechanism && !isTable ? "block" : "none";
-  $("table-agent-controls").style.display = isTable ? "block" : "none";
-  $("table-controls").style.display = isTable ? "block" : "none";
+  $("data-controls").style.display = !placeholderOnly && !mechanism && !isTable && !sourceFigure ? "block" : "none";
+  $("table-agent-controls").style.display = isTable && !state.online_project ? "block" : "none";
+  $("table-controls").style.display = isTable && !placeholderOnly ? "block" : "none";
+  $("table-workflow-note").textContent = state.online_project
+    ? "上方图片由当前 LaTeX 真实编译；可生成结构化初稿并直接编辑 LaTeX。"
+    : "上方图片由当前 LaTeX 真实编译。初稿与实验结果相关修改均由本地 Agent 完成。";
+  $("table-generate").textContent = state.online_project ? "生成表格初稿" : "本地 Agent 生成初稿";
   renderFigureEditorInput(
     $("table-prompt"),
     figure.id,
@@ -1472,7 +1580,7 @@ function renderFigures() {
     "table_agent_prompt",
     figure.agent_prompt || "",
   );
-  if (!mechanism && !isTable) {
+  if (!mechanism && !isTable && !sourceFigure) {
     renderLayoutPrompt(figure);
     if ((figure.panels || []).length === 1) {
       renderSingleDataFigure(figure);
@@ -1498,11 +1606,12 @@ function renderFigures() {
     placement.appendChild(item);
   });
   if (figure.placement_after) placement.value = figure.placement_after;
-  $("figure-layout-control").hidden = isTable;
+  $("figure-placement-row").hidden = placeholderOnly;
+  $("figure-layout-control").hidden = isTable || placeholderOnly;
   $("figure-layout-mode").value = figure.layout_mode || "single-column";
   $("figure-prompt").textContent = figure.draw_prompt
     ? "按右侧指令更新 Prompt"
-    : "GPT 生成设计 Prompt";
+    : "GPT 生成画图 Prompt";
   updateMechanismFlow(figure);
   updateFigureButtonStates();
 
@@ -1515,7 +1624,8 @@ function renderFigures() {
     link.download = "";
     downloads.appendChild(link);
   });
-  $("figure-message").textContent = figure.last_message || "";
+  downloads.hidden = placeholderOnly;
+  $("figure-message").textContent = placeholderOnly ? "" : (figure.last_message || "");
   ensureFigurePolling();
   if (
     mechanism
@@ -1542,7 +1652,7 @@ function renderFigures() {
             current_prompt: "",
             prompt_instruction: "",
           },
-          "正在根据当前 section 正文自动生成设计 Prompt…",
+          "正在根据当前 section 正文自动生成画图 Prompt…",
         );
       }
     }, 50);
@@ -1552,7 +1662,8 @@ function renderFigures() {
 }
 
 const DEMO_READ_ONLY_CONTROL_IDS = [
-  "generate", "accept", "candidate", "comment", "reset", "reset-generated",
+  "generate", "accept", "candidate", "comment", "reset-generated",
+  "compile", "model", "model-apply", "runtime-key-open",
   "title-generate", "title-save", "paper-title", "title-gpt-prompt",
   "figure-prompt", "draw-prompt", "prompt-instruction", "figure-draw",
   "figure-cancel", "figure-build", "single-data-prompt", "single-data-generate",
@@ -1568,6 +1679,12 @@ function applyReadOnlyDemoRestrictions() {
   // visitor sees a clean read-only viewer instead of controls that look
   // clickable and then dead-end in a network error.
   if (!state || !state.demo_mode) return;
+  document.querySelectorAll("input, textarea, select, [contenteditable='true']")
+    .forEach((element) => {
+      element.disabled = true;
+      element.setAttribute("contenteditable", "false");
+      element.setAttribute("aria-readonly", "true");
+    });
   DEMO_READ_ONLY_CONTROL_IDS.forEach((id) => {
     const element = $(id);
     if (element) element.disabled = true;
@@ -1591,6 +1708,9 @@ function render() {
   // switching providers/models deliberately is unaffected.
   $("model-runtime-config").hidden = Boolean(state.online_project);
   $("runtime-key-open").hidden = Boolean(state.online_project);
+  $("artifact-workflow-summary").textContent = state.online_project
+    ? "线上仅保留正文、可编辑表格与 Python 数据图；其他图以带 Caption 和 label 的 placeholder 写入论文。"
+    : "机制图单独设计；数据图和表格都从 results/ 生成，确认后插入对应自然段。";
   const modelInput = $("model");
   const modelOptions = state.llm_model_options || [];
   $("model-suggestions").replaceChildren(...modelOptions.map((option) => {
@@ -1600,20 +1720,17 @@ function render() {
     return element;
   }));
   renderTitleDraftInput(modelInput, "model", state.model || "gpt-5-nano");
-  $("model-provider-note").textContent = `${apiKeySetup.provider_label || "当前 API"} 提供；可自行输入模型名称，建议项仅作参考。`;
   updateModelApplyButton();
   $("api-key-setup").hidden = apiKeyReady;
   $("api-key-setup-command").textContent = apiKeySetup.setup_command || 'export OPENAI_API_KEY="粘贴你的 API key"';
   $("api-key-setup-description").textContent = `${apiKeySetup.provider_label || "当前"} API 尚未配置。请在启动 Paper Studio 的本机终端设置；密钥不会进入网页。GPT Image 仍单独使用 OpenAI。`;
   $("api-key-restart-command").textContent = apiKeySetup.restart_command || "python3 -m research_avatar.paper_studio.server";
   document.querySelector(".workspace").classList.toggle("api-key-missing", !apiKeyReady);
-  $("project-eyebrow").textContent = project.eyebrow || project.name || "PAPER PROJECT";
   $("studio-title").textContent = project.studio_title || "Paper Studio";
-  $("project-subtitle").textContent = project.subtitle || "逐段对话、确认后写入 LaTeX";
   const referencePaper = project.reference_paper || {};
   const referenceEl = $("project-reference-paper");
   if (referencePaper.title) {
-    const meta = [referencePaper.authors, referencePaper.venue].filter(Boolean).join(" · ");
+    const meta = referencePaper.venue || "";
     referenceEl.replaceChildren();
     referenceEl.append("参考论文：");
     if (referencePaper.url) {
@@ -1643,12 +1760,12 @@ function render() {
     $("figures-workspace").hidden = true;
     $("section-kicker").textContent = "EMPTY STUDIO";
     $("section-title").textContent = "尚未载入论文";
-    ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "model", "model-apply", "runtime-key-open"].forEach((id) => {
+    ["writing-view", "figures-view", "tables-view", "compile", "reset-generated", "model", "model-apply", "runtime-key-open"].forEach((id) => {
       $(id).disabled = true;
     });
     return;
   }
-  ["writing-view", "figures-view", "tables-view", "compile", "reset", "reset-generated", "model", "runtime-key-open"].forEach((id) => {
+  ["writing-view", "figures-view", "tables-view", "compile", "reset-generated", "model", "runtime-key-open"].forEach((id) => {
     $(id).disabled = false;
   });
   updateModelApplyButton();
@@ -1667,17 +1784,19 @@ function render() {
   }
   $("section-kicker").textContent = "SECTION";
   const section = state.sections[activeSection];
+  const planningOnly = section.writing_mode === "plan_only";
   $("section-title").textContent = section.title;
   $("title-editor").hidden = activeSection !== "abstract";
   if (activeSection === "abstract") renderTitleEditor();
   renderParagraphNavigation(section);
+  renderReferenceContext(section);
+  renderStructureBlueprint(section);
   const paragraph = section.current_paragraph;
   const candidate = paragraph && paragraph.candidate;
   $("paragraph-id").textContent = paragraph ? paragraph.id : "完成";
   $("paragraph-progress").textContent = paragraph
     ? `${paragraph.position} / ${paragraph.total}`
     : `${section.paragraph_count} / ${section.paragraph_count}`;
-  $("reference").textContent = paragraph ? paragraph.reference_text : "";
   $("candidate-label").textContent = paragraph
     ? candidate
       ? "当前候选段落"
@@ -1706,36 +1825,104 @@ function render() {
     proseBaselineKey = editorKey;
     proseBaselineText = proseDraft ? proseDraft.baseline : serverText;
   }
-  $("candidate").placeholder = paragraph
+  $("candidate").placeholder = planningOnly
+    ? "未上传实验结果：本 section 只保留段落主旨和待执行实验，不生成正文。"
+    : paragraph
     ? paragraph.accepted_text
       ? "这是当前写入 LaTeX 的版本；填写 comment 后可继续修改。"
       : "等待生成当前段落…"
     : "这个 section 已完成。";
   $("comment").value = commentDrafts.get(editorKey) || "";
   updateAcceptButton();
-  $("generate").disabled = !paragraph;
+  $("candidate").disabled = planningOnly;
+  $("comment").disabled = planningOnly;
+  $("generate").disabled = !paragraph || planningOnly;
   const gate = $("gate");
-  gate.textContent = state.outline_confirmed
+  gate.textContent = planningOnly
+    ? "未上传实验结果：从 Experiments 开始仅展示每段主旨、写作任务和待执行实验，不调用 LLM 生成正文。"
+    : state.outline_confirmed
     ? ""
     : "Outline 尚未确认。可以浏览界面，但在确认并建立 LaTeX scaffold 前不能 Accept → LaTeX。";
-  gate.classList.toggle("show", !state.outline_confirmed);
+  gate.classList.toggle("show", planningOnly || !state.outline_confirmed);
   renderFullDraft();
   renderPdf();
   const fullDraftRunning = Boolean(
     state.full_draft && state.full_draft.job && state.full_draft.job.status === "running"
   );
+  const sectionDraftJob = state.section_draft && state.section_draft.job;
+  const sectionDraftRunning = Boolean(
+    sectionDraftJob && sectionDraftJob.status === "running"
+  );
+  const sectionDraftArtifactsPending = Boolean(
+    sectionDraftJob && sectionDraftJob.status === "artifacts_pending"
+  );
+  if (sectionDraftRunning && !fullDraftPollTimer) {
+    fullDraftPollTimer = setTimeout(pollFullDraft, 900);
+  }
+  const sectionPending = (section.paragraph_navigation || []).filter(
+    (item) => item.status !== "accepted"
+  ).length;
+  const sectionDraftStart = $("section-draft-start");
+  sectionDraftStart.disabled = Boolean(
+    planningOnly
+    || fullDraftRunning
+    || sectionDraftRunning
+    || sectionDraftArtifactsPending
+    || fullDraftRequestBusy
+    || proseRequestBusy
+    || !state.outline_confirmed
+    || !state.api_key_configured
+    || sectionPending === 0
+  );
+  const activeSectionArtifactJob = Boolean(
+    sectionDraftArtifactsPending
+    && sectionDraftJob.section === activeSection
+  );
+  const activeSectionRunningJob = Boolean(
+    sectionDraftRunning && sectionDraftJob.section === activeSection
+  );
+  const sectionProgressVisible = Boolean(
+    sectionDraftJob
+    && sectionDraftJob.section === activeSection
+    && ["running", "artifacts_pending"].includes(sectionDraftJob.status)
+  );
+  const sectionProgressRow = $("section-draft-progress-row");
+  sectionProgressRow.hidden = !sectionProgressVisible;
+  $("section-draft-progress").value = Number(sectionDraftJob?.progress || 0);
+  $("section-draft-progress-text").textContent = sectionProgressVisible
+    ? `已完成 ${Number(sectionDraftJob.completed || 0)} / ${Number(sectionDraftJob.total || sectionPending)} 段 · ${sectionDraftJob.progress_message || "正在生成当前 Section…"}`
+    : "";
+  sectionDraftStart.textContent = activeSectionRunningJob
+    ? `${sectionDraftJob.progress_message || "正在生成当前 Section…"}`
+    : activeSectionArtifactJob
+    ? `正在完成本 Section 图表（${(sectionDraftJob.pending_artifacts || []).join("、")}）`
+    : sectionPending
+      ? `一键生成当前 Section（${sectionPending} 段待完成）`
+      : "当前 Section 已完成";
   if (
     !state.demo_mode
     && activeView === "writing"
     && !fullDraftRunning
+    && !sectionDraftRunning
     && paragraph
+    && !planningOnly
     && !candidate
     && !paragraph.accepted_text
   ) {
     const key = `${activeSection}:${paragraph.id}`;
     if (!autoAttempted.has(key)) {
       autoAttempted.add(key);
-      setTimeout(() => generateCurrent(true), 50);
+      setTimeout(() => {
+        const job = state.full_draft && state.full_draft.job;
+        if (
+          fullDraftRequestBusy
+          || queuedFullDraftStart
+          || (job && job.status === "running")
+          || sectionDraftRunning
+          || $("candidate").dataset.dirty === "true"
+        ) return;
+        generateCurrent(true);
+      }, 50);
     }
   }
   applyReadOnlyDemoRestrictions();
@@ -1746,11 +1933,13 @@ function renderFullDraft() {
   const draft = state.full_draft || {};
   const job = draft.job || null;
   const running = Boolean(job && job.status === "running");
+  const artifactsPending = Boolean(job && job.status === "artifacts_pending");
   const pending = Number(draft.pending_paragraphs || 0);
   const total = Number(draft.total_paragraphs || 0);
   card.classList.toggle("is-running", running);
   card.classList.toggle("is-failed", Boolean(job && job.status === "failed"));
   card.classList.toggle("is-completed", Boolean(job && job.status === "completed"));
+  card.classList.toggle("has-pending-artifacts", Boolean(job && job.status === "artifacts_pending"));
 
   const summary = $("full-draft-summary");
   if (job && job.progress_message) {
@@ -1767,7 +1956,7 @@ function renderFullDraft() {
 
   const start = $("full-draft-start");
   const cancel = $("full-draft-cancel");
-  start.disabled = fullDraftRequestBusy || running || !draft.available || pending === 0;
+  start.disabled = fullDraftRequestBusy || queuedFullDraftStart || running || artifactsPending || !draft.available || pending === 0;
   start.textContent = job && ["failed", "cancelled"].includes(job.status)
     ? "继续补齐未完成正文"
     : pending === 0
@@ -1783,7 +1972,7 @@ function renderFullDraft() {
     ? `${Number(job.completed || 0)} / ${Number(job.total || pending)} · ${job.progress_message || job.status}`
     : "";
 
-  ["candidate", "comment", "generate", "accept", "paper-title", "title-gpt-prompt", "title-generate", "title-save", "model", "reset", "reset-generated"].forEach((id) => {
+  ["candidate", "comment", "generate", "section-draft-start", "accept", "paper-title", "title-gpt-prompt", "title-generate", "title-save", "model", "reset-generated"].forEach((id) => {
     const element = $(id);
     if (element && running) element.disabled = true;
   });
@@ -1818,7 +2007,6 @@ async function refresh() {
   }
   if (!state.sections[activeSection]) {
     activeSection = state.sections.abstract ? "abstract" : Object.keys(state.sections)[0];
-    rememberActiveSection(activeSection);
   }
   render();
 }
@@ -1834,7 +2022,7 @@ async function generateCurrent(automatic = false) {
   }
   try {
     setBusy(true, automatic
-      ? "正在结合 reference paragraph、working abstract 和实验结果生成当前段落…"
+      ? "正在结合已批准的段落结构、working abstract 和实验结果生成当前段落…"
       : "正在根据 comment 修改当前段落…");
     const payload = await request("/api/generate", {
       method: "POST",
@@ -1848,14 +2036,17 @@ async function generateCurrent(automatic = false) {
     });
     state = payload.state;
     if (activeSection === requestedSection) {
+      if (automatic && $("candidate").dataset.dirty === "true") {
+        renderSections();
+        updateAcceptButton();
+        showMessage("后台 candidate 已生成；已保留你正在编辑的正文，Accept 时将以编辑框内容为准。");
+        return;
+      }
       forgetProseDraft(`${requestedSection}:${requestedParagraph.id}`);
       forgetCommentDraft(`${requestedSection}:${requestedParagraph.id}`);
       $("candidate").dataset.dirty = "false";
       render();
-      const added = payload.candidate.citations_added || [];
-      showMessage(added.length
-        ? `当前段落已生成，并联网核验后新增 citation：${added.join(", ")}。`
-        : "当前段落已生成。你只需要写 comment 修改，或 Accept → LaTeX。");
+      showMessage("当前段落已生成。你只需要写 comment 修改，或 Accept → LaTeX。");
     } else {
       renderSections();
       showMessage(`${state.sections[requestedSection].title} 的当前段落已生成并保存。`);
@@ -1865,6 +2056,10 @@ async function generateCurrent(automatic = false) {
   } finally {
     proseRequestBusy = false;
     setBusy(false);
+    if (queuedFullDraftStart) {
+      queuedFullDraftStart = false;
+      void startFullDraftFromBrowser();
+    }
   }
 }
 
@@ -1892,7 +2087,7 @@ $("comment").addEventListener("input", (event) => {
 });
 
 async function applyWritingModel() {
-  if (proseRequestBusy || fullDraftRequestBusy || titleBusy || conversationResetBusy) {
+  if (proseRequestBusy || fullDraftRequestBusy || titleBusy || modelApplyBusy) {
     return;
   }
   const requestedModel = $("model").value.trim();
@@ -1905,7 +2100,7 @@ async function applyWritingModel() {
   if (!confirm(`切换到 ${requestedModel}？这会重置所有 LLM 对话链，但不会修改已写入的正文、图表或 PDF。`)) {
     return;
   }
-  conversationResetBusy = true;
+  modelApplyBusy = true;
   try {
     setBusy(true, `正在切换写作模型为 ${requestedModel}…`);
     const payload = await request("/api/llm-model", {
@@ -1919,7 +2114,7 @@ async function applyWritingModel() {
   } catch (error) {
     showMessage(error.message, true);
   } finally {
-    conversationResetBusy = false;
+    modelApplyBusy = false;
     setBusy(false);
   }
 }
@@ -2053,16 +2248,15 @@ async function acceptCurrent() {
     candidate = latestCandidate;
     const manualRevision = Boolean(
       paragraph
-      && paragraph.accepted_text
       && visibleCandidateText
-      && visibleCandidateText !== String(paragraph.accepted_text).trim()
+      && visibleCandidateText !== visibleBaseText
     );
     if (!candidate && !manualRevision) {
       render();
       showMessage(
         latestParagraph && visibleParagraphId && latestParagraph.id !== visibleParagraphId
           ? `当前编辑位置已更新到 ${latestParagraph.id}，请确认后再 Accept。`
-          : "当前段落没有可接受的 candidate；请先生成候选。",
+          : "当前段落没有可接受的正文。",
         true,
       );
       return;
@@ -2176,32 +2370,6 @@ $("compile").onclick = async () => {
   }
 };
 
-$("reset").onclick = async () => {
-  if (conversationResetBusy) return;
-  const requestedModel = $("model").value.trim();
-  if (!requestedModel) {
-    showMessage("模型名称不能为空。", true);
-    return;
-  }
-  if (!confirm(`将模型设为 ${requestedModel}，并重置当前 section 的 API 对话链？已接受的 LaTeX 不会删除。`)) return;
-  conversationResetBusy = true;
-  try {
-    setBusy(true, "正在重置当前 section 的 API 对话链…");
-    const payload = await request("/api/reset-conversation", {
-      method: "POST",
-      body: JSON.stringify({section: activeSection, model: requestedModel}),
-    });
-    state = payload.state;
-    showMessage(`模型已设为 ${state.model}；当前 section 的 conversation 已重置。`);
-    render();
-  } catch (error) {
-    showMessage(error.message, true);
-  } finally {
-    conversationResetBusy = false;
-    setBusy(false);
-  }
-};
-
 async function submitGeneratedReset(typed) {
   if (generatedResetBusy) return;
   const requestedModel = $("model").value.trim();
@@ -2217,6 +2385,16 @@ async function submitGeneratedReset(typed) {
   $("reset-generated-dialog").close();
   try {
     setBusy(true, "正在清空生成内容并编译空壳 PDF…");
+    // Cancel old vector-page loads before the server removes generated page
+    // caches and recompiles the empty shell. Otherwise an already queued
+    // page-4 request can race the new one-page PDF and surface a noisy 400.
+    $("pdf-pages").replaceChildren();
+    $("pdf-pages").dataset.signature = "";
+    $("pdf-navigation").replaceChildren();
+    $("pdf-navigation").dataset.signature = "";
+    $("pdf-viewer").style.display = "none";
+    $("pdf-download").hidden = true;
+    updatePdfPageIndicator();
     const payload = await request("/api/reset-generated-paper", {
       method: "POST",
       body: JSON.stringify({project_id: typed.trim(), model: requestedModel}),
@@ -2320,7 +2498,6 @@ function switchView(view) {
       );
       if (fallbackSection && state.sections[fallbackSection]) {
         activeSection = fallbackSection;
-        rememberActiveSection(activeSection);
         available = sectionFigures();
       }
     }
@@ -2330,15 +2507,18 @@ function switchView(view) {
     const first = selected || available[0];
     if (first) activeFigure = first.id;
   }
-  try {
-    localStorage.setItem(ACTIVE_VIEW_KEY, view);
-  } catch (_error) {}
   render();
 }
 
 $("writing-view").onclick = () => switchView("writing");
-$("full-draft-start").onclick = async () => {
-  if (fullDraftRequestBusy) return;
+async function startFullDraftFromBrowser() {
+  if (fullDraftRequestBusy || queuedFullDraftStart) return;
+  if (proseRequestBusy) {
+    queuedFullDraftStart = true;
+    renderFullDraft();
+    showMessage("当前段落生成完成后将自动启动全文初稿任务…");
+    return;
+  }
   fullDraftRequestBusy = true;
   $("full-draft-start").disabled = true;
   try {
@@ -2355,7 +2535,32 @@ $("full-draft-start").onclick = async () => {
     fullDraftRequestBusy = false;
     renderFullDraft();
   }
-};
+}
+$("full-draft-start").onclick = () => startFullDraftFromBrowser();
+async function startSectionDraftFromBrowser() {
+  if (fullDraftRequestBusy || proseRequestBusy) return;
+  const requestedSection = activeSection;
+  fullDraftRequestBusy = true;
+  $("section-draft-start").disabled = true;
+  try {
+    const payload = await request("/api/section-draft/start", {
+      method: "POST",
+      body: JSON.stringify({
+        model: $("model").value.trim(),
+        section: requestedSection,
+      }),
+    });
+    state = payload.state;
+    render();
+    showMessage(`${state.sections[requestedSection].title} 的整节生成任务已启动；将按段落顺序自动写入 LaTeX 并编译。`);
+  } catch (error) {
+    showMessage(error.message, true);
+  } finally {
+    fullDraftRequestBusy = false;
+    render();
+  }
+}
+$("section-draft-start").onclick = () => startSectionDraftFromBrowser();
 $("full-draft-cancel").onclick = async () => {
   if (fullDraftRequestBusy) return;
   fullDraftRequestBusy = true;
@@ -2410,6 +2615,12 @@ async function runFigureAction(path, body, busyMessage) {
   } finally {
     figureRequestBusy = false;
     setBusy(false);
+    const current = selectedFigure();
+    if (current && activeView === "figures" && current.kind === "data") {
+      setTimeout(() => scheduleAutomaticDataPanel(current), 0);
+    } else if (current && activeView === "tables" && current.kind === "table") {
+      setTimeout(() => scheduleAutomaticTableGenerate(current), 0);
+    }
   }
 }
 
@@ -2436,6 +2647,12 @@ async function startFigureJob(path, body, startingMessage) {
   } finally {
     figureRequestBusy = false;
     updateFigureButtonStates();
+    const current = selectedFigure();
+    if (current && activeView === "figures" && current.kind === "data") {
+      setTimeout(() => scheduleAutomaticDataPanel(current), 0);
+    } else if (current && activeView === "tables" && current.kind === "table") {
+      setTimeout(() => scheduleAutomaticTableGenerate(current), 0);
+    }
   }
 }
 
@@ -2471,7 +2688,7 @@ $("figure-prompt").onclick = () => startFigureJob(
     current_prompt: $("draw-prompt").value,
     prompt_instruction: $("prompt-instruction").value,
   },
-  "正在启动 GPT 设计 Prompt 任务…",
+  "正在启动 GPT 画图 Prompt 任务…",
 );
 
 $("figure-draw").onclick = () => startFigureJob(
@@ -2535,7 +2752,12 @@ $("figure-build").onclick = () => startFigureJob(
 
 $("mechanism-preview-toggle").onclick = () => {
   const figure = selectedFigure();
-  if (!figure || !figure.gpt_preview_url || !figure.paper_preview_url) return;
+  if (
+    !figure
+    || figure.status === "approved"
+    || !figure.gpt_preview_url
+    || !figure.paper_preview_url
+  ) return;
   const current = mechanismPreviewModes.get(figure.id) || "paper";
   mechanismPreviewModes.set(figure.id, current === "paper" ? "gpt" : "paper");
   renderFigures();

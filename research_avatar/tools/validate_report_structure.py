@@ -22,12 +22,10 @@ REPORT_STRUCTURES = {
     },
     "literature": {
         "sections": [
-            ("scope-taxonomy", "1. Scope and Taxonomy"),
-            ("theme-map", "2. Theme Map"),
-            ("landscape-comparison", "3. Landscape Comparison"),
-            ("live-debates", "4. Live Debates"),
-            ("trends-gaps", "5. Trends and Structural Gaps"),
-            ("verified-references", "6. Verified References"),
+            ("problem", "1. Problem"),
+            ("approaches", "2. Approaches"),
+            ("evaluation", "3. Evaluation"),
+            ("gaps", "4. Gaps"),
         ],
     },
     "ideas": {
@@ -40,17 +38,12 @@ REPORT_STRUCTURES = {
     },
     "expplan": {
         "sections": [
-            ("target-and-references", "1. Target Conference and Reference Papers"),
+            ("target-and-references", "1. Target Conference and Reference Paper"),
             ("projected-paper", "2. Projected Paper"),
-            ("approval", "3. Approval"),
         ],
         "subsections": [
             ("projected-title-abstract", "2.1 Projected Title and Abstract"),
-            ("figure-table-count", "2.2 Figure/Table Count"),
-            ("paragraph-blueprint", "2.3 Paragraph Blueprint and Evidence Shells"),
-            ("claim-falsifier-evidence", "2.4 Claim–Falsifier–Evidence"),
-            ("implementation-plan", "2.5 Implementation Plan"),
-            ("budget-decision-criteria", "2.6 Budget and Decision Criteria"),
+            ("projected-paper-structure", "2.2 Projected Paper Structure and Evidence Shells"),
         ],
     },
     "runplan": {
@@ -70,6 +63,18 @@ REPORT_STRUCTURES = {
     },
 }
 
+# Reader-facing reports may be translated after their fixed structure has been
+# generated.  The stable contract is the section id and order; these localized
+# titles are equivalent labels, not a structural change.
+LOCALIZED_TITLE_ALIASES = {
+    "literature": {
+        "problem": {"1. 问题"},
+        "approaches": {"2. 方法"},
+        "evaluation": {"3. 评估"},
+        "gaps": {"4. 差距"},
+    },
+}
+
 
 class StructureParser(HTMLParser):
     def __init__(self) -> None:
@@ -81,6 +86,8 @@ class StructureParser(HTMLParser):
         self._section_stack: list[int] = []
         self._subsection_stack: list[int] = []
         self._section_markers: list[tuple[str, int] | None] = []
+        self.figure_artifacts: list[list[str | bool]] = []
+        self._artifact_markers: list[int | None] = []
         self._capture: tuple[str, int] | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -98,6 +105,16 @@ class StructureParser(HTMLParser):
                 self._subsection_stack.append(len(self.subsections) - 1)
                 marker = ("subsection", self._subsection_stack[-1])
             self._section_markers.append(marker)
+            artifact_id = str(attributes.get("data-artifact-id") or "")
+            if artifact_id.upper().startswith("F"):
+                self.figure_artifacts.append([artifact_id, False])
+                self._artifact_markers.append(len(self.figure_artifacts) - 1)
+            else:
+                self._artifact_markers.append(None)
+        if tag == "table":
+            for artifact_index in self._artifact_markers:
+                if artifact_index is not None:
+                    self.figure_artifacts[artifact_index][1] = True
         if tag == "h2" and self._section_stack:
             self._capture = ("section", self._section_stack[-1])
         if tag == "h3" and self._subsection_stack:
@@ -112,6 +129,7 @@ class StructureParser(HTMLParser):
                 self._subsection_stack.pop()
             elif marker and marker[0] == "section":
                 self._section_stack.pop()
+            self._artifact_markers.pop()
 
     def handle_data(self, data: str) -> None:
         if not self._capture:
@@ -135,7 +153,16 @@ def validate(kind: str, html_path: Path) -> list[str]:
     expected = REPORT_STRUCTURES[kind]
     errors: list[str] = []
     actual_sections = _normalized(parser.sections)
-    if actual_sections != expected["sections"]:
+    expected_sections = expected["sections"]
+    aliases = LOCALIZED_TITLE_ALIASES.get(kind, {})
+    sections_match = len(actual_sections) == len(expected_sections) and all(
+        actual_id == expected_id
+        and (actual_title == expected_title or actual_title in aliases.get(expected_id, set()))
+        for (actual_id, actual_title), (expected_id, expected_title) in zip(
+            actual_sections, expected_sections
+        )
+    )
+    if not sections_match:
         errors.append(f"sections: expected {expected['sections']!r}, got {actual_sections!r}")
     actual_subsections = _normalized(parser.subsections)
     expected_subsections = expected.get("subsections", [])
@@ -153,6 +180,12 @@ def validate(kind: str, html_path: Path) -> list[str]:
     ):
         if len(" ".join(body.split())) < 10:
             errors.append(f"subsection {subsection_id!r} has no substantive content")
+    if kind in {"runplan", "results"}:
+        for artifact_id, has_table in parser.figure_artifacts:
+            if not has_table:
+                errors.append(
+                    f"figure {artifact_id!r} lacks an adjacent source/evidence table"
+                )
     return errors
 
 

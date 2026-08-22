@@ -118,6 +118,32 @@ export class OnlineStudioContainerV38 extends OnlineStudioContainer {}
 // reference paper directly.
 export class OnlineStudioContainerV39 extends OnlineStudioContainer {}
 
+// Online-authoring boundary release: keep prose, editable tables, and Python
+// data figures interactive; render mechanism and unsupported figure kinds as
+// inert caption/label placeholders until the project is exported locally.
+export class OnlineStudioContainerV40 extends OnlineStudioContainer {}
+
+// Placeholder phase/cachebuster release. A fresh class guarantees Cloudflare
+// starts this image instead of retaining an already-running V40 instance.
+export class OnlineStudioContainerV41 extends OnlineStudioContainer {}
+
+// Read-only demo and sidebar-cleanup release: the public demo embeds the exact
+// Paper Studio UI but exposes no editable fields, write actions, or escape link;
+// both local and online Studio sidebars also omit the scaffold subtitle and
+// reference-paper author line.
+export class OnlineStudioContainerV42 extends OnlineStudioContainer {}
+
+// Full-fidelity demo release: demo sessions expose the completed local
+// Paper Studio artifact set (real mechanism/data figures and tables) while
+// the gateway and UI keep the entire surface read-only.
+export class OnlineStudioContainerV43 extends OnlineStudioContainer {}
+
+// Immersive embedded-writing release: the Demo keeps Paper Studio inside the
+// six-stage Research Studio shell, compresses navigation, and gives the editor
+// the rest of the viewport instead of opening a separate page.
+export class OnlineStudioContainerV44 extends OnlineStudioContainer {}
+export class OnlineStudioContainerV45 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
@@ -555,7 +581,6 @@ export default {
           authenticated: user !== null,
           user: user ? { email: user.email, provider: user.provider } : null,
           google_configured: googleConfigured(env),
-          access_token_required: false,
         });
       }
       if (request.method === "GET" && path === "/auth/google/start") {

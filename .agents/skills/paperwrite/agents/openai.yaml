@@ -1,4 +1,0 @@
-interface:
-  display_name: "Personalized Paper Writing"
-  short_description: "Draft and revise a personalized evidence-grounded paper"
-  default_prompt: "Use $paperwrite to draft this paper from the approved plan and real results."

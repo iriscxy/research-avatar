@@ -6,16 +6,26 @@ const authForm = document.querySelector('#auth-form');
 const authMessage = document.querySelector('#auth-message');
 const workspaceShell = document.querySelector('#workspace-shell');
 const sessionNotice = document.querySelector('#session-notice');
-const lightweightForm = document.querySelector('#lightweight-form');
-const lightweightMessage = document.querySelector('#lightweight-message');
-const lightweightSubmit = document.querySelector('#lightweight-submit');
+const studioFrame = document.querySelector('#studio-frame');
+const useOnboarding = document.querySelector('#use-onboarding');
+const sessionActions = document.querySelector('#session-actions');
+let activeStudioSession = false;
+
+function showStudioInUseTab() {
+  if (!activeStudioSession) return;
+  useOnboarding.classList.add('hidden');
+  sessionActions.classList.add('hidden');
+  document.querySelector('#use-panel').classList.add('studio-active');
+  studioFrame.classList.remove('hidden');
+  if (studioFrame.getAttribute('src') !== '/studio') studioFrame.src = '/studio';
+}
 
 function showNavigationNotice(authenticated) {
   const url = new URL(window.location.href);
   const expired = url.searchParams.get('session_expired') === '1';
   const loginRequired = url.searchParams.get('login_required') === '1';
   if (expired && authenticated) {
-    sessionNotice.textContent = '上一次临时写作会话已结束。请在 Use it 重新开始一个写作会话。';
+    sessionNotice.textContent = '上一次临时写作会话已结束。请在“免费纯文字 PaperWrite 版”重新开始一个写作会话。';
     sessionNotice.classList.remove('hidden');
   } else if (loginRequired && !authenticated) {
     authMessage.className = 'error';
@@ -37,6 +47,7 @@ function selectProductPanel(panelId) {
     tab.classList.toggle('active', active);
     tab.setAttribute('aria-selected', String(active));
   });
+  if (panelId === 'use-panel') showStudioInUseTab();
 }
 
 document.querySelectorAll('.product-tab').forEach((tab) => {
@@ -44,28 +55,36 @@ document.querySelectorAll('.product-tab').forEach((tab) => {
 });
 
 async function showAuthenticated(user) {
-  // The landing page always shows Demo/Use it first, even for a
-  // researcher with an active "Use it" writing session -- it used to
+  // The landing page always shows Demo/the free text-only PaperWrite tab
+  // first, even for a researcher with an active writing session -- it used to
   // auto-redirect straight into /studio here, which meant the site's own
-  // root URL could never actually be used to reach the Demo/Use it shell
+  // root URL could never actually be used to reach the landing-page shell
   // once you had a session going. The "继续当前写作会话" resume link
-  // inside the Use it tab (#session-actions) is how you get back into an
+  // inside the PaperWrite tab (#session-actions) is how you get back into an
   // active session now; it's an explicit choice, not automatic.
   document.body.classList.add('workspace-authenticated');
   authCard.classList.add('hidden');
   workspaceShell.classList.remove('hidden');
   showNavigationNotice(true);
-  selectProductPanel('demo-panel');
+  const requestedPanel = new URLSearchParams(window.location.search).get('open') === 'use'
+    ? 'use-panel'
+    : 'demo-panel';
+  selectProductPanel(requestedPanel);
   const demoFrame = document.querySelector('#demo-frame');
   demoFrame.src = '/demo/?authenticated=' + Date.now();
   document.querySelector('#account-label').textContent =
     user.email + ' · ' + (user.provider === 'google' ? 'Google' : '邮箱账户');
-  const sessionActions = document.querySelector('#session-actions');
   sessionActions.classList.add('hidden');
   try {
     const response = await fetch('/api/online/session', { cache: 'no-store' });
     const state = await response.json();
-    if (state.active) sessionActions.classList.remove('hidden');
+    activeStudioSession = Boolean(state.active);
+    if (activeStudioSession) {
+      sessionActions.classList.remove('hidden');
+      if (!document.querySelector('#use-panel').classList.contains('hidden')) {
+        showStudioInUseTab();
+      }
+    }
   } catch (_) {
     // Leave the resume link hidden if the check fails.
   }
@@ -78,10 +97,6 @@ async function initializeAuth() {
     document.querySelector('#google-login').classList.toggle(
       'hidden',
       !state.google_configured,
-    );
-    document.querySelector('#access-wrap').classList.toggle(
-      'hidden',
-      !state.access_token_required,
     );
     if (state.authenticated) {
       await showAuthenticated(state.user);
@@ -154,10 +169,37 @@ async function startSession(payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  const result = await response.json();
+  let result = await response.json();
   if (!response.ok || !result.ok) throw new Error(result.error || '创建会话失败。');
-  window.location.assign(result.redirect);
+  if (result.pending && result.job_id) {
+    const jobId = result.job_id;
+    const startedAt = Date.now();
+    while (!result.ready) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const poll = await fetch(
+        `/api/online/session/job?job_id=${encodeURIComponent(jobId)}`,
+        { cache: 'no-store' },
+      );
+      result = await poll.json();
+      if (!poll.ok || !result.ok) throw new Error(result.error || '初始化失败。');
+      const elapsed = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
+      const progressMessage = result.message || '正在初始化…';
+      const estimate = progressMessage.includes('LLM 直接读取结构参考论文 PDF')
+        ? '（预计 2–3 min）'
+        : '';
+      message.textContent = `${progressMessage} · ${Number(result.progress || 0)}% · 已等待 ${elapsed} 秒${estimate}`;
+      if (elapsed > 600) throw new Error('初始化超过 10 分钟，请重试。');
+    }
+  }
+  activeStudioSession = true;
+  selectProductPanel('use-panel');
+  showStudioInUseTab();
 }
+
+document.querySelector('#resume-studio').addEventListener('click', () => {
+  activeStudioSession = true;
+  showStudioInUseTab();
+});
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -165,56 +207,20 @@ form.addEventListener('submit', async (event) => {
   message.textContent = '正在读取资料并启动写作台…';
   submit.disabled = true;
   try {
-    const archiveFile = form.elements.project_package.files[0];
-    if (!archiveFile || !archiveFile.name.toLowerCase().endsWith('.zip')) {
-      throw new Error('Research Avatar 项目包必须是 ZIP 文件。');
-    }
-    if (archiveFile.size > 32 * 1024 * 1024) {
-      throw new Error('研究证据 ZIP 不能超过 32 MB。');
-    }
+    const elements = form.elements;
+    const projectBriefFile = elements.project_brief_file.files[0];
+    const referencePaperFile = elements.reference_paper_file.files[0];
+    if (!projectBriefFile) throw new Error('请上传当前工作说明。');
+    if (!referencePaperFile) throw new Error('请上传一篇完整的结构参考论文。');
     await startSession({
-      mode: 'package',
-      access_token: form.elements.access_token.value,
-      evidence_archive: await encodeFile(archiveFile),
+      mode: 'materials',
+      venue: elements.venue.value,
+      project_brief_files: [await encodeFile(projectBriefFile)],
+      reference_paper_files: [await encodeFile(referencePaperFile)],
     });
-    form.elements.access_token.value = '';
   } catch (error) {
     message.className = 'error';
     message.textContent = error.message;
     submit.disabled = false;
-  }
-});
-
-lightweightForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  lightweightMessage.className = '';
-  lightweightMessage.textContent = '正在读取材料并启动写作台…';
-  lightweightSubmit.disabled = true;
-  try {
-    const elements = lightweightForm.elements;
-    const scholarFile = elements.scholar_file.files[0];
-    const referenceFiles = Array.from(elements.reference_files.files);
-    const resultsFile = elements.results_file.files[0];
-    let results = null;
-    if (resultsFile) {
-      const text = await resultsFile.text();
-      try {
-        results = JSON.parse(text);
-      } catch (_) {
-        throw new Error('实验结果数据不是有效 JSON。');
-      }
-    }
-    await startSession({
-      mode: 'lightweight',
-      venue: elements.venue.value,
-      title: elements.title.value,
-      scholar_files: scholarFile ? [await encodeFile(scholarFile)] : [],
-      reference_files: await Promise.all(referenceFiles.map(encodeFile)),
-      results,
-    });
-  } catch (error) {
-    lightweightMessage.className = 'error';
-    lightweightMessage.textContent = error.message;
-    lightweightSubmit.disabled = false;
   }
 });

@@ -18,30 +18,51 @@ from research_avatar.research_studio.server import (
     record_expplan_approval,
     render_ledger_html,
     render_publications_html,
+    rewrite_artifact_html_links,
     start_paper_studio,
 )
 
 
 class ResearchStudioTests(unittest.TestCase):
+    def test_artifact_html_rewrites_sibling_report_links(self):
+        source = (
+            '<a href="01_LIT_SURVEY.html">survey</a>'
+            '<a href="./03_EXPERIMENT_PLAN.html#setup">plan</a>'
+            '<a href="https://example.org/01_LIT_SURVEY.html">external</a>'
+        )
+        rendered = rewrite_artifact_html_links(source)
+        self.assertIn('href="/artifact/literature"', rendered)
+        self.assertIn('href="/artifact/expplan#setup"', rendered)
+        self.assertIn('href="https://example.org/01_LIT_SURVEY.html"', rendered)
+        self.assertIn('href="https://example.org/01_LIT_SURVEY.html" target="_blank" rel="noopener noreferrer"', rendered)
+
+    def test_artifact_html_external_links_escape_preview_iframe(self):
+        source = '<a class="paper" href="https://arxiv.org/abs/2606.22357">ORBIT</a>'
+        rendered = rewrite_artifact_html_links(source)
+        self.assertIn('target="_blank"', rendered)
+        self.assertIn('rel="noopener noreferrer"', rendered)
+
     def test_http_server_accepts_browser_asset_bursts(self):
         self.assertGreaterEqual(studio.StudioHTTPServer.request_queue_size, 32)
 
     @patch.object(studio.LOCAL_URL_OPENER, "open")
     def test_paper_studio_status_uses_state_independent_health_endpoint(self, open_url):
-        expected = json.loads(
-            (studio.ROOT / "paper/paper_studio.json").read_text(encoding="utf-8")
-        )["project"]["id"]
+        expected = "configured-paper-test"
         response = MagicMock()
         response.read.return_value = json.dumps(
             {
                 "ok": True,
                 "project": {"root": str(studio.ROOT), "id": expected},
                 "pid": 123,
+                "embedded_only": True,
             }
         ).encode("utf-8")
         open_url.return_value.__enter__.return_value = response
 
-        status = studio.paper_studio_status()
+        with patch.object(
+            studio, "load_json", return_value={"project": {"id": expected}}
+        ):
+            status = studio.paper_studio_status()
 
         self.assertTrue(status["running"])
         self.assertTrue(status["same_workspace"])
@@ -50,24 +71,15 @@ class ResearchStudioTests(unittest.TestCase):
             f"{studio.PAPER_STUDIO_URL}/api/health", timeout=1.2
         )
 
-    def test_profile_job_state_is_initialized_and_uses_profile_html_only(self):
+    def test_research_studio_has_no_runtime_skill_dependency(self):
         source = Path(studio.__file__).read_text(encoding="utf-8")
         self.assertNotIn("researcher-profile/profile.md", source.lower())
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            profile = root / "researcher-profile" / "PROFILE.html"
-            profile.parent.mkdir(parents=True)
-            profile.write_text("<html><body>Writing Style</body></html>", encoding="utf-8")
-            with patch.dict(
-                studio.PROFILE_JOB,
-                {"status": "complete", "message": "done", "logs": []},
-                clear=True,
-            ):
-                state = studio.profile_job_state()
-                progress = studio.profile_progress_state(state, root)
-        self.assertEqual(state["status"], "complete")
-        self.assertEqual(progress["percent"], 100)
-        self.assertEqual(progress["current_phase"], 8)
+        self.assertNotIn(".agents/skills", source)
+        self.assertNotIn("$profileconstruct", source)
+        self.assertNotIn("$researchlit", source)
+        self.assertNotIn("$ideagen", source)
+        self.assertNotIn("$expplan", source)
+        self.assertNotIn("$runplan", source)
 
     @patch("research_avatar.research_studio.server.subprocess.Popen")
     @patch("research_avatar.research_studio.server.paper_studio_status")
@@ -77,7 +89,8 @@ class ResearchStudioTests(unittest.TestCase):
             "same_workspace": False,
             "url": "http://127.0.0.1:8765",
         }
-        result = start_paper_studio()
+        with patch.object(studio, "paper_project_configured", return_value=True):
+            result = start_paper_studio()
         self.assertFalse(result["ok"])
         self.assertIn("different workspace", result["error"])
         popen.assert_not_called()
@@ -93,6 +106,7 @@ class ResearchStudioTests(unittest.TestCase):
                 "running": True,
                 "same_workspace": True,
                 "same_project": True,
+                "embedded_only": True,
                 "url": studio.PAPER_STUDIO_URL,
             },
         ]
@@ -101,7 +115,8 @@ class ResearchStudioTests(unittest.TestCase):
         popen.return_value = process
 
         with patch.object(studio, "PAPER_STUDIO_PROCESS", None):
-            result = start_paper_studio()
+            with patch.object(studio, "paper_project_configured", return_value=True):
+                result = start_paper_studio()
 
         self.assertTrue(result["ok"])
         self.assertFalse(result["already_running"])
@@ -136,6 +151,7 @@ class ResearchStudioTests(unittest.TestCase):
                 "running": True,
                 "same_workspace": True,
                 "same_project": True,
+                "embedded_only": True,
                 "url": studio.PAPER_STUDIO_URL,
             },
         ]
@@ -144,7 +160,8 @@ class ResearchStudioTests(unittest.TestCase):
         popen.return_value = process
 
         with patch.object(studio, "PAPER_STUDIO_PROCESS", None):
-            result = start_paper_studio()
+            with patch.object(studio, "paper_project_configured", return_value=True):
+                result = start_paper_studio()
 
         self.assertTrue(result["ok"])
         self.assertFalse(result["already_running"])
@@ -165,7 +182,8 @@ class ResearchStudioTests(unittest.TestCase):
         popen.return_value = process
 
         with patch.object(studio, "PAPER_STUDIO_PROCESS", None):
-            result = start_paper_studio()
+            with patch.object(studio, "paper_project_configured", return_value=True):
+                result = start_paper_studio()
 
         self.assertFalse(result["ok"])
         self.assertIn("exited during startup", result["error"])
@@ -255,11 +273,11 @@ class ResearchStudioTests(unittest.TestCase):
 
         self.assertEqual(
             result["urls"],
-            ["http://127.0.0.1:8780", "http://127.0.0.1:8765"],
+            ["http://127.0.0.1:8780"],
         )
         self.assertEqual(
             open_browser.call_args_list,
-            [call("http://127.0.0.1:8780"), call("http://127.0.0.1:8765")],
+            [call("http://127.0.0.1:8780")],
         )
 
     @patch("research_avatar.research_studio.server.webbrowser.open")
@@ -303,12 +321,18 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertNotIn("artifactMarkup", app_source)
         self.assertNotIn("该阶段尚未开始", app_source)
         self.assertNotIn("profileTerminalMarkup", app_source)
-        self.assertNotIn("artifactSelectorMarkup", app_source)
+        self.assertIn("renderArtifactTabs(stage, primaryArtifact?.key", app_source)
         self.assertIn("selectArtifact(primaryArtifact.key)", app_source)
+        self.assertIn('id="artifact-tabs"', index_source)
         self.assertIn('id="preview-open"', index_source)
         self.assertIn('id="preview-command"', index_source)
+        self.assertIn('id="preview-command-copy"', index_source)
+        self.assertIn('id="preview-copy-status"', index_source)
         self.assertIn("请在终端运行以下命令", index_source)
-        self.assertIn('previewCommand.textContent = stage.command', app_source)
+        self.assertIn('previewCommand.textContent = command', app_source)
+        self.assertIn('command.startsWith("python3 -m ")', app_source)
+        self.assertIn('previewCommandCopy.addEventListener("click"', app_source)
+        self.assertIn("navigator.clipboard.writeText(value)", app_source)
 
     def test_paper_stage_embeds_interactive_studio_instead_of_pdf(self):
         with TemporaryDirectory() as directory:
@@ -320,11 +344,12 @@ class ResearchStudioTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
+            result = studio.ensure_paper_project_from_completed_run(root)
             stage = studio.paper_stage(root)
 
         self.assertEqual(stage["artifacts"][0]["key"], "paper_studio")
         self.assertTrue(stage["artifacts"][0]["interactive"])
-        self.assertEqual(stage["artifacts"][0]["url"], studio.PAPER_STUDIO_URL)
+        self.assertEqual(stage["artifacts"][0]["url"], studio.PAPER_STUDIO_ROUTE + "/")
         self.assertNotIn("paper_pdf", [item["key"] for item in stage["artifacts"]])
 
         source = (
@@ -333,6 +358,125 @@ class ResearchStudioTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("artifact.interactive === true", source)
         self.assertIn("if (isPdf || isInteractive)", source)
+        self.assertIn('document.body.classList.toggle("paper-focus", stage.id === "paper")', source)
+        style = (
+            Path(__file__).resolve().parents[1]
+            / "research_avatar/research_studio/static/style.css"
+        ).read_text(encoding="utf-8")
+        self.assertIn(".paper-focus .preview-toolbar{display:none}", style)
+        self.assertIn(".paper-focus .artifact-preview iframe{height:100%", style)
+
+    @patch("research_avatar.tools.init_paper_studio_from_pipeline.initialize")
+    def test_completed_run_automatically_initializes_paper_studio(self, initialize):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = root / "reports"
+            reports.mkdir(parents=True)
+            plan = reports / "03_EXPERIMENT_PLAN_LOCAL.html"
+            plan.write_text("approved plan", encoding="utf-8")
+            (reports / "05_EXP_RESULT.html").write_text("results", encoding="utf-8")
+            run_state = {
+                "state": "completed",
+                "source_plan": "reports/03_EXPERIMENT_PLAN_LOCAL.html",
+                "goals": [{"id": "G1", "status": "completed"}],
+            }
+            (reports / "04_RUN_PLAN.html").write_text(
+                '<script id="run-plan-state" type="application/json">'
+                + json.dumps(run_state)
+                + "</script>",
+                encoding="utf-8",
+            )
+
+            def create_config(project_root, source_plan, results):
+                paper = project_root / "paper"
+                paper.mkdir()
+                (paper / "paper_studio.json").write_text(
+                    json.dumps({"project": {"id": "auto", "name": "Auto"}}),
+                    encoding="utf-8",
+                )
+                self.assertEqual(source_plan, plan.resolve())
+                self.assertEqual(results, reports / "05_EXP_RESULT.html")
+                return {"config": "paper/paper_studio.json"}
+
+            initialize.side_effect = create_config
+            result = studio.ensure_paper_project_from_completed_run(root)
+            stage = studio.paper_stage(root)
+
+        initialize.assert_called_once()
+        self.assertTrue(result["created"])
+        self.assertTrue(stage["paper_studio"]["configured"])
+        self.assertEqual(stage["status"], "in_progress")
+        self.assertEqual(stage["command"], "Paper Studio 已就绪")
+
+    @patch("research_avatar.tools.init_paper_studio_from_pipeline.initialize")
+    def test_incomplete_run_does_not_initialize_paper_studio(self, initialize):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = root / "reports"
+            reports.mkdir(parents=True)
+            (reports / "04_RUN_PLAN.html").write_text(
+                '<script id="run-plan-state" type="application/json">'
+                + json.dumps({
+                    "state": "completed",
+                    "goals": [{"id": "G1", "status": "running"}],
+                })
+                + "</script>",
+                encoding="utf-8",
+            )
+            (reports / "05_EXP_RESULT.html").write_text("partial", encoding="utf-8")
+            result = studio.ensure_paper_project_from_completed_run(root)
+            stage = studio.paper_stage(root)
+
+        initialize.assert_not_called()
+        self.assertFalse(result["created"])
+        self.assertFalse(stage["paper_studio"]["configured"])
+
+    def test_completed_experiment_shows_explicit_paper_studio_command(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = root / "reports"
+            reports.mkdir(parents=True)
+            (reports / "04_RUN_PLAN.html").write_text(
+                '<script id="run-plan-state" type="application/json">'
+                + json.dumps({
+                    "state": "completed",
+                    "goals": [{"id": "G1", "status": "completed"}],
+                })
+                + "</script>",
+                encoding="utf-8",
+            )
+            (reports / "05_EXP_RESULT.html").write_text("results", encoding="utf-8")
+
+            stage = studio.paper_stage(root)
+
+        self.assertEqual(stage["status"], "not_started")
+        self.assertTrue(stage["paper_studio"]["experiment_ready"])
+        self.assertEqual(
+            stage["command"],
+            "python3 -m research_avatar.tools.init_paper_studio_from_pipeline "
+            "--from-run-plan --open",
+        )
+
+    def test_completed_experiment_accepts_current_status_field(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = root / "reports"
+            reports.mkdir(parents=True)
+            (reports / "04_RUN_PLAN.html").write_text(
+                '<script id="run-plan-state" type="application/json">'
+                + json.dumps({
+                    "status": "completed",
+                    "goals": [{"id": "G1", "status": "completed"}],
+                })
+                + "</script>",
+                encoding="utf-8",
+            )
+            (reports / "05_EXP_RESULT.html").write_text("results", encoding="utf-8")
+
+            stage = studio.paper_stage(root)
+
+        self.assertTrue(stage["paper_studio"]["experiment_ready"])
+        self.assertIn("init_paper_studio_from_pipeline", stage["command"])
 
     def test_paper_stage_is_complete_only_when_all_synced_outputs_are_complete(self):
         with TemporaryDirectory() as directory:
@@ -354,7 +498,27 @@ class ResearchStudioTests(unittest.TestCase):
 
         self.assertEqual(stage["status"], "complete")
 
-    def test_pipeline_tabs_use_readable_typography_and_bumped_cache(self):
+    def test_paper_stage_accepts_live_compile_ok_as_complete(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            paper = root / "paper"
+            (paper / ".paper_studio").mkdir(parents=True)
+            (paper / "paper_studio.json").write_text(json.dumps({
+                "project": {"id": "complete", "name": "Complete"},
+                "figures": {"F1": {}}, "tables": {"T1": {}},
+            }), encoding="utf-8")
+            (paper / ".paper_studio/state.json").write_text(json.dumps({
+                "sections": {"abstract": {"paragraphs": [{"accepted_text": "done"}]}},
+                "figures": {"F1": {"status": "approved"}},
+                "tables": {"T1": {"status": "approved"}},
+                "compile": {"status": "ok"},
+            }), encoding="utf-8")
+
+            stage = studio.paper_stage(root)
+
+        self.assertEqual(stage["status"], "complete")
+
+    def test_pipeline_tabs_match_paper_tab_dimensions_and_bumped_cache(self):
         root = Path(__file__).resolve().parents[1]
         style_source = (
             root / "research_avatar" / "research_studio" / "static" / "style.css"
@@ -362,9 +526,9 @@ class ResearchStudioTests(unittest.TestCase):
         index_source = (
             root / "research_avatar" / "research_studio" / "static" / "index.html"
         ).read_text(encoding="utf-8")
-        self.assertIn(".pipeline-button strong{font-size:14px", style_source)
-        self.assertIn("font:750 10px var(--serif)", style_source)
-        self.assertIn("/style.css?v=20260810-typography", index_source)
+        self.assertIn(".pipeline-button strong{font-size:11px", style_source)
+        self.assertIn("font:750 8px var(--serif)", style_source)
+        self.assertIn("/style.css?v=20260820-command-copy", index_source)
 
     def test_live_demo_matches_the_local_six_stage_navigation(self):
         root = Path(__file__).resolve().parents[1]
@@ -379,37 +543,37 @@ class ResearchStudioTests(unittest.TestCase):
             for stage_id in ("profile", "literature", "ideas", "expplan", "runplan", "paper")
         ]
         self.assertEqual(stage_positions, sorted(stage_positions))
-        self.assertIn("grid-template-columns:repeat(6,1fr)", demo_style)
+        self.assertIn("grid-template-columns:repeat(6,minmax(112px,1fr))", demo_style)
         self.assertIn('id: "literature"', demo_source)
-        self.assertIn("compare: null", demo_source)
+        self.assertIn("Problem → Approaches → Evaluation → Gaps", demo_source)
+        self.assertIn("结果太多、太乱", demo_source)
         self.assertNotIn("README 对比", demo_source)
         self.assertNotIn("解析研究画像", demo_source)
         self.assertNotIn("upload-zone", demo_source)
         self.assertNotIn("paper/WRITING_STYLE.md", demo_source)
         self.assertNotIn("PROFILE.md", demo_source)
         self.assertNotIn('data-action="profile-section"', demo_source)
-        self.assertIn('reportDocument("profile"', demo_source)
+        self.assertIn('canonicalArtifact("profile")', demo_source)
         self.assertNotIn("profileDocument", demo_source)
         self.assertNotIn('class="profile-output"', demo_source)
         self.assertIn("$profileconstruct 使用 ~/Downloads/scholar_profile.html", demo_source)
-        for report_key in (
-            "profile",
-            "literature",
-            "ideas",
-            "runplan",
-        ):
-            self.assertIn(f'reportDocument("{report_key}"', demo_source)
+        for report_key in ("profile", "literature", "ideas", "expplan", "runplan"):
+            self.assertIn(f'canonicalArtifact("{report_key}")', demo_source)
         self.assertNotIn('reportDocument("results"', demo_source)
         self.assertNotIn('reportDocument("paper-studio"', demo_source)
-        self.assertIn("experimentPlanDemo()", demo_source)
-        self.assertIn("Margin-Targeted Typo Augmentation", demo_source)
-        self.assertIn("F2 · 六设置确认图", demo_source)
-        self.assertIn("50 类主实验", demo_source)
+        self.assertNotIn("调研范围与分类", demo_source)
+        self.assertIn("结构参考 · Ref Paper", demo_source)
+        self.assertIn("目标证据 · T1–T4", demo_source)
+        self.assertNotIn("MORE", demo_source)
+        self.assertIn("上方 1–4 如何落实到下面的实验任务", demo_source)
+        self.assertIn("${goal.id} → ${artifacts(goal)}", demo_source)
+        self.assertIn("goalMap", demo_source)
+        self.assertIn("下方六张任务卡逐项执行并核验", demo_source)
         self.assertNotIn("First-Divergence Repair", demo_source)
         self.assertNotIn("F3A · Only the first-exit layer", demo_source)
         self.assertNotIn("F4 · Safety–utility sensitivity", demo_source)
-        self.assertIn("provenance-number", demo_source)
-        self.assertIn("provenance-tooltip", demo_source)
+        self.assertNotIn("results/typo_margin", demo_source)
+        self.assertIn("表格逐格核对论文数值", demo_source)
         self.assertIn('"全部任务已确认"', demo_source)
         self.assertIn("一次确认全部任务", demo_source)
         self.assertIn("逐项确认", demo_source)
@@ -419,7 +583,7 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertNotIn('data-action="paper-view"', demo_source)
         self.assertNotIn("RESULTS_LEDGER.csv", demo_source)
         self.assertNotIn("data-provenance-trigger", demo_source)
-        self.assertNotIn("scrollIntoView", demo_source)
+        self.assertIn('target.scrollIntoView({behavior:"smooth", block:"center"})', demo_source)
         self.assertIn("Research Avatar", demo_source)
         self.assertNotIn("RESEARCH BUDDY", demo_source)
         self.assertIn("overflow-y:auto", demo_style)
@@ -469,6 +633,10 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertEqual(state["reason"], "Best falsifier")
         self.assertIn("Selected: I2 — Second", updated)
         self.assertIn("已选择 I2", updated)
+        self.assertIn(
+            '<article class="idea" data-idea-id="I1"><h3>I1 · First</h3><p class="pitch">One</p></article>',
+            updated,
+        )
 
     def test_ledger_renderer_keeps_headers_when_no_results_exist(self):
         with TemporaryDirectory() as directory:
@@ -593,9 +761,62 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertEqual(state["stages"][4]["goals"][0]["status"], "completed")
         self.assertEqual(
             [item["key"] for item in state["stages"][4]["artifacts"]],
-            ["runplan"],
+            ["results", "runplan"],
         )
+        self.assertEqual(state["stages"][4]["default_artifact_key"], "results")
         self.assertEqual(state["stages"][4]["results_backend"]["key"], "results")
+
+    def test_build_state_overlays_available_reconstruction_tabs_and_falls_back(self):
+        with TemporaryDirectory() as directory:
+            base = Path(directory)
+            root = base / "main"
+            overlay = base / "caa"
+            for project in (root, overlay):
+                (project / "reports").mkdir(parents=True)
+                (project / "paper").mkdir()
+            (root / "researcher-profile").mkdir()
+            (root / "researcher-profile" / "PROFILE.html").write_text(
+                "<title>Main Researcher</title>", encoding="utf-8"
+            )
+            (root / "reports" / "01_LIT_SURVEY.html").write_text(
+                "<title>Main Survey</title>", encoding="utf-8"
+            )
+            (root / "reports" / "02_IDEA_REPORT.html").write_text(
+                "<title>Main Ideas</title>", encoding="utf-8"
+            )
+            (overlay / "reports" / "01_LIT_SURVEY.html").write_text(
+                "<title>CAA Survey</title>", encoding="utf-8"
+            )
+            (overlay / "reports" / "03_EXPERIMENT_PLAN.html").write_text(
+                '<title>CAA Plan</title><script id="experiment-plan-contract" '
+                'type="application/json">{"approval_status":"approved"}</script>',
+                encoding="utf-8",
+            )
+            (overlay / "reports" / "04_RUN_PLAN.html").write_text(
+                '<title>CAA Run</title><script id="run-plan-state" '
+                'type="application/json">{"state":"completed","goals":[]}</script>',
+                encoding="utf-8",
+            )
+            (overlay / "reports" / "05_EXP_RESULT.html").write_text(
+                "<title>CAA Results</title>", encoding="utf-8"
+            )
+            (overlay / "paper" / "paper_studio.json").write_text(
+                json.dumps({"project": {"name": "CAA Paper"}}), encoding="utf-8"
+            )
+
+            state = build_state(root, overlay)
+
+        self.assertEqual(state["project"]["name"], "CAA Paper")
+        self.assertEqual(state["project"]["root"], str(root))
+        self.assertEqual(state["project"]["paper_root"], str(overlay.resolve()))
+        self.assertEqual(state["stages"][0]["status"], "complete")
+        self.assertEqual(state["stages"][1]["artifacts"][0]["title"], "CAA Survey")
+        self.assertEqual(state["stages"][2]["artifacts"][0]["title"], "Main Ideas")
+        self.assertEqual(state["stages"][3]["artifacts"][0]["title"], "CAA Plan")
+        self.assertEqual(
+            [item["title"] for item in state["stages"][4]["artifacts"]],
+            ["CAA Results", "CAA Run"],
+        )
 
 
 if __name__ == "__main__":

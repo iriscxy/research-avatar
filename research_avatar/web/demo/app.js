@@ -28,6 +28,76 @@ const projectedPanel = ({ title, dataset, metric, fields, xLabel, xs, series, im
     </div>
   </section>`;
 
+const projectedPaperExample = () => `
+  <section class="workflow-example" data-demo-example="projected-f2">
+    <p class="artifact-kicker">具体例子 · Projected Paper</p>
+    <h4>参照结构论文规划写作逻辑，再为 Introduction 的图 2 保留待填证据</h4>
+    <div class="reference-writing-contract">
+      <b>结构参考 · Ref Paper</b>
+      <span>下面逐项给出 Ref Paper 段落位置与目标论文段落的对应关系；只迁移论证功能与图表节奏，不迁移研究内容、数据或结论。</span>
+    </div>
+    <div class="paper-structure-flow" aria-label="预期论文结构">
+      <div><b>Ref Paper · §1 P3</b><em>失败现象 → 研究缺口</em><span>目标论文 · Introduction I-P3：提出固定目标组合导致训练波动。</span><strong>目标证据 · F2</strong></div>
+      <i>→</i><div><b>Ref Paper · §3.1</b><em>按问题顺序展开方法</em><span>目标论文 · Method M-P1–P3：定义分阶段训练与自适应权重。</span><strong>目标证据 · F3</strong></div>
+      <i>→</i><div><b>Ref Paper · §4.2–§4.3</b><em>主结果 → 消融</em><span>目标论文 · Experiments E-P2–P4：比较任务效果、效率与组件贡献。</span><strong>目标证据 · T1–T4</strong></div>
+      <i>→</i><div><b>Ref Paper · §4.4</b><em>观察 → 解释 → 边界</em><span>目标论文 · Analysis A-P1–P3：分析人评、权重变化和失败案例。</span><strong>目标证据 · F4–F5</strong></div>
+    </div>
+    <div class="figure-data-pair projected-example-pair">
+      <div class="numeric-source">
+        <h5>F2 待填数据表</h5>
+        <div class="table-scroll"><table class="source-table projected-f2-table"><thead><tr><th>Objective</th><th>Metric</th><th>Statistic</th><th>Value</th></tr></thead><tbody>
+          <tr><th>Reasoning only</th><td>Reasoning accuracy</td><td>Average std</td><td class="demo-pending">待实验</td></tr>
+          <tr><th>Rsn+Gen</th><td>Reasoning accuracy</td><td>Average std</td><td class="demo-pending">待实验</td></tr>
+          <tr><th>Generation only</th><td>Response quality</td><td>Std range</td><td class="demo-pending">待实验</td></tr>
+          <tr><th>Rsn+Gen</th><td>Response quality</td><td>Std range</td><td class="demo-pending">待实验</td></tr>
+        </tbody></table></div>
+        <p class="field-line">预先固定：训练目标、指标、统计量、数值与来源定位；结果生成前不允许补造。</p>
+      </div>
+      <figure class="blank-chart projected-chart" aria-label="图 2 待填图">
+        <span class="blank-axis blank-x"></span><span class="blank-axis blank-y"></span>
+        <strong>F2 · Training dynamics</strong><span>等待左侧数据合同完成后自动绘图</span>
+      </figure>
+    </div>
+  </section>`;
+
+const provenanceValue = (value, locator, calculation) => `
+  <a class="provenance-number" href="#run-plan" data-provenance-target="demo-f2-provenance">
+    ${escapeHtml(value)}
+    <span class="provenance-tooltip"><b>点击查看得到过程</b><span><strong>来源：</strong>${escapeHtml(locator)}</span><span><strong>处理：</strong>${escapeHtml(calculation)}</span><span><strong>核验：</strong>两次定位核对 · VERIFIED</span></span>
+  </a>`;
+
+const completedExperimentExample = () => `
+  <section class="workflow-example completed-example" data-demo-example="completed-f2">
+    <p class="artifact-kicker">具体例子 · 已完成 Goal G1.1</p>
+    <h4>同一张 F2 已填入数据，并由表格直接生成结果图</h4>
+    <div class="completed-result-grid">
+      <div class="table-scroll"><table class="source-table completed-source"><thead><tr><th>Objective</th><th>Metric</th><th>Statistic</th><th>Value</th></tr></thead><tbody>
+        <tr><th>Reasoning only</th><td>Reasoning accuracy</td><td>Average std</td><td>${provenanceValue("0.030", "runs/G1.1/reasoning_only/metrics.jsonl", "汇总 3 个种子的 checkpoint 标准差后取平均")}</td></tr>
+        <tr><th>Rsn+Gen</th><td>Reasoning accuracy</td><td>Average std</td><td>${provenanceValue("0.073", "runs/G1.1/joint/metrics.jsonl", "汇总 3 个种子的 checkpoint 标准差后取平均")}</td></tr>
+        <tr><th>Reasoning only</th><td>Reasoning accuracy</td><td>Std range</td><td>${provenanceValue("0.02–0.04", "runs/G1.1/reasoning_only/metrics.jsonl", "读取各随机种子的最小值与最大值")}</td></tr>
+        <tr><th>Rsn+Gen</th><td>Reasoning accuracy</td><td>Std range</td><td>${provenanceValue("0.07–0.08", "runs/G1.1/joint/metrics.jsonl", "读取各随机种子的最小值与最大值")}</td></tr>
+        <tr><th>Generation only</th><td>Response quality</td><td>Std range</td><td>${provenanceValue("0.06–0.07", "runs/G1.1/generation_only/metrics.jsonl", "读取各随机种子的最小值与最大值")}</td></tr>
+        <tr><th>Rsn+Gen</th><td>Response quality</td><td>Std range</td><td>${provenanceValue("0.11–0.13", "runs/G1.1/joint/metrics.jsonl", "读取各随机种子的最小值与最大值")}</td></tr>
+      </tbody></table></div>
+      <figure class="completed-chart" aria-label="图 2 已完成的训练波动结果">
+        <svg viewBox="0 0 560 330" role="img" aria-label="四个训练目标的标准差范围">
+          <g class="chart-grid"><line x1="145" y1="55" x2="515" y2="55"/><line x1="145" y1="115" x2="515" y2="115"/><line x1="145" y1="175" x2="515" y2="175"/><line x1="145" y1="235" x2="515" y2="235"/></g>
+          <g class="chart-axis"><line x1="145" y1="270" x2="515" y2="270"/><line x1="145" y1="35" x2="145" y2="270"/></g>
+          <g class="chart-labels"><text x="10" y="59">Reasoning only</text><text x="64" y="119">Rsn+Gen</text><text x="20" y="179">Generation only</text><text x="64" y="239">Rsn+Gen</text><text x="140" y="292">0.00</text><text x="268" y="292">0.05</text><text x="400" y="292">0.10</text><text x="500" y="292">0.14</text></g>
+          <g stroke="#203f4d" stroke-width="8" stroke-linecap="round"><line x1="198" y1="55" x2="251" y2="55"/><line x1="330" y1="115" x2="356" y2="115"/></g>
+          <g stroke="#0a8a78" stroke-width="8" stroke-linecap="round"><line x1="303" y1="175" x2="330" y2="175"/><line x1="435" y1="235" x2="488" y2="235"/></g>
+          <g fill="#fff" stroke="#203f4d" stroke-width="4"><circle cx="224" cy="55" r="7"/><circle cx="338" cy="115" r="7"/></g>
+        </svg>
+        <figcaption>F2 · 表中范围决定线段，精确平均值决定圆点；没有公开的 checkpoint 数组不被伪造。</figcaption>
+      </figure>
+    </div>
+    <p class="hover-instruction">每个绿色数值都是证据链接：悬停可预览来源与处理方式，点击可打开完整得到过程。</p>
+    <details id="demo-f2-provenance" class="provenance-card">
+      <summary>F2 数值的完整得到过程</summary>
+      <dl><dt>执行 Goal</dt><dd>G1.1 · 采集训练动态</dd><dt>原始数据</dt><dd>三个随机种子的结构化训练日志</dd><dt>定位</dt><dd>runs/G1.1/&lt;condition&gt;/metrics.jsonl</dd><dt>获取方式</dt><dd>Code Agent 读取每个 checkpoint 的指标并写入结构化 F2 数据表</dd><dt>计算规则</dt><dd>先按种子计算波动，再汇总平均值与范围；不从图形反推数据</dd><dt>图形生成</dt><dd>读取当前表格序列化值：范围→线段，平均值→圆点</dd><dt>验证状态</dt><dd><span class="verified-mark">VERIFIED · 数据行数、种子数与聚合结果核对通过</span></dd></dl>
+    </details>
+  </section>`;
+
 const resultTable = ({ id, title, headers, rows, note }) => `
   <section class="evidence-artifact result-table-artifact">
     <p class="artifact-kicker">${id} · 等待实验结果</p>
@@ -36,65 +106,45 @@ const resultTable = ({ id, title, headers, rows, note }) => `
     <p>${note}</p>
   </section>`;
 
-const experimentPlanDemo = () => {
-  const methods = ["仅干净数据", "同预算随机增强", "MTA（本文方法）", "四倍完整混合增强"];
-  return `
-    <article class="actual-expplan">
-      <header class="expplan-title">
-        <p class="artifact-kicker">实验方案 · 已确认</p>
-        <h4>Margin-Targeted Typo Augmentation</h4>
-        <p>在类别配额和重训练样本数相同的条件下，检验优先选择低真实标签分数差的拼写扰动是否优于随机选择。</p>
-        <div class="expplan-facts"><span>COLING 2027 短文</span><span>3 张图</span><span>2 张表</span><span>40 个待填数据单元</span><span>本地 CPU · 无需 GPU</span></div>
-      </header>
-
-      <section class="plain-section projected-abstract">
-        <p class="artifact-kicker">标题与摘要方向</p>
-        <h4>Spend Typo Budget Where the Classifier Is Unsure</h4>
-        <p>MTA 为每条训练样本生成交换、删除、插入和键盘邻键四类拼写扰动，用干净分类器计算真实标签分数差，再按类别等额选择最低分数差的候选。实验只改变选择策略，其余条件保持一致。</p>
-      </section>
-
-      <section class="plain-section setup-section">
-        <p class="artifact-kicker">段落与证据</p><h4>每个关键主张都有对应图表和失败条件</h4>
-        <dl class="setup-grid"><dt>数据</dt><dd>固定版本 CLINC150；50 类主实验与 20 类范围检查</dd><dt>模型</dt><dd>共享的多项式朴素贝叶斯词频分类器</dd><dt>比较方法</dt><dd>仅干净数据 · 类别平衡随机增强 · MTA · 类别平衡完整混合</dd><dt>主要指标</dt><dd>干净准确率 · 四类拼写扰动的平均与最差准确率 · 配对自助法 95% 区间</dd><dt>固定种子</dt><dd>六个设置使用同一组 8 个确认种子</dd><dt>证据产物</dt><dd>F1 动机图 · T1 主表 · F2 六设置区间图 · T2 操作符表 · F3 固定 20 类预算曲线</dd></dl>
-      </section>
-
-      ${resultTable({id:"T1",title:"50 类主实验",headers:["方法","干净准确率 ↑","平均扰动准确率 ↑","最差操作符准确率 ↑","增强样本数 ↓"],rows:methods,note:"C1 要求 MTA−随机的配对 95% 区间下界大于 0；C2 要求 MTA−完整混合的区间下界大于 −0.01。"})}
-
-      <section class="evidence-artifact">
-        <p class="artifact-kicker">F2 · 六设置确认图</p><h4>同一冻结种子组上的结果必须全部为正</h4>
-        ${pendingTable({headers:["设置","MTA − 随机 · 平均扰动准确率","配对 95% 区间"],rows:["50 类","20 类","扰动强度 0.30","扰动强度 0.60","预算 10%","预算 50%"]})}
-        <p class="field-line">图表源字段：case_id · seed · random_noisy_accuracy · mta_noisy_accuracy · bootstrap_ci</p>
-      </section>
-
-      <section class="plain-section claim-contract">
-        <p class="artifact-kicker">主张与失败条件</p><h4>正结果必须同时满足这些预先固定的边界</h4>
-        <div class="claim-rows"><div><b>C1</b><p>MTA 在全部六个设置中优于同预算随机选择。</p><span>任一配对区间下界不高于 0，则对应广度主张失败。</span></div><div><b>C2</b><p>主设置用四分之一增强样本达到完整混合的一点以内。</p><span>MTA−完整混合区间下界不高于 −0.01，则非劣主张失败。</span></div><div><b>C3</b><p>优势覆盖 swap、delete、insert、keyboard 四种测试操作符。</p><span>任一操作符点估计不优于随机，则收窄跨操作符主张。</span></div></div>
-      </section>
-
-      <section class="plain-section">
-        <p class="artifact-kicker">解释边界</p><h4>验证完整选择器效果，不冒充几何机制证明</h4>
-        <p>低分数差选择还可能改变编辑强度和难例来源的重复权重，因此当前设计只识别整个选择策略的效果；编辑数匹配与每来源唯一候选是后续机制对照，不作为当前论文已经证明的结论。</p>
-      </section>
-
-      <section class="approval-line"><strong>方案确认</strong><span>已确认 · 2026-08-17</span><p>阈值和设置固定在确认脚本中；若证据不支持，就报告失败条件而不是改写判断标准。</p></section>
-    </article>`;
-};
-
 let runPlanDemoState = null;
 
 const runStatusMark = status => ({completed:"✅",running:"▶",proposed:"→",locked:"○",pending:"○",blocked:"⚠",invalidated:"⚠"}[status] || "○");
 
 const publicPartTitles = {
-  P1: "基础通路验证",
-  P2: "正结果确认",
+  P1: "来源与重建政策",
+  P2: "离线比较证据",
+  P3: "线上 A/B 证据",
+  P4: "组件消融证据",
+  P5: "人评、权重与案例图",
 };
 
 const publicArtifactLabels = {
   F1: "图 1",
   F2: "图 2",
   F3: "图 3",
+  F4: "图 4",
+  F5: "图 5",
   T1: "表 1",
   T2: "表 2",
+  T3: "表 3",
+  T4: "表 4",
+};
+
+const runPlanTraceMap = () => {
+  if (!runPlanDemoState) return "";
+  const artifacts = goal => goal?.artifact_ids?.map(id => publicArtifactLabels[id] || id).join("、") || "无";
+  const goalMap = runPlanDemoState.goals.map(goal => `${goal.id} → ${artifacts(goal)}`).join("；");
+  const partMap = runPlanDemoState.parts.map(part => `${part.id} → ${(part.goals || []).join("、")}`).join("；");
+  return `<section class="runplan-trace-map" aria-label="执行计划四部分与实验任务的对应关系">
+    <div class="trace-map-head"><p class="artifact-kicker">从计划到执行</p><h4>上方 1–4 如何落实到下面的实验任务</h4><p>1–3 定义每项任务必须遵守的资源、实现和图表合同；第 4 部分给出任务层级。下方任务卡是这四部分的可执行展开，不是另一套计划。</p></div>
+    <div class="trace-map-grid">
+      <div><b>1 · 资源与时间估算</b><span>约束证据获取与原论文训练成本</span><strong>6 项证据任务已完成；论文训练披露为 8 张 GPU、约 47 小时。</strong></div>
+      <div><b>2 · 实现来源</b><span>规定精确复用和图形重建的边界</span><strong>表格逐格核对论文数值；曲线与案例图明确标记近似或定性重建。</strong></div>
+      <div><b>3 · 图表与任务对应</b><span>规定每项任务完成后回填什么论文证据</span><strong>${escapeHtml(goalMap)}</strong></div>
+      <div><b>4 · 阶段与任务</b><span>把前三项约束组织成依赖有序的执行单元</span><strong>${escapeHtml(partMap)}</strong></div>
+    </div>
+    <div class="trace-map-arrow"><span>上方执行合同</span><i>↓</i><strong>下方六张任务卡逐项执行并核验</strong></div>
+  </section>`;
 };
 
 const executionModePanel = goal => `<div class="demo-current-goal execution-mode-panel" data-demo-current-goal="${escapeHtml(goal.id)}">
@@ -113,57 +163,29 @@ const goalHierarchy = () => {
   const goals = Object.fromEntries(runPlanDemoState.goals.map(goal => [goal.id, goal]));
   const currentId = runPlanDemoState.active_goal || runPlanDemoState.proposed_goal_id;
   const completed = runPlanDemoState.goals.filter(goal => goal.status === "completed").length;
-  const representativeGoalIds = [currentId, "G1.1", "G2.1"].filter((id, index, ids) => id && goals[id] && ids.indexOf(id) === index);
+  const representativeGoalIds = runPlanDemoState.goals.map(goal => goal.id);
   const representativeParts = representativeGoalIds.map(goalId => {
     const goal = goals[goalId];
     const part = runPlanDemoState.parts.find(item => item.id === goal.part_id);
     return {part, goal};
   });
-  return `<section class="goal-hierarchy"><p class="artifact-kicker">实验任务</p><p class="runplan-demo-note">两项任务依次完成运行环境核验和六设置确认。当前 ${completed}/${runPlanDemoState.goals.length} 项已完成。</p>${representativeParts.map(({part, goal}) => {
+  return `<section class="goal-hierarchy"><p class="artifact-kicker">实验任务</p><p class="runplan-demo-note">六项任务依次核验来源、离线比较、线上 A/B、组件消融以及人评与案例图。当前 ${completed}/${runPlanDemoState.goals.length} 项已完成。</p>${representativeParts.map(({part, goal}) => {
     const destination = goal.artifact_ids?.length ? goal.artifact_ids.map(id => publicArtifactLabels[id] || id).join("、") : "本任务不直接更新图表";
-    const completedExample = goal.id === "G2.1";
-    return `<div class="part-row"><h4><span>${escapeHtml(part.id.replace("P", "阶段 "))}</span>${escapeHtml(publicPartTitles[part.id] || part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p><div class="expanded-goal ${completedExample ? "demo-completed-goal" : ""}"><b>${completedExample ? "✅" : runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}</strong><span>对应论文内容：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成标准：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? executionModePanel(goal) : ""}${completedExample ? resultProvenanceDemo() : ""}</div></div>`;
+    return `<div class="part-row"><h4><span>${escapeHtml(part.id.replace("P", "阶段 "))}</span>${escapeHtml(publicPartTitles[part.id] || part.title)}</h4><p class="part-decision">${escapeHtml(part.decision)}</p><div class="expanded-goal"><b>${runStatusMark(goal.status)}</b><strong>${escapeHtml(goal.id)} · ${escapeHtml(goal.title)}</strong><span>对应论文内容：${escapeHtml(destination)}</span><p>${escapeHtml(goal.visible_work)} ${escapeHtml(goal.visible_evidence)} 完成标准：${escapeHtml(goal.completion_check)}</p>${goal.id === currentId ? executionModePanel(goal) : ""}</div></div>`;
   }).join("")}</section>`;
 };
-
-const completedF2Rows = [
-  ["50 类", 0.01675, 0.01317, 0.02079],
-  ["20 类", 0.01307, 0.00802, 0.01688],
-  ["severity .30", 0.00745, 0.00547, 0.00943],
-  ["severity .60", 0.01641, 0.01016, 0.02172],
-  ["budget 10%", 0.00682, 0.00344, 0.01073],
-  ["budget 50%", 0.01740, 0.01359, 0.02120],
-];
-
-const provenanceNumber = (value, setting, field) => `<span class="provenance-number" tabindex="0">${value.toFixed(4)}<span class="provenance-tooltip" role="tooltip"><b>已核验结果</b><span><strong>任务</strong> G2.1</span><span><strong>设置</strong> ${setting} · ${field}</span><span><strong>原始结果</strong> results/typo_margin/confirmatory_results.json</span><span><strong>派生数据</strong> results/typo_margin/paper_values.json</span><span><strong>计算</strong> 8 个确认种子的配对准确率差与百分位自助法区间</span><span><strong>运行命令</strong> python3 code/typo_margin/confirm.py</span><span><strong>验证</strong> 40/40 数据单元已核验</span></span></span>`;
-
-const completedF2Chart = () => {
-  const x = value => 55 + value / 0.025 * 410;
-  return `<figure class="completed-chart"><svg viewBox="0 0 520 260" role="img" aria-label="六个确认设置的 MTA 减随机准确率及 95% 区间"><g class="chart-grid"><line x1="55" y1="25" x2="55" y2="225"/><line x1="219" y1="25" x2="219" y2="225"/><line x1="383" y1="25" x2="383" y2="225"/></g>${completedF2Rows.map((row,index) => { const y=42+index*32; return `<text x="7" y="${y+4}" class="setting-label">${row[0]}</text><line x1="${x(row[2])}" y1="${y}" x2="${x(row[3])}" y2="${y}" class="ci-line"/><line x1="${x(row[2])}" y1="${y-5}" x2="${x(row[2])}" y2="${y+5}" class="ci-line"/><line x1="${x(row[3])}" y1="${y-5}" x2="${x(row[3])}" y2="${y+5}" class="ci-line"/><circle cx="${x(row[1])}" cy="${y}" r="4" class="point-style"/>`; }).join("")}<g class="chart-labels"><text x="50" y="247">0</text><text x="207" y="247">0.01</text><text x="371" y="247">0.02</text><text x="438" y="247">MTA − 随机</text></g></svg><figcaption>圆点为平均差，横线为配对自助法 95% 区间。</figcaption></figure>`;
-};
-
-const resultProvenanceDemo = () => `
-  <section class="evidence-artifact completed-result future-result-example"><p class="artifact-kicker">真实完成结果</p><h4>六个设置中的 MTA − 随机选择</h4>
-    <div class="simulated-run-summary"><strong>✅ 确认运行已完成</strong><span>40/40 数据单元已核验</span><span>配对区间可重算</span><span>图形可重新生成</span></div>
-    <p>这里展示当前正结果研究的真实确认数据。每个数字都能查看结果路径、计算方法、命令和验证状态。</p>
-    <div class="provenance-flow"><span>确认种子结果</span><i>→</i><span>配对差值</span><i>→</i><span>自助法区间</span><i>→</i><span>证据台账</span><i>→</i><span>论文图形</span></div>
-    <div class="completed-result-grid"><div class="table-scroll"><table class="result-shell source-table completed-source"><thead><tr><th>设置</th><th>平均差</th><th>95% 下界</th><th>95% 上界</th></tr></thead><tbody>${completedF2Rows.map(([setting,estimate,low,high]) => `<tr><th>${setting}</th><td>${provenanceNumber(estimate,setting,"estimate")}</td><td>${provenanceNumber(low,setting,"CI low")}</td><td>${provenanceNumber(high,setting,"CI high")}</td></tr>`).join("")}</tbody></table><p class="hover-instruction">鼠标停在任一数字上，或用键盘聚焦，即可查看来源、计算和验证过程。</p></div>${completedF2Chart()}</div>
-  </section>`;
 
 const paperStudioScreenshots = () => `<section class="paper-studio-live">
   <p class="artifact-kicker">论文写作工作区</p>
   <h4>Paper Studio</h4>
-  <a class="paper-studio-open-callout" href="/demo-studio/" target="_blank" rel="noopener">
-    <span>建议在新页面打开</span>
-    <strong>打开 Paper Studio →</strong>
-  </a>
   <div class="paper-studio-frame-shell">
-    <div class="paper-studio-frame-bar"><span>完成态 Demo · 只读</span></div>
-    <iframe src="/demo-studio/" title="完成态 Paper Studio 交互 Demo" loading="lazy"></iframe>
+    <div class="paper-studio-frame-bar"><span>本地当前状态快照 · 只读，输入与写入操作均已锁定</span></div>
+    <iframe src="/demo-studio/" title="Paper Studio 通用只读 Demo" loading="lazy"></iframe>
   </div>
 </section>`;
 
 let reportStructures = {};
+let artifactManifest = {};
 
 const publicReportTitles = {
   profile: "研究者画像",
@@ -175,27 +197,41 @@ const publicReportTitles = {
   "paper-studio": "论文写作工作区",
 };
 
-const publicSectionTitles = {
-  profile: {H:"数据来源与覆盖", 1:"研究方向", 2:"研究脉络", 3:"写作风格", 4:"实验习惯", 5:"工作偏好", 6:"论文记录"},
-  literature: {1:"调研范围与分类", 2:"主题地图", 3:"文献对比", 4:"当前争议", 5:"趋势与研究空白", 6:"核验过的参考文献"},
-  ideas: {1:"文献边界", 2:"候选方向排序", 3:"候选方案", 4:"研究者选择"},
-  expplan: {1:"投稿目标与参考依据", 2:"论文结构与证据规划", 3:"方案确认"},
-  runplan: {1:"资源与时间估算", 2:"实现来源", 3:"图表与任务对应", 4:"阶段与任务"},
-  results: {1:"完成进度", 2:"论文图表", 3:"数字如何生成"},
-  "paper-studio": {正文:"正文写作", 图:"图片制作", 表:"表格编辑"},
-};
+const runPlanGoalExample = () => `<div class="goal-status-example" aria-label="Parts and Goals 执行状态示例">
+  <div class="goal-status-legend"><span>✅ 已完成</span><span>▶ 执行中</span><span>❌ 未通过完成标准</span><span>○ 等待依赖</span></div>
+  <ol>
+    <li><span>Part 1</span><b>✅ G1.1 · 训练动态</b><em>F2 数据表与曲线已生成并核验</em></li>
+    <li><span>Part 1</span><b>✅ G1.2 · 主结果比较</b><em>T1 已填入全部基线与置信区间</em></li>
+    <li><span>Part 2</span><b>▶ G2.1 · 组件消融</b><em>3 组配置已完成 2 组</em></li>
+    <li><span>Part 2</span><b>○ G2.2 · 稳健性检查</b><em>等待 G2.1 产出最佳配置</em></li>
+    <li><span>Part 3</span><b>❌ G3.1 · 效率约束</b><em>延迟超过预设阈值，失败证据已保存</em></li>
+    <li><span>Part 3</span><b>○ G3.2 · 错误分析</b><em>等待前置结果完成后启动</em></li>
+  </ol>
+</div>`;
 
-const reportDocument = (key, kicker = "内容预览") => {
+const reportDocument = key => {
   const report = reportStructures[key];
   if (!report) return "";
-  return `<article class="report-document" aria-label="${report.artifact}内容预览">
-    <header><span>${kicker}</span><h4>${publicReportTitles[key] || report.artifact}</h4><p>${report.note}</p></header>
-    ${report.sections.map(section => `<section data-structure-section="${key}:${section.number}">
-      <div class="report-section-title"><span>${section.number}</span><h5>${publicSectionTitles[key]?.[section.number] || section.title}</h5></div>
-      <p>${section.content}</p>
-      ${section.details?.length ? `<ul>${section.details.map(detail => `<li>${detail}</li>`).join("")}</ul>` : ""}
-    </section>`).join("")}
+  return `<article class="report-document" aria-label="${escapeHtml(report.artifact)}内容总结">
+    <section class="report-structure-summary" aria-label="${escapeHtml(report.artifact)}结构总结">
+      <p class="report-overview">${escapeHtml(report.note)}</p>
+      <div class="report-section-grid">${report.sections.map(section => `<section data-structure-section="${escapeHtml(key)}:${escapeHtml(section.number)}">
+        <div class="report-section-title"><span>${escapeHtml(section.number)}</span><h5>${escapeHtml(section.title)}</h5></div>
+        <p>${escapeHtml(section.content)}</p>
+        ${section.details?.length ? `<ul>${section.details.map(detail => `<li>${escapeHtml(detail)}</li>`).join("")}</ul>` : ""}
+        ${key === "runplan" && String(section.number) === "4" ? runPlanGoalExample() : ""}
+      </section>`).join("")}</div>
+    </section>
   </article>`;
+};
+
+const canonicalArtifact = key => {
+  const artifact = artifactManifest[key];
+  const title = publicReportTitles[key] || reportStructures[key]?.artifact || key;
+  return `<section class="canonical-artifact" data-canonical-artifact="${escapeHtml(key)}">
+    <div class="canonical-artifact-head"><span>内容总结</span><strong>${escapeHtml(title)}</strong><small>${artifact?.source ? `对应本地 ${escapeHtml(artifact.source)}` : "对应本地 Research Studio 产物"}</small></div>
+    ${reportDocument(key)}
+  </section>`;
 };
 
 const stages = [
@@ -205,22 +241,23 @@ const stages = [
     render: () => `
       <div class="stage-head"><div><p class="eyebrow">第一步 · 研究者画像</p><h3>建立可复用的研究者画像</h3><p>从研究者提供的 Scholar 页面和本地写作样本中，整理研究方向、方法偏好、写作风格与实验习惯。</p></div><span class="status-pill">已完成</span></div>
       ${commandStrip("从本地 Scholar HTML 建立研究者画像", "$profileconstruct 使用 ~/Downloads/scholar_profile.html")}
-      ${reportDocument("profile", "画像预览")}`
+      ${canonicalArtifact("profile")}`
   },
   {
-    id: "literature", short: "文献调研", path: "literature", title: "先建立可核验的文献地图", compare: null,
+    id: "literature", short: "文献调研", path: "literature", title: "用四步结构提炼可核验的文献地图",
+    compare: ["一次返回大量论文、摘要和零散结论", "结果太多、太乱，方法类别、评测依据和真正的研究空白混在一起，很难直接用于判断。", "把核验过的证据归纳为 Problem → Approaches → Evaluation → Gaps：先界定问题，再分类方法、比较评测，最后推出研究空白，清晰、简洁、准确。"],
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">第二步 · 文献调研</p><h3>把相关工作整理成可核验的研究地图</h3><p>从不同角度检索并核对论文，梳理主要方向、争议和仍待解决的问题。</p></div><span class="status-pill">30 篇已核验</span></div>
-      ${commandStrip("整理并核验相关文献", "$researchlit typographical robustness in lightweight intent classification")}
-      ${reportDocument("literature")}`
+      <div class="stage-head"><div><p class="eyebrow">第二步 · 文献调研</p><h3>把相关工作整理成可核验的研究地图</h3><p>从不同角度检索并核对论文，梳理主要方向、争议和仍待解决的问题。</p></div><span class="status-pill">52 篇已核验</span></div>
+      ${commandStrip("整理并核验相关文献", "$researchlit <research topic>")}
+      ${canonicalArtifact("literature")}`
   },
   {
     id: "ideas", short: "方向选择", path: "ideas", title: "候选先过门槛，再由研究者选择",
     compare: ["通常用排序快速呈现候选方向", "研究者再判断价值与新颖性", "把新颖性与可证伪性设为独立硬门槛"],
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">第三步 · 研究方向</p><h3>比较候选方向，明确新颖性与风险</h3><p>每个方向都说明研究空白、核心机制、可证伪条件和最近工作的重合程度，最后由研究者选择。</p></div><span class="status-pill">I7 已选择</span></div>
+      <div class="stage-head"><div><p class="eyebrow">第三步 · 研究方向</p><h3>比较候选方向，明确新颖性与风险</h3><p>每个方向都说明研究空白、核心机制、可证伪条件和最近工作的重合程度，最后由研究者选择。</p></div><span class="status-pill">I1 已选择</span></div>
       ${commandStrip("生成候选方向并逐一核验", "$ideagen")}
-      ${reportDocument("ideas")}`
+      ${canonicalArtifact("ideas")}`
   },
   {
     id: "expplan", short: "实验设计", path: "experiment-plan", title: "先明确论文主张，再反推所需实验",
@@ -228,7 +265,8 @@ const stages = [
     render: () => `
       <div class="stage-head"><div><p class="eyebrow">第四步 · 实验设计</p><h3>从论文主张反推实验和证据</h3><p>先明确论文需要回答的问题，再为每个主张安排数据、基线、指标、图表和失败条件。</p></div><span class="status-pill">方案已确认</span></div>
       ${commandStrip("生成实验设计与待填图表", "$expplan")}
-      ${experimentPlanDemo()}`
+      ${canonicalArtifact("expplan")}
+      ${projectedPaperExample()}`
   },
   {
     id: "runplan", short: "实验执行", path: "run-plan", title: "按证据依赖执行实验",
@@ -238,16 +276,15 @@ const stages = [
       const allGoalsConfirmed = runPlanDemoState?.goal_confirmation?.scope === "all_goals";
       return `
       <div class="stage-head"><div><p class="eyebrow">第五步 · 实验执行</p><h3>按证据依赖执行实验</h3><p>每项任务都明确依赖、产出、完成标准和对应图表，可一次确认或逐项确认。</p></div><span class="status-pill">${allGoalsConfirmed ? "全部任务已确认" : `${escapeHtml(currentId)} 等待确认`}</span></div>
-      ${reportDocument("runplan")}
-      ${goalHierarchy()}`;
+      ${canonicalArtifact("runplan")}
+      ${completedExperimentExample()}`;
     }
   },
   {
     id: "paper", short: "论文写作", path: "paper-writing", title: "逐段写作、实时编译、图表可编辑",
     compare: ["倾向批量生成 Markdown 或 LaTeX 草稿", "适合快速获得整体版本", "正文调用 LLM API（不是 Code Agent）逐段生成；确认接受后才写入 LaTeX 并实时编译"],
     render: () => `
-      <div class="stage-head"><div><p class="eyebrow">第六步 · 论文写作</p><h3>撰写正文并制作图表</h3><p>正文、图表、LaTeX 与论文 PDF 在同一工作区同步更新。</p></div><span class="status-pill">写作工作区</span></div>
-      ${commandStrip("启动论文写作", "$paperwrite", "准备论文项目并打开 Paper Studio。")}
+      <div class="stage-head"><div><p class="eyebrow">第六步 · 论文写作</p><h3>撰写正文并制作图表</h3><p>正文、图表、LaTeX 与论文 PDF 在同一工作区同步更新。</p></div><span class="status-pill">20/26 段 · 进行中</span></div>
       ${paperStudioScreenshots()}`
   }
 ];
@@ -287,6 +324,7 @@ function renderCompare() {
 
 function renderStage() {
   const stage = stages[state.stage];
+  document.body.classList.toggle("paper-focus", stage.id === "paper");
   renderNav();
   path.textContent = `research-avatar-demo.pages.dev/${stage.path}`;
   content.innerHTML = stage.render();
@@ -305,20 +343,19 @@ nav.addEventListener("click", event => {
 
 window.addEventListener("popstate", syncStageFromLocation);
 window.addEventListener("hashchange", syncStageFromLocation);
-window.addEventListener("message", event => {
-  if (event.origin !== window.location.origin) return;
-  const paperFrame = document.querySelector('.paper-studio-live iframe[src="/demo-studio/"]');
-  if (
-    !paperFrame
-    || event.source !== paperFrame.contentWindow
-    || event.data?.type !== "paper-studio-demo-api-key-required"
-  ) return;
-  if (window.parent && window.parent !== window) {
-    window.parent.postMessage(event.data, window.location.origin);
-  }
-});
-
 document.addEventListener("click", async event => {
+  const provenanceLink = event.target.closest("[data-provenance-target]");
+  if (provenanceLink) {
+    event.preventDefault();
+    const target = document.getElementById(provenanceLink.dataset.provenanceTarget);
+    if (target) {
+      target.open = true;
+      target.classList.add("is-open");
+      target.scrollIntoView({behavior:"smooth", block:"center"});
+      target.querySelector("summary")?.focus();
+    }
+    return;
+  }
   const button = event.target.closest("[data-copy]");
   if (!button) return;
   const original = button.textContent;
@@ -348,14 +385,17 @@ document.addEventListener("click", async event => {
 
 async function initializeDemo() {
   try {
-    const [structureResponse, runPlanResponse] = await Promise.all([
-      fetch("report-structures.json?v=20260815-goal-modes"),
-      fetch("runplan-state.json?v=20260817-mta-positive")
+    const [structureResponse, runPlanResponse, artifactResponse] = await Promise.all([
+      fetch("report-structures.json?v=20260822-generic-workflow"),
+      fetch("runplan-state.json?v=20260822-generic-workflow"),
+      fetch("artifact-manifest.json?v=20260822-canonical-artifacts")
     ]);
     if (!structureResponse.ok) throw new Error(`report structures HTTP ${structureResponse.status}`);
     if (!runPlanResponse.ok) throw new Error(`run plan snapshot HTTP ${runPlanResponse.status}`);
+    if (!artifactResponse.ok) throw new Error(`artifact manifest HTTP ${artifactResponse.status}`);
     reportStructures = await structureResponse.json();
     runPlanDemoState = await runPlanResponse.json();
+    artifactManifest = await artifactResponse.json();
     state.stage = stageIndexFromLocation();
     renderStage();
   } catch (error) {

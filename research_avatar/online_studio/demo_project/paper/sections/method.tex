@@ -1,33 +1,68 @@
-\section{Margin-Targeted Augmentation}\label{sec:method}
+\section{MORE}
 
-\subsection{Candidate margins}
-Let $D=\{(x_i,y_i)\}_{i=1}^{n}$ be the clean training set, $O$ the four typo operators, and $f_0$ a classifier fitted on $D$. Each operator produces one deterministic candidate for a fixed seed,
-\begin{equation}
-c_{i,o}=T_o(x_i;s),\qquad o\in O.
-\end{equation}
-Writing $g_k(c)$ for the pre-normalization score of intent $k$, we measure how securely the candidate retains its true intent by
-\begin{equation}
-m(c_{i,o})=g_{y_i}(c_{i,o})-\max_{k\neq y_i}g_k(c_{i,o}).
-\end{equation}
-A negative margin means that the clean classifier assigns a competing intent a larger score. MTA uses low score gaps as a model-specific ranking signal, without consulting validation or test accuracy. The clean-only model computes the score before any augmented example is selected, so selection cannot benefit from a refitted classifier or final evaluation labels. Candidates remain separate records even when two operators emit the same surface form; this preserves the shared generation contract. The raw score gap is not a normalized geometric distance to a hyperplane. It can favor candidates with more edits or repeatedly select variants of one hard source, so the experiment tests the complete selector rather than isolating a boundary-proximity mechanism. Recomputing the ranking for a different representation is part of applying the method because score scales and competing intents may change. Ties follow immutable candidate order. Margin magnitude is only an ordering statistic: MTA assumes neither calibrated probabilities nor a tunable threshold.
+\label{sec:method}
 
-\subsection{Class-balanced selection}
-For total budget $B$ and label set $\mathcal{Y}$, the quota for label $y$ is
-\begin{equation}
-q_y=\left\lfloor \frac{B}{|\mathcal{Y}|}\right\rfloor+r_y,
-\qquad \sum_{y\in\mathcal{Y}}r_y=B\bmod |\mathcal{Y}|,
-\end{equation}
-where the deterministic remainders $r_y\in\{0,1\}$ follow label order. Within each label, MTA takes the $q_y$ candidates with the smallest margin:
-\begin{equation}
-S_y=\underset{S\subseteq C_y,\ |S|=q_y}{\arg\min}\ \sum_{c\in S}m(c),
-\qquad S=\bigcup_y S_y.
-\label{eq:selection}
-\end{equation}
-This construction guarantees the same total count and intent distribution as the random-budget control. The class-balanced random baseline samples $q_y$ candidates in each class; balanced full-mixture augmentation takes one example per clean item and distributes operators evenly. Every method refits the same multinomial Naive Bayes classifier. Without class constraints, global ranking could reweight difficult intents. All declared quotas are feasible because each class contributes four candidate streams per clean example. Quotas are fixed before ranking, so MTA and random differ in within-class membership, not class counts. This also makes class counts directly auditable. Selection adds one sort per class after shared candidate scoring and no additional model fit. The augmented-example ratio is computed against the full mixture.
+% PAPER_STUDIO_PARAGRAPH:M-P1
 
-\subsection{Decision rules}
-We evaluate clean accuracy and accuracy for swap, deletion, insertion, and keyboard-neighbor substitution. Mean noisy accuracy averages the four operator accuracies within each seed; the worst-operator score takes their minimum. The primary comparison is the paired seed-level difference between MTA and random selection. Claim C1 requires the lower endpoint of its bootstrap 95\% interval to exceed zero in every declared setting. Claim C2 uses a non-inferiority margin $\epsilon=0.01$: if $\Delta_{\mathrm{MTA-full}}$ denotes paired mean noisy accuracy, support requires
-\begin{equation}
-\operatorname{LCB}_{.95}(\Delta_{\mathrm{MTA-full}})>-\epsilon.
-\end{equation}
-The bootstrap resamples the eight frozen perturbation seeds and recomputes the paired statistic; no setting or threshold is selected from final performance. Pairing is essential because all methods within a seed see perturbations derived from the same clean examples. The paired noisy-accuracy difference removes seed-level difficulty before resampling, whereas an unpaired interval discards this control. We retain unrounded per-seed accuracies and decide from percentile endpoints. Clean accuracy guards against robustness purchased by destroying uncorrupted performance, and the worst-operator score prevents a favorable mean from concealing one failed edit family. The primary scope takes the first 50 lexicographically ordered intents, giving 5,000 training, 1,000 validation, and 1,500 test utterances; a 20-intent scope tests label-space sensitivity. Additive smoothing is 1.0, and every selection policy receives the same candidate pool. This inferential design tests repeatability across perturbation randomness, not uncertainty from resampling the dataset or changing model families.
+We formalize the dialogue response problem as follows. Each interaction is a triple \((u, h, q)\), where \(u\) is a structured user profile, \(h\) is the dialogue history preceding the current turn, and \(q\) is the user's current query. The goal is to learn a policy \(\pi_\theta\) that maps \((u, h, q)\) to a natural-language response \(r\). The profile \(u\) encodes attributes relevant to the seller's reasoning, such as preference constraints and eligibility information; the history \(h\) captures the conversational context, including previously stated requirements and any prior system utterances. The query \(q\) reflects the user's immediate request at the present turn. These three inputs constitute the complete context available at generation time. Training proceeds in a staged manner: a reasoning-enhanced policy is first produced through scaffold tasks, and the final generator is then trained by adapting this policy under the multi-reward objective described in the remainder of this section, while a supervised baseline of standard response generation provides the initial policy.
+
+% PAPER_STUDIO_PARAGRAPH:M-P2
+
+For each context \((u, h, q)\), the policy generates a group of \(G\) candidate responses \(r_1, \dots, r_G\) sampled from \(\pi_\theta\). All candidates within a group share the same context, enabling group-relative comparison of their reward scores. For each candidate \(r_i\), we compute a reward \(R(r_i)\) by aggregating the multi-reward channels described in M-P5, then define a normalized advantage
+
+\[
+A_i =
+\begin{aligned}
+\frac{R(r_i) - \frac{1}{G}\sum_{j=1}^{G} R(r_j)}
+{\sqrt{\frac{1}{G}\sum_{j=1}^{G} \bigl(R(r_j) - \bar{R}\bigr)^2 + \epsilon}}
+\end{aligned}
+\]
+
+where \(\bar{R}\) denotes the group mean and \(\epsilon\) is a small constant for numerical stability. The policy is updated via clipped objective
+
+\[
+L(\theta) =
+\begin{aligned}
+\mathbb{E}_{(u,h,q)}
+\left[\frac{1}{G}\sum_{i=1}^{G} \min\left(
+\rho_i A_i,\;
+\operatorname{clip}(\rho_i, 1-\delta, 1+\delta) A_i
+\right)\right]
+\end{aligned}
+\]
+
+with importance ratio \(\rho_i = \pi_\theta(r_i \mid u,h,q) / \pi_{\text{old}}(r_i \mid u,h,q)\), where \(\pi_{\text{old}}\) is the policy snapshot before the update. To prevent the policy from drifting too far, an additional KL anchor term penalizes divergence from the frozen reference policy \(\pi_{\text{ref}}\) established in M-P4. The final training objective combines the clipped group-relative loss with a KL penalty
+
+\[
+L_{\text{total}}(\theta) =
+\begin{aligned}
+L(\theta) - \beta \cdot \frac{1}{G}\sum_{i=1}^{G}
+\operatorname{KL}\bigl(\pi_\theta(\cdot \mid u,h,q) \,\|\, \pi_{\text{ref}}(\cdot \mid u,h,q)\bigr)
+\end{aligned}
+\]
+
+with coefficient \(\beta\) controlling the strength of the anchor.
+
+% PAPER_STUDIO_PARAGRAPH:M-P3
+
+We construct the reasoning enhancer through two verifiable scaffold tasks that produce inspectable intermediate signals. The first is masked attribute completion. Given a dialogue context and a structured profile, we mask a subset of attribute values and train the model to recover them. Because the ground-truth values are recorded in the profile, correctness can be checked directly without human annotation. The second is programmatic numerical reasoning. We sample attribute combinations and programmatically compose arithmetic expressions over their values, such as price comparisons or eligibility thresholds. The model is trained to produce the intermediate expression alongside the final result, and both are verified against the deterministic programmatic computation. These tasks provide dense, objective training signal that rewards faithful reasoning rather than surface fluency. After training, the resulting policy serves as the frozen reference \(\pi_{\text{ref}}\) used in the KL anchor of M-P2, supplying stable reasoning behavior during subsequent reward-driven optimization.
+
+% PAPER_STUDIO_PARAGRAPH:M-P4
+
+The reasoning-enhanced policy is kept frozen and used only as a reference for KL anchoring rather than being combined into a jointly mixed reward objective. This design choice follows from the distinct roles of the two stages. The scaffold training in M-P3 optimizes for verifiable reasoning fidelity, producing a policy whose behavior is interpretable and checkable against deterministic ground truths. If that same policy were directly added as a reward channel during response optimization, its dense corrective signal could overwhelm the comparatively sparse quality rewards, and any residual errors in the scaffold itself would propagate into the final objective without an explicit mechanism to contain them. Treating the reasoning policy as a frozen reference instead preserves its stable behavior as a prior while allowing the adaptive gradient-ranked weighting of M-P6 to coordinate the response-quality channels. The KL anchor then keeps the final policy near this reasoning-competent region without letting any single objective dominate the others during training.
+
+% PAPER_STUDIO_PARAGRAPH:M-P5
+
+For every candidate response \(r_i\), we evaluate a set of response-quality reward channels that capture distinct desiderata. The correctness channel measures whether the response satisfies the user's stated requirements and the relevant attribute constraints from the profile, rewarding responses that faithfully reflect the reasoning outcome. The naturalness channel scores the response for fluency and conversational appropriateness, favoring language that reads as a natural human-written turn. The coverage channel rewards responses that address all aspects of the user's query and the dialogue context, penalizing omissions of required information. Each channel is computed as a scalar reward, and the per-candidate reward \(R(r_i)\) is obtained by aggregating these channels with a weighted combination. The weights are not fixed globally; rather, the rank-based gradient-weighting mechanism of M-P6 adapts the influence of each channel according to the local context, so that the relative emphasis among correctness, naturalness, and coverage varies appropriately across training instances.
+
+% PAPER_STUDIO_PARAGRAPH:M-P6
+
+Rather than fixing reward weights a priori or tuning them as global hyperparameters, MORE coordinates the response-quality channels through a rank-based gradient-weighting mechanism that adapts to each training context. For each group of candidates sharing the same context, we compute a per-channel ranking of the candidates according to that channel's reward. The resulting cross-channel rank agreement indicates whether the channels are aligned or in conflict for the given context. When a channel's ranking disagrees with the aggregated ranking of the other channels, that channel is treated as less informative for the current instance, and its gradient contribution is down-weighted accordingly. Conversely, channels whose rankings agree receive relatively larger weight. This mechanism makes the effective reward mixture context-sensitive: the optimization emphasizes the channel that best discriminates among candidates at each step, rather than applying a static blend across all instances. Figure~\ref{framework-figure} illustrates this adaptive coordination alongside the reasoning scaffold, the frozen reference, and the direct-response inference used at deployment.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{fig/f3.pdf}
+  \caption{Qualitative reconstruction of the reasoning scaffold, frozen reference, adaptive reward coordination through rank-based gradient weighting, and direct-response inference at deployment.}
+  \Description{Qualitative reconstruction of the reasoning scaffold, frozen reference, adaptive reward coordination through rank-based gradient weighting, and direct-response inference at deployment.}
+  \label{framework-figure}
+\end{figure*}

@@ -1,5 +1,10 @@
 {
-  "profile":{"artifact":"研究者画像","note":"集中呈现研究方向、方法偏好、写作风格和实验习惯","sections":[
+  "profile":{"artifact":"研究者画像","note":"集中呈现研究方向、方法偏好、写作风格和实验习惯","features":[
+    {"title":"整合研究履历","content":"从 Scholar 导出、出版记录和本地写作样本建立统一研究者档案。"},
+    {"title":"提炼研究偏好","content":"识别长期研究主线、常用方法、实验习惯与风险偏好。"},
+    {"title":"校准后续生成","content":"为文献调研、Idea 生成、实验设计和论文写作提供个性化约束。"},
+    {"title":"保留来源记录","content":"展示数据覆盖、生成时间和缺失项，便于检查画像依据。"}
+  ],"sections":[
     {"number":"H","title":"Source and Coverage","content":"画像来自展开的 Scholar 页面、出版记录和本地写作样本；所有来源、生成时间和缺失项均显式记录。","details":["Scholar 页面快照","本地出版记录","写作与实验样本"]},
     {"number":"1","title":"Research Identity","content":"研究主线为可信人工智能、大模型安全与可核验评测；习惯把失败现象转化为受控、可证伪的实验问题。","details":["可信人工智能","大模型安全","可核验评测"]},
     {"number":"2","title":"Research Lineage","content":"研究路径从任务建模与鲁棒评测延伸到安全干预、表示机制和证据契约。","details":["任务建模","鲁棒评测","安全干预"]},
@@ -8,47 +13,73 @@
     {"number":"5","title":"Workflow Preferences","content":"每个论文数字链接到结果路径、计算方式和命令；方向、实验设计和论文结构保留明确确认记录。","details":["数字可追踪","命令可复现","决策有记录"]},
     {"number":"6","title":"Publication Records","content":"出版记录单独保存并可检索；写作时最多使用三篇相关自引，并以最接近目标会议的本人论文校准结构。","details":["出版记录可检索","自引不超过三篇","按目标会议校准结构"]}
   ]},
-  "literature":{"artifact":"文献调研报告","note":"30 篇已核验论文覆盖意图识别噪声、表示粒度、拼写扰动基准与低成本增强","sections":[
-    {"number":"1","title":"Scope and Taxonomy","content":"范围限定为轻量意图分类的拼写鲁棒性，覆盖真实对话噪声、字符编辑、表示粒度和噪声感知训练。"},
-    {"number":"2","title":"Theme Map","content":"对输入施加交换、删除、插入和键盘邻键扰动，比较词、字符、子词、字节表示和训练策略。"},
-    {"number":"3","title":"Landscape Comparison","content":"逐项核验论文的任务、扰动类型、模型、指标和资源，并区分意图分类证据与通用拼写鲁棒性证据。"},
-    {"number":"4","title":"Live Debates","content":"字符输入不自动等于鲁棒；合成噪声与自然噪声回答不同问题；平均准确率不能代替最差操作符表现。"},
-    {"number":"5","title":"Trends and Structural Gaps","content":"已有研究证明噪声感知训练有效，但固定增强预算下如何选择候选仍缺少受控证据。"},
-    {"number":"6","title":"Verified References","content":"只列实际打开并核验的论文；作者、发表信息、年份和链接均回到原始记录。"}
+  "literature":{"artifact":"文献调研报告","note":"示例文献集从问题、方法、评测和空白四个角度组织已核验证据","features":[
+    {"title":"多角度检索与核验","content":"按多个研究角度检索论文，并核对正式论文页、作者和出版信息。"},
+    {"title":"四步领域地图","content":"用 Problem → Approaches → Evaluation → Gaps 压缩大量文献。"},
+    {"title":"方法与评测分类","content":"将工作按方法家族和评测证据组织，而不是逐篇罗列。"},
+    {"title":"为 Idea 提供依据","content":"把可验证的研究空白和证据边界传递给方向生成阶段。"}
+  ],"sections":[
+    {"number":"1","title":"Problem","content":"把示例任务界定为多目标协调问题：任务质量、稳健性与计算成本不能被一个平均分掩盖。"},
+    {"number":"2","title":"Approaches","content":"按数据策略、训练目标、优化方法与部署约束组织已有方法，而不是逐篇罗列论文。"},
+    {"number":"3","title":"Evaluation","content":"区分自动指标、人工判断、交互任务成功、线上业务指标和计算成本，并核对各类证据是否支持公平比较。"},
+    {"number":"4","title":"Gaps","content":"主要缺口包括奖励冲突识别、评判器有效性、公开可复现性，以及质量提升与线上成本之间的匹配比较。"}
   ]},
-  "ideas":{"artifact":"研究方向评估","note":"在用户拒绝负结果方向后，选择可执行的正向干预并固定成功条件","sections":[
-    {"number":"1","title":"Literature Landscape","content":"已有工作证明拼写错误会损害意图分类，也证明聚合增强有效；未解决点是同预算条件下的候选选择。"},
-    {"number":"2","title":"Ranked Decision Slate","content":"I7 Margin-Targeted Typo Augmentation 被选中；旧的二维无标签足迹方向因确认区间不支持而归档。"},
-    {"number":"3","title":"Candidate Cards","content":"MTA 生成四类候选，用干净模型的真实标签分数差排序，在每个意图类别内选择最低分数差样本并从头重训练。"},
-    {"number":"4","title":"Human Selection","content":"成功条件固定为相对同预算随机选择的配对自助法区间下界高于零；不通过则报告失败。"}
+  "ideas":{"artifact":"研究方向评估","note":"从已核验研究空白中选择一个示例方向，并保留可证伪条件与部署风险","features":[
+    {"title":"生成候选方向","content":"从已核验文献空白生成多个工程、理论或评测方向。"},
+    {"title":"逐项比较","content":"并列展示问题、机制、新颖性、可证伪条件和最近工作重合度。"},
+    {"title":"标记风险边界","content":"显式记录伦理风险、部署风险和可能导致方向失效的证据。"},
+    {"title":"保存研究者选择","content":"保留被选 Idea 与选择时间，作为后续实验计划的唯一入口。"}
+  ],"sections":[
+    {"number":"1","title":"Literature Landscape","content":"示例领域已形成多条方法路线；核心问题是目标冲突、评判有效性与成本匹配。"},
+    {"number":"2","title":"Ranked Decision Slate","content":"候选 I1 被选中；其余候选覆盖算法、理论和评测三类不同研究路径。"},
+    {"number":"3","title":"Candidate Cards","content":"每张卡片并列展示问题、机制、预期证据、失败条件和与最近工作的差异。"},
+    {"number":"4","title":"Human Selection","content":"研究者确认 I1 后，系统才把该方向传入实验设计；Demo 不绑定任何真实项目名称。"}
   ]},
-  "expplan":{"artifact":"实验设计","note":"从论文主张出发，提前确定图表、阈值、对照和证据边界","sections":[
-    {"number":"1","title":"Target Conference and Reference Papers","content":"目标为 COLING 2027 短文；参考论文仅用于校准段落功能、章节比例和图表节奏。"},
-    {"number":"2","title":"Projected Paper","content":"论文围绕固定重训练预算下的候选选择组织，包含 3 张图、2 张表和 40 个数据单元。"},
-    {"number":"3","title":"Approval","content":"方案固定 CLINC150、四类拼写扰动、共享分类器、六个设置、同一组 8 个确认种子，以及 C1/C2/C3 的失败条件。"}
+  "expplan":{"artifact":"实验设计","note":"从论文主张出发，提前确定图表、阈值、对照和证据边界","features":[
+    {"title":"锁定目标与结构参考","content":"明确目标会议和结构参考论文，只借鉴论证组织，不复制研究内容。"},
+    {"title":"从主张反推实验","content":"为每项核心主张定义数据集、基线、指标、消融与失败条件。"},
+    {"title":"规划图表与段落","content":"提前确定 Figure、Table 数量，并绑定到目标论文的具体段落。"},
+    {"title":"生成待填证据壳","content":"保留实验设置、表格列和图形需求，等待真实运行结果回填。"}
+  ],"sections":[
+    {"number":"1","title":"Target Conference and Reference Paper","content":"先锁定目标会议，再把 Ref Paper 的具体 Section 与段落功能映射到目标论文；只参考结构，不复用内容。"},
+    {"number":"2","title":"Projected Paper","content":"Ref Paper §1 P3、§3.1、§4.2–§4.4 分别对应目标论文的 Introduction、Method、Experiments 与 Analysis，并绑定目标论文自己的图表证据。"}
   ]},
-  "projected-paper":{"artifact":"论文结构与证据规划","note":"标题、段落、图表、实现方案和决策规则在确认运行前统一规划","sections":[
-    {"number":"2.1","title":"Projected Title and Abstract","content":"工作标题为 Spend Typo Budget Where the Classifier Is Unsure；投影摘要不预写实验数字。"},
-    {"number":"2.2","title":"Figure/Table Count","content":"F1 解释同预算选择问题；T1/F2/T2/F3 分别承担主比较、六设置确认、操作符分析和固定范围预算曲线。"},
-    {"number":"2.3","title":"Paragraph Blueprint and Evidence Shells","content":"每个正文段落有一句功能说明；所有实证图表先建立空壳和字段契约，运行后只能由台账填充。"},
-    {"number":"2.4","title":"Claim–Falsifier–Evidence","content":"C1 要求六个 MTA−随机区间下界均高于零；C2 要求主设置 MTA−完整混合下界高于 −0.01。"},
-    {"number":"2.5","title":"Implementation Plan","content":"四种方法共享候选、类别配额、模型、随机种子和评测器，只改变最终重训练接收哪些候选。"},
-    {"number":"2.6","title":"Budget and Decision Criteria","content":"确认运行仅使用本地 CPU；全部阈值固定在确认脚本中，结果失败时收窄主张。"}
+  "projected-paper":{"artifact":"论文结构与证据规划","note":"标题、段落、图表、实现方案和决策规则在确认运行前统一规划","features":[
+    {"title":"规划标题与摘要","content":"形成目标论文的标题方向、摘要论证闭环和证据边界。"},
+    {"title":"规划逐段职责","content":"为每个自然段指定论证任务、参考段落和图表引用。"}
+  ],"sections":[
+    {"number":"2.1","title":"Projected Title and Abstract","content":"工作标题、摘要论证链和证据边界均使用通用示例，不绑定任何真实研究项目。"},
+    {"number":"2.2","title":"Projected Paper Structure and Evidence Shells","content":"按 Abstract、Introduction、Related Work、Method、Experiments、Analysis 和 Conclusion 排列；9 个论文图表均绑定到具体段落和来源。"}
   ]},
-  "runplan":{"artifact":"实验执行计划","note":"两项任务覆盖可复现通路和全部正结果证据","sections":[
-    {"number":"1","title":"Execution Estimate","content":"完整研究仅需本地 CPU；G1.1 固定数据与执行通路，G2.1 完成六设置确认。"},
-    {"number":"2","title":"Implementation Sources","content":"所有方法都在同一个本地词频分类、扰动、选择与评测框架中实现。"},
-    {"number":"3","title":"Figure/Table Coverage","content":"F1 是计数型动机图；G2.1 从真实确认结果填充 T1、F2、T2 和 F3 的全部 40 个单元。"},
-    {"number":"4","title":"Parts and Goals","content":"两项任务均已完成；每项结果保存、验证并回填 04/05 报告和 Paper Studio。"}
+  "runplan":{"artifact":"实验执行计划","note":"示例把论文图表拆为依赖有序的 Goals，并逐项显示执行状态与产出","features":[
+    {"title":"拆分依赖有序任务","content":"把实验计划拆成可恢复的 Parts、Goals 和原子证据采集任务。"},
+    {"title":"固定数据获取合同","content":"每个结果明确来源、命令、计算方法、目标单元和完成标准。"},
+    {"title":"展示资源与进度","content":"集中查看预算、预计时间、依赖关系、状态和图表覆盖率。"},
+    {"title":"支持两种执行方式","content":"可一次确认全部任务自动顺序执行，也可逐项检查后执行。"}
+  ],"sections":[
+    {"number":"1","title":"Execution Estimate","content":"每个 Goal 在执行前声明预算、依赖、预计时间和停止条件。"},
+    {"number":"2","title":"Implementation Sources","content":"每个结果记录原始日志路径、执行命令、计算规则和验证状态。"},
+    {"number":"3","title":"Figure/Table Coverage","content":"G1.1→F1/F2/F3，G2.1→T1，G2.2→T2，G3.1→T3，G4.1→T4，G5.1→F4/F5。"},
+    {"number":"4","title":"Parts and Goals","content":"逐项查看每个 Goal 属于哪个 Part、当前状态、实际产出以及是否满足完成标准。"}
   ]},
-  "results":{"artifact":"实验结果与证据","note":"40/40 数据单元均已核验，并可从保存的种子级操作数重算","sections":[
-    {"number":"1","title":"Artifact Completion","content":"全部五个论文图表已完成；MTA 在六个设置中的 MTA−随机配对区间下界均高于零。"},
-    {"number":"2","title":"Paper Tables and Figures","content":"主设置中 MTA 比同预算随机选择高 0.0168，95% CI 为 [0.0132, 0.0208]；相对完整混合的区间满足预先固定的一点非劣边界。"},
-    {"number":"3","title":"生成过程","content":"每个数字都链接到采集编号、结果编号、原始 JSON 路径、派生操作数和验证状态；F2/F3 由同一数据表直接生成。"}
+  "results":{"artifact":"实验结果与证据","note":"203 个论文报告证据单元均已核验并保留行列级来源","features":[
+    {"title":"汇总图表完成度","content":"展示每张图表是否已有结果、是否通过核验以及由哪个 Goal 生成。"},
+    {"title":"保留行列级证据","content":"每个数字绑定采集合同、计算方法、来源定位和验证时间。"},
+    {"title":"区分证据等级","content":"明确区分精确测量、近似重建、定性案例和缺失结果。"},
+    {"title":"向论文写作供数","content":"Paper Studio 只读取已核验结果，不允许模型自行补造数字。"}
+  ],"sections":[
+    {"number":"1","title":"Artifact Completion","content":"5 张图和 4 张表均已取得或重建；每项证据绑定到 G1.1–G5.1。"},
+    {"number":"2","title":"Paper Tables and Figures","content":"T1–T4 保留精确报告值；训练曲线、人评、权重与案例图保留近似或定性重建标识。"},
+    {"number":"3","title":"生成过程","content":"每个表格单元链接采集合同、论文定位、结果编号和验证时间；图形来源政策单独冻结。"}
   ]},
-  "paper-studio":{"artifact":"论文写作工作区","note":"正文、图表、LaTeX 与 PDF 保持同步","sections":[
-    {"number":"正文","title":"逐段写作与确认","content":"19 个段落均已写入；修改确认后会重新编译论文。"},
-    {"number":"图","title":"绘图与编辑","content":"F1、F2、F3 均可预览；F1 同时提供可编辑的 PowerPoint 文件。"},
-    {"number":"表","title":"数据与排版","content":"T1、T2 使用已核验结果，并与 LaTeX 预览同步。"}
+  "paper-studio":{"artifact":"论文写作工作区","note":"正文、图表、LaTeX 与 PDF 保持同步","features":[
+    {"title":"逐段生成与确认","content":"按段落规划调用 LLM，研究者接受后才写入 LaTeX。"},
+    {"title":"引用与证据约束","content":"将参考结构、实验结果和 citation 义务限制到当前自然段。"},
+    {"title":"图表联动","content":"正文引用图表后生成 Caption、插入位置并同步预览。"},
+    {"title":"实时编译 PDF","content":"每次接受修改后重新编译，并在同一工作区检查最终版式。"}
+  ],"sections":[
+    {"number":"正文","title":"逐段写作与确认","content":"示例论文当前已写入 20/26 个段落；修改确认后会重新编译论文。"},
+    {"number":"图","title":"绘图与编辑","content":"F1–F3 已确认，F4–F5 尚待在当前写作工作区完成。"},
+    {"number":"表","title":"数据与排版","content":"T1–T3 已确认，T4 尚待排版确认；所有数据来自已核验证据。"}
   ]}
 }

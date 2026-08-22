@@ -278,7 +278,7 @@ def check_style(args):
     leak_patterns = {
         "workspace_path": r"\b(?:paper|results|reports|tools|code)/[A-Za-z0-9_.\-/]+",
         "implementation_file": r"\b[A-Za-z0-9_.-]+\.(?:py|json|csv|md)\b",
-        "agent_command": r"(?:\$(?:paperwrite|expplan|runplan|ideagen)|/(?:goal|paperwrite|expplan|runplan|ideagen))\b",
+        "agent_command": r"(?:\$(?:expplan|runplan|ideagen)|/(?:goal|expplan|runplan|ideagen))\b",
         "workflow_jargon": r"\b(?:RUN_STATE|RESULTS_LEDGER|canonical artifact|Coding Agent)\b",
     }
     for kind, pattern in leak_patterns.items():

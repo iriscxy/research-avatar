@@ -14,6 +14,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class TranslateReportHtmlTests(unittest.TestCase):
+    def test_protected_acronym_plural_is_language_neutral(self):
+        self.assertEqual(
+            translator.protected_tokens("SAEs outperform SAEs"),
+            translator.protected_tokens("SAE优于SAE"),
+        )
+        self.assertEqual(translator.protected_tokens("SFT-reward"), ["SFT"])
+
+    def test_protected_only_fragment_bypasses_translation(self):
+        self.assertTrue(
+            translator.protected_only_fragment(
+                {"text": "REPRESENTATION", "protected_tokens": ["REPRESENTATION"]}
+            )
+        )
+        self.assertFalse(
+            translator.protected_only_fragment(
+                {"text": "About CLINC150", "protected_tokens": ["CLINC150"]}
+            )
+        )
+
     @staticmethod
     def fake_response(_url, payload, _api_key):
         request = json.loads(payload.get("input") or payload["messages"][-1]["content"])

@@ -283,6 +283,56 @@ class RunPlanProgressTests(unittest.TestCase):
         self.assertIn('data-local-result-href="05_EXP_RESULT.html#provenance-R-F2-1"', source)
         self.assertIn('class="result-value"', source)
 
+    def test_completed_goal_embeds_every_figure_with_an_adjacent_table(self):
+        state = fixture_state(proposed="G2.1")
+        state["goals"][0]["artifact_ids"] = ["F1", "F2"]
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = root / "04_RUN_PLAN.html"
+            report = root / "05_EXP_RESULT.html"
+            plan.write_text(
+                '<html><body><section data-report-section="parts-and-goals"><p>old</p></section>'
+                '<script type="application/json" id="run-plan-state">'
+                + json.dumps(state)
+                + '</script></body></html>',
+                encoding="utf-8",
+            )
+            report.write_text(
+                '<section data-artifact-id="F1"><h3>Qualitative mechanism</h3>'
+                '<svg></svg><table><tr><td>verified evidence input</td></tr></table></section>'
+                '<section data-artifact-id="F2" '
+                'data-provenance="ESTIMATED_ARRAY_CONSTRAINED_BY_REPORTED_SUMMARIES">'
+                '<h3>Estimated curve</h3><svg></svg><table><tr><td>0</td>'
+                '<td>0.717</td></tr></table></section>',
+                encoding="utf-8",
+            )
+            result = refresh(plan)
+            source = plan.read_text(encoding="utf-8")
+        self.assertEqual(result["completed_artifact_snapshots"], 2)
+        self.assertIn('data-artifact-id="F2"', source)
+        self.assertIn("0.717", source)
+        self.assertIn('data-artifact-id="F1"', source)
+        self.assertIn("verified evidence input", source)
+
+    def test_completed_goal_rejects_figure_without_adjacent_table(self):
+        state = fixture_state(proposed="G2.1")
+        state["goals"][0]["artifact_ids"] = ["F1"]
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            plan = root / "04_RUN_PLAN.html"
+            report = root / "05_EXP_RESULT.html"
+            plan.write_text(
+                '<html><body><section data-report-section="parts-and-goals"><p>old</p></section>'
+                '<script type="application/json" id="run-plan-state">'
+                + json.dumps(state) + '</script></body></html>', encoding="utf-8",
+            )
+            report.write_text(
+                '<section data-artifact-id="F1"><h3>Figure only</h3><svg></svg></section>',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "lacks its adjacent source/evidence table"):
+                refresh(plan)
+
     def test_completed_goal_rejects_unlinked_target(self):
         state = fixture_state(proposed="G2.1")
         state["acquisition_contracts"] = [{

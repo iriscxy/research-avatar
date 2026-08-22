@@ -43,16 +43,11 @@ def _plan_contract(path: Path) -> dict:
 def _selected_references(root: Path, contract: dict) -> list[tuple[Path, str]]:
     references = contract.get("references") if isinstance(contract.get("references"), dict) else {}
     selected: list[tuple[Path, str]] = []
-    for role, archive_name in (
-        ("researcher_owned_structure", "references/structure.txt"),
-        ("external_mechanism", "references/mechanism.txt"),
-    ):
+    for role, archive_name in (("researcher_owned_logic", "references/logic-reference.txt"),):
         record = references.get(role) if isinstance(references.get(role), dict) else {}
         value = str(record.get("local_full_text") or "").strip()
         if not value:
-            if role == "researcher_owned_structure":
-                raise SystemExit("03 contract does not name a researcher-owned structural reference")
-            continue
+            raise SystemExit("03 contract does not name its sole researcher-owned logic reference")
         path = (root / value).resolve()
         try:
             path.relative_to(root)
@@ -124,7 +119,19 @@ def build_archive(root: Path, output: Path) -> list[str]:
     if missing:
         raise SystemExit("Missing required evidence: " + ", ".join(missing))
     contract = _plan_contract(root / "reports/03_EXPERIMENT_PLAN.html")
+    if str(contract.get("schema_version")) != "1.2":
+        raise SystemExit("03 contract must use schema 1.2 single-reference architecture")
     selected_references = _selected_references(root, contract)
+    section_context_path = root / "paper/reference_context.json"
+    section_context_content: bytes | None = None
+    if section_context_path.is_file():
+        section_context = json.loads(section_context_path.read_text(encoding="utf-8"))
+        if not isinstance(section_context.get("sections"), dict):
+            raise SystemExit("paper/reference_context.json has invalid sections")
+        section_context["reference_source"] = "references/logic-reference.txt"
+        section_context_content = (
+            json.dumps(section_context, ensure_ascii=False, indent=2) + "\n"
+        ).encode("utf-8")
     files = _selected_result_files(root, contract)
     files.extend(_selected_plotting_files(root, contract))
     # Keep each selected reference at its contract-declared project path for
@@ -144,6 +151,8 @@ def build_archive(root: Path, output: Path) -> list[str]:
     output.parent.mkdir(parents=True, exist_ok=True)
     archive_names = [path.relative_to(root).as_posix() for path in sorted(set(files))]
     archive_names.extend(name for _path, name in selected_references)
+    if section_context_content is not None:
+        archive_names.append("references/section-contexts.json")
     manifest = {
         "schema_version": "2.0",
         "kind": "research-avatar-paper-input",
@@ -159,6 +168,10 @@ def build_archive(root: Path, output: Path) -> list[str]:
             content = path.read_bytes()
             archive.writestr(name, content)
             manifest["files"][name] = hashlib.sha256(content).hexdigest()
+        if section_context_content is not None:
+            name = "references/section-contexts.json"
+            archive.writestr(name, section_context_content)
+            manifest["files"][name] = hashlib.sha256(section_context_content).hexdigest()
         archive.writestr(
             "project-package.json",
             json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",

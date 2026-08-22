@@ -204,7 +204,7 @@ def render_parts_and_goals(state: dict, completed_artifacts: dict[str, list[str]
             artifact_ids = [str(value) for value in item.get("artifact_ids", [])]
             mapping = "、".join(artifact_ids) if artifact_ids else "无直接图表（基础设施或配置冻结）"
             if str(goal_id) == "G1.1":
-                mapping += "；F1 为非实验图，仅计数，后续由 paperwrite/figureppt 绘制"
+                mapping += "；F1 为非实验图，仅计数，后续在论文写作阶段绘制"
             mark = STATUS_MARK.get(str(item.get("status", "locked")), "○")
             chunks.append(
                 f'<article class="goal" data-goal-id="{html.escape(str(goal_id))}" '
@@ -317,10 +317,10 @@ def completed_artifact_snapshots(state: dict, results_path: Path) -> dict[str, l
         owner_goal = artifact_owner.get(artifact_id, producing_goal)
         if producing_goal in completed and owner_goal in completed and artifact_id and target_id:
             scoped.setdefault(owner_goal, {}).setdefault(artifact_id, []).append(target_id)
-    if not scoped:
-        return {}
     if not results_path.exists():
-        raise ValueError("completed paper-facing goal requires reports/05_EXP_RESULT.html")
+        if scoped:
+            raise ValueError("completed paper-facing goal requires reports/05_EXP_RESULT.html")
+        return {}
     report = results_path.read_text(encoding="utf-8")
     snapshots: dict[str, list[str]] = {}
     for goal_id, artifacts in scoped.items():
@@ -330,6 +330,33 @@ def completed_artifact_snapshots(state: dict, results_path: Path) -> dict[str, l
             if missing:
                 raise ValueError(
                     f"completed artifact owner {goal_id} has unlinked/unverified targets in {artifact_id}: {missing[:5]}"
+                )
+            snapshots.setdefault(goal_id, []).append(snapshot)
+
+    # Every completed figure remains auditable in the execution view.  Numeric
+    # figures carry their exact source-data table; qualitative figures carry a
+    # structured evidence-input table rather than invented numeric cells.
+    for goal in goals:
+        goal_id = str(goal.get("id") or "")
+        if goal_id not in completed:
+            continue
+        already_present = {
+            match.group(1)
+            for snapshot in snapshots.get(goal_id, [])
+            if (match := re.search(r'data-artifact-id=["\']([^"\']+)', snapshot))
+        }
+        for artifact_id in map(str, goal.get("artifact_ids", [])):
+            if artifact_id in already_present:
+                continue
+            try:
+                snapshot = _artifact_snapshot(report, artifact_id)
+            except ValueError:
+                continue
+            if not artifact_id.upper().startswith("F"):
+                continue
+            if "<table" not in snapshot:
+                raise ValueError(
+                    f"completed figure {artifact_id} under {goal_id} lacks its adjacent source/evidence table"
                 )
             snapshots.setdefault(goal_id, []).append(snapshot)
     return snapshots

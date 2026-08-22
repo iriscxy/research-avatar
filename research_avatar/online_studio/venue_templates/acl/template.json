@@ -14,8 +14,10 @@
     "\\usepackage[utf8]{inputenc}",
     "\\usepackage{microtype}",
     "\\usepackage{graphicx}",
-    "\\usepackage{amsmath,amssymb,booktabs,flafter}",
-    "\\usepackage{xurl}"
+    "\\usepackage{amsmath,amssymb,booktabs,flafter,placeins}",
+    "\\usepackage{xurl}",
+    "\\widowpenalty=10000",
+    "\\clubpenalty=10000"
   ],
   "assets": ["acl.sty", "acl_natbib.bst"],
   "bibliography_command": "\\bibliography{references}",

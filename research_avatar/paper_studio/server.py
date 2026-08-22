@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import html
 import json
+import math
 import os
 import re
 import signal
@@ -27,13 +28,14 @@ import unicodedata
 import urllib.error
 import urllib.request
 import uuid
-import webbrowser
 import zipfile
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+
+from research_avatar.survey_bibliography import verified_survey_bibliography
 
 from .api_usage import append_usage, usage_record, usage_summary
 
@@ -48,7 +50,9 @@ PAPER = ROOT / "paper"
 STATE_DIR = PAPER / ".paper_studio"
 STATE_FILE = STATE_DIR / "state.json"
 API_USAGE_FILE = STATE_DIR / "api_usage.jsonl"
-PARAGRAPH_PLAN_FILE = PAPER / "paragraph_plan.json"
+REFERENCE_CONTEXT_FILE = PAPER / "reference_context.json"
+LITERATURE_SURVEY_FILE = ROOT / "reports" / "01_LIT_SURVEY.html"
+EXPERIMENT_PLAN_FILE = ROOT / "reports" / "03_EXPERIMENT_PLAN.html"
 FIGURE_DIR = PAPER / "fig"
 FIGURE_SOURCE_DIR = PAPER / "figsrc"
 DATA_FIGURE_AGENT_DIR = FIGURE_SOURCE_DIR / "data_agents"
@@ -58,12 +62,18 @@ PAPER_PAGE_DIR = STATE_DIR / "paper_pages"
 FIGURE_TOOL = PACKAGE_ROOT / "tools" / "figure_ppt.py"
 PROJECT_CONFIG_FILE = PAPER / "paper_studio.json"
 DEFAULT_MODEL = os.environ.get("PAPER_STUDIO_MODEL", "gpt-5-nano")
-DEFAULT_PROVIDER = os.environ.get("PAPER_STUDIO_PROVIDER", "openai").strip().lower()
+DEFAULT_PROVIDER = os.environ.get("PAPER_STUDIO_PROVIDER", "deepseek").strip().lower()
 ONLINE_PROJECT_MODE = os.environ.get("PAPER_STUDIO_ONLINE", "").lower() in {
     "1",
     "true",
     "yes",
 }
+EMBEDDED_ONLY = os.environ.get("PAPER_STUDIO_EMBEDDED_ONLY", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
+EMBEDDED_PROXY_TOKEN = os.environ.get("PAPER_STUDIO_PROXY_TOKEN", "")
 ONLINE_DISABLED_ARTIFACT_AGENT_PATHS = {
     # These all spawn a local Codex CLI subprocess, which the shared online
     # container never runs. "/api/table/generate" is deliberately absent:
@@ -71,7 +81,7 @@ ONLINE_DISABLED_ARTIFACT_AGENT_PATHS = {
     # online, because it too routed through the Agent unconditionally even
     # though its only real job (the default case) is generate_table_latex's
     # deterministic structured-prompt parser -- the same safe, non-Agent
-    # path materialize_direct_full_draft_artifacts() already relies on.
+    # path materialize_batch_artifacts() already relies on.
     # handle_table_generate branches on ONLINE_PROJECT_MODE to use that
     # path directly online instead of the Agent. "/api/table/agent-edit"
     # stays blocked: it interprets an arbitrary free-text revision
@@ -90,6 +100,10 @@ ONLINE_DISABLED_ARTIFACT_AGENT_PATHS = {
     "/api/figure/compose",
     "/api/table/agent-edit",
 }
+ONLINE_PLACEHOLDER_FIGURE_MESSAGE = (
+    "网页版保留图位、图题和正文引用，但不直接绘制机制图；"
+    "请下载项目 ZIP，并在本地终端运行 Code Agent 完成绘图。"
+)
 DEMO_MODE = os.environ.get("PAPER_STUDIO_DEMO_MODE", "").lower() in {
     "1",
     "true",
@@ -112,7 +126,10 @@ PROVIDER_MODEL_OPTIONS = {
         ("deepseek-v4-flash", "DeepSeek V4 Flash"),
     ),
 }
-MECHANISM_AGENT_TIMEOUT_SECONDS = 120
+# A method figure can require image inspection plus a 30–50 object native-shape
+# plan. Two minutes regularly terminates a healthy local Agent just before it
+# returns JSON, especially when two figures are reconstructed concurrently.
+MECHANISM_AGENT_TIMEOUT_SECONDS = 300
 API_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 API_URL += "/responses"
 API_KEY_ENVIRONMENT_VARIABLE = "OPENAI_API_KEY"
@@ -125,8 +142,11 @@ STATE_LOCK = threading.RLock()
 FIGURE_PROCESS_LOCK = threading.RLock()
 RUNNING_FIGURE_PROCESSES: dict[str, subprocess.Popen[str]] = {}
 CANCELLED_FIGURE_JOBS: set[str] = set()
-FULL_DRAFT_JOB_LOCK = threading.RLock()
+DRAFT_BATCH_JOB_LOCK = threading.RLock()
+FULL_DRAFT_JOB_LOCK = DRAFT_BATCH_JOB_LOCK
 CANCELLED_FULL_DRAFT_JOBS: set[str] = set()
+SECTION_DRAFT_JOB_LOCK = DRAFT_BATCH_JOB_LOCK
+CANCELLED_SECTION_DRAFT_JOBS: set[str] = set()
 # Serializes latexmk/bibtex runs against PAPER. The HTTP server is
 # threaded, and multiple callers can trigger a compile concurrently (the
 # explicit "编译 PDF" button, the pdf/locate auto-rebuild fallback, a
@@ -135,10 +155,37 @@ CANCELLED_FULL_DRAFT_JOBS: set[str] = set()
 # can corrupt each other's intermediate files well enough to produce a
 # "missing \item" fatal error on an otherwise-correct manuscript.
 COMPILE_LOCK = threading.RLock()
+AUTOMATIC_MECHANISM_FINALIZE_LOCK = threading.RLock()
 SERVER_INSTANCE_TOKEN = uuid.uuid4().hex
-REFERENCE_EXCERPT_MAX_CHARS = 6000
-BIBLIOGRAPHY_PROMPT_MAX_CHARS = 32000
+BIBLIOGRAPHY_PROMPT_MAX_CHARS = 8000
 BIBLIOGRAPHY_PROMPT_MIN_RECORDS = 8
+# Paragraph writing is intentionally cost-bounded. These are character limits,
+# so they remain deterministic across providers and tokenizers.
+PAPER_TEXT_PROMPT_MAX_CHARS = 55_000
+MANUSCRIPT_DASH_RULE = (
+    "Do not use em dashes (—), en dashes (–), or LaTeX double/triple hyphens "
+    "(-- or ---) as punctuation in manuscript prose. Rewrite with a comma, colon, "
+    "semicolon, parentheses, or a separate sentence. A single hyphen in an established "
+    "compound term and a minus sign inside LaTeX math are allowed."
+)
+FIGURE_CAPTION_MAX_WORDS = 40
+FIGURE_CAPTION_MAX_CHARS = 500
+PAPER_TEXT_CONTEXT_LIMITS = {
+    "outline": 5_000,
+    "working_abstract": 2_000,
+    "writing_style": 2_500,
+    "section_evidence": 10_000,
+    "current_section": 5_000,
+    "current_candidate": 4_000,
+    "architecture": 3_500,
+    "reference_context": 3_500,
+    "bound_artifacts": 3_500,
+    "researcher_comment": 2_500,
+    "purpose": 2_500,
+}
+DEEPSEEK_PAPER_MAX_OUTPUT_TOKENS = int(
+    os.environ.get("DEEPSEEK_PAPER_MAX_OUTPUT_TOKENS", "1600")
+)
 
 
 class StudioHTTPServer(ThreadingHTTPServer):
@@ -149,6 +196,18 @@ class StudioHTTPServer(ThreadingHTTPServer):
 
 class ProjectConfigError(RuntimeError):
     """Raised when paper/paper_studio.json cannot safely drive the fixed Studio engine."""
+
+
+def process_is_alive(pid: object) -> bool:
+    """Return whether a persisted local worker process still exists."""
+    try:
+        numeric_pid = int(pid)
+        if numeric_pid <= 0:
+            return False
+        os.kill(numeric_pid, 0)
+    except (TypeError, ValueError, OSError):
+        return False
+    return True
 
 
 def _project_path(root: Path, value: str, field: str) -> Path:
@@ -198,6 +257,10 @@ def load_project_config(
             raise ProjectConfigError(f"Section file must be a filename: {section['file']}")
         if not isinstance(section["result_keys"], list):
             raise ProjectConfigError(f"Section result_keys must be a list: {section_id}")
+        if str(section.get("writing_mode", "draft")) not in {"draft", "plan_only"}:
+            raise ProjectConfigError(
+                f"sections[{index}].writing_mode must be draft or plan_only"
+            )
         section_ids.append(section_id)
     batch_order = config.get("batch_writing_order", section_ids)
     if (
@@ -221,6 +284,15 @@ def load_project_config(
             for field in ("title", "label", "kind", "width", "source_sections", "description", "caption"):
                 if field not in definition:
                     raise ProjectConfigError(f"{kind}.{artifact_id}.{field} is required")
+            # Experiment-plan shells sometimes use the artifact id as a temporary
+            # description/caption.  That token is useful while planning but is not
+            # publication prose.  Promote the already-approved artifact title to a
+            # one-sentence caption before any state or LaTeX is created.
+            title = str(definition.get("title") or "").strip()
+            for field in ("description", "caption"):
+                value = str(definition.get(field) or "").strip()
+                if value.casefold() == str(artifact_id).casefold():
+                    definition[field] = title + ("." if field == "caption" and not title.endswith(".") else "")
             unknown_sections = set(definition["source_sections"]) - set(section_ids)
             if unknown_sections:
                 raise ProjectConfigError(
@@ -309,7 +381,7 @@ def load_project_config(
     if not isinstance(paths, dict):
         raise ProjectConfigError("paper_studio.json paths is required")
     resolved_paths: dict[str, Path] = {}
-    for field in ("metrics", "main", "reference"):
+    for field in ("metrics", "main"):
         value = str(paths.get(field, "")).strip()
         if not value:
             raise ProjectConfigError(f"paper_studio.json paths.{field} is required")
@@ -317,14 +389,12 @@ def load_project_config(
         if not resolved.is_file():
             raise ProjectConfigError(f"paper_studio.json paths.{field} does not exist: {value}")
         resolved_paths[field] = resolved
-    if len(set(resolved_paths.values())) != 3:
-        raise ProjectConfigError("paper_studio.json main, reference, and metrics paths must be distinct")
+    if len(set(resolved_paths.values())) != 2:
+        raise ProjectConfigError("paper_studio.json main and metrics paths must be distinct")
     if resolved_paths["main"].suffix.lower() != ".tex" or r"\begin{document}" not in resolved_paths[
         "main"
     ].read_text(encoding="utf-8", errors="replace"):
         raise ProjectConfigError("paper_studio.json paths.main must be a LaTeX document entry point")
-    if not resolved_paths["reference"].read_text(encoding="utf-8", errors="replace").strip():
-        raise ProjectConfigError("paper_studio.json paths.reference must contain extracted reference text")
     try:
         metrics_payload = json.loads(resolved_paths["metrics"].read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
@@ -333,6 +403,7 @@ def load_project_config(
         raise ProjectConfigError("paper_studio.json paths.metrics must contain a non-empty JSON object or list")
     target = project.get("target")
     reference_paper = project.get("reference_paper")
+    decision_source = str(project.get("decision_source", "")).strip()
     venue = str(project.get("venue", "")).strip()
     if (
         not venue
@@ -343,14 +414,18 @@ def load_project_config(
             "paper_studio.json project.venue and matching project.target.venue "
             "must be inherited from the approved 03 experiment plan"
         )
-    if not isinstance(reference_paper, dict) or not str(
-        reference_paper.get("title", "")
-    ).strip():
+    if (
+        decision_source != "lightweight-onboarding"
+        and (
+            not isinstance(reference_paper, dict)
+            or not str(reference_paper.get("title", "")).strip()
+        )
+    ):
         raise ProjectConfigError(
             "paper_studio.json project.reference_paper.title must identify the "
             "structural reference selected before paper writing"
         )
-    if not str(project.get("decision_source", "")).strip():
+    if not decision_source:
         raise ProjectConfigError(
             "paper_studio.json project.decision_source must name the approved "
             "HTML contract that selected the venue and reference paper"
@@ -362,8 +437,13 @@ EMPTY_PROJECT_MODE = "--empty" in sys.argv or not PROJECT_CONFIG_FILE.exists()
 
 
 def project_files_ready() -> bool:
-    """Return whether a loaded project still has its two canonical control files."""
-    return PROJECT_CONFIG_FILE.is_file() and PARAGRAPH_PLAN_FILE.is_file()
+    """Return whether the project config and its approved paragraph architecture load."""
+    if not PROJECT_CONFIG_FILE.is_file():
+        return False
+    try:
+        return bool(paragraph_plan().get("sections"))
+    except (OSError, ValueError, ProjectConfigError, StudioError):
+        return False
 
 
 def empty_project_config() -> dict[str, Any]:
@@ -375,7 +455,7 @@ def empty_project_config() -> dict[str, Any]:
             "name": "",
             "eyebrow": "PAPER STUDIO",
             "studio_title": "Paper Studio",
-            "subtitle": "等待 paperwrite 填入论文项目数据",
+            "subtitle": "等待载入论文项目数据",
         },
         "sections": [],
         "batch_writing_order": [],
@@ -403,6 +483,7 @@ SECTION_MAP = {
         "latex_title": str(item.get("latex_title", "")),
         "start_label": str(item.get("start_label", "")),
         "end_label": str(item.get("end_label", "")),
+        "writing_mode": str(item.get("writing_mode", "draft")),
     }
     for item in SECTION_SPECS
 }
@@ -468,6 +549,15 @@ def batch_writing_order() -> list[str]:
     return [str(item["id"]) for item in SECTION_SPECS]
 
 
+def draft_writing_order() -> list[str]:
+    """Return only sections allowed to produce manuscript prose."""
+    return [
+        section
+        for section in batch_writing_order()
+        if SECTION_MAP.get(section, {}).get("writing_mode") != "plan_only"
+    ]
+
+
 def default_table_prompt(table_id: str) -> str:
     """Return the editable, deterministic writing brief for a result table."""
     definition = TABLES[table_id]
@@ -529,7 +619,7 @@ def recovered_data_panel_prompt(figure_id: str, panel_id: str) -> str:
 
 
 def outline_is_confirmed() -> bool:
-    """Recognize both the marker and the canonical paperwrite approval record."""
+    """Recognize both the marker and the canonical outline approval record."""
     if (PAPER / ".outline-approved").exists():
         return True
     approval = PAPER / "outline_approval.json"
@@ -566,10 +656,17 @@ def artifact_writing_context(
 ) -> list[dict[str, Any]]:
     """Describe paragraph-bound artifacts and their mandatory LaTeX references."""
     context: list[dict[str, Any]] = []
+    metrics = metrics_bundle()
+    fixture = metrics.get("fixture", {}) if isinstance(metrics, dict) else {}
     for artifact_id in artifact_ids or []:
         if artifact_id in FIGURES:
             definition = FIGURES[artifact_id]
             figure_state = (figure_states or {}).get(artifact_id, {})
+            evidence = {
+                str(key): result_path_value(metrics, str(key))
+                for key in definition.get("result_keys", [])
+                if has_result_path(metrics, str(key))
+            }
             context.append(
                 {
                     "id": artifact_id,
@@ -586,6 +683,8 @@ def artifact_writing_context(
                         for panel in definition.get("panels", [])
                     ],
                     "label": definition["label"],
+                    "fixture": fixture,
+                    "traceable_results": evidence,
                     "required_reference": (
                         f"Figure~\\ref{{{definition['label']}}}"
                     ),
@@ -593,6 +692,13 @@ def artifact_writing_context(
             )
         elif artifact_id in TABLES:
             definition = TABLES[artifact_id]
+            grid = definition.get("data_grid", {})
+            grid_path = str(grid.get("path") or "") if isinstance(grid, dict) else ""
+            evidence = (
+                {grid_path: result_path_value(metrics, grid_path)}
+                if grid_path and has_result_path(metrics, grid_path)
+                else {}
+            )
             context.append(
                 {
                     "id": artifact_id,
@@ -601,6 +707,8 @@ def artifact_writing_context(
                     "description": definition["description"],
                     "caption": definition["caption"],
                     "label": definition["label"],
+                    "fixture": fixture,
+                    "traceable_results": evidence,
                     "required_reference": f"Table~\\ref{{{definition['label']}}}",
                 }
             )
@@ -658,16 +766,134 @@ def artifact_reference_error(
     if not details:
         return ""
     return (
-        "图表引用不符合 paragraph plan："
+        "图表引用不符合已批准的段落结构："
         + "；".join(details)
-        + "。每个绑定图表在该段必须且只能引用一次；需要在其他段落再次引用时，先在 "
-        "paper/paragraph_plan.json 中显式绑定。"
+        + "。每个绑定图表在该段必须且只能引用一次；需要在其他段落再次引用时，"
+        "先在实验计划的目标段落中显式绑定。"
     )
-FIGURE_PROMPT_INSTRUCTIONS = """You are an expert designer of figures for ACL-family NLP papers. Carefully read the supplied manuscript evidence and return one complete, production-ready GPT Image prompt for a restrained academic diagram.
 
-First identify the figure's single scientific message and the minimum visual structure needed to communicate it. Follow common ACL figure conventions: pure white background, flat vector geometry, thin consistent strokes, compact alignment, generous whitespace, precise typography, two to four clearly related regions, and a muted colorblind-safe palette of three to five colors. Use tokens, small semantic glyphs, arrows, brackets, paths, matrices, or modules only when they encode the mechanism. Prefer an Illustrator/TikZ-like schematic over a decorative BioRender poster. Do not add people, scenery, mascots, photorealistic objects, gradients, glow, glass, 3D depth, glossy buttons, heavy shadows, or marketing-style visual drama unless the manuscript explicitly requires them. Do not default to oversized text cards or a generic box-and-arrow flowchart; small boxes and panels are acceptable when they precisely encode tokens, states, or modules. Keep labels short and print-readable. Never invent evidence or put result charts in a method figure.
 
-You are operating one persistent conversation dedicated to exactly one paper figure. Keep the figure faithful to its bound manuscript section and approved figure role. The supplied <paper_figure_format> is mandatory: explicitly restate its single-column or two-column target, physical aspect ratio, central safe composition band, and density guidance in the returned image-generation prompt. On revision turns, preserve sound prior design decisions but follow the researcher's latest instruction about scope, layout, density, hierarchy, and column width. Return only the complete revised image-generation prompt, with no commentary or Markdown fence."""
+def configured_manuscript_labels() -> set[str]:
+    """Return every project-owned label that prose may reference directly."""
+    labels = {
+        str(definition.get("label") or "")
+        for definition in [*FIGURES.values(), *TABLES.values()]
+    }
+    for metadata in SECTION_MAP.values():
+        labels.update(
+            {
+                str(metadata.get("start_label") or ""),
+                str(metadata.get("end_label") or ""),
+            }
+        )
+    return {label for label in labels if label}
+
+
+def unsupported_internal_reference_issues(text: str) -> list[str]:
+    """Reject model-invented refs while permitting labels defined in the paragraph."""
+    allowed = configured_manuscript_labels()
+    allowed.update(re.findall(r"\\label\{([^{}]+)\}", text))
+    referenced = re.findall(r"\\(?:ref|pageref|autoref)\{([^{}]+)\}", text)
+    return [
+        f"unsupported internal reference: {label}"
+        for label in dict.fromkeys(referenced)
+        if label not in allowed
+    ]
+FIGURE_PROMPT_INSTRUCTIONS = """You design non-data figures for ACL-family NLP papers. Read the supplied evidence, determine the figure's rhetorical type, and return one complete production-ready image-generation prompt. Return only that prompt.
+
+First state one scientific message internally, then select the smallest visual grammar that communicates it. Obey the supplied <acl_figure_type_profile>; do not collapse motivation, architecture, method, and agent-interaction figures into the same generic box-and-arrow diagram. Use concrete manuscript objects such as tokens, prompts, hidden states, modules, vectors, documents, agents, messages, or outputs. Preserve object identity across stages and make each transformation visually inspectable.
+
+Treat the profile's visual_signature as a hard art-direction constraint. Read <cross_figure_distinction> and make this figure visibly different from every sibling mechanism figure: do not reuse its panel geometry, dominant object family, or information density. In particular, an Introduction figure must remain semantic and immediately readable without exposing the model internals that belong in a model or mechanism figure.
+
+Match recurring ACL conventions: pure white background; publication-ready editable-vector appearance; flat fills; thin dark strokes; compact alignment; generous whitespace; precise sans-serif labels; restrained colorblind-safe accents; repeated shapes for repeated scientific entities; solid arrows for primary flow and dashed arrows only for a different, explicitly named relation. Use color to reinforce meaning, never as the only distinction. Avoid decorative poster art, photorealism, people, scenery, mascots, gradients, glow, glass, 3D depth, heavy shadows, marketing graphics, large title cards, and empirical result plots.
+
+Apply a cold-reader gate. From the figure and one-sentence caption alone, a researcher must identify the input or compared states, the proposed operation, the output, and the paper-specific difference. Every arrow and visual object must correspond to the supplied evidence. Do not invent modules, claims, outcomes, numerical results, or causal relations. Keep labels short and print-readable at the target column width; put explanations in the caption, not inside the figure.
+
+The supplied format and type profiles are mandatory. Restate the canvas, column target, composition, object inventory, reading order, label budget, palette roles, line semantics, and prohibited content in the final image-generation prompt. On revision turns, preserve correct prior decisions while applying the latest instruction. Do not mention named drawing software; describe the visible result rather than a tool-specific style."""
+
+
+ACL_FIGURE_TYPE_PROFILES: dict[str, dict[str, Any]] = {
+    "motivation_contrast": {
+        "role": "Introduction or motivation figure",
+        "message_pattern": "one concrete setup, two visibly comparable cases, one bounded takeaway",
+        "visual_signature": "semantic example cards and large comparison paths, not an internal model diagram",
+        "composition": "two spacious matched cases with one concrete semantic anchor; comparison before mechanism detail",
+        "object_grammar": [
+            "a concrete prompt, behavior-control card, response bubble, or task object",
+            "matched branches that preserve common context",
+            "one highlighted structural difference per branch",
+            "short outcome or diagnostic symbols without result numbers",
+            "equivalent alternatives drawn in parallel and converging on one shared outcome",
+        ],
+        "reading_order": "shared setup, contrasted cases, takeaway",
+        "avoid": [
+            "full model stack",
+            "dense implementation detail",
+            "Jacobians, layer stacks, tensor grids, or repeated internal model blocks",
+            "more than six labels unless the manuscript example requires literal text",
+            "decorative metaphor",
+            "generic problem versus solution title cards",
+            "a causal arrow between two cases that are claimed to be equal alternatives",
+        ],
+    },
+    "model_architecture": {
+        "role": "Model or module architecture figure",
+        "message_pattern": "stable outer structure with the proposed internal change made locally explicit",
+        "visual_signature": "formal technical modules, repeated state geometry, named interfaces, and operator-level flow",
+        "composition": "aligned baseline-to-proposed panels or one nested architecture with a magnified module",
+        "object_grammar": [
+            "repeated modules drawn with identical geometry",
+            "tokens or tensors entering and leaving named interfaces",
+            "routing, aggregation, residual, or attention relations with distinct line semantics",
+            "a compact legend only when colors encode module classes",
+        ],
+        "reading_order": "input interface, internal structure, output interface",
+        "avoid": [
+            "narrative example text",
+            "unexplained icons",
+            "stage numbering when the computation is not sequential",
+            "changing shape vocabulary between equivalent modules",
+        ],
+    },
+    "method_workflow": {
+        "role": "Method, training, inference, or measurement workflow",
+        "message_pattern": "trace one recognizable data object through paper-specific transformations",
+        "visual_signature": "recognizable artifacts transformed through numbered or clearly ordered stages",
+        "composition": "left-to-right or top-to-bottom stages with a single dominant path and explicit optional loop",
+        "object_grammar": [
+            "real input and output artifacts rather than abstract Start and End boxes",
+            "stage-local transformations shown inside or beside their module",
+            "preserved examples or token/state snippets that reveal what changes",
+            "feedback arrows only when the method actually iterates",
+        ],
+        "reading_order": "input, ordered transformations, output or diagnostic",
+        "avoid": [
+            "equal-sized generic boxes for semantically different objects",
+            "paragraphs inside the figure",
+            "multiple competing reading directions",
+            "arrows without named source and target roles",
+        ],
+    },
+    "agent_interaction": {
+        "role": "Agent, tool-use, retrieval, or environment interaction figure",
+        "message_pattern": "show who owns each state, what message moves, and where control returns",
+        "visual_signature": "spatially distinct actors and stores joined by labeled message handoffs and feedback",
+        "composition": "entity lanes or spatially separated actors connected by labeled request, result, and feedback paths",
+        "object_grammar": [
+            "distinct actors or stores with stable visual identities",
+            "message artifacts placed on arrows or at handoff boundaries",
+            "external tools, memory, or environment separated from the reasoning controller",
+            "loops with an explicit continuation or stopping condition",
+        ],
+        "reading_order": "request, dispatch, external action, returned evidence, updated reasoning",
+        "avoid": [
+            "logo collage without information flow",
+            "unlabeled bidirectional arrows",
+            "placing all agents in identical anonymous boxes",
+            "implying parallelism when calls are sequential",
+        ],
+    },
+}
 
 
 class StudioError(Exception):
@@ -679,6 +905,7 @@ def generate_figure_caption(
     state: dict[str, Any],
     current_caption: str,
     prompt_instruction: str,
+    trigger_paragraph: dict[str, str] | None = None,
 ) -> str:
     """Generate an editable caption candidate grounded in the figure's bound evidence."""
     definition = FIGURES[figure_id]
@@ -689,6 +916,10 @@ def generate_figure_caption(
         if has_result_path(metrics, key)
     }
     figure_state = state["figures"][figure_id]
+    synthetic = "[SYNTHETIC]" in current_caption or any(
+        isinstance(value, dict) and value.get("synthetic") is True
+        for value in evidence.values()
+    )
     context = {
         "id": figure_id,
         "title": definition["title"],
@@ -698,36 +929,270 @@ def generate_figure_caption(
         "layout_plan": figure_state.get("layout_plan", {}),
         "current_caption": current_caption,
         "researcher_instruction": prompt_instruction,
+        "trigger_paragraph": trigger_paragraph or {},
+        "bound_manuscript_prose": {
+            section: state.get("sections", {}).get(section, {}).get("accepted_text", "")
+            for section in definition.get("source_sections", [])
+        },
         "traceable_results": evidence,
     }
     payload = {
         "model": str(state.get("model") or DEFAULT_MODEL),
         "store": False,
         "instructions": (
-            "Write one concise, publication-ready English figure caption grounded only "
+            "Write exactly one concise, publication-ready English sentence as the figure "
+            "caption, grounded only "
             "in the supplied figure context and traceable results. Follow the researcher's "
-            "instruction. Explain panel semantics when panels exist, define non-obvious "
-            "metrics or conditions, and do not invent measurements. Return only the caption "
-            "text: no Markdown, no commentary, and no LaTeX caption wrapper. Preserve the "
-            "literal [SYNTHETIC] marker whenever the context contains synthetic data."
+            f"instruction. Use no more than {FIGURE_CAPTION_MAX_WORDS} words, with no minimum "
+            "length. State only what the "
+            "figure shows, the panel mapping when needed, and the minimum metric or condition "
+            "definition needed to interpret it. Do not repeat the manuscript motivation, "
+            "method narrative, contribution list, or every limitation. Do not invent "
+            "measurements. Return only the caption "
+            "text: no Markdown, no commentary, no leading Figure/Fig. number, and no LaTeX "
+            "caption wrapper. Emit pdflatex-safe prose: put mathematical notation inside "
+            "\\(...\\), use ASCII LaTeX commands instead of Unicode math glyphs or "
+            "superscripts, and escape percent signs. Preserve the "
+            "literal [SYNTHETIC] marker whenever the context contains synthetic data. "
+            f"For this figure, synthetic marker required is {str(synthetic).lower()}; "
+            "include [SYNTHETIC] if and only if that value is true. "
+            + MANUSCRIPT_DASH_RULE
         ),
         "input": json.dumps(context, ensure_ascii=False, indent=2)[:24000],
     }
     response = post_openai(payload)
-    caption = " ".join(extract_output_text(response).split()).strip()
-    if caption.startswith("\\caption{") and caption.endswith("}"):
-        caption = caption[len("\\caption{") : -1].strip()
+    caption = normalize_figure_caption_text(extract_output_text(response))
     if not caption:
         raise StudioError("GPT 没有返回可用的 Caption。")
-    if len(caption) > 2000:
-        raise StudioError("GPT 返回的 Caption 超过 2000 字符，请缩短 Prompt 后重试。")
-    synthetic = "[SYNTHETIC]" in current_caption or any(
-        isinstance(value, dict) and value.get("synthetic") is True
-        for value in evidence.values()
-    )
+    if not synthetic:
+        caption = caption.replace("[SYNTHETIC]", "").strip()
     if synthetic and "[SYNTHETIC]" not in caption:
         caption = "[SYNTHETIC] " + caption
+    if figure_caption_issues(caption):
+        repair = post_openai(
+            {
+                "model": str(state.get("model") or DEFAULT_MODEL),
+                "store": False,
+                "instructions": (
+                    "Compress and polish one academic figure caption into exactly one "
+                    "sentence. Return only the caption, with at most "
+                    f"{FIGURE_CAPTION_MAX_WORDS} words and "
+                    f"{FIGURE_CAPTION_MAX_CHARS} characters. Preserve all supplied facts, "
+                    "panel mappings, citation-free metric definitions, and the literal "
+                    "[SYNTHETIC] marker when present. Remove manuscript motivation, repeated "
+                    "method explanation, contribution claims, leading Figure/Fig. numbering, "
+                    "and commentary. Emit pdflatex-safe prose: put all notation inside "
+                    "\\(...\\), replace Unicode math glyphs and superscripts with LaTeX, "
+                    "and escape percent signs. Do not invent information. "
+                    + MANUSCRIPT_DASH_RULE
+                ),
+                "input": f"<caption_to_compress>{caption}</caption_to_compress>",
+            }
+        )
+        caption = normalize_figure_caption_text(extract_output_text(repair))
+        if synthetic and caption and "[SYNTHETIC]" not in caption:
+            caption = "[SYNTHETIC] " + caption
+        if not synthetic:
+            caption = caption.replace("[SYNTHETIC]", "").strip()
+    caption = enforce_figure_caption_bounds(caption)
+    remaining_issues = figure_caption_issues(caption)
+    if remaining_issues:
+        raise StudioError(
+            "GPT Caption 自动压缩后仍不符合长度或标点约束："
+            + "；".join(remaining_issues)
+        )
     return caption
+
+
+def normalize_figure_caption_text(source: str) -> str:
+    caption = " ".join(source.split()).strip()
+    if caption.startswith("\\caption{") and caption.endswith("}"):
+        caption = caption[len("\\caption{") : -1].strip()
+    caption = re.sub(
+        r"^(?:Figure|Fig\.)\s+\d+[A-Za-z]?\s*[:.]\s*",
+        "",
+        caption,
+        flags=re.IGNORECASE,
+    )
+    # The model occasionally ignores the no-dash instruction even on its
+    # compression pass.  Normalize punctuation deterministically so approval
+    # cannot oscillate on repeated API calls.  Compact numeric/alphanumeric
+    # spans represent ranges; spaced marks represent sentence punctuation.
+    caption = re.sub(r"(?<=\w)[—–](?=\w)", " to ", caption)
+    caption = re.sub(r"\s*[—–]\s*", "; ", caption)
+    caption = re.sub(r"\s*-{2,}\s*", "; ", caption)
+    return re.sub(r"\s+([,.;:!?])", r"\1", caption).strip()
+
+
+def enforce_figure_caption_bounds(caption: str) -> str:
+    """Deterministically enforce the one-sentence/word cap after API repair.
+
+    This is a final formatting fallback, not another content-generation pass.  It
+    joins accidental sentence boundaries and, only when necessary, removes the
+    trailing surplus words while preserving balanced LaTeX delimiters.
+    """
+    bounded = normalize_figure_caption_text(caption)
+    bounded = re.sub(
+        r"(?<=[.!?])\s+(?=[A-Z0-9\[])",
+        "; ",
+        bounded,
+    )
+    words = list(re.finditer(r"\b[\w']+\b", bounded, flags=re.UNICODE))
+    if len(words) > FIGURE_CAPTION_MAX_WORDS:
+        cutoff = words[FIGURE_CAPTION_MAX_WORDS].start()
+        candidate = bounded[:cutoff].rstrip(" ,;:")
+        # Prefer a complete leading clause to a word-count slice that can end
+        # midway through a range or comparison (for example, "from ... to.").
+        clause_break = max(candidate.rfind(";"), candidate.rfind(","))
+        if clause_break >= max(24, len(candidate) // 3):
+            candidate = candidate[:clause_break].rstrip(" ,;:")
+        # Never keep a mechanically truncated suffix that breaks math or braces.
+        while candidate and (
+            candidate.count(r"\(") != candidate.count(r"\)")
+            or candidate.count("{") != candidate.count("}")
+        ):
+            candidate = candidate.rsplit(" ", 1)[0].rstrip(" ,;:")
+        if candidate:
+            bounded = candidate
+    bounded = bounded.rstrip(".;:!? ")
+    while re.search(r"\b(?:to|from|and|or|versus|with|of)$", bounded, re.I):
+        bounded = bounded.rsplit(" ", 1)[0].rstrip(" ,;:")
+    bounded += "."
+    return bounded
+
+
+def figure_caption_issues(caption: str) -> list[str]:
+    issues: list[str] = []
+    word_count = len(re.findall(r"\b[\w']+\b", caption, flags=re.UNICODE))
+    if word_count > FIGURE_CAPTION_MAX_WORDS:
+        issues.append(f"{word_count} words exceeds {FIGURE_CAPTION_MAX_WORDS}")
+    if len(caption) > FIGURE_CAPTION_MAX_CHARS:
+        issues.append(f"{len(caption)} characters exceeds {FIGURE_CAPTION_MAX_CHARS}")
+    sentence_parts = [
+        part
+        for part in re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\[])", caption.strip())
+        if part.strip()
+    ]
+    if len(sentence_parts) != 1:
+        issues.append(f"{len(sentence_parts)} sentences; exactly one is required")
+    if "—" in caption or "–" in caption or re.search(r"-{2,}", caption):
+        issues.append("contains forbidden dash punctuation")
+    if re.search(r"\b(?:to|from|and|or|versus|with|of)\.$", caption, re.I):
+        issues.append("ends with an incomplete clause")
+    # Caption rendering escapes ordinary TeX specials such as %, _, &, #, and
+    # ^ via ``latex_escape_title``.  Reject only hazards that escaping cannot
+    # repair without understanding the intended mathematics.
+    caption_latex_issues = [
+        issue
+        for issue in latex_prose_issues(caption)
+        if issue.startswith("Unicode math glyphs")
+        or issue.startswith("unbalanced ")
+    ]
+    issues.extend(f"pdflatex hazard: {issue}" for issue in caption_latex_issues)
+    return issues
+
+
+def auto_generate_bound_figure_captions(
+    state: dict[str, Any],
+    section: str,
+    paragraph: dict[str, Any],
+    accepted_text: str,
+) -> list[str]:
+    """Generate canonical captions when their citing paragraph is accepted."""
+    generated: list[str] = []
+    paragraph_id = str(paragraph.get("id") or "")
+    fingerprint = hashlib.sha256(accepted_text.encode("utf-8")).hexdigest()
+    for artifact in paragraph.get("artifacts", []):
+        if isinstance(artifact, str):
+            figure_id = artifact
+        elif isinstance(artifact, dict) and artifact.get("kind") == "figure":
+            figure_id = str(artifact.get("id") or "")
+        else:
+            continue
+        if figure_id not in FIGURES or figure_id not in state.get("figures", {}):
+            continue
+        figure_state = state["figures"][figure_id]
+        if figure_state.get("caption_source") == "researcher":
+            continue
+        if (
+            figure_state.get("caption_generated_from_paragraph") == paragraph_id
+            and figure_state.get("caption_generated_from_sha256") == fingerprint
+        ):
+            continue
+        try:
+            caption = generate_figure_caption(
+                figure_id,
+                state,
+                str(figure_state.get("caption") or FIGURES[figure_id]["caption"]),
+                "Generate the caption because the paragraph citing this figure has just been accepted.",
+                trigger_paragraph={
+                    "section": section,
+                    "paragraph_id": paragraph_id,
+                    "accepted_text": accepted_text,
+                },
+            )
+        except StudioError as exc:
+            figure_state["caption_last_error"] = str(exc)
+            raise StudioError(
+                f"{paragraph_id} 绑定的 {figure_id} Caption 自动生成失败；"
+                "本段未接受，请重试。" + str(exc)
+            ) from exc
+        figure_state.update(
+            {
+                "caption": caption,
+                "caption_source": "paragraph_accept",
+                "caption_generated_from_paragraph": paragraph_id,
+                "caption_generated_from_sha256": fingerprint,
+                # This value is also the browser's cache-invalidation token.  A
+                # second-level timestamp can repeat when a paragraph is revised
+                # twice quickly, leaving an older local draft visible over the
+                # newly generated canonical caption.
+                "caption_generated_at": time.time_ns(),
+                "caption_last_error": "",
+            }
+        )
+        generated.append(figure_id)
+    return generated
+
+
+def ensure_figure_caption_before_approval(
+    state: dict[str, Any], figure_id: str
+) -> None:
+    """Backfill the caption when prose predates automatic caption generation.
+
+    Existing projects can contain accepted citing paragraphs created before the
+    paragraph-accept hook was introduced.  Figure approval is the last safe
+    transaction boundary before a caption enters the manuscript, so never let a
+    configured placeholder such as ``F3`` pass that boundary unchanged.
+    """
+    figure_state = state["figures"][figure_id]
+    caption_source = figure_state.get("caption_source")
+    if caption_source == "researcher":
+        return
+    if caption_source == "paragraph_accept" and not figure_caption_issues(
+        str(figure_state.get("caption") or "")
+    ):
+        return
+    if caption_source == "paragraph_accept":
+        # Revalidate legacy automatic captions created before the current
+        # one-sentence/length contract instead of treating their old prose
+        # fingerprint as proof that generation is still current.
+        figure_state["caption_generated_from_sha256"] = ""
+    binding = first_artifact_binding(figure_id)
+    if binding is None:
+        raise StudioError(f"{figure_id} 没有绑定引用段落，无法生成 Caption。")
+    section, paragraph_id = binding
+    paragraph, _ = paragraph_by_id(state, section, paragraph_id)
+    accepted_text = str(paragraph.get("accepted_text") or "").strip()
+    if not accepted_text:
+        raise StudioError(
+            f"请先接受引用 {figure_id} 的段落 {paragraph_id}，再确认插图。"
+        )
+    generated = auto_generate_bound_figure_captions(
+        state, section, paragraph, accepted_text
+    )
+    if figure_id not in generated and figure_state.get("caption_source") != "paragraph_accept":
+        raise StudioError(f"{figure_id} Caption 未生成，插图未确认。")
 
 
 def figure_latex(
@@ -737,8 +1202,13 @@ def figure_latex(
     definition = FIGURES[figure_id]
     paths = figure_paths(figure_id)
     figure_state = figure_state or {}
-    caption = latex_escape_title(
+    caption = latex_escape_caption(
         str(figure_state.get("caption") or definition["caption"]).strip()
+    )
+    description = (
+        [f"  \\Description{{{caption}}}"]
+        if str(PROJECT_METADATA.get("venue") or "").strip().casefold().startswith("kdd")
+        else []
     )
     mode = figure_state.get("layout_mode")
     stored_width = figure_state.get("layout_width")
@@ -750,6 +1220,7 @@ def figure_latex(
                 "  \\centering",
                 f"  \\includegraphics[width=\\linewidth]{{{relative_pdf}}}",
                 f"  \\caption{{{caption}}}",
+                *description,
                 f"  \\label{{{definition['label']}}}",
                 r"\end{wrapfigure}",
             ]
@@ -762,13 +1233,20 @@ def figure_latex(
         wide = definition["width"].startswith("two-column")
     environment = "figure*" if wide else "figure"
     width = "\\textwidth" if wide else "\\columnwidth"
+    # A narrow float may be anchored after the last accepted paragraph while
+    # all following sections are still empty. With top-only placement,
+    # ``flafter`` prevents it from moving before that anchor and LaTeX can
+    # silently defer it forever. Allow the normal single-column positions;
+    # wide ``figure*`` floats remain top-only in standard two-column LaTeX.
+    placement = "t" if wide else "htbp"
     relative_pdf = paths["pdf"].relative_to(PAPER).as_posix()
     return "\n".join(
         [
-            f"\\begin{{{environment}}}[t]",
+            f"\\begin{{{environment}}}[{placement}]",
             "  \\centering",
             f"  \\includegraphics[width={width}]{{{relative_pdf}}}",
             f"  \\caption{{{caption}}}",
+            *description,
             f"  \\label{{{definition['label']}}}",
             f"\\end{{{environment}}}",
         ]
@@ -782,7 +1260,8 @@ def section_figure_anchors(
     anchors: dict[str | None, list[str]] = {}
     for figure_id in FIGURE_ORDER:
         definition = FIGURES[figure_id]
-        if section not in definition["source_sections"]:
+        binding = first_artifact_binding(figure_id)
+        if binding is None or binding[0] != section:
             continue
         if figure_states.get(figure_id, {}).get("status") != "approved":
             continue
@@ -818,23 +1297,39 @@ def figure_placeholder_latex(
     """Return a compilable labelled float until the real figure is approved."""
     definition = FIGURES[figure_id]
     figure_state = figure_state or {}
-    caption = latex_escape_title(
+    caption = latex_escape_caption(
         str(figure_state.get("caption") or definition["caption"]).strip()
     )
     mode = figure_state.get("layout_mode")
     wide = mode == "two-column" or (
         mode is None and definition["width"].startswith("two-column")
     )
+    # A wide placeholder is not the final artifact and should not enter
+    # LaTeX's separate double-column float queue. Several pending wide
+    # placeholders can otherwise be emitted partly above the page crop box.
+    # Keep the requested span in project metadata; the real local figure still
+    # renders at that span after export.
+    if ONLINE_PROJECT_MODE and (
+        definition.get("kind") == "mechanism" or definition.get("online_placeholder")
+    ):
+        wide = False
     environment = "figure*" if wide else "figure"
-    box_width = r"0.94\textwidth" if wide else r"0.94\columnwidth"
+    box_width = r"0.92\linewidth"
     placeholder = latex_escape_title(
-        f"{figure_id} placeholder -- figure generation is in progress"
+        (
+            f"{figure_id} placeholder: complete the final artwork after project export"
+            if ONLINE_PROJECT_MODE
+            and (definition.get("kind") == "mechanism" or definition.get("online_placeholder"))
+            else f"{figure_id} placeholder -- figure generation is in progress"
+        )
     )
     return "\n".join(
         [
             f"\\begin{{{environment}}}[t]",
             r"  \centering",
-            f"  \\fbox{{\\parbox[c][0.16\\textheight][c]{{{box_width}}}{{\\centering {placeholder}}}}}",
+            # Reserve the height inside the frame. Exterior vertical space can
+            # push a top float beyond the printable area and clip its border.
+            f"  \\fbox{{\\parbox[c][6em][c]{{{box_width}}}{{\\centering {placeholder}}}}}",
             f"  \\caption{{{caption}}}",
             f"  \\label{{{definition['label']}}}",
             f"\\end{{{environment}}}",
@@ -849,10 +1344,15 @@ def section_table_anchors(
     anchors: dict[str | None, list[str]] = {}
     for table_id in TABLE_ORDER:
         definition = TABLES[table_id]
-        if section not in definition["source_sections"]:
+        binding = first_artifact_binding(table_id)
+        if binding is None or binding[0] != section:
             continue
         stored = table_states.get(table_id, {})
-        if stored.get("status") != "approved" or not stored.get("latex"):
+        if (
+            stored.get("status") != "approved"
+            or not stored.get("latex")
+            or table_latex_is_placeholder(str(stored.get("latex") or ""))
+        ):
             continue
         related = definition.get("related_paragraphs", {}).get(section, [])
         anchor = stored.get("placement_after") or (related[-1] if related else None)
@@ -891,14 +1391,18 @@ def table_placeholder_latex(
     """Return a compilable labelled float until the real table is approved."""
     definition = TABLES[table_id]
     table_state = table_state or {}
-    caption = latex_escape_title(
+    caption = latex_escape_caption(
         str(table_state.get("caption") or definition["caption"]).strip()
     )
     wide = str(definition.get("width", "")).startswith("two-column")
     environment = "table*" if wide else "table"
     box_width = r"0.94\textwidth" if wide else r"0.94\columnwidth"
     placeholder = latex_escape_title(
-        f"{table_id} placeholder -- table generation is in progress"
+        (
+            f"{table_id} placeholder: complete the final table after project export"
+            if ONLINE_PROJECT_MODE and definition.get("online_placeholder")
+            else f"{table_id} placeholder -- table generation is in progress"
+        )
     )
     return "\n".join(
         [
@@ -912,6 +1416,21 @@ def table_placeholder_latex(
     )
 
 
+def table_latex_is_placeholder(latex: str) -> bool:
+    """Return whether a labelled table float is only a draft placeholder.
+
+    Placeholder floats deliberately carry the final label so prose can compile while
+    a table is pending.  They must never be recovered or preserved as an approved
+    table merely because the label is present.
+    """
+    source = str(latex or "")
+    return bool(
+        re.search(r"\bplaceholder\b", source, flags=re.IGNORECASE)
+        or "table generation is in progress" in source.lower()
+        or not re.search(r"\\begin\{tabular\*?\}", source)
+    )
+
+
 def render_section_source(
     section: str,
     section_state: dict[str, Any],
@@ -920,7 +1439,12 @@ def render_section_source(
 ) -> tuple[str, str]:
     """Render accepted paragraphs without discarding the section's LaTeX wrapper."""
     accepted_paragraphs = [
-        (item["id"], normalize_latex_ready_text(item["accepted_text"].strip()))
+        (
+            item["id"],
+            strip_managed_section_headings(
+                normalize_latex_ready_text(item["accepted_text"].strip())
+            ),
+        )
         for item in section_state["paragraphs"]
         if item["accepted_text"].strip()
     ]
@@ -986,10 +1510,289 @@ def render_section_source(
     return "\n\n".join(parts) + "\n", accepted_text
 
 
+def _normalize_planned_paragraph(paragraph: dict[str, Any]) -> dict[str, Any]:
+    """Normalize an approved contract paragraph for the browser writer."""
+    normalized = {
+        **paragraph,
+        "id": str(paragraph.get("id") or ""),
+        "purpose": str(
+            paragraph.get("purpose") or paragraph.get("plan_sentence") or ""
+        ),
+        "rhetorical_role": str(paragraph.get("rhetorical_role") or ""),
+        "relation_to_previous": str(paragraph.get("relation_to_previous") or ""),
+        "relation_to_next": str(paragraph.get("relation_to_next") or ""),
+        "artifacts": [
+            str(item)
+            for item in (
+                paragraph.get("artifacts")
+                if isinstance(paragraph.get("artifacts"), list)
+                else paragraph.get("artifact_refs", [])
+            )
+        ],
+    }
+    normalized.pop("plan_sentence", None)
+    normalized.pop("artifact_refs", None)
+    return normalized
+
+
+def _approved_contract() -> dict[str, Any]:
+    decision_source = str(PROJECT_METADATA.get("decision_source") or "").strip()
+    if not decision_source or decision_source == "lightweight-onboarding":
+        return {}
+    source = _project_path(ROOT, decision_source, "project.decision_source")
+    if not source.is_file():
+        raise StudioError("已批准的实验计划不存在。")
+    match = re.search(
+        r"<script\b[^>]*\bid=[\"']experiment-plan-contract[\"'][^>]*>(.*?)</script>",
+        source.read_text(encoding="utf-8", errors="replace"),
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not match:
+        raise StudioError("实验计划缺少可读取的写作契约。")
+    try:
+        contract = json.loads(match.group(1))
+    except json.JSONDecodeError as exc:
+        raise StudioError("实验计划中的写作契约不是有效 JSON。") from exc
+    return contract if isinstance(contract, dict) else {}
+
+
 def paragraph_plan() -> dict[str, Any]:
-    if not PARAGRAPH_PLAN_FILE.exists():
-        raise StudioError("paper/paragraph_plan.json is missing.")
-    return json.loads(PARAGRAPH_PLAN_FILE.read_text(encoding="utf-8"))
+    """Return paragraph architecture embedded in config or the approved contract."""
+    configured: dict[str, list[dict[str, Any]]] = {}
+    for section in SECTION_SPECS:
+        paragraphs = section.get("paragraphs")
+        if not isinstance(paragraphs, list):
+            configured = {}
+            break
+        configured[str(section["id"])] = [
+            _normalize_planned_paragraph(item)
+            for item in paragraphs
+            if isinstance(item, dict)
+        ]
+    if configured:
+        return {"sections": configured}
+
+    if DEMO_MODE and STATE_FILE.is_file():
+        try:
+            demo_state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise StudioError("只读 Demo 的段落结构不是有效 JSON。") from exc
+        demo_sections = demo_state.get("sections")
+        if isinstance(demo_sections, dict):
+            sections = {
+                str(section_id): [
+                    _normalize_planned_paragraph(item)
+                    for item in section.get("paragraphs", [])
+                    if isinstance(item, dict)
+                ]
+                for section_id, section in demo_sections.items()
+                if isinstance(section, dict)
+            }
+            if sections:
+                return {"sections": sections}
+
+    contract = _approved_contract()
+    outline = contract.get("paper_outline")
+    if not isinstance(outline, list):
+        raise StudioError("项目配置和实验计划均缺少已批准的段落结构。")
+    sections: dict[str, list[dict[str, Any]]] = {}
+    for section in outline:
+        if not isinstance(section, dict):
+            continue
+        section_id = str(section.get("section_id") or section.get("id") or "").strip()
+        paragraphs = section.get("paragraphs")
+        if section_id and isinstance(paragraphs, list):
+            sections[section_id] = [
+                _normalize_planned_paragraph(item)
+                for item in paragraphs
+                if isinstance(item, dict)
+            ]
+    # Older approved contracts used two combined IDs while the current editor
+    # exposes Discussion, Limitations, and Appendix as separate manuscript
+    # files. Adapt only those known schema aliases; scientific paragraph text,
+    # order, and artifact bindings remain untouched.
+    configured_ids = set(SECTION_MAP)
+    if (
+        "discussion_limitations" in sections
+        and {"discussion", "limitations"}.issubset(configured_ids)
+    ):
+        combined = sections.pop("discussion_limitations")
+        limitations = [
+            item
+            for item in combined
+            if re.search(
+                r"\blimitation|external[- ]validity|future work|beyond\b",
+                " ".join(
+                    str(item.get(field) or "")
+                    for field in ("purpose", "rhetorical_role")
+                ),
+                re.IGNORECASE,
+            )
+        ]
+        limitation_ids = {str(item.get("id")) for item in limitations}
+        discussion = [
+            item for item in combined if str(item.get("id")) not in limitation_ids
+        ]
+        if not discussion and combined:
+            discussion = combined[:1]
+            limitations = combined[1:]
+        sections["discussion"] = discussion
+        sections["limitations"] = limitations
+    if "appendices" in sections and "appendix" in configured_ids:
+        sections["appendix"] = sections.pop("appendices")
+    return {"sections": sections}
+
+
+def approved_outline_context() -> str:
+    """Render the approved target-paper architecture as compact prompt context."""
+    lines = [f"Title: {manuscript_title_display()}", "", "Approved section plan:"]
+    sections = paragraph_plan().get("sections", {})
+    for index, section_spec in enumerate(SECTION_SPECS, 1):
+        section_id = str(section_spec["id"])
+        lines.append(f"{index}. {section_spec['title']}")
+        for paragraph in sections.get(section_id, []):
+            lines.append(f"  - {paragraph['id']}: {paragraph['purpose']}")
+    return "\n".join(lines)
+
+
+def normalize_reference_excerpt(lines: list[str]) -> str:
+    """Remove PDF line wrapping while retaining real blank-line paragraph breaks."""
+    paragraphs: list[str] = []
+    current: list[str] = []
+    for raw_line in lines:
+        line = raw_line.replace("\f", "").strip()
+        if line:
+            current.append(line)
+        elif current:
+            paragraphs.append(" ".join(current))
+            current = []
+    if current:
+        paragraphs.append(" ".join(current))
+    return "\n\n".join(paragraphs)
+
+
+def reference_contexts() -> dict[str, Any]:
+    if not REFERENCE_CONTEXT_FILE.is_file():
+        return {}
+    try:
+        payload = json.loads(REFERENCE_CONTEXT_FILE.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise StudioError("paper/reference_context.json 不是有效 JSON。") from exc
+    sections = payload.get("sections") if isinstance(payload, dict) else None
+    if not isinstance(sections, dict):
+        raise StudioError("paper/reference_context.json sections 必须是 object。")
+    source_value = str(payload.get("reference_source") or "").strip()
+    if source_value:
+        source_path = _project_path(ROOT, source_value, "reference_context.reference_source")
+        if not source_path.is_file():
+            raise StudioError("reference_context.reference_source 不存在。")
+        source_lines = source_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        for context in sections.values():
+            if not isinstance(context, dict):
+                continue
+            for excerpt in context.get("excerpts", []):
+                if not isinstance(excerpt, dict):
+                    continue
+                start, end = excerpt.get("start_line"), excerpt.get("end_line")
+                if (
+                    not isinstance(start, int) or isinstance(start, bool)
+                    or not isinstance(end, int) or isinstance(end, bool)
+                    or start < 1 or end < start or end > len(source_lines)
+                ):
+                    raise StudioError("reference_context 中存在无效原文行号。")
+                excerpt["text"] = normalize_reference_excerpt(source_lines[start - 1:end])
+    return sections
+
+
+def section_reference_context(section: str) -> dict[str, Any]:
+    context = reference_contexts().get(section, {})
+    return context if isinstance(context, dict) else {}
+
+
+def _reference_paragraph_ids(paragraph: dict[str, Any]) -> list[str]:
+    """Return only source-paragraph IDs explicitly mapped to one target paragraph."""
+    raw_ids = paragraph.get("reference_paragraph_ids", [])
+    ids = [str(item).strip() for item in raw_ids] if isinstance(raw_ids, list) else []
+    mappings = paragraph.get("reference_mapping", [])
+    if isinstance(mappings, list):
+        for mapping in mappings:
+            if isinstance(mapping, str):
+                ids.append(mapping.strip())
+            elif isinstance(mapping, dict):
+                ids.append(
+                    str(
+                        mapping.get("source_paragraph_id")
+                        or mapping.get("reference_paragraph_id")
+                        or mapping.get("id")
+                        or ""
+                    ).strip()
+                )
+    return list(dict.fromkeys(item for item in ids if item))
+
+
+def paragraph_reference_ids(section: str, paragraph: dict[str, Any]) -> list[str]:
+    """Resolve the approved reference mapping for the selected target paragraph."""
+    direct = _reference_paragraph_ids(paragraph)
+    if direct:
+        return direct
+    paragraph_id = str(paragraph.get("id") or "").strip()
+    if not paragraph_id:
+        return []
+    try:
+        outline = _approved_contract().get("paper_outline", [])
+    except StudioError:
+        return []
+    planned_sections = (
+        [item for item in outline if isinstance(item, dict)]
+        if isinstance(outline, list)
+        else []
+    )
+    matching_sections = [
+        item
+        for item in planned_sections
+        if str(item.get("section_id") or item.get("id") or "").strip() == section
+    ]
+    # Paper Studio may use a display-oriented section alias (for example,
+    # discussion_and_limitations) while the approved contract uses a shorter
+    # source ID. Paragraph IDs are contract-wide coordinates, so use them as
+    # the compatibility fallback instead of dropping the mapping.
+    for planned_section in matching_sections or planned_sections:
+        if not isinstance(planned_section, dict):
+            continue
+        for planned in planned_section.get("paragraphs", []):
+            if isinstance(planned, dict) and str(planned.get("id") or "").strip() == paragraph_id:
+                return _reference_paragraph_ids(planned)
+    return []
+
+
+def paragraph_reference_context(section: str, paragraph: dict[str, Any]) -> dict[str, Any]:
+    """Filter section context to the reference prose mapped to the active paragraph.
+
+    This deliberately fails closed: an absent mapping exposes no source prose rather
+    than silently showing every excerpt from the surrounding section.
+    """
+    context = section_reference_context(section)
+    selected_ids = set(paragraph_reference_ids(section, paragraph))
+    filtered = dict(context)
+    paragraph_id = str(paragraph.get("id") or "").strip()
+    filtered["writing_constraints"] = [
+        item
+        for item in context.get("writing_constraints", [])
+        if isinstance(item, dict) and str(item.get("id") or "").strip() == paragraph_id
+    ]
+    filtered["excerpts"] = [
+        excerpt
+        for excerpt in context.get("excerpts", [])
+        if isinstance(excerpt, dict)
+        and str(
+            excerpt.get("id")
+            or excerpt.get("reference_paragraph_id")
+            or excerpt.get("source_paragraph_id")
+            or ""
+        ).strip()
+        in selected_ids
+    ]
+    return filtered
 
 
 def first_artifact_binding(artifact_id: str) -> tuple[str, str] | None:
@@ -1047,13 +1850,13 @@ def mechanism_generation_prerequisite_message(
 
 
 def validate_project_workspace() -> None:
-    """Fail fast when project config, paragraph plan, and artifact bindings disagree."""
+    """Fail fast when project config, paragraph architecture, and bindings disagree."""
     if EMPTY_PROJECT_MODE:
         return
     plan = paragraph_plan()
     planned_sections = plan.get("sections")
     if not isinstance(planned_sections, dict):
-        raise StudioError("paper/paragraph_plan.json sections must be an object.")
+        raise StudioError("已批准的段落结构必须按 section 组织。")
     configured_sections = set(SECTION_MAP)
     missing_sections = configured_sections - set(planned_sections)
     extra_sections = set(planned_sections) - configured_sections
@@ -1063,28 +1866,53 @@ def validate_project_workspace() -> None:
             details.append("缺少 " + ", ".join(sorted(missing_sections)))
         if extra_sections:
             details.append("多出 " + ", ".join(sorted(extra_sections)))
-        raise StudioError("paragraph_plan 与 paper_studio.json 的 section 不一致：" + "；".join(details))
+        raise StudioError("段落结构与 paper_studio.json 的 section 不一致：" + "；".join(details))
+    contexts = reference_contexts()
+    if contexts:
+        if set(contexts) != configured_sections:
+            raise StudioError("reference_context.json 必须覆盖每个已配置 section，且不能包含额外 section。")
+        for section, context in contexts.items():
+            if not isinstance(context, dict):
+                raise StudioError(f"参考论文对应内容 {section} 必须是 object。")
+            for field in ("source_heading", "logic_summary_zh"):
+                if not str(context.get(field) or "").strip():
+                    raise StudioError(f"参考论文对应内容 {section} 缺少 {field}。")
+            excerpts = context.get("excerpts")
+            if context.get("mode") == "abstracted":
+                constraints = context.get("writing_constraints")
+                if excerpts not in ([], None):
+                    raise StudioError(f"抽象参考模式 {section} 禁止携带原文片段。")
+                if not isinstance(constraints, list) or not 1 <= len(constraints) <= 50:
+                    raise StudioError(f"抽象参考模式 {section} 必须含 1--50 个写作约束。")
+                if any(
+                    not isinstance(item, dict)
+                    or not str(item.get("id") or "").strip()
+                    or not str(item.get("purpose") or "").strip()
+                    for item in constraints
+                ):
+                    raise StudioError(f"抽象参考模式 {section} 存在无效写作约束。")
+            else:
+                if not isinstance(excerpts, list) or not 1 <= len(excerpts) <= 50:
+                    raise StudioError(f"参考论文对应内容 {section} 必须含 1--50 个原文片段。")
+                if any(
+                    not isinstance(item, dict) or not str(item.get("text") or "").strip()
+                    for item in excerpts
+                ):
+                    raise StudioError(f"参考论文对应内容 {section} 存在空原文片段。")
     artifact_ids = set(FIGURES) | set(TABLES)
     artifact_bindings = {artifact_id: [] for artifact_id in artifact_ids}
     paragraph_ids: dict[str, set[str]] = {}
     for section, paragraphs in planned_sections.items():
         if not isinstance(paragraphs, list):
-            raise StudioError(f"paragraph_plan section {section} must be a list.")
+            raise StudioError(f"段落结构中的 section {section} 必须是列表。")
         ids = [str(item.get("id", "")) for item in paragraphs]
         if any(not item for item in ids) or len(ids) != len(set(ids)):
-            raise StudioError(f"paragraph_plan section {section} has invalid paragraph ids.")
+            raise StudioError(f"段落结构中的 section {section} 含无效段落 ID。")
         paragraph_ids[section] = set(ids)
         for paragraph in paragraphs:
-            reference_lines = paragraph.get("reference_lines")
-            if (
-                not isinstance(reference_lines, list)
-                or len(reference_lines) != 2
-                or any(not isinstance(item, int) or isinstance(item, bool) or item < 1 for item in reference_lines)
-                or reference_lines[0] > reference_lines[1]
-            ):
-                raise StudioError(
-                    f"段落 {paragraph['id']} 的 reference_lines 必须是两个递增的正整数。"
-                )
+            for field in ("purpose", "rhetorical_role", "relation_to_previous", "relation_to_next"):
+                if not str(paragraph.get(field, "")).strip():
+                    raise StudioError(f"段落 {paragraph['id']} 缺少已批准的 {field}。")
             bound = paragraph.get("artifacts", [])
             if not isinstance(bound, list) or len(bound) != len(set(bound)):
                 raise StudioError(
@@ -1097,14 +1925,6 @@ def validate_project_workspace() -> None:
                 )
             for artifact_id in bound:
                 artifact_bindings[artifact_id].append(f"{section}/{paragraph['id']}")
-    configured_reference = str(PROJECT_CONFIG.get("paths", {}).get("reference", "")).strip()
-    if str(plan.get("reference_file", "")).strip() != configured_reference:
-        raise StudioError(
-            "paragraph_plan.reference_file 必须与 paper_studio.json paths.reference 完全一致。"
-        )
-    for section, paragraphs in planned_sections.items():
-        for paragraph in paragraphs:
-            reference_excerpt(paragraph["reference_lines"])
     unbound = sorted(
         artifact_id for artifact_id, bindings in artifact_bindings.items() if not bindings
     )
@@ -1186,8 +2006,9 @@ def enforce_required_heading(
     prose = text.strip()
     if not prose:
         return ""
+    prose = strip_managed_section_headings(prose)
     prose = re.sub(
-        r"^\\(?:paragraph|subsection|textbf)\{[^{}]*\}\s*",
+        r"^\\(?:paragraph|subsection|textbf)\*?\{[^{}]*\}\s*",
         "",
         prose,
         count=1,
@@ -1199,21 +2020,66 @@ def enforce_required_heading(
     return f"{expected}{separator}{prose}".strip()
 
 
-def reference_excerpt(lines: list[int]) -> str:
-    plan = paragraph_plan()
-    path = ROOT / plan["reference_file"]
-    source_lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    start, end = lines
-    selected = source_lines[max(start - 1, 0) : min(end, len(source_lines))]
-    text = " ".join(line.strip("\f ").strip() for line in selected if line.strip())
-    text = re.sub(r"\s+", " ", text).strip()
-    if len(text) > REFERENCE_EXCERPT_MAX_CHARS:
-        raise StudioError(
-            "reference_lines 选中了过长的参考论文片段（"
-            f"{len(text)} 字符，上限 {REFERENCE_EXCERPT_MAX_CHARS}）；"
-            "请只绑定与当前段落修辞作用匹配的局部段落。"
-        )
-    return text
+def strip_managed_section_headings(text: str) -> str:
+    """Strip LLM-emitted top-level headings owned by the section renderer.
+
+    Paper Studio deterministically inserts one ``\\section`` wrapper per configured
+    section.  A model-emitted section command is therefore always duplication, even
+    when its title differs slightly from the configured title.
+    """
+    prose = str(text or "").strip()
+    while True:
+        revised = re.sub(
+            r"^\\section\*?\{[^{}]*\}\s*",
+            "",
+            prose,
+            count=1,
+        ).strip()
+        if revised == prose:
+            return prose
+        prose = revised
+
+
+def strip_redundant_section_name_leadin(text: str, section_title: str) -> str:
+    """Remove a model-emitted prose label already owned by the section wrapper.
+
+    ``Related Work. Body`` and ``Abstract: Body`` are not natural paragraph
+    openings; they are duplicate headings even though they are not LaTeX
+    commands.  Keep outline-defined paragraph/subsection headings separate:
+    this runs before ``enforce_required_heading`` deterministically adds them.
+    """
+    prose = strip_managed_section_headings(text)
+    title = r"\s+".join(
+        re.escape(token) for token in str(section_title or "").strip().split()
+    )
+    if not title:
+        return prose
+    aliases = [title]
+    if str(section_title).strip().casefold() == "abstract":
+        aliases.extend(("Abstrct", "Abtract"))
+    names = "|".join(aliases)
+    while True:
+        revised = re.sub(
+            rf"^(?:\\textbf\{{\s*)?(?:{names})\s*"
+            rf"(?:[.:]\s*|[—–-]\s+|\}}\s*)",
+            "",
+            prose,
+            count=1,
+            flags=re.IGNORECASE,
+        ).strip()
+        if revised == prose:
+            return prose
+        prose = revised
+
+
+def paragraph_architecture(paragraph: dict[str, Any]) -> dict[str, str]:
+    """Return only the approved target-paper logic; never expose reference prose."""
+    return {
+        "purpose": str(paragraph.get("purpose") or "").strip(),
+        "rhetorical_role": str(paragraph.get("rhetorical_role") or "").strip(),
+        "relation_to_previous": str(paragraph.get("relation_to_previous") or "").strip(),
+        "relation_to_next": str(paragraph.get("relation_to_next") or "").strip(),
+    }
 
 
 def _default_state() -> dict[str, Any]:
@@ -1229,6 +2095,7 @@ def _default_state() -> dict[str, Any]:
             "last_message": "",
         },
         "full_draft_job": None,
+        "section_draft_job": None,
         "updated_at": None,
         "sections": {
             key: {
@@ -1252,6 +2119,12 @@ def _default_state() -> dict[str, Any]:
                 "approved_at": None,
                 "prompt_approved_at": None,
                 "last_message": "",
+                "caption": FIGURES[figure_id]["caption"],
+                "caption_source": "configured",
+                "caption_generated_from_paragraph": "",
+                "caption_generated_from_sha256": "",
+                "caption_generated_at": None,
+                "caption_last_error": "",
                 "draw_prompt": "",
                 "prompt_instruction": "",
                 "prompt_history": [],
@@ -1356,13 +2229,19 @@ def load_state() -> dict[str, Any]:
                     candidate = {
                         **candidate,
                         "text": enforce_required_heading(
-                            str(candidate.get("text", "")),
+                            strip_redundant_section_name_leadin(
+                                str(candidate.get("text", "")),
+                                str(current.get("title") or SECTION_MAP[key]["title"]),
+                            ),
                             planned.get("heading"),
                             planned.get("heading_style"),
                         ),
                     }
                 accepted_text = enforce_required_heading(
-                    str(prior.get("accepted_text", "")),
+                    strip_redundant_section_name_leadin(
+                        str(prior.get("accepted_text", "")),
+                        str(current.get("title") or SECTION_MAP[key]["title"]),
+                    ),
                     planned.get("heading"),
                     planned.get("heading_style"),
                 )
@@ -1403,16 +2282,41 @@ def load_state() -> dict[str, Any]:
         for field, value in default["title_editor"].items():
             title_editor.setdefault(field, value)
         draft_job = state.setdefault("full_draft_job", None)
+        # Section generation used to be stored as a disguised full-draft job.
+        # Migrate that state once so the two product features remain independent.
+        if (
+            isinstance(draft_job, dict)
+            and draft_job.get("scope") == "section"
+            and not state.get("section_draft_job")
+        ):
+            state["section_draft_job"] = draft_job
+            state["full_draft_job"] = None
+            draft_job = None
         if (
             isinstance(draft_job, dict)
             and draft_job.get("status") == "running"
             and draft_job.get("server_instance") != SERVER_INSTANCE_TOKEN
+            and not process_is_alive(draft_job.get("server_pid"))
         ):
             state["full_draft_job"] = {
                 **draft_job,
                 "status": "failed",
                 "token": None,
                 "progress_message": "服务已重启；全文生成任务已停止，可从未完成段落继续。",
+                "finished_at": int(time.time()),
+            }
+        section_job = state.setdefault("section_draft_job", None)
+        if (
+            isinstance(section_job, dict)
+            and section_job.get("status") == "running"
+            and section_job.get("server_instance") != SERVER_INSTANCE_TOKEN
+            and not process_is_alive(section_job.get("server_pid"))
+        ):
+            state["section_draft_job"] = {
+                **section_job,
+                "status": "failed",
+                "token": None,
+                "progress_message": "服务已重启；Section 生成任务已停止，可重新继续。",
                 "finished_at": int(time.time()),
             }
         state.setdefault("compile", default["compile"])
@@ -1427,6 +2331,22 @@ def load_state() -> dict[str, Any]:
             )
             for field, value in figure_state.items():
                 current_figure.setdefault(field, value)
+            if (
+                ONLINE_PROJECT_MODE
+                and FIGURES[figure_id].get("kind") == "mechanism"
+                and current_figure.get("status") == "failed"
+            ):
+                # Older online workers incorrectly attempted the intentionally
+                # unavailable local image/PPTX pipeline. Recover those red failures
+                # to the normal hosted placeholder state on reload.
+                current_figure.update(
+                    status="pending",
+                    progress=0,
+                    progress_message="",
+                    last_message="",
+                    job_token=None,
+                    job_started_at=None,
+                )
             if current_figure.get("layout_prompt_is_default"):
                 current_figure["layout_prompt"] = ""
                 current_figure["layout_prompt_is_default"] = False
@@ -1460,7 +2380,7 @@ def load_state() -> dict[str, Any]:
                 FIGURES[figure_id]["kind"] == "data"
                 and not current_figure.get("composed_at")
                 and not current_figure.get("approved_at")
-                and current_figure.get("status") not in FIGURE_RUNNING_STATUSES
+                and current_figure.get("status") == "built"
             ):
                 current_figure["status"] = "pending"
         stored_tables = state.get("tables", {})
@@ -1472,6 +2392,7 @@ def load_state() -> dict[str, Any]:
             current_table = state.setdefault("tables", {}).setdefault(table_id, table_state)
             for field, value in table_state.items():
                 current_table.setdefault(field, value)
+        refresh_full_draft_artifact_status(state)
         state["schema_version"] = default["schema_version"]
         return state
 
@@ -1685,12 +2606,19 @@ def traceable_result_payload(
     if missing:
         raise StudioError("缺少结果数据：" + ", ".join(missing))
     fixture = metrics.get("fixture", {})
+    traceable_results: dict[str, Any] = {}
+    for key in result_keys:
+        value = result_path_value(metrics, key)
+        # The metrics contract is an exact dotted-key map.  Do not also add
+        # parent objects here: doing so leaks result families that were not
+        # explicitly bound to the artifact and makes provenance checks
+        # ambiguous.  Plot programs are instructed to index this map by the
+        # complete dotted key.
+        traceable_results[key] = value
     payload: dict[str, Any] = {
         "schema_version": "1.0",
         "source_metrics": PROJECT_CONFIG["paths"]["metrics"],
-        "traceable_results": {
-            key: result_path_value(metrics, key) for key in result_keys
-        },
+        "traceable_results": traceable_results,
     }
     if isinstance(fixture, dict):
         if "synthetic" in fixture:
@@ -1838,7 +2766,32 @@ def figure_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "id": figure_id,
                 **definition,
+                "placeholder_only": bool(
+                    ONLINE_PROJECT_MODE and definition.get("kind") == "mechanism"
+                ),
+                "placeholder_message": (
+                    ONLINE_PLACEHOLDER_FIGURE_MESSAGE
+                    if ONLINE_PROJECT_MODE and definition.get("kind") == "mechanism"
+                    else ""
+                ),
                 "caption": stored.get("caption") or definition["caption"],
+                "caption_source": stored.get("caption_source", "configured"),
+                "caption_needs_backfill": (
+                    stored.get("caption_source", "configured") != "researcher"
+                    and (
+                        stored.get("caption_source", "configured") != "paragraph_accept"
+                        or bool(
+                            figure_caption_issues(
+                                str(stored.get("caption") or definition["caption"])
+                            )
+                        )
+                    )
+                ),
+                "caption_generated_from_paragraph": stored.get(
+                    "caption_generated_from_paragraph", ""
+                ),
+                "caption_generated_at": stored.get("caption_generated_at"),
+                "caption_last_error": stored.get("caption_last_error", ""),
                 "status": stored.get("status", "pending"),
                 "revision": int(stored.get("revision", 0)),
                 "approved_at": stored.get("approved_at"),
@@ -1902,7 +2855,11 @@ def figure_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
                 "gpt_preview_url": (
                     f"/figure-file/{figure_id}/draft"
                     f"?v={int(mechanism_draft.stat().st_mtime)}"
-                    if not is_data and mechanism_draft.exists()
+                    if (
+                        not is_data
+                        and stored.get("status") != "approved"
+                        and mechanism_draft.exists()
+                    )
                     else None
                 ),
                 "gpt_preview_no_text": mechanism_gpt_preview_no_text(figure_id),
@@ -1930,6 +2887,8 @@ def table_gate(
     table_id: str, state: dict[str, Any], metrics: dict[str, Any] | None = None
 ) -> tuple[bool, str]:
     definition = TABLES[table_id]
+    if ONLINE_PROJECT_MODE and definition.get("online_placeholder"):
+        return False, ONLINE_PLACEHOLDER_FIGURE_MESSAGE
     metrics = metrics if metrics is not None else metrics_bundle()
     missing_results = [
         key for key in definition.get("result_keys", []) if not has_result_path(metrics, key)
@@ -1953,6 +2912,16 @@ def table_grid(table_id: str, metrics: dict[str, Any]) -> tuple[list[str], list[
             for record in source
             if isinstance(record, dict)
         ]
+        # Some HTML result tables retain their visual header as the first
+        # extracted record.  Do not render that record as a duplicate body row.
+        if rows:
+            matches = sum(
+                normalize_plain_title(value).casefold()
+                == normalize_plain_title(header).casefold()
+                for value, header in zip(rows[0], headers)
+            )
+            if matches >= max(2, len(headers) - 1):
+                rows = rows[1:]
         return headers, rows
     if grid_type == "benchmark_rows":
         if not isinstance(source, dict):
@@ -2044,9 +3013,16 @@ def parse_table_prompt(
     columns = list(available_columns)
     requested_columns = directives.get("columns", "")
     if requested_columns:
+        # Column labels often contain explanatory commas, e.g.
+        # ``ASR (%, lower is better)``.  A pipe-delimited prompt must therefore
+        # treat only pipes as separators; otherwise the untouched generated
+        # prompt rejects its own perfectly valid column label as two unknown
+        # columns.  Retain comma separation for older prompts that contain no
+        # pipes.
+        separator = r"\s*\|\s*" if "|" in requested_columns else r"\s*[,，]\s*"
         names = [
             item.strip()
-            for item in re.split(r"\s*[|,，]\s*", requested_columns)
+            for item in re.split(separator, requested_columns)
             if item.strip()
         ]
         lookup = {name.casefold(): name for name in available_columns}
@@ -2134,6 +3110,22 @@ def latex_escape_cell(value: str) -> str:
         "}": r"\}",
         "↑": r"$\uparrow$",
         "↓": r"$\downarrow$",
+        "ρ": r"$\rho$",
+        "α": r"$\alpha$",
+        "β": r"$\beta$",
+        "±": r"$\pm$",
+        "×": r"$\times$",
+        "✓": "Yes",
+        "✔": "Yes",
+        "✗": "No",
+        "✘": "No",
+        "→": r"$\rightarrow$",
+        "←": r"$\leftarrow$",
+        "≤": r"$\leq$",
+        "≥": r"$\geq$",
+        "−": "-",
+        "—": "N/A",
+        "–": " to ",
     }
     return "".join(replacements.get(character, character) for character in value)
 
@@ -2145,7 +3137,58 @@ def numeric_cell(value: str) -> float | None:
 
 def figure_records_grid(figure_id: str, metrics: dict[str, Any]) -> tuple[list[str], list[list[str]]]:
     """Records-shaped data_grid reader for deterministic (non-Agent) data figures."""
-    grid = FIGURES[figure_id]["data_grid"]
+    definition = FIGURES[figure_id]
+    grid = definition.get("data_grid")
+    if not isinstance(grid, dict):
+        # Full Research Avatar packages predate the lightweight uploader's
+        # explicit data_grid field.  Their data figures still point at
+        # traceable records through result_keys (for example
+        # artifacts.F2.rows).  Online mode cannot run the local plotting
+        # Agent, so derive the small typed grid from those records instead of
+        # crashing with a KeyError.  The first non-numeric column is the x
+        # label and every consistently numeric column becomes a series.
+        source = None
+        source_path = ""
+        for candidate in definition.get("result_keys", []):
+            value = result_path_value(metrics, str(candidate))
+            if isinstance(value, list) and value and all(
+                isinstance(row, dict) for row in value
+            ):
+                source = value
+                source_path = str(candidate)
+                break
+        if source is None:
+            raise StudioError(
+                f"{figure_id} 缺少可用于线上 Python 绘图的 records data_grid；"
+                "请配置 data_grid，或让 result_keys 指向非空对象列表。"
+            )
+        keys = list(source[0].keys())
+        label_key = next(
+            (
+                key
+                for key in keys
+                if any(numeric_cell(str(row.get(key, ""))) is None for row in source)
+            ),
+            keys[0] if keys else "",
+        )
+        numeric_keys = [
+            key
+            for key in keys
+            if key != label_key
+            and all(numeric_cell(str(row.get(key, ""))) is not None for row in source)
+        ]
+        if not label_key or not numeric_keys:
+            raise StudioError(
+                f"{figure_id} 的 {source_path} 至少需要一个标识列和一个数值列。"
+            )
+        columns = [
+            {"key": label_key, "label": str(label_key).replace("_", " ").strip().title()},
+            *[
+                {"key": key, "label": str(key).replace("_", " ").strip().title()}
+                for key in numeric_keys
+            ],
+        ]
+        grid = {"type": "records", "path": source_path, "columns": columns}
     if str(grid.get("type", "")) != "records":
         raise StudioError(f"{figure_id} 的确定性绘图仅支持 records 类型 data_grid。")
     source = result_path_value(metrics, str(grid.get("path", "")))
@@ -2158,7 +3201,38 @@ def figure_records_grid(figure_id: str, metrics: dict[str, Any]) -> tuple[list[s
         for record in source
         if isinstance(record, dict)
     ]
+    # HTML experiment reports often expose three provenance rows followed by
+    # their real visual header ("Category / point", series names) as records.
+    # Promote that embedded row to chart headers and exclude provenance text
+    # from the numeric series instead of failing on a generic "Value 2" column.
+    embedded_header = next(
+        (
+            index
+            for index, row in enumerate(rows)
+            if row
+            and row[0].strip().casefold()
+            in {"category / point", "category", "point", "case type"}
+        ),
+        None,
+    )
+    if embedded_header is not None and embedded_header + 1 < len(rows):
+        headers = rows[embedded_header]
+        rows = rows[embedded_header + 1 :]
     return headers, rows
+
+
+def data_figure_axis_labels(definition: dict[str, Any]) -> tuple[str, str]:
+    """Return semantic axis labels without treating a series name as an axis."""
+    visible_dimensions = [
+        str(item).strip()
+        for item in definition.get("visible_dimensions", [])
+        if str(item).strip()
+    ]
+    x_label = str(definition.get("x_axis_label") or "").strip()
+    if not x_label and visible_dimensions:
+        x_label = visible_dimensions[0].replace("_", " ").title()
+    y_label = str(definition.get("y_axis_label") or "").strip() or "Value"
+    return x_label, y_label
 
 
 def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pdf_path: Path, png_path: Path) -> None:
@@ -2177,8 +3251,8 @@ def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pd
     numeric_headers = headers[1:]
     if not numeric_headers:
         raise StudioError(f"{figure_id} 至少需要一个标识列和一个数值列才能绘图。")
-    labels = [row[0] for row in rows]
-    series: list[tuple[str, list[float]]] = []
+    labels = [row[0].replace("_", " ").strip().title() for row in rows]
+    raw_series: dict[str, list[float]] = {}
     for column_index, label in enumerate(numeric_headers, start=1):
         values = []
         for row in rows:
@@ -2186,7 +3260,24 @@ def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pd
             if value is None:
                 raise StudioError(f"{figure_id} 的列“{label}”包含非数值内容，无法绘图。")
             values.append(value)
-        series.append((label, values))
+        raw_series[label] = values
+
+    # Contract-derived result grids may carry paired interval bounds beside
+    # the estimate.  Treat those columns as uncertainty metadata, never as
+    # additional bars (the old renderer produced three nearly identical bars
+    # labelled estimate/CI-low/CI-high, which was scientifically misleading).
+    interval_columns: dict[str, dict[str, list[float]]] = {}
+    series: list[tuple[str, list[float]]] = []
+    for label, values in raw_series.items():
+        match = re.match(r"^(.*?)\s+CI\s+(low|high)$", label, re.IGNORECASE)
+        if match:
+            interval_columns.setdefault(match.group(1).strip(), {})[
+                match.group(2).lower()
+            ] = values
+        else:
+            series.append((label, values))
+    if not series:
+        raise StudioError(f"{figure_id} 没有估计值列可供绘图。")
 
     import matplotlib
 
@@ -2195,17 +3286,94 @@ def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pd
     import numpy as np
 
     definition = FIGURES[figure_id]
+    if len(series) == 1 and {
+        "cohen kappa", "llm-human spearman rho", "latency old cot (s/item)",
+        "latency more (s/item)", "output old cot (tokens)", "output more (tokens)",
+    }.issubset({label.casefold() for label in labels}):
+        values_by_label = {
+            label.casefold(): value for label, value in zip(labels, series[0][1])
+        }
+        figure, panel_axes = plt.subplots(1, 3, figsize=(7.0, 2.15))
+        panels = [
+            ("Human agreement", ["Cohen kappa", "Spearman rho"], [
+                values_by_label["cohen kappa"], values_by_label["llm-human spearman rho"]
+            ], (0, 1)),
+            ("Latency (s/item)", ["CoT", "MORE"], [
+                values_by_label["latency old cot (s/item)"], values_by_label["latency more (s/item)"]
+            ], None),
+            ("Output length (tokens)", ["CoT", "MORE"], [
+                values_by_label["output old cot (tokens)"], values_by_label["output more (tokens)"]
+            ], None),
+        ]
+        for axis, (title, panel_labels, panel_values, limits) in zip(panel_axes, panels):
+            bars = axis.bar(panel_labels, panel_values, color=["#6b7280", "#2563eb"])
+            axis.set_title(title, fontsize=8, fontweight="bold")
+            axis.tick_params(axis="x", labelsize=7)
+            axis.tick_params(axis="y", labelsize=7)
+            axis.grid(axis="y", linewidth=0.35, alpha=0.35)
+            if limits:
+                axis.set_ylim(*limits)
+            for bar, value in zip(bars, panel_values):
+                axis.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{value:g}",
+                          ha="center", va="bottom", fontsize=7)
+        sample_count = values_by_label.get("samples per model")
+        if sample_count is not None:
+            figure.suptitle(f"Human evaluation: {sample_count:g} samples per model", fontsize=8)
+        figure.tight_layout()
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        png_path.parent.mkdir(parents=True, exist_ok=True)
+        figure.savefig(pdf_path, format="pdf")
+        figure.savefig(png_path, format="png", dpi=150)
+        plt.close(figure)
+        return
     figure, axes = plt.subplots(figsize=(3.32, 2.4))
     positions = np.arange(len(labels))
+    percent_x = all(re.fullmatch(r"[-+]?\d+(?:\.\d+)?%", label) for label in labels)
     width = 0.8 / max(len(series), 1)
     for index, (label, values) in enumerate(series):
-        axes.bar(positions + index * width, values, width, label=label)
-    axes.set_xticks(positions + width * (len(series) - 1) / 2)
+        interval = interval_columns.get(label, {})
+        error = None
+        if "low" in interval and "high" in interval:
+            error = np.array([
+                [max(0.0, value - low) for value, low in zip(values, interval["low"])],
+                [max(0.0, high - value) for value, high in zip(values, interval["high"])],
+            ])
+        if percent_x and len(labels) >= 3:
+            axes.errorbar(
+                positions, values, yerr=error, marker="o", linewidth=1.25,
+                capsize=2.5, label=label,
+            )
+        elif len(series) == 1 and error is not None:
+            axes.errorbar(
+                positions, values, yerr=error, marker="o", linestyle="none",
+                capsize=3, label=label,
+            )
+            axes.axhline(0.0, color="#666666", linewidth=0.7, linestyle="--")
+        else:
+            axes.bar(
+                positions + index * width, values, width, yerr=error,
+                capsize=2.5 if error is not None else 0, label=label,
+            )
+    tick_positions = positions if percent_x or (len(series) == 1 and interval_columns) else positions + width * (len(series) - 1) / 2
+    axes.set_xticks(tick_positions)
     axes.set_xticklabels(labels, rotation=20, ha="right", fontsize=7)
-    axes.set_title(str(definition.get("caption", "")), fontsize=8, wrap=True)
     axes.tick_params(axis="y", labelsize=7)
+    x_axis_label, y_axis_label = data_figure_axis_labels(definition)
+    if x_axis_label:
+        axes.set_xlabel(x_axis_label, fontsize=7)
+    axes.set_ylabel(y_axis_label, fontsize=7)
+    axes.grid(axis="y", linewidth=0.35, alpha=0.35)
     if len(series) > 1:
-        axes.legend(fontsize=6)
+        axes.legend(
+            fontsize=5.5,
+            frameon=False,
+            loc="lower center",
+            bbox_to_anchor=(0.5, 1.01),
+            ncol=min(3, len(series)),
+        )
+    # The LaTeX caption already carries the complete scientific description;
+    # repeating it as an in-plot title wastes scarce single-column space and
+    # previously leaked internal JSON filenames into the rendered figure.
     figure.tight_layout()
     pdf_path.parent.mkdir(parents=True, exist_ok=True)
     png_path.parent.mkdir(parents=True, exist_ok=True)
@@ -2227,6 +3395,22 @@ def generate_table_latex(
     wide = definition["width"].startswith("two-column")
     environment = "table*" if wide else "table"
     alignment = "l" + "c" * (len(columns) - 1)
+    compact_wide_header = wide and len(columns) >= 8
+
+    def header_cell(value: Any, column_index: int) -> str:
+        escaped = latex_escape_cell(value)
+        if not compact_wide_header or column_index == 0:
+            return escaped
+        # Repeated condition headers such as ``Positive +1`` otherwise force
+        # a many-column table through a severe global resize.  A short stack
+        # preserves the exact label while keeping the body numbers readable.
+        parts = str(value).strip().rsplit(None, 1)
+        if len(parts) == 2 and len(parts[0]) >= 3 and len(parts[1]) <= 4:
+            return (
+                r"\shortstack{" + latex_escape_cell(parts[0]) + r"\\"
+                + latex_escape_cell(parts[1]) + "}"
+            )
+        return escaped
     best_cells: set[tuple[int, int]] = set()
     if spec["best"] != "none":
         for column_index in range(1, len(columns)):
@@ -2250,6 +3434,11 @@ def generate_table_latex(
         f"\\begin{{{environment}}}[{'t' if wide else 'tb'}]",
         "  \\centering",
         f"  \\{spec['size']}",
+        *(
+            [r"  \setlength{\tabcolsep}{3.5pt}"]
+            if compact_wide_header
+            else []
+        ),
         # Long row labels (a common shape for method-comparison tables) can
         # make the tabular wider than the column that holds it -- a single
         # ("table", not "table*") environment does not know to reserve
@@ -2260,13 +3449,23 @@ def generate_table_latex(
         # never bleeds into adjacent text.
         r"  \sbox0{\begin{tabular}{" + alignment + "}",
         "    \\toprule",
-        "    " + " & ".join(latex_escape_cell(item) for item in columns) + r" \\",
+        "    "
+        + " & ".join(
+            header_cell(item, column_index)
+            for column_index, item in enumerate(columns)
+        )
+        + r" \\",
         "    \\midrule",
     ]
     for row_index, row in enumerate(rows):
         cells = []
         for column_index, item in enumerate(row):
-            escaped = latex_escape_cell(item)
+            display_item = (
+                f"{item:.3f}"
+                if isinstance(item, float) and -1.0 <= item <= 1.0
+                else item
+            )
+            escaped = latex_escape_cell(display_item)
             if (row_index, column_index) in best_cells:
                 escaped = f"\\textbf{{{escaped}}}"
             cells.append(escaped)
@@ -2283,7 +3482,7 @@ def generate_table_latex(
             f"\\end{{{environment}}}",
         ]
     )
-    return "\n".join(lines)
+    return normalize_table_numeric_precision("\n".join(lines))
 
 
 def table_preview_paths(
@@ -2469,7 +3668,9 @@ def paragraph_texts_from_manuscript(
             text = _clean_recovered_paragraph(source[match.end() : end])
             if not text:
                 return None
-            recovered[match.group(1)] = text
+            recovered[match.group(1)] = strip_redundant_section_name_leadin(
+                text, str(SECTION_MAP[section]["title"])
+            )
         return recovered
 
     headings: list[tuple[str, str, int, int]] = []
@@ -2502,7 +3703,9 @@ def paragraph_texts_from_manuscript(
             text = _clean_recovered_paragraph(source[start : min(candidates)])
             if not text:
                 return None
-            recovered[paragraph_id] = text
+            recovered[paragraph_id] = strip_redundant_section_name_leadin(
+                text, str(SECTION_MAP[section]["title"])
+            )
         return recovered
 
     # Abstract, Introduction, Conclusion, and Limitations use ordered prose blocks.
@@ -2518,9 +3721,98 @@ def paragraph_texts_from_manuscript(
     if len(blocks) != len(paragraphs):
         return None
     return {
-        str(paragraph["id"]): block
+        str(paragraph["id"]): strip_redundant_section_name_leadin(
+            block, str(SECTION_MAP[section]["title"])
+        )
         for paragraph, block in zip(paragraphs, blocks)  # noqa: B905 - equal lengths checked above
     }
+
+
+def repair_redundant_section_leadins_in_manuscript(state: dict[str, Any]) -> bool:
+    """Rewrite only sections whose stored source still contains duplicate name labels."""
+    changed = False
+    for section, section_state in state.get("sections", {}).items():
+        metadata = SECTION_MAP.get(section)
+        if not metadata:
+            continue
+        source_path = PAPER / "sections" / metadata["file"]
+        source = read_text(source_path, 500000)
+        title_pattern = r"\s+".join(
+            re.escape(token) for token in str(metadata["title"]).split()
+        )
+        aliases = [title_pattern]
+        if str(metadata["title"]).casefold() == "abstract":
+            aliases.extend(("Abstrct", "Abtract"))
+        if not re.search(
+            rf"(?im)^\s*(?:\\textbf\{{\s*)?(?:{'|'.join(aliases)})\s*"
+            rf"(?:[.:]\s*|[—–-]\s+|\}}\s*)",
+            source,
+        ):
+            continue
+        repaired, _accepted = render_section_source(
+            section, section_state, state["figures"], state["tables"]
+        )
+        if repaired != source:
+            temporary = source_path.with_suffix(".tex.tmp")
+            temporary.write_text(repaired, encoding="utf-8")
+            os.replace(temporary, source_path)
+            changed = True
+    return changed
+
+
+def repair_online_placeholder_references_in_manuscript(
+    state: dict[str, Any],
+) -> bool:
+    """Upgrade accepted hosted prose after placeholder bindings are introduced."""
+    if not ONLINE_PROJECT_MODE:
+        return False
+    changed_sections: set[str] = set()
+    for section, section_state in state.get("sections", {}).items():
+        for paragraph in section_state.get("paragraphs", []):
+            text = str(paragraph.get("accepted_text") or "").strip()
+            if not text:
+                continue
+            placeholder_ids = [
+                artifact_id
+                for artifact_id in paragraph.get("artifacts", [])
+                if (
+                    artifact_id in FIGURES
+                    and FIGURES[artifact_id].get("online_placeholder")
+                )
+                or (
+                    artifact_id in TABLES
+                    and TABLES[artifact_id].get("online_placeholder")
+                )
+            ]
+            missing = artifact_reference_issues(
+                text, artifact_writing_context(placeholder_ids, state.get("figures"))
+            )["missing"]
+            if not missing:
+                continue
+            references = [str(item["required_reference"]) for item in missing]
+            if len(references) == 1:
+                joined = references[0]
+            else:
+                joined = ", ".join(references[:-1]) + " and " + references[-1]
+            paragraph["accepted_text"] = (
+                text
+                + " The corresponding planned analysis is reserved in "
+                + joined
+                + "; these placeholders specify the intended evidence display and do "
+                "not imply that measurements have already been observed."
+            )
+            changed_sections.add(section)
+    for section in changed_sections:
+        source, accepted = render_section_source(
+            section,
+            state["sections"][section],
+            state.get("figures", {}),
+            state.get("tables", {}),
+        )
+        target = PAPER / "sections" / SECTION_MAP[section]["file"]
+        target.write_text(source, encoding="utf-8")
+        state["sections"][section]["accepted_text"] = accepted
+    return bool(changed_sections)
 
 
 def synchronize_paragraph_editors_from_manuscript(state: dict[str, Any]) -> bool:
@@ -2553,7 +3845,8 @@ def synchronize_paragraph_editors_from_manuscript(state: dict[str, Any]) -> bool
 
 
 def synchronize_artifact_workbenches_from_manuscript(
-    state: dict[str, Any], *, build_table_previews: bool = True
+    state: dict[str, Any], *, build_table_previews: bool = True,
+    artifact_ids: list[str] | None = None,
 ) -> bool:
     """Recover editable artifact state from labelled floats in canonical section sources.
 
@@ -2571,7 +3864,10 @@ def synchronize_artifact_workbenches_from_manuscript(
             section_sources[section] = (path, read_text(path, 500000))
         return section_sources[section]
 
+    allowed = set(artifact_ids) if artifact_ids is not None else None
     for figure_id in FIGURE_ORDER:
+        if allowed is not None and figure_id not in allowed:
+            continue
         definition = FIGURES[figure_id]
         stored = state["figures"][figure_id]
         recovered: tuple[str, int, int, str, Path] | None = None
@@ -2603,9 +3899,18 @@ def synchronize_artifact_workbenches_from_manuscript(
             )
             or stored.get("placement_after")
             or (first_artifact_binding(figure_id) or (None, None))[1],
-            "caption": latex_command_content(latex, "caption")
-            or stored.get("caption")
-            or definition["caption"],
+            # Generated/researcher captions in state are the canonical editable
+            # text.  Parsing the rendered LaTeX back into that field preserves
+            # escape sequences and caused each restart to double-escape math
+            # such as ``10^{-7}`` and prose ``90\%``.
+            "caption": (
+                stored.get("caption")
+                if stored.get("caption_source") in {"researcher", "paragraph_accept"}
+                and str(stored.get("caption") or "").strip()
+                else latex_command_content(latex, "caption")
+                or stored.get("caption")
+                or definition["caption"]
+            ),
             "progress": 100,
             "progress_message": "已从论文源码恢复图片工作台。",
         }
@@ -2629,6 +3934,8 @@ def synchronize_artifact_workbenches_from_manuscript(
                 changed = True
 
     for table_id in TABLE_ORDER:
+        if allowed is not None and table_id not in allowed:
+            continue
         definition = TABLES[table_id]
         stored = state["tables"][table_id]
         recovered = None
@@ -2641,6 +3948,10 @@ def synchronize_artifact_workbenches_from_manuscript(
         if not recovered:
             continue
         latex, start, _end, section, source_path = recovered
+        if table_latex_is_placeholder(latex):
+            # A pending placeholder has the final label solely to keep paragraph
+            # compilation transactional.  It is not an editable result table.
+            continue
         latex = validate_table_latex_source(table_id, latex)
         recovered_at = int(source_path.stat().st_mtime)
         updates = {
@@ -2674,7 +3985,51 @@ def synchronize_artifact_workbenches_from_manuscript(
     return changed
 
 
-def materialize_direct_full_draft_artifacts(state: dict[str, Any]) -> bool:
+def direct_full_draft_table_source(
+    table_id: str, stored: dict[str, Any], metrics: dict[str, Any]
+) -> tuple[str, str, bool]:
+    """Return table LaTeX without overwriting a researcher-approved revision."""
+    approved_latex = str(stored.get("latex") or "").strip()
+    duplicate_extracted_header = bool(
+        re.search(
+            r"\\midrule\s*(?:\r?\n)\s*(?:Method / variant|Case type)\s*&",
+            approved_latex,
+            re.IGNORECASE,
+        )
+    )
+    if (
+        stored.get("status") == "approved"
+        and approved_latex
+        and not table_latex_is_placeholder(approved_latex)
+        and not duplicate_extracted_header
+    ):
+        configured_caption = str(TABLES[table_id].get("caption") or "").strip()
+        existing_caption = latex_command_content(approved_latex, "caption").strip()
+        if existing_caption.casefold() == table_id.casefold() and configured_caption:
+            approved_latex = re.sub(
+                r"\\caption\{[^{}]*\}",
+                lambda _match: "\\caption{" + latex_escape_caption(configured_caption) + "}",
+                approved_latex,
+                count=1,
+            )
+        return (
+            validate_table_latex_source(table_id, approved_latex),
+            str(stored.get("generation_prompt") or default_table_prompt(table_id)),
+            True,
+        )
+    prompt = default_table_prompt(table_id)
+    return (
+        validate_table_latex_source(
+            table_id, generate_table_latex(table_id, metrics, prompt)
+        ),
+        prompt,
+        False,
+    )
+
+
+def materialize_batch_artifacts(
+    state: dict[str, Any], artifact_ids: list[str] | None = None
+) -> bool:
     """Fill bound figure/table workbenches after unattended prose drafting.
 
     Direct drafting must end in the same project state as interactive acceptance.
@@ -2683,7 +4038,10 @@ def materialize_direct_full_draft_artifacts(state: dict[str, Any]) -> bool:
     metrics fixture rather than copied from prose.
     """
     changed = False
+    allowed = set(artifact_ids) if artifact_ids is not None else None
     for figure_id in FIGURE_ORDER:
+        if allowed is not None and figure_id not in allowed:
+            continue
         definition = FIGURES[figure_id]
         stored = state["figures"][figure_id]
         binding = first_artifact_binding(figure_id)
@@ -2694,16 +4052,31 @@ def materialize_direct_full_draft_artifacts(state: dict[str, Any]) -> bool:
         if not str(paragraph.get("accepted_text", "")).strip():
             continue
         paths = figure_paths(figure_id)
+        if definition.get("kind") == "data" and not paths["pdf"].is_file():
+            # Resetting a generated paper deliberately removes prior outputs.
+            # A browser full-draft rerun must therefore recreate deterministic
+            # result figures from metrics instead of merely recovering files
+            # left by an earlier run.
+            render_data_figure_deterministic(
+                figure_id, metrics_bundle(), paths["pdf"], paths["preview"]
+            )
+            changed = True
         if not paths["pdf"].is_file():
             continue
-        if definition.get("kind") == "mechanism" and not paths["pptx"].is_file():
-            continue
+        if definition.get("kind") == "mechanism":
+            if not paths["pptx"].is_file():
+                continue
+            if not completed_mechanism_deliverables_match_current_draft(figure_id):
+                # A failed redraw may coexist with an older PDF/PPTX. Never
+                # approve those stale deliverables for the new Prompt/draft.
+                continue
+        ensure_figure_caption_before_approval(state, figure_id)
         updates = {
             "status": "approved",
             "approved_at": int(paths["pdf"].stat().st_mtime),
             "placement_after": stored.get("placement_after") or paragraph_id,
             "progress": 100,
-            "progress_message": "已从 direct full draft 的配置产物恢复图片工作台。",
+            "progress_message": "已从批量写作的配置产物恢复图片工作台。",
         }
         if definition.get("kind") == "data":
             updates["composed_at"] = int(paths["pdf"].stat().st_mtime)
@@ -2720,6 +4093,8 @@ def materialize_direct_full_draft_artifacts(state: dict[str, Any]) -> bool:
 
     metrics = metrics_bundle()
     for table_id in TABLE_ORDER:
+        if allowed is not None and table_id not in allowed:
+            continue
         definition = TABLES[table_id]
         stored = state["tables"][table_id]
         binding = first_artifact_binding(table_id)
@@ -2729,21 +4104,33 @@ def materialize_direct_full_draft_artifacts(state: dict[str, Any]) -> bool:
         paragraph, _index = paragraph_by_id(state, section, paragraph_id)
         if not str(paragraph.get("accepted_text", "")).strip():
             continue
-        # Project configuration is the canonical unattended brief. A stale UI
-        # draft from an earlier schema must not break terminal full-draft sync.
-        prompt = default_table_prompt(table_id)
-        latex = validate_table_latex_source(
-            table_id, generate_table_latex(table_id, metrics, prompt)
+        # Project configuration is the canonical unattended brief for an
+        # unfinished table.  A valid researcher-approved revision is already
+        # canonical manuscript content and must survive a later full-draft run.
+        latex, prompt, preserved_approved = direct_full_draft_table_source(
+            table_id, stored, metrics
         )
         compile_table_preview(table_id, latex)
         updates = {
             "latex": latex,
             "status": "approved",
-            "approved_at": int(time.time()),
+            "approved_at": (
+                stored.get("approved_at") or int(time.time())
+                if preserved_approved
+                else int(time.time())
+            ),
             "placement_after": stored.get("placement_after") or paragraph_id,
             "progress": 100,
-            "progress_message": "已从验证 metrics 恢复可编辑表格与预览。",
-            "last_message": "表格数字由 paper/metrics.json 确定性生成。",
+            "progress_message": (
+                "已保留研究者确认的表格并刷新预览。"
+                if preserved_approved
+                else "已从验证 metrics 恢复可编辑表格与预览。"
+            ),
+            "last_message": (
+                stored.get("last_message") or "已保留研究者确认的表格。"
+                if preserved_approved
+                else "表格数字由 paper/metrics.json 确定性生成。"
+            ),
             "generation_prompt": prompt,
         }
         for field, value in updates.items():
@@ -2751,8 +4138,6 @@ def materialize_direct_full_draft_artifacts(state: dict[str, Any]) -> bool:
                 stored[field] = value
                 changed = True
 
-    if not changed:
-        return False
     for section, section_state in state["sections"].items():
         for paragraph in section_state.get("paragraphs", []):
             accepted_text = str(paragraph.get("accepted_text", ""))
@@ -2769,7 +4154,7 @@ def materialize_direct_full_draft_artifacts(state: dict[str, Any]) -> bool:
     compile_result = compile_paper()
     if not compile_result.ok:
         raise StudioError(
-            "Direct full draft 图表物化后 LaTeX 编译失败。\n" + compile_result.message
+            "批量写作图表物化后 LaTeX 编译失败。\n" + compile_result.message
         )
     state["compile"] = {
         "status": "ok",
@@ -2777,6 +4162,210 @@ def materialize_direct_full_draft_artifacts(state: dict[str, Any]) -> bool:
         "updated_at": int(time.time()),
     }
     return True
+
+
+def pending_batch_artifacts(
+    state: dict[str, Any], artifact_ids: list[str] | None = None
+) -> list[str]:
+    """List paragraph-bound artifacts that still need researcher-visible work.
+
+    A prose batch is not a completed paper while a configured figure or table is
+    still pending. Ready mechanism figures are generated automatically when their
+    required paragraphs are accepted; this list keeps the batch visibly pending
+    until that background work has produced and inserted the final deliverables.
+    """
+    pending: list[str] = []
+    allowed = set(artifact_ids) if artifact_ids is not None else None
+    for artifact_id in [*FIGURE_ORDER, *TABLE_ORDER]:
+        if allowed is not None and artifact_id not in allowed:
+            continue
+        # An explicitly configured hosted placeholder is the complete online
+        # deliverable.  It must remain visible and referenceable in the manuscript,
+        # while the exported project carries the actual table/figure completion to
+        # the local workflow. Counting that unreachable approval as pending strands
+        # an otherwise finished online draft forever.
+        if (
+            ONLINE_PROJECT_MODE
+            and (
+                (artifact_id in FIGURES and FIGURES[artifact_id].get("online_placeholder"))
+                or (artifact_id in TABLES and TABLES[artifact_id].get("online_placeholder"))
+                or (
+                    artifact_id in FIGURES
+                    and FIGURES[artifact_id].get("kind") == "mechanism"
+                )
+            )
+        ):
+            continue
+        binding = first_artifact_binding(artifact_id)
+        if not binding:
+            continue
+        section, paragraph_id = binding
+        paragraph, _index = paragraph_by_id(state, section, paragraph_id)
+        if not str(paragraph.get("accepted_text", "")).strip():
+            continue
+        collection = "figures" if artifact_id in FIGURES else "tables"
+        artifact_state = state[collection][artifact_id]
+        if artifact_state.get("status") != "approved":
+            pending.append(artifact_id)
+    return pending
+
+
+def refresh_full_draft_artifact_status(state: dict[str, Any]) -> None:
+    """Synchronize independent full-paper and section artifact completion."""
+    for job_key in ("full_draft_job", "section_draft_job"):
+        job = state.get(job_key)
+        if not isinstance(job, dict) or job.get("status") not in {
+            "completed",
+            "artifacts_pending",
+        }:
+            continue
+        section_scope = job_key == "section_draft_job"
+        artifact_ids = (
+            [str(item) for item in job.get("artifact_ids", [])]
+            if section_scope
+            else None
+        )
+        pending = pending_batch_artifacts(state, artifact_ids)
+        job["pending_artifacts"] = pending
+        if pending:
+            job["status"] = "artifacts_pending"
+            job["progress_message"] = (
+                (
+                    "当前 Section 正文已写入 LaTeX；正在完成并确认绑定图表："
+                    if section_scope
+                    else "正文已全部写入 LaTeX；请在图表工作台完成并确认："
+                )
+                + "、".join(pending)
+            )
+        else:
+            job["status"] = "completed"
+            job["progress_message"] = (
+                f"{SECTION_MAP[str(job.get('section'))]['title']} 的正文与绑定图表均已完成，"
+                "并已写入 LaTeX 和 PDF。"
+                if section_scope
+                else "全文初稿与全部图表已写入 LaTeX，并完成 PDF 编译。"
+            )
+
+
+def completed_manuscript_issues(state: dict[str, Any]) -> list[str]:
+    """Return deterministic defects that forbid a completed-full-draft status."""
+    issues: list[str] = []
+    active_metrics = metrics_bundle()
+    lightweight_project = (
+        active_metrics.get("lightweight_project", {})
+        if isinstance(active_metrics, dict)
+        else {}
+    )
+    online_without_results = bool(
+        ONLINE_PROJECT_MODE
+        and isinstance(lightweight_project, dict)
+        and lightweight_project.get("numeric_policy")
+        == "replace_quantitative_values_with_xx"
+    )
+    manuscript_sources: list[tuple[str, str]] = []
+    for section, section_state in state.get("sections", {}).items():
+        metadata = SECTION_MAP.get(section, {})
+        source = read_text(PAPER / "sections" / str(metadata.get("file", "")), 500000)
+        manuscript_sources.append((section, source))
+        if metadata.get("render") != "abstract" and len(
+            re.findall(r"^\\section\*?\{", source, flags=re.M)
+        ) != 1:
+            issues.append(f"{section}: expected exactly one managed section heading")
+        for paragraph in section_state.get("paragraphs", []):
+            accepted = str(paragraph.get("accepted_text") or "")
+            issues.extend(
+                f"{section}/{paragraph.get('id')}: {item}"
+                for item in appendix_content_issues(section, accepted)
+            )
+            issues.extend(
+                f"{section}/{paragraph.get('id')}: {item}"
+                for item in numeric_comparison_issues(accepted)
+            )
+            issues.extend(
+                f"{section}/{paragraph.get('id')}: {item}"
+                for item in synthesis_comparison_issues(section, accepted)
+            )
+            issues.extend(
+                f"{section}/{paragraph.get('id')}: {item}"
+                for item in execution_record_contradiction_issues(accepted)
+            )
+            issues.extend(
+                f"{section}/{paragraph.get('id')}: {item}"
+                for item in experimental_setup_issues(
+                    section, str(paragraph.get("purpose") or ""), accepted
+                )
+            )
+            issues.extend(
+                f"{section}/{paragraph.get('id')}: {item}"
+                for item in manuscript_completion_placeholder_issues(accepted)
+            )
+            issues.extend(
+                f"{section}/{paragraph.get('id')}: {item}"
+                for item in manuscript_markup_issues(accepted)
+            )
+            issues.extend(
+                f"{section}/{paragraph.get('id')}: {item}"
+                for item in latex_prose_issues(accepted)
+            )
+            if online_without_results:
+                issues.extend(
+                    f"{section}/{paragraph.get('id')}: {item}"
+                    for item in unexecuted_result_claim_issues(accepted)
+                )
+            issues.extend(
+                f"{section}/{paragraph.get('id')}: {item}"
+                for item in unsupported_internal_reference_issues(accepted)
+            )
+            issues.extend(
+                f"{section}/{paragraph.get('id')}: {item}"
+                for item in unsupported_appendix_numeric_issues(
+                    section,
+                    accepted,
+                    section_evidence(
+                        section,
+                        [str(item) for item in paragraph.get("artifacts", [])],
+                    ),
+                )
+            )
+    label_locations: dict[str, list[str]] = {}
+    for section, source in manuscript_sources:
+        for label in re.findall(r"\\label\{([^{}]+)\}", source):
+            label_locations.setdefault(label, []).append(section)
+    for label, locations in label_locations.items():
+        if len(locations) > 1:
+            issues.append(
+                f"duplicate LaTeX label {label}: " + ", ".join(locations)
+            )
+    actual_labels = set(label_locations)
+    for section, source in manuscript_sources:
+        for label in dict.fromkeys(
+            re.findall(r"\\(?:ref|pageref|autoref)\{([^{}]+)\}", source)
+        ):
+            if label not in actual_labels:
+                issues.append(f"{section}: unresolved internal reference {label}")
+    for table_id, stored in state.get("tables", {}).items():
+        if ONLINE_PROJECT_MODE and TABLES.get(table_id, {}).get("online_placeholder"):
+            continue
+        if stored.get("status") != "approved" or table_latex_is_placeholder(
+            str(stored.get("latex") or "")
+        ):
+            issues.append(f"{table_id}: unresolved table placeholder")
+    metrics = metrics_bundle()
+    if not bool(metrics.get("synthetic", False)):
+        for path in (PAPER / "sections").glob("*.tex"):
+            if "[SYNTHETIC]" in read_text(path, 500000):
+                issues.append(f"{path.name}: unexpected synthetic marker")
+    compile_log = read_text(PAPER / "main.log", 2_000_000)
+    overfull_points = [
+        float(value)
+        for value in re.findall(r"Overfull \\hbox \(([0-9.]+)pt too wide\)", compile_log)
+    ]
+    if any(value > 1.0 for value in overfull_points):
+        issues.append(
+            "PDF contains overfull boxes wider than 1pt: "
+            + ", ".join(f"{value:.1f}pt" for value in overfull_points if value > 1.0)
+        )
+    return issues
 
 
 def extract_agent_table_latex(text: str) -> str:
@@ -2797,6 +4386,15 @@ def extract_agent_table_latex(text: str) -> str:
     if not match:
         raise StudioError("本地 Agent 没有返回完整的 table/table* LaTeX。")
     return match.group(1).strip()
+
+
+def normalize_table_numeric_precision(latex: str) -> str:
+    """Keep publication tables readable without changing source provenance."""
+    return re.sub(
+        r"(?<![\w.])(-?\d+\.\d{4,})(?![\w.])",
+        lambda match: f"{float(match.group(1)):.3f}",
+        latex,
+    )
 
 
 def validate_table_latex_source(table_id: str, latex: str) -> str:
@@ -2825,27 +4423,6 @@ def validate_table_latex_source(table_id: str, latex: str) -> str:
     if "\\caption{" not in source:
         raise StudioError("表格 LaTeX 缺少 caption。")
     return source
-
-
-def table_reference_context() -> tuple[str, str]:
-    """Return the approved reference-paper extraction and its project-local path."""
-    if not PARAGRAPH_PLAN_FILE.exists():
-        return "", ""
-    try:
-        plan = json.loads(PARAGRAPH_PLAN_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return "", ""
-    relative = str(plan.get("reference_file", "")).strip()
-    if not relative:
-        return "", ""
-    candidate = (ROOT / relative).resolve()
-    try:
-        candidate.relative_to(ROOT.resolve())
-    except ValueError:
-        return "", ""
-    if not candidate.is_file():
-        return "", ""
-    return relative, candidate.read_text(encoding="utf-8", errors="replace")[:60000]
 
 
 def table_numeric_cells(latex: str) -> tuple[str, ...]:
@@ -2881,9 +4458,6 @@ def table_numeric_cells(latex: str) -> tuple[str, ...]:
 def requests_reference_expansion(instruction: str) -> bool:
     lowered = instruction.casefold()
     markers = (
-        "pdf",
-        "reference",
-        "参考",
         "更多数字",
         "不止这么多",
         "别的数字",
@@ -2967,7 +4541,7 @@ def require_substantive_table_revision(
         after = table_numeric_cells(revised)
         if len(after) <= len(before) and set(after).issubset(set(before)):
             raise StudioError(
-                "你要求补充参考 PDF 中的更多实验数字，但本地 Agent 没有增加"
+                "你要求补充更多实验数字，但本地 Agent 没有增加任何来自可追溯结果的"
                 "任何可追溯数值。当前草稿未被覆盖。"
             )
 
@@ -2993,22 +4567,14 @@ def edit_table_with_local_agent(
         ensure_ascii=False,
         indent=2,
     )
-    reference_path, reference_text = table_reference_context()
-    reference_block = (
-        f"<reference_pdf_extraction path={json.dumps(reference_path)}>\n"
-        f"{reference_text}\n</reference_pdf_extraction>"
-        if reference_text
-        else "<reference_pdf_extraction unavailable=\"true\" />"
-    )
     action = "重写当前 LaTeX 表格" if latex.strip() else "从零生成 LaTeX 表格初稿"
     prompt = f"""你是 Paper Studio 的本地表格 agent。根据研究者的自由文本要求，
 {action}。只返回一个完整的 table/table* 环境，不要 Markdown fence，不要解释，
 也不要修改仓库文件。
 
 硬约束：
-1. 只能使用 <traceable_results> 或 <reference_pdf_extraction> 中明确出现的实验
-   数值；不得创造、推断或改写任何数值。用户提到“那篇 PDF”或“参考稿”时，
-   必须阅读后一个区块并从中恢复她点名的完整结果维度。
+1. 只能使用 <traceable_results> 中明确出现的实验数值；不得创造、推断或改写
+   任何数值。参考论文不是本项目实验结果来源。
 2. 必须保留固定标签 \\label{{{definition['label']}}}，并保留 caption。
 3. 保持 booktabs 学术表格风格；caption 位于 tabular 之后。
 4. 可以按要求修改分组表头、列/行顺序、对齐、字号、加粗、caption 措辞和注释。
@@ -3017,6 +4583,8 @@ def edit_table_with_local_agent(
    tabularx、adjustbox 或任何需要新增 package 的命令；分组表头使用 \\multicolumn
    与 \\cmidrule 实现。宽表可使用 graphicx 已提供的
    \\resizebox{{\\textwidth}}{{!}}{{...}}。
+7. 所有小数指标统一显示到小数点后三位；这是展示精度，不得改变行列对应关系或
+   使用不可追溯的新数值。
 
 <researcher_instruction>
 {instruction}
@@ -3025,8 +4593,6 @@ def edit_table_with_local_agent(
 <traceable_results>
 {evidence}
 </traceable_results>
-
-{reference_block}
 
 <current_table_latex>
 {latex.strip()}
@@ -3072,8 +4638,10 @@ def edit_table_with_local_agent(
             )
         if not output.exists():
             raise StudioError("本地 Agent 未写出最终回复。")
-        revised = extract_agent_table_latex(
-            output.read_text(encoding="utf-8", errors="replace")
+        revised = normalize_table_numeric_precision(
+            extract_agent_table_latex(
+                output.read_text(encoding="utf-8", errors="replace")
+            )
         )
     return validate_table_latex_source(table_id, revised)
 
@@ -3206,6 +4774,14 @@ def table_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "id": table_id,
                 **definition,
+                "placeholder_only": bool(
+                    ONLINE_PROJECT_MODE and definition.get("online_placeholder")
+                ),
+                "placeholder_message": (
+                    ONLINE_PLACEHOLDER_FIGURE_MESSAGE
+                    if ONLINE_PROJECT_MODE and definition.get("online_placeholder")
+                    else ""
+                ),
                 "status": stored.get("status", "pending"),
                 "revision": int(stored.get("revision", 0)),
                 "approved_at": stored.get("approved_at"),
@@ -3249,10 +4825,438 @@ def table_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
-def section_evidence(section: str) -> str:
+def _is_experiment_section(section: str) -> bool:
+    title = str(SECTION_MAP.get(section, {}).get("title", "")).lower()
+    return section.lower() in {"e", "experiment", "experiments"} or "experiment" in title
+
+
+def _is_method_section(section: str) -> bool:
+    title = str(SECTION_MAP.get(section, {}).get("title", "")).lower()
+    return section.lower() in {"m", "method", "methods", "methodology"} or any(
+        token in title for token in ("method", "methodology", "approach")
+    )
+
+
+def unexecuted_experiment_tense_issues(section: str, text: str) -> list[str]:
+    """Detect result-like present tense in hosted plan-only experiments.
+
+    The online flow intentionally has no experiment-result upload. Prompting alone is
+    not a sufficient guard because a model can turn an approved future-tense plan into
+    conventional camera-ready present tense, such as ``we report`` or ``Table 1
+    compares``. These compact patterns trigger one constrained correction pass.
+    """
+    if not _is_experiment_section(section):
+        return []
+    patterns = {
+        "first-person present-tense experiment claim": re.compile(
+            r"\bwe\s+(?:apply|assess|analy[sz]e|compare|compute|construct|demonstrate|"
+            r"evaluate|find|measure|observe|quantify|record|report|run|show|test|"
+            r"use|validate)\b",
+            re.IGNORECASE,
+        ),
+        "present-tense artifact result claim": re.compile(
+            r"\b(?:figure|table)\s*~?\\ref\{[^}]+\}\s+"
+            r"(?:compares|demonstrates|depicts|presents|reports|shows|summarizes)\b",
+            re.IGNORECASE,
+        ),
+    }
+    issues = [label for label, pattern in patterns.items() if pattern.search(text)]
+    prose = re.sub(r"\\(?:cite\w*|ref)\{[^}]*\}", "", text)
+    word_count = len(re.findall(r"\b[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)?\b", prose))
+    if word_count > 85:
+        issues.append(f"plan-only experiment paragraph exceeds 85 words: {word_count}")
+    return issues
+
+
+def unexecuted_result_claim_issues(text: str) -> list[str]:
+    """Reject claims that a result exists in the hosted no-results workflow."""
+    patterns = {
+        "past-tense study completion claim": re.compile(
+            r"\b(?:we|this paper|the study|the analysis)\s+"
+            r"(?:investigated|evaluated|tested|reported|found|observed|demonstrated|"
+            r"validated|established|showed)\b",
+            re.IGNORECASE,
+        ),
+        "result-support claim": re.compile(
+            r"\b(?:the\s+)?(?:results?|findings?|experiments?|empirical evidence)\s+"
+            r"(?:support|show|demonstrate|indicate|confirm|reveal|establish|suggest)\b",
+            re.IGNORECASE,
+        ),
+        "observed comparative outcome": re.compile(
+            r"\b(?:order gap|predictor|proposed method|Steering Commutator)\b"
+            r".{0,120}\b(?:persists?|shows? higher|outperforms?|improves?|exceeds?|"
+            r"achieves?|performs? better)\b",
+            re.IGNORECASE | re.DOTALL,
+        ),
+        "claimed tested condition": re.compile(
+            r"\b(?:conditions?|configurations?|models?|benchmarks?)\s+tested\b",
+            re.IGNORECASE,
+        ),
+        "completed-evidence contribution": re.compile(
+            r"\bwe\s+(?:provide|present|report)\s+(?:controlled|empirical|experimental)\s+"
+            r"(?:evidence|results?|findings?)\b",
+            re.IGNORECASE,
+        ),
+        "concrete unavailable numerical threshold": re.compile(
+            r"(?<![A-Za-z0-9])10\s*\^\s*\{?[-+]\d+\}?",
+            re.IGNORECASE,
+        ),
+    }
+    return [label for label, pattern in patterns.items() if pattern.search(text)]
+
+
+def _is_appendix_section(section: str) -> bool:
+    title = str(SECTION_MAP.get(section, {}).get("title", "")).lower()
+    return section.lower() in {"ap", "appendix", "appendices"} or "append" in title
+
+
+def _is_synthesis_section(section: str) -> bool:
+    title = str(SECTION_MAP.get(section, {}).get("title", "")).lower()
+    return SECTION_MAP.get(section, {}).get("render") == "abstract" or any(
+        token in title for token in ("conclusion", "limitation")
+    )
+
+
+def execution_record_context(metrics: dict[str, Any]) -> dict[str, Any]:
+    """Load small run-owned config/environment records linked by the result report."""
+    result_source = str(metrics.get("result_source") or "").strip()
+    if not result_source:
+        return {}
+    report_path = _project_path(ROOT, result_source, "metrics.result_source")
+    report = read_text(report_path, 500000)
+    paths = dict.fromkeys(
+        re.findall(
+            r"(?:^|[\s·>])((?:results|paper)/[A-Za-z0-9_./-]+/(?:config|environment|metrics)\.json)",
+            report,
+        )
+    )
+    records: dict[str, Any] = {}
+    for relative in paths:
+        try:
+            path = _project_path(ROOT, relative, "result execution record")
+            payload = json.loads(read_text(path, 120000))
+        except (OSError, ValueError, json.JSONDecodeError, ProjectConfigError):
+            continue
+        if path.name == "metrics.json" and isinstance(payload, dict):
+            payload = {"metadata": payload.get("metadata", {})}
+        records[relative] = payload
+    return records
+
+
+def primary_comparison_outcome(metrics: dict[str, Any]) -> dict[str, Any]:
+    """Derive the proposed method's win/loss record from the primary result table."""
+    rows = (
+        metrics.get("artifacts", {}).get("T1", {}).get("rows", [])
+        if isinstance(metrics.get("artifacts"), dict)
+        else []
+    )
+    if not isinstance(rows, list) or len(rows) < 3:
+        return {}
+    proposed_names = {
+        str(item.get("name") or "").casefold()
+        for item in experiment_setup_context().get("proposed_methods", [])
+    }
+    header = rows[0] if isinstance(rows[0], dict) else {}
+    data_rows = [row for row in rows[1:] if isinstance(row, dict)]
+    proposed = next(
+        (
+            row
+            for row in data_rows
+            if str(row.get("method") or row.get("name") or "").casefold()
+            in proposed_names
+        ),
+        None,
+    )
+    if not proposed:
+        return {}
+    comparisons: list[dict[str, Any]] = []
+    for key, raw_value in proposed.items():
+        if key in {"method", "name"}:
+            continue
+        try:
+            proposed_value = float(raw_value)
+        except (TypeError, ValueError):
+            continue
+        candidates: list[tuple[str, float]] = []
+        for row in data_rows:
+            try:
+                candidates.append(
+                    (
+                        str(row.get("method") or row.get("name") or ""),
+                        float(row[key]),
+                    )
+                )
+            except (KeyError, TypeError, ValueError):
+                pass
+        if not candidates:
+            continue
+        label = str(header.get(key) or key)
+        lower_is_better = "↓" in label or any(
+            token in label.casefold() for token in ("rmse", "error", "cost", "latency")
+        )
+        best_name, best_value = (
+            min(candidates, key=lambda item: item[1])
+            if lower_is_better
+            else max(candidates, key=lambda item: item[1])
+        )
+        comparisons.append(
+            {
+                "metric": label,
+                "proposed_value": proposed_value,
+                "best_method": best_name,
+                "best_value": best_value,
+                "proposed_is_best": math.isclose(
+                    proposed_value, best_value, rel_tol=1e-9, abs_tol=1e-12
+                ),
+            }
+        )
+    return {
+        "proposed_method": str(proposed.get("method") or proposed.get("name") or ""),
+        "comparisons": comparisons,
+        "wins": sum(item["proposed_is_best"] for item in comparisons),
+        "metric_count": len(comparisons),
+    }
+
+
+def synthesis_comparison_issues(section: str, text: str) -> list[str]:
+    """Reject positive comparative summaries when the primary table shows no wins."""
+    if not _is_synthesis_section(section):
+        return []
+    outcome = primary_comparison_outcome(metrics_bundle())
+    if not outcome or outcome.get("wins") != 0:
+        return []
+    pattern = re.compile(
+        r"\b(?:Steering Commutator|proposed (?:method|predictor)|local pushforward "
+        r"commutator)\b.{0,180}\b(?:outperform(?:s|ed)?|better than|"
+        r"tracked .* more closely|improv(?:e|es|ed|ing) (?:held-out )?"
+        r"(?:alignment|correlation|AUROC)|explains? (?:a )?substantial share|"
+        r"validat(?:e|es|ed) .*predictive mechanism)\b|"
+        r"\b(?:outperform(?:s|ed)?|better than)\b.{0,80}\b(?:IAA|"
+        r"interference-aware (?:allocator|baseline))\b",
+        re.IGNORECASE | re.DOTALL,
+    )
+    return ["positive proposed-method comparison contradicts the primary table"] if pattern.search(text) else []
+
+
+def experimental_setup_issues(section: str, purpose: str, text: str) -> list[str]:
+    """Enforce the compact dataset/baseline/settings contract for setup prose."""
+    if not (
+        _is_experiment_section(section)
+        and re.search(
+            r"\b(?:experimental setup|protocol|vector extraction|calibration|"
+            r"dataset|baseline selection)\b",
+            purpose,
+            re.I,
+        )
+    ):
+        return []
+    contract = experiment_setup_context()
+    purpose_folded = purpose.casefold()
+    requires_datasets = "dataset" in purpose_folded
+    requires_baselines = "baseline" in purpose_folded
+    if not requires_datasets and not requires_baselines:
+        # A single generic setup paragraph owns the whole compact contract;
+        # split setup paragraphs own only the category named by their approved
+        # purpose, avoiding forced repetition in every paragraph.
+        requires_datasets = bool(re.search(r"\bexperimental setup\b", purpose, re.I))
+        requires_baselines = requires_datasets
+    required_setup_items = [
+        *(contract.get("datasets", []) if requires_datasets else []),
+        *(contract.get("baselines", []) if requires_baselines else []),
+    ]
+    missing = [
+        str(item.get("name"))
+        for item in required_setup_items
+        if str(item.get("name") or "").casefold() not in text.casefold()
+    ]
+    issues = ["missing setup item: " + item for item in missing]
+    # A compact setup must cite externally sourced datasets and baselines, but
+    # the required count has to come from this project's approved contract.
+    # Requiring three citations unconditionally made any valid plan without
+    # ``dataset_citations``/``baseline_contract`` impossible to write, and the
+    # repair prompt then leaked names from one unrelated Steering Commutator
+    # fixture.  Cap the density at three while accepting zero when expplan did
+    # not declare any published setup items.
+    external_setup_items = [
+        item
+        for item in required_setup_items
+        if str(item.get("name") or "").strip()
+    ]
+    required_citation_count = min(3, len(external_setup_items))
+    if required_citation_count and len(citation_keys(text)) < required_citation_count:
+        issues.append("published datasets and baselines lack introducing citations")
+    protocol = metrics_bundle().get("evaluation_protocol", {})
+    protocol_models = protocol.get("models", []) if isinstance(protocol, dict) else []
+    explicitly_planned_models = [
+        str(item)
+        for item in protocol_models
+        if str(item).casefold() in purpose_folded
+    ]
+    required_models = explicitly_planned_models
+    if not required_models and re.search(r"\bexact executed models?\b", purpose, re.I):
+        required_models = [str(item) for item in protocol_models]
+    required_seeds = (
+        [str(item) for item in protocol.get("seeds", [])]
+        if isinstance(protocol, dict) and "seed" in purpose_folded
+        else []
+    )
+    for required in [*required_models, *required_seeds]:
+        if str(required).casefold() not in text.casefold():
+            issues.append("missing executed setting: " + str(required))
+    if len(re.findall(r"\b[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)?\b", text)) > 170:
+        issues.append("experimental setup exceeds 170 words")
+    return issues
+
+
+def section_evidence(
+    section: str, artifact_ids: list[str] | None = None
+) -> str:
+    """Return executed evidence, narrowed to the current planned paragraph.
+
+    ``None`` retains section-wide context for bibliography selection.  A list
+    (including an empty list) comes from a concrete paragraph and prevents an
+    unrelated experiment table from leaking into that paragraph's prompt.
+    """
     metrics = metrics_bundle()
-    selected = {key: metrics[key] for key in RESULT_KEYS.get(section, []) if key in metrics}
+    selected: dict[str, Any] = {}
+    if metrics.get("result_source"):
+        selected["result_source"] = metrics["result_source"]
+    if metrics.get("evidence_grade"):
+        selected["evidence_grade"] = metrics["evidence_grade"]
+    if isinstance(metrics.get("fixture"), dict):
+        selected["fixture"] = metrics["fixture"]
+    if _is_method_section(section) and isinstance(metrics.get("model_design"), dict):
+        selected["approved_model_design"] = metrics["model_design"]
+    if _is_experiment_section(section):
+        setup = experiment_setup_context()
+        if setup:
+            selected["experiment_setup_contract"] = setup
+        selected["claims"] = metrics.get("claims", [])
+        selected["evaluation_protocol"] = metrics.get("evaluation_protocol", {})
+        records = execution_record_context(metrics)
+        if records:
+            selected["execution_records"] = records
+    if _is_appendix_section(section):
+        # Appendix paragraphs must materialize the promised proof, configuration,
+        # grids, evaluator definitions, and provenance.  Supplying only result keys
+        # bound to the appendix (usually none) made models write a roadmap instead.
+        setup = experiment_setup_context()
+        if setup:
+            selected["experiment_setup_contract"] = setup
+        selected["claims"] = metrics.get("claims", [])
+        selected["evaluation_protocol"] = metrics.get("evaluation_protocol", {})
+        selected["complete_executed_artifacts"] = metrics.get("artifacts", {})
+        records = execution_record_context(metrics)
+        if records:
+            selected["execution_records"] = records
+    if _is_synthesis_section(section):
+        selected["claims"] = metrics.get("claims", [])
+        selected["evaluation_protocol"] = metrics.get("evaluation_protocol", {})
+        outcome = primary_comparison_outcome(metrics)
+        if outcome:
+            selected["primary_comparison_outcome"] = outcome
+
+    is_abstract = SECTION_MAP.get(section, {}).get("render") == "abstract"
+    if artifact_ids is None:
+        for key in RESULT_KEYS.get(section, []):
+            if has_result_path(metrics, key):
+                selected[key] = result_path_value(metrics, key)
+        relevant_artifacts = [
+            artifact_id
+            for artifact_id, definition in {**FIGURES, **TABLES}.items()
+            if section in definition.get("source_sections", [])
+        ]
+    else:
+        relevant_artifacts = [
+            artifact_id
+            for artifact_id in artifact_ids
+            if artifact_id in FIGURES or artifact_id in TABLES
+        ]
+    # The abstract is written last and gets the compact result tables.  It no
+    # longer starts with an empty evidence block and [X] placeholders.
+    if is_abstract or _is_synthesis_section(section):
+        relevant_artifacts = list(TABLES)
+    for artifact_id in relevant_artifacts:
+        if artifact_id in FIGURES:
+            keys = FIGURES[artifact_id].get("result_keys", [])
+        else:
+            grid = TABLES[artifact_id].get("data_grid", {})
+            keys = [grid.get("path")] if isinstance(grid, dict) else []
+        for key in keys:
+            if key and has_result_path(metrics, str(key)):
+                selected[str(key)] = result_path_value(metrics, str(key))
     return json.dumps(selected, ensure_ascii=False, indent=2)[:26000]
+
+
+def experiment_setup_context() -> dict[str, Any]:
+    """Return the compact setup contract embedded by expplan.
+
+    Paper writing needs the selected methods and implementation boundary, not
+    the entire (large) planning contract.  Keeping this extraction here also
+    makes the setup available without changing the expplan skill or report.
+    """
+    if not EXPERIMENT_PLAN_FILE.exists():
+        return {}
+    source = read_text(EXPERIMENT_PLAN_FILE, 4_000_000)
+    match = re.search(
+        r'<script[^>]*\bid=["\']experiment-plan-contract["\'][^>]*>'
+        r"(.*?)</script>",
+        source,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not match:
+        return {}
+    try:
+        contract = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(contract, dict):
+        return {}
+    dataset_rows = contract.get("dataset_citations", [])
+    baseline_rows = contract.get("baseline_contract", {}).get("selected", [])
+    implementation_rows = contract.get("implementation_contract", [])
+    metric_rows = contract.get("metric_contract", [])
+    datasets = [
+        {"name": str(row.get("name", "")).strip(), "url": str(row.get("url", "")).strip()}
+        for row in dataset_rows
+        if isinstance(row, dict) and str(row.get("name", "")).strip()
+    ]
+    implementations = {
+        str(row.get("method", "")).strip(): str(
+            row.get("implementation_summary", "")
+        ).strip()
+        for row in implementation_rows
+        if isinstance(row, dict) and str(row.get("method", "")).strip()
+    }
+    baselines = []
+    for row in baseline_rows:
+        if not isinstance(row, dict) or not str(row.get("name", "")).strip():
+            continue
+        name = str(row["name"]).strip()
+        baselines.append(
+            {
+                "name": name,
+                "role": str(row.get("scientific_role", "")).strip(),
+                "implementation": implementations.get(name, ""),
+            }
+        )
+    our_methods = [
+        {"name": name, "implementation": summary}
+        for name, summary in implementations.items()
+        if name not in {item["name"] for item in baselines}
+    ]
+    metrics = [
+        str(row.get("name", "")).strip()
+        for row in metric_rows
+        if isinstance(row, dict) and str(row.get("name", "")).strip()
+    ]
+    return {
+        "datasets": datasets,
+        "baseline_count": len(baselines),
+        "baselines": baselines,
+        "proposed_methods": our_methods,
+        "metrics": metrics,
+    }
 
 
 def current_paragraph(section_state: dict[str, Any]) -> dict[str, Any] | None:
@@ -3265,11 +5269,30 @@ def current_paragraph(section_state: dict[str, Any]) -> dict[str, Any] | None:
 
 def normalize_latex_ready_text(source: str) -> str:
     """Collapse JSON-style double escaping before known manuscript commands only."""
+    # Models occasionally wrap an otherwise valid paragraph in a fenced Markdown
+    # block. Backticks are printable in LaTeX, so compilation succeeds while the PDF
+    # visibly starts with ``latex`` and ends with quote-like marks. Strip only
+    # standalone fence lines; inline code remains a validation error below.
+    source = re.sub(r"(?im)^\s*```(?:latex|tex)?\s*$", "", source).strip()
     commands = (
         r"cite\w*|ref|pageref|label|textbf|textit|emph|subsection|subsubsection|"
-        r"paragraph|footnote|url|href"
+        r"section|paragraph|footnote|url|href|path"
     )
     normalized = re.sub(rf"\\\\(?=(?:{commands})\b)", lambda _match: "\\", source)
+    # ``[SYNTHETIC]`` is a literal provenance marker, never a mathematical
+    # display.  Models occasionally escape its brackets after seeing the
+    # pdflatex-safety rule, which otherwise renders it as display math.
+    normalized = re.sub(
+        r"\\\[\s*SYNTHETIC\s*\\\]",
+        "[SYNTHETIC]",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    # Keep the marker visually separate from the value or word it qualifies.
+    # DeepSeek often emits ``0.73[SYNTHETIC]`` even when the literal marker is
+    # correct, which is valid TeX but poor manuscript typography.
+    normalized = re.sub(r"(?<!\s)\[SYNTHETIC\]", " [SYNTHETIC]", normalized)
+    normalized = re.sub(r"\[SYNTHETIC\](?=[A-Za-z0-9])", "[SYNTHETIC] ", normalized)
     # LLMs sometimes obey the general "put mathematics in \( ... \)" rule
     # inside an already-open display environment.  TeX rejects those nested
     # inline delimiters with "Bad math environment delimiter".  Removing only
@@ -3286,6 +5309,14 @@ def normalize_latex_ready_text(source: str) -> str:
             normalized,
             flags=re.S,
         )
+    # Monospace text boxes do not line-break long repository paths and can
+    # overflow an ACL column. xurl/url is already part of the scaffold, so use
+    # its path command while preserving ordinary short code identifiers.
+    normalized = re.sub(
+        r"\\texttt\{((?=[^{}]*/)[^{}]+)\}",
+        lambda match: r"\path{" + match.group(1).replace(r"\_", "_") + "}",
+        normalized,
+    )
     normalized = re.sub(
         r"(\\begin\{(?:equation\*?|align\*?|gather\*?|multline\*?)\})"
         r"[ \t]*\n(?:[ \t]*\n)+",
@@ -3305,7 +5336,7 @@ def normalize_latex_ready_text(source: str) -> str:
         r"(?s)(\\\(.*?\\\)|\\\[.*?\\\]|(?<!\\)\$.*?(?<!\\)\$|"
         r"\\begin\{(?:equation\*?|align\*?|gather\*?|multline\*?)\}.*?"
         r"\\end\{(?:equation\*?|align\*?|gather\*?|multline\*?)\}|"
-        r"\\(?:cite\w*|ref|pageref|label)\{[^{}]*\})"
+        r"\\(?:cite\w*|ref|pageref|label|path)\{[^{}]*\})"
     )
     pieces = protected.split(normalized)
     for index in range(0, len(pieces), 2):
@@ -3314,12 +5345,31 @@ def normalize_latex_ready_text(source: str) -> str:
     # Models occasionally decorate the reserved placeholder with notes or even
     # provisional cite commands. Canonicalize the whole bracket so the verified
     # citation resolver handles it instead of leaking workflow syntax into prose.
-    return re.sub(
+    normalized = re.sub(
         r"\[CITATION\s+NEEDED[^\]]*\]",
         "[CITATION NEEDED]",
         normalized,
         flags=re.IGNORECASE,
     )
+    seen_citations: set[str] = set()
+
+    def keep_first_citation(match: re.Match[str]) -> str:
+        raw_keys = [item.strip() for item in match.group(1).split(",") if item.strip()]
+        if not raw_keys:
+            return match.group(0)
+        fresh = []
+        for key in raw_keys:
+            if key and key not in seen_citations:
+                seen_citations.add(key)
+                fresh.append(key)
+        return rf"\cite{{{','.join(fresh)}}}" if fresh else ""
+
+    normalized = re.sub(
+        r"\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{([^}]*)\}",
+        keep_first_citation,
+        normalized,
+    )
+    return re.sub(r"[ \t]+([,.;:!?])", r"\1", normalized)
 
 
 # Explicit Greek/letterlike math variable ranges: Unicode's general category
@@ -3333,6 +5383,7 @@ def normalize_latex_ready_text(source: str) -> str:
 # glyph, which is exactly what broke a real batch-writing run.
 LATEX_PROSE_UNICODE_MATH_RANGES = (
     (0x0370, 0x03FF),  # Greek and Coptic (math variables: α β γ θ φ ψ ω ...)
+    (0x2070, 0x209F),  # Superscripts and Subscripts (10⁻⁷, x₂, ...)
     (0x2100, 0x214F),  # Letterlike Symbols (blackboard bold: ℝ ℤ ℕ ℚ ℂ ...)
     (0x2190, 0x21FF),  # Arrows
     (0x27C0, 0x27EF),  # Miscellaneous Mathematical Symbols-A
@@ -3362,6 +5413,21 @@ def latex_prose_issues(source: str) -> list[str]:
     not a lossy character-rewriter: GPT gets one chance to preserve the intended
     mathematics while converting it to valid LaTeX.
     """
+    issues: list[str] = []
+    display_bodies = re.findall(r"(?s)\\\[(.*?)\\\]", source)
+    display_bodies += re.findall(
+        r"(?s)\\begin\{equation\*?\}(.*?)\\end\{equation\*?\}", source
+    )
+    for body in display_bodies:
+        compact = re.sub(r"\s+", " ", body).strip()
+        multiline = re.search(
+            r"\\begin\{(?:aligned|split|multlined|gathered)\}|\\\\", body
+        )
+        if len(compact) > 82 and not multiline:
+            issues.append(
+                "displayed equation is too long for one ACL column; split it with aligned"
+            )
+
     masked = source
     for pattern in (
         r"(?s)\\\(.*?\\\)",
@@ -3373,7 +5439,12 @@ def latex_prose_issues(source: str) -> list[str]:
     ):
         masked = re.sub(pattern, "", masked)
 
-    issues: list[str] = []
+    if "—" in masked:
+        issues.append("em dash punctuation is forbidden")
+    if "–" in masked:
+        issues.append("en dash punctuation is forbidden")
+    if re.search(r"-{2,}", masked):
+        issues.append("LaTeX double/triple-hyphen dash punctuation is forbidden")
 
     # Balance-check math delimiters on the raw (unmasked) source: the masking
     # above only strips *correctly paired* math, so a stray or mismatched
@@ -3449,7 +5520,18 @@ def candidate_for_accept(
 
     accepted = str(paragraph.get("accepted_text", "")).strip()
     if not accepted:
-        raise StudioError("当前段落没有可接受的 candidate；请先生成候选。")
+        if not submitted:
+            raise StudioError("当前段落没有可接受的正文。")
+        candidate = {
+            "id": uuid.uuid4().hex,
+            "text": submitted,
+            "purpose": paragraph.get("purpose", ""),
+            "citations_added": [],
+            "created_at": int(time.time()),
+            "source": "manual_draft",
+        }
+        paragraph["candidate"] = candidate
+        return candidate, submitted
     if base_text.strip() != accepted:
         raise StudioError("已接受版本已在别处更新；页面将载入最新版，请检查后再次修改。")
     if not submitted or submitted == accepted:
@@ -3491,6 +5573,75 @@ def bibliography_catalog() -> str:
     return read_text(PAPER / "references.bib", 2_000_000)
 
 
+def ensure_survey_bibliography() -> list[str]:
+    """Recover an empty citation bank from the project's verified survey."""
+    if bibliography_keys() or not LITERATURE_SURVEY_FILE.is_file():
+        return []
+    source = read_text(LITERATURE_SURVEY_FILE, 4_000_000)
+    bibliography = verified_survey_bibliography(source)
+    if not bibliography.strip():
+        return []
+    path = PAPER / "references.bib"
+    temporary = path.with_suffix(".bib.tmp")
+    temporary.write_text(bibliography, encoding="utf-8")
+    os.replace(temporary, path)
+    return sorted(bibliography_keys())
+
+
+def _bibtex_entries(source: str) -> list[tuple[str, str]]:
+    starts = list(re.finditer(r"@\w+\s*\{\s*([^,\s]+)\s*,", source))
+    return [
+        (
+            match.group(1).strip(),
+            source[
+                match.start() : starts[index + 1].start()
+                if index + 1 < len(starts)
+                else len(source)
+            ].strip(),
+        )
+        for index, match in enumerate(starts)
+    ]
+
+
+def survey_bibliography_keys() -> set[str]:
+    """Return bibliography keys whose records are present in the verified survey.
+
+    The local editor may only cite sources already selected and verified by the
+    literature-survey stage.  Matching uses stable identifiers first and the
+    normalized title as a fallback, so the survey HTML does not need to embed a
+    second machine-specific BibTeX copy.
+    """
+    survey_html = read_text(LITERATURE_SURVEY_FILE, 4_000_000)
+    if not survey_html:
+        return set()
+    survey_text = html.unescape(survey_html).lower()
+    survey_plain = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", survey_text))
+    allowed: set[str] = set()
+    for key, entry in _bibtex_entries(bibliography_catalog()):
+        authors = _bibtex_field(entry, "author")
+        # An abbreviated survey label is sufficient for discovery but not for a
+        # camera-ready bibliography.  Do not let paragraph generation cite it
+        # until the survey carries complete machine-readable author metadata.
+        if not authors or re.search(r"\band\s+others\b|\bet\s+al\.?\b", authors, re.I):
+            continue
+        identifiers = [
+            _bibtex_field(entry, field).strip().lower().rstrip("/")
+            for field in ("doi", "eprint", "url")
+        ]
+        identifiers = [value for value in identifiers if value]
+        title = _bibtex_field(entry, "title")
+        normalized_title = re.sub(
+            r"\s+",
+            " ",
+            re.sub(r"[{}\\]", "", html.unescape(title).lower()),
+        ).strip()
+        if any(value in survey_text for value in identifiers) or (
+            normalized_title and normalized_title in survey_plain
+        ):
+            allowed.add(key)
+    return allowed
+
+
 def _bibtex_field(entry: str, field: str) -> str:
     """Extract one prompt-facing BibTeX field without requiring a BibTeX dependency."""
     match = re.search(rf"(?:^|,)\s*{re.escape(field)}\s*=\s*", entry, re.I | re.M)
@@ -3520,7 +5671,10 @@ def _bibtex_field(entry: str, field: str) -> str:
 
 
 def bibliography_prompt_catalog(
-    relevant_text: str = "", *, required_keys: set[str] | None = None
+    relevant_text: str = "",
+    *,
+    required_keys: set[str] | None = None,
+    allowed_keys: set[str] | None = None,
 ) -> str:
     """Return a bounded, relevance-ranked citation catalog for one writing turn.
 
@@ -3530,12 +5684,14 @@ def bibliography_prompt_catalog(
     by lexical overlap, and retain a small fallback set for sparse plans.
     """
     source = bibliography_catalog()
-    starts = list(re.finditer(r"@\w+\s*\{\s*([^,\s]+)\s*,", source))
     entries: list[tuple[str, str, str, int]] = []
-    fields = ("author", "title", "year", "booktitle", "journal", "doi", "eprint", "url")
-    for index, match in enumerate(starts):
-        entry = source[match.start() : starts[index + 1].start() if index + 1 < len(starts) else len(source)]
-        key = match.group(1).strip()
+    fields = (
+        "author", "title", "year", "booktitle", "journal", "doi", "eprint",
+        "url", "claimsummary",
+    )
+    for index, (key, entry) in enumerate(_bibtex_entries(source)):
+        if allowed_keys is not None and key not in allowed_keys:
+            continue
         values = [f"key={key}"]
         for field in fields:
             value = _bibtex_field(entry, field)
@@ -3584,6 +5740,34 @@ def bibliography_prompt_catalog(
     return "\n".join(records)
 
 
+def bounded_prompt_text(value: object, limit: int, label: str) -> str:
+    """Bound one prompt component while retaining both its framing and tail."""
+    text = str(value or "")
+    if len(text) <= limit:
+        return text
+    marker = f"\n[... {label} truncated to control API input cost ...]\n"
+    remaining = max(0, limit - len(marker))
+    head = remaining * 2 // 3
+    return text[:head] + marker + text[-(remaining - head):]
+
+
+def writing_bibliography_catalog(relevant_text: str = "") -> str:
+    """Expose only project-verified citations to the paragraph writer.
+
+    Local projects retain the stricter literature-survey allow-list.  Online
+    projects have no survey stage, so their ``references.bib`` is itself the
+    verified citation bank assembled from uploaded/externally checked
+    metadata.  Hiding that bank used to guarantee citation-free online
+    manuscripts even when valid sources were present.
+    """
+    if ONLINE_PROJECT_MODE:
+        return bibliography_prompt_catalog(relevant_text)
+    return bibliography_prompt_catalog(
+        relevant_text,
+        allowed_keys=survey_bibliography_keys(),
+    )
+
+
 def bibliography_fingerprint() -> str:
     return hashlib.sha256(bibliography_catalog().encode("utf-8")).hexdigest()
 
@@ -3600,6 +5784,25 @@ def citation_keys(source: str) -> set[str]:
     return found
 
 
+def citation_key_counts(source: str) -> dict[str, int]:
+    """Count citation-command uses per key, rather than mere bibliography presence."""
+    counts: dict[str, int] = {}
+    for match in re.finditer(r"\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{([^}]+)\}", source):
+        for key in (item.strip() for item in match.group(1).split(",")):
+            if key:
+                counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def prior_section_citation_counts(section: str, exclude_text: str = "") -> dict[str, int]:
+    """Return citations already used elsewhere in the current section."""
+    path = PAPER / "sections" / SECTION_MAP[section]["file"]
+    source = read_text(path, 500_000)
+    if exclude_text.strip():
+        source = source.replace(exclude_text.strip(), "", 1)
+    return citation_key_counts(source)
+
+
 def manuscript_citation_keys() -> set[str]:
     keys: set[str] = set()
     sections = PAPER / "sections"
@@ -3610,6 +5813,430 @@ def manuscript_citation_keys() -> set[str]:
             continue
         keys.update(citation_keys(read_text(path, 500_000)))
     return keys
+
+
+def has_uncited_named_attribution(text: str) -> bool:
+    """Detect an explicit author/year attribution lacking a citation command.
+
+    This is deliberately narrow: it catches prose such as ``Zhu et al. (2020)``
+    without forcing citation calls for ordinary method/results paragraphs.
+    """
+    attribution = re.compile(
+        r"\b[A-Z][A-Za-z'’-]+(?:\s+(?:and|&)\s+[A-Z][A-Za-z'’-]+|\s+et\s+al\.)"
+        r"\s*(?:\((?:19|20)\d{2}[a-z]?\)|,?\s+(?:19|20)\d{2}[a-z]?)"
+    )
+    for match in attribution.finditer(text):
+        left = max(text.rfind(".", 0, match.start()), text.rfind("\n", 0, match.start()))
+        right_candidates = [
+            position
+            for position in (text.find(".", match.end()), text.find("\n", match.end()))
+            if position >= 0
+        ]
+        right = min(right_candidates) if right_candidates else len(text)
+        if not citation_keys(text[left + 1 : right + 1]):
+            return True
+    return False
+
+
+def paragraph_requires_citation_audit(
+    section: str,
+    purpose: str,
+    text: str,
+) -> bool:
+    """Select paragraphs that need a cheap, survey-only citation audit.
+
+    Generation models sometimes omit both a citation and the explicit
+    ``[CITATION NEEDED]`` marker.  Looking only for malformed citations therefore
+    misses exactly the failure the audit is meant to catch.  Introduction and
+    related-work prose always receive the audit; other sections receive it only
+    when they name an external dataset, benchmark, baseline, prior study, or
+    attribution.  The audit itself may correctly return zero citations.
+    """
+    if SECTION_MAP.get(section, {}).get("render") == "abstract":
+        return False
+    section_title = str(SECTION_MAP.get(section, {}).get("title", "")).lower()
+    if (
+        section in {"introduction", "related_work"}
+        or "introduction" in section_title
+        or "related work" in section_title
+    ):
+        return True
+    corpus = f"{purpose}\n{text}"
+    external_obligation = re.compile(
+        r"\b(?:dataset|benchmark|corpus|testbed|baseline|prior work|previous work|"
+        r"previous studies|existing methods?|introduced by|proposed by|according to|"
+        r"activation steering|steering vectors?|inference-time interventions?|"
+        r"CLINC150|ATIS|SNIPS|BERT|RoBERTa|GPT-[2345]|Llama(?:\s*[- ]?\d+)?)\b",
+        re.IGNORECASE,
+    )
+    return bool(external_obligation.search(corpus) or has_uncited_named_attribution(text))
+
+
+def real_result_status_issues(text: str) -> list[str]:
+    """Flag future-tense result language when the configured fixture is measured."""
+    metrics = metrics_bundle()
+    fixture = metrics.get("fixture", {}) if isinstance(metrics, dict) else {}
+    if not isinstance(fixture, dict) or fixture.get("synthetic") is not False:
+        return []
+    patterns = {
+        "pending execution": r"\bpending (?:confirmatory )?execution\b",
+        "pre-registration described as current status": r"\bpre-?registered\b",
+        "future table population": r"\bwill be populated\b",
+        "future run completion": r"\bafter (?:the )?(?:run|experiment) completes\b",
+        "future claim test": r"\bwe will test\b",
+        "future first-person action": r"\bwe will\b",
+        "future computation": r"\bwe will (?:compute|report|evaluate|compare|use|construct|average)\b",
+        "future execution action": r"\b(?:evaluation|records?|split contract|protocol|analysis|study) will\b",
+        "future comparison": r"\ball reported comparisons will\b",
+        "future interval": r"\b(?:intervals?|means?|values?) will (?:be )?(?:constructed|computed|averaged|determined)\b",
+        "future split freeze": r"\bsplit contract will be fixed\b|\bbefore any seed is executed\b",
+        "confirmatory status applied to pilot": r"(?<!not )\bconfirmatory (?:design|protocol|test|means?|values?|seeds?|study)\b",
+        "future full run": r"\bfull runs?\b",
+    }
+    return [label for label, pattern in patterns.items() if re.search(pattern, text, re.I)]
+
+
+def execution_record_contradiction_issues(text: str) -> list[str]:
+    """Flag prose that contradicts persisted run completion/provenance fields."""
+    metrics = metrics_bundle()
+    records = execution_record_context(metrics)
+    config = next(
+        (value for key, value in records.items() if key.endswith("/config.json")), {}
+    )
+    metadata = next(
+        (
+            value.get("metadata", {})
+            for key, value in records.items()
+            if key.endswith("/metrics.json") and isinstance(value, dict)
+        ),
+        {},
+    )
+    environment = next(
+        (value for key, value in records.items() if key.endswith("/environment.json")),
+        {},
+    )
+    issues: list[str] = []
+    try:
+        completed_before_stop = float(metadata["elapsed_seconds"]) < 60.0 * float(
+            config["hard_stop_minutes"]
+        )
+    except (KeyError, TypeError, ValueError):
+        completed_before_stop = False
+    if completed_before_stop and re.search(
+        r"hard stop (?:fired|was reached|triggered)|cells? (?:were )?(?:not populated|missing)|"
+        r"did not complete before the hard stop",
+        text,
+        re.I,
+    ):
+        issues.append("claims missing cells even though the run completed before its hard stop")
+    for field in ("python", "platform", "machine"):
+        if environment.get(field) and re.search(
+            rf"no [^.\n]{{0,40}}\b{field}\b[^.\n]{{0,30}}(?:recorded|available)|"
+            rf"\b{field}\b field was not recorded",
+            text,
+            re.I,
+        ):
+            issues.append(f"claims recorded {field} provenance is absent")
+    serialized_records = json.dumps(records, ensure_ascii=False).casefold()
+    if "license" not in serialized_records and re.search(
+        r"\blicense(?:s| identifiers?| text)? (?:is|are|was|were) "
+        r"(?:documented|recorded|released|provided)",
+        text,
+        re.I,
+    ):
+        issues.append("claims license provenance that was not recorded")
+    if not re.search(r"\b(?:commit|revision|git)\b", serialized_records) and re.search(
+        r"\b(?:repository|code) (?:state|revision|commit) (?:is|was|has been) "
+        r"(?:documented|recorded|pinned)",
+        text,
+        re.I,
+    ):
+        issues.append("claims repository revision provenance that was not recorded")
+    return issues
+
+
+def appendix_content_issues(section: str, text: str) -> list[str]:
+    """Reject appendix roadmaps that describe content instead of supplying it."""
+    if not _is_appendix_section(section):
+        return []
+    prose = re.sub(r"^\\subsection\*?\{[^{}]*\}\s*", "", text.strip())
+    issues: list[str] = []
+    if re.search(r"\bwe will\b|\bwill (?:give|list|report|document|provide|show)\b", prose, re.I):
+        issues.append("future appendix roadmap")
+    if re.match(
+        r"Appendix\s+[A-Z]\s+(?:supplies|provides|reports|documents|lists|gives|describes)\b",
+        prose,
+        re.I,
+    ):
+        issues.append("appendix self-description instead of content")
+    word_count = len(re.findall(r"\b[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)?\b", prose))
+    if word_count > 380:
+        issues.append(f"appendix paragraph exceeds 380 words: {word_count}")
+    if re.search(
+        r"\bremainder\b[^.]{0,100}\b(?:stays?|remains?|is)\b[^.]{0,40}"
+        r"\b(?:below|within)\b[^.]{0,40}\b(?:tolerance|threshold)\b",
+        prose,
+        re.I,
+    ):
+        issues.append("unsupported empirical bound on the formal remainder")
+    evidence_text = section_evidence(section, [])
+    if "proxy_definition" not in evidence_text.casefold() and re.search(
+        r"\b(?:normalized match count|keyword and phrase patterns|mean log-probability)\b",
+        prose,
+        re.I,
+    ):
+        issues.append("proxy implementation detail absent from execution evidence")
+    return issues
+
+
+def manuscript_markup_issues(text: str) -> list[str]:
+    """Reject Markdown residue in a LaTeX-only manuscript response."""
+    issues: list[str] = []
+    if re.search(r"(?m)^\s*(?:#{1,6}|(?:\\#){1,6})\s+", text):
+        issues.append("Markdown heading")
+    if re.search(r"\*\*[^*\n]+\*\*|__[^_\n]+__", text):
+        issues.append("Markdown bold markup")
+    if re.search(r"(?<!`)`[^`\n]+`(?!`)", text):
+        issues.append("Markdown inline-code markup")
+    if re.search(r"(?m)^\s*```(?:latex|tex)?\s*$", text):
+        issues.append("Markdown fenced-code markup")
+    if re.search(r"\\section\*?\{", text):
+        issues.append("model-emitted top-level section heading")
+    if re.search(
+        r"(?im)^\s*(?:here is|the following is) (?:the )?(?:paragraph|draft)|"
+        r"\b[A-Z]+-P\d+ (?:and [A-Z]+-P\d+ )?(?:form|is) the\b",
+        text,
+    ):
+        issues.append("model commentary around manuscript prose")
+    return issues
+
+
+def _latex_numeric_values(text: str) -> list[float]:
+    """Extract ordinary and ``a\\times10^{b}`` values for local comparison gates."""
+    positioned: list[tuple[int, float]] = []
+    consumed: list[tuple[int, int]] = []
+    scientific = re.compile(
+        r"(?<![A-Za-z0-9])([+-]?\d+(?:\.\d+)?)\s*\\times\s*10\s*\^\s*\{?([+-]?\d+)\}?"
+    )
+    for match in scientific.finditer(text):
+        positioned.append(
+            (match.start(), float(match.group(1)) * (10.0 ** int(match.group(2))))
+        )
+        consumed.append(match.span())
+    power_of_ten = re.compile(r"(?<![A-Za-z0-9])10\s*\^\s*\{?([+-]?\d+)\}?")
+    for match in power_of_ten.finditer(text):
+        if any(start <= match.start() < end for start, end in consumed):
+            continue
+        positioned.append((match.start(), 10.0 ** int(match.group(1))))
+        consumed.append(match.span())
+    # ACL tables commonly omit the leading zero (``.63``).  Matching only
+    # digit-first values started at the ``6`` and silently converted .63 to
+    # 63, which then triggered false inverted-comparison failures.
+    ordinary = re.compile(
+        r"(?<![A-Za-z0-9.])([+-]?(?:\d+(?:\.\d+)?|\.\d+))(?![A-Za-z0-9]|\.\d)"
+    )
+    for match in ordinary.finditer(text):
+        if any(start <= match.start() < end for start, end in consumed):
+            continue
+        positioned.append((match.start(), float(match.group(1))))
+    return [value for _position, value in sorted(positioned)]
+
+
+def unsupported_appendix_numeric_issues(
+    section: str, text: str, evidence: str
+) -> list[str]:
+    """Catch appendix measurements/configuration numbers absent from run evidence."""
+    if not _is_appendix_section(section):
+        return []
+    supplied = _latex_numeric_values(evidence)
+    supplied.extend(
+        float(match.group(0))
+        for match in re.finditer(
+            r"(?<![A-Za-z0-9_.])[+-]?\d+(?:\.\d+)?[eE][+-]?\d+(?![A-Za-z0-9_.])",
+            evidence,
+        )
+    )
+    allowed_constants = {0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 10.0, 100.0}
+    unsupported: list[str] = []
+    for value in _latex_numeric_values(text):
+        if value in allowed_constants:
+            continue
+        if any(
+            math.isclose(value, item, rel_tol=0.012, abs_tol=1e-12)
+            or math.isclose(value / 100.0, item, rel_tol=0.012, abs_tol=1e-12)
+            for item in supplied
+        ):
+            continue
+        rendered = f"{value:g}"
+        if rendered not in unsupported:
+            unsupported.append(rendered)
+    return [f"number absent from appendix evidence: {item}" for item in unsupported]
+
+
+def numeric_comparison_issues(text: str) -> list[str]:
+    """Catch directly inverted prose comparisons before a paragraph is accepted."""
+    issues: list[str] = []
+    for clause in re.split(r"(?<=[.;])\s+", text):
+        greater = re.search(
+            r"\b(?:exceeds|higher than|larger than|greater than)\b", clause, re.I
+        )
+        lesser = re.search(
+            r"\b(?:below|lower than|smaller than|less than)\b", clause, re.I
+        )
+        comparison = greater or lesser
+        if comparison is None:
+            continue
+        values = _latex_numeric_values(clause)
+        if re.search(r"\b(?:versus|vs\.?)\b", clause, re.I):
+            if len(values) < 2:
+                continue
+            left, right = values[-2:]
+        else:
+            # Only infer direction when the prose itself puts a number on
+            # both sides of the comparison phrase.  Phrases such as
+            # "fell below 5.34, reaching 4.42" mention the reference first
+            # and the measured value second; treating the final two numbers
+            # as left/right produced a false 5.34 < 4.42 rejection.
+            left_values = _latex_numeric_values(clause[: comparison.start()])
+            right_values = _latex_numeric_values(clause[comparison.end() :])
+            if not left_values or not right_values:
+                continue
+            left, right = left_values[-1], right_values[0]
+        if greater is not None and not left > right:
+            issues.append(f"inverted greater-than comparison: {left} versus {right}")
+        if lesser is not None and not left < right:
+            issues.append(f"inverted less-than comparison: {left} versus {right}")
+    return issues
+
+
+def bound_artifact_row_value_issues(text: str, evidence: str) -> list[str]:
+    """Detect decimal values borrowed from a different named result row.
+
+    LLM table audits can still copy a valid cell from the wrong behavior.  A
+    global numeric-membership check cannot notice because the value exists
+    elsewhere in the same table.  When a sentence explicitly names one or more
+    row labels, restrict its decimal measurements to those rows.  Direct
+    pairwise differences are allowed for ordinary effect-size prose.
+    """
+    try:
+        payload = json.loads(evidence)
+    except (TypeError, json.JSONDecodeError):
+        return []
+    if not isinstance(payload, dict):
+        return []
+    issues: list[str] = []
+    decimal_pattern = re.compile(
+        r"(?<![A-Za-z0-9])([+-]?(?:\d+\.\d+|\.\d+))(?![A-Za-z0-9])"
+    )
+    for artifact_key, raw_rows in payload.items():
+        if not str(artifact_key).startswith("artifacts.") or not isinstance(raw_rows, list):
+            continue
+        rows = [row for row in raw_rows if isinstance(row, dict) and row]
+        if not rows:
+            continue
+        # Result-table records keep their visible identifier in the first
+        # nonnumeric column (normally behavior, category, method, or variant).
+        identifier_key = next(
+            (
+                key
+                for key in rows[0]
+                if any(
+                    numeric_cell(str(row.get(key, ""))) is None
+                    and str(row.get(key, "")).strip()
+                    for row in rows
+                )
+            ),
+            "",
+        )
+        if not identifier_key:
+            continue
+        labeled_rows: dict[str, list[dict[str, Any]]] = {}
+        for row in rows:
+            label = str(row.get(identifier_key, "")).strip()
+            if label:
+                # Several result tables legitimately repeat a dataset label
+                # across multiple metrics. Preserve every matching row instead
+                # of silently retaining only the last one.
+                labeled_rows.setdefault(label, []).append(row)
+        for sentence in re.split(r"(?<=[.!?;])\s+", text):
+            matched = [
+                (label, matching_rows)
+                for label, matching_rows in labeled_rows.items()
+                if label.casefold() in sentence.casefold()
+            ]
+            sentence_words = set(re.findall(r"[A-Za-z][A-Za-z0-9-]+", sentence.casefold()))
+            for label, matching_rows in labeled_rows.items():
+                distinctive = {
+                    token
+                    for token in re.findall(r"[A-Za-z][A-Za-z0-9-]+", label.casefold())
+                    if len(token) >= 6
+                }
+                if distinctive & sentence_words and not any(
+                    existing_label == label for existing_label, _rows in matched
+                ):
+                    matched.append((label, matching_rows))
+            if re.search(r"\b(?:full|complete)\s+(?:model|configuration|method)\b", sentence, re.I):
+                for label, matching_rows in labeled_rows.items():
+                    if re.search(r"\b(?:more|ours|full)\b", label, re.I) and not any(
+                        existing_label == label for existing_label, _rows in matched
+                    ):
+                        matched.append((label, matching_rows))
+            if not matched:
+                continue
+            row_values = [
+                value
+                for _label, matching_rows in matched
+                for row in matching_rows
+                for key, raw in row.items()
+                if key != identifier_key
+                for value in [numeric_cell(str(raw))]
+                if value is not None
+            ]
+            allowed = list(row_values)
+            allowed.extend(
+                left - right
+                for index, left in enumerate(row_values)
+                for right in row_values[index + 1 :]
+            )
+            allowed.extend(
+                right - left
+                for index, left in enumerate(row_values)
+                for right in row_values[index + 1 :]
+            )
+            for token in decimal_pattern.findall(sentence):
+                value = float(token)
+                if any(math.isclose(value, item, rel_tol=1e-9, abs_tol=5e-4) for item in allowed):
+                    continue
+                labels = ", ".join(label for label, _rows in matched)
+                issue = (
+                    f"{artifact_key} sentence naming [{labels}] uses {token}, "
+                    "which is absent from those rows and their direct differences"
+                )
+                if issue not in issues:
+                    issues.append(issue)
+    return issues
+
+
+def numerical_placeholder_issues(text: str) -> list[str]:
+    """Return bracketed planning placeholders that cannot enter a finished abstract."""
+    return list(dict.fromkeys(
+        match.group(0)
+        for match in re.finditer(
+            r"\[\s*(?:[Xx](?:\\?%|[^\]]*)?|N|NUMBER|VALUE)\s*\]",
+            text,
+            flags=re.IGNORECASE,
+        )
+    ))
+
+
+def manuscript_completion_placeholder_issues(text: str) -> list[str]:
+    """Return planning/provenance tokens that cannot appear in a finished paper."""
+    pattern = re.compile(
+        r"\[(?:\s*placeholder\b[^\]]*|\s*missing\b[^\]]*|\s*pending\s*|"
+        r"\s*revision\s*|\s*[A-Z0-9_-]*license\s*)\]|\bTBD\b|\bTO BE DETERMINED\b",
+        flags=re.IGNORECASE,
+    )
+    return list(dict.fromkeys(match.group(0) for match in pattern.finditer(text)))
 
 
 def extract_output_text(response: dict[str, Any]) -> str:
@@ -3762,6 +6389,10 @@ def _chat_completion_payload(payload: dict[str, Any]) -> tuple[dict[str, Any], l
         "model": payload.get("model"),
         "messages": messages,
     }
+    if str(payload.get("model") or "").startswith("deepseek-v4-"):
+        # Paragraph drafting needs concise prose, not a billed reasoning trace.
+        request_payload["thinking"] = {"type": "disabled"}
+        request_payload["max_tokens"] = DEEPSEEK_PAPER_MAX_OUTPUT_TOKENS
     text_config = payload.get("text") or {}
     format_config = text_config.get("format") if isinstance(text_config, dict) else None
     if isinstance(format_config, dict) and format_config.get("type") == "json_schema":
@@ -3806,8 +6437,7 @@ def post_openai(
         )
     if provider != "openai" and payload.get("tools"):
         raise StudioError(
-            f"{config['label']} 当前可用于正文、标题、Caption 和设计 Prompt；"
-            "自动联网核验 citation 需要切换到 OpenAI 后重试。"
+            f"{config['label']} 当前不支持这个工具调用；请使用不带工具的文本请求。"
         )
     request_payload = payload
     history: list[dict[str, str]] | None = None
@@ -3894,15 +6524,292 @@ def mark_unverified_citations_as_needed(text: str) -> str:
     return re.sub(r"\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{([^}]+)\}", replace, text)
 
 
+def citation_placeholders(text: str) -> str:
+    """Keep verified keys and turn only unresolved obligations into placeholders."""
+    text = re.sub(
+        r"\[CITATION\s+NEEDED[^\]]*\]",
+        r"\\cite{}",
+        text,
+        flags=re.IGNORECASE,
+    )
+    known = bibliography_keys()
+
+    def replace_unknown(match: re.Match) -> str:
+        keys = [key.strip() for key in match.group(1).split(",") if key.strip()]
+        return match.group(0) if keys and all(key in known for key in keys) else r"\cite{}"
+
+    return re.sub(
+        r"\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{([^}]*)\}",
+        replace_unknown,
+        text,
+    )
+
+
+def online_citation_markers(text: str) -> str:
+    """Represent every hosted citation obligation as literal ``\\cite{}``."""
+    text = re.sub(
+        r"\[CITATION\s+NEEDED[^\]]*\]",
+        r"\\cite{}",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(
+        r"\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{[^}]*\}",
+        r"\\cite{}",
+        text,
+    )
+
+
+def local_survey_citations(text: str) -> str:
+    """Keep only real keys backed by the local verified literature survey."""
+    text = re.sub(
+        r"\[CITATION\s+NEEDED[^\]]*\]",
+        r"\\cite{}",
+        text,
+        flags=re.IGNORECASE,
+    )
+    allowed = survey_bibliography_keys()
+
+    def replace_unapproved(match: re.Match) -> str:
+        keys = [key.strip() for key in match.group(1).split(",") if key.strip()]
+        return match.group(0) if keys and all(key in allowed for key in keys) else r"\cite{}"
+
+    return re.sub(
+        r"\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{([^}]*)\}",
+        replace_unapproved,
+        text,
+    )
+
+
+def remove_manuscript_citations(text: str) -> str:
+    """Remove citation commands from sections whose project role forbids them."""
+    without = re.sub(
+        r"\s*\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{[^}]*\}",
+        "",
+        text,
+    )
+    return re.sub(r"[ \t]+([,.;:!?])", r"\1", without)
+
+
+def has_empty_citation_placeholder(text: str) -> bool:
+    return bool(re.search(r"\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{\s*\}", text))
+
+
+def validate_citations_for_accept(text: str, *, workflow: str = "正文") -> None:
+    """Apply one citation gate to interactive and direct-full-draft Accept."""
+    if ONLINE_PROJECT_MODE:
+        non_placeholder_keys = citation_keys(text)
+        if non_placeholder_keys:
+            raise StudioError(
+                f"{workflow}线上模式只能保留 \\cite{{}} 标记，不能写入 citation key："
+                + ", ".join(sorted(non_placeholder_keys))
+            )
+        return
+    if has_empty_citation_placeholder(text):
+        raise StudioError(
+            f"{workflow}仍有未解决的 \\cite{{}}；请重新生成，或从项目已核验的 "
+            "references.bib 中选择真实引用。"
+        )
+    allowed = bibliography_keys() if ONLINE_PROJECT_MODE else survey_bibliography_keys()
+    unknown = sorted(citation_keys(text) - allowed)
+    if unknown:
+        raise StudioError(
+            f"{workflow}包含未由 survey HTML 核验的 citation keys："
+            + ", ".join(unknown)
+        )
+
+
 def needs_citation_resolution(text: str) -> bool:
     return (
         "[CITATION NEEDED]" in text
+        or has_empty_citation_placeholder(text)
         or any(
             key.startswith("[") and key.endswith("]")
             for key in citation_keys(text)
         )
         or bool(citation_keys(text) - bibliography_keys())
     )
+
+
+def resolve_citations_from_survey(
+    *,
+    model: str,
+    previous_response_id: str,
+    section: str,
+    purpose: str,
+    paragraph: str,
+) -> tuple[str, str]:
+    """Audit one local paragraph using only sources already verified in survey HTML."""
+    if SECTION_MAP.get(section, {}).get("render") == "abstract":
+        return previous_response_id, remove_manuscript_citations(paragraph)
+    allowed = survey_bibliography_keys()
+    catalog = bibliography_prompt_catalog(
+        paragraph + "\n" + purpose,
+        allowed_keys=allowed,
+    )
+    if not allowed or not catalog:
+        return previous_response_id, local_survey_citations(paragraph)
+    prior_counts = prior_section_citation_counts(section, paragraph)
+    response = post_openai(
+        {
+            "model": model,
+            "store": True,
+            "previous_response_id": previous_response_id,
+            "instructions": """Audit citations in one academic manuscript paragraph.
+Return only the complete LaTeX-ready paragraph. First decide whether the paragraph has
+any genuine external attribution obligation; zero citations is a valid and often correct
+result. Do not cite generic motivation, common knowledge, a self-contained definition,
+or this paper's own method, experiments, results, and interpretations. Add a citation
+only where a specific prior work, externally sourced claim, method, model, dataset,
+benchmark, or metric needs attribution for the sentence to be accurate. Prefer the
+smallest directly supporting set and never append a survey-style citation dump to a
+broad opening sentence. Select only keys in <survey_catalog>, which comes from the
+project's verified literature-survey HTML. Never use web search, invent a key, or add a
+bibliographic record. Replace a genuinely required but unsupported citation position
+with the literal \\cite{}. Avoid reusing a key listed in
+<citations_already_used_in_section> for a generic restatement. Reuse is allowed only
+when this paragraph makes a distinct, source-specific claim that genuinely requires
+that same paper; a key already used twice should not appear a third time. Preserve all
+scientific claims, numbers, headings, artifact
+references, and wording except the citation commands.""",
+            "input": f"""<section>{section}</section>
+<paragraph_purpose>{purpose}</paragraph_purpose>
+<paragraph>{paragraph}</paragraph>
+<citations_already_used_in_section>{json.dumps(prior_counts, ensure_ascii=False)}</citations_already_used_in_section>
+<survey_catalog>{catalog}</survey_catalog>
+
+Return the citation-audited paragraph only.""",
+            "text": {"verbosity": "low"},
+        }
+    )
+    revised = normalize_latex_ready_text(extract_output_text(response))
+    response_id = str(response.get("id") or "")
+    if not revised or not response_id:
+        raise StudioError("Survey citation audit did not return a paragraph.")
+    return response_id, local_survey_citations(revised)
+
+
+def resolve_citations_from_online_bibliography(
+    *,
+    model: str,
+    previous_response_id: str,
+    section: str,
+    purpose: str,
+    paragraph: str,
+) -> tuple[str, str]:
+    """Mark every genuine hosted citation obligation with ``\\cite{}``."""
+    if SECTION_MAP.get(section, {}).get("render") == "abstract":
+        return previous_response_id, remove_manuscript_citations(paragraph)
+    prior_counts = prior_section_citation_counts(section, paragraph)
+    response = post_openai(
+        {
+            "model": model,
+            "store": True,
+            "previous_response_id": previous_response_id,
+            "instructions": """Audit citation obligations in one academic manuscript
+paragraph. Return only the complete LaTeX-ready paragraph. This online workflow has no
+bibliography and must not emit any citation key, author, year, title, or BibTeX record.
+Insert the exact literal marker \\cite{} immediately after every clause that genuinely
+depends on prior work, an externally sourced factual claim, a named existing method,
+model, dataset, benchmark, or metric. Use no citation for this paper's own method,
+proposed experiment, interpretation, common knowledge, or self-contained definition.
+Preserve the paragraph's scientific content, numbers, headings, and artifact references.
+Do not remove an external claim merely because no bibliography is available; mark its
+citation position with \\cite{}. Do not append a citation dump at paragraph end.""",
+            "input": f"""<section>{section}</section>
+<paragraph_purpose>{purpose}</paragraph_purpose>
+<paragraph>{paragraph}</paragraph>
+<citations_already_used_in_section>{json.dumps(prior_counts, ensure_ascii=False)}</citations_already_used_in_section>
+Return the citation-audited paragraph only.""",
+            "text": {"verbosity": "low"},
+        }
+    )
+    revised = normalize_latex_ready_text(extract_output_text(response))
+    response_id = str(response.get("id") or "")
+    if not revised or not response_id:
+        raise StudioError("Online citation audit did not return a paragraph.")
+    return response_id, online_citation_markers(revised)
+
+
+def repair_empty_citation_placeholders(
+    *,
+    model: str,
+    previous_response_id: str,
+    section: str,
+    purpose: str,
+    paragraph: str,
+) -> tuple[str, str]:
+    """Resolve or remove unsupported external clauses before acceptance.
+
+    Citation audits intentionally use ``\\cite{}`` as a fail-safe when a claim
+    is not supported by their bounded catalog.  Leaving that sentinel for the
+    accept handler makes batch writing stop even when a verified source exists,
+    while deleting it mechanically would publish an unsupported attribution.
+    Give the low-output text model one final, catalog-bounded choice: cite a
+    directly supporting verified record, or narrowly remove/rewrite the external
+    attribution.  The server still rejects the paragraph if the sentinel remains.
+    """
+    if ONLINE_PROJECT_MODE:
+        return previous_response_id, online_citation_markers(paragraph)
+    if not has_empty_citation_placeholder(paragraph):
+        return previous_response_id, paragraph
+    catalog = writing_bibliography_catalog(purpose + "\n" + paragraph)
+    response = post_openai(
+        {
+            "model": model,
+            "store": True,
+            "previous_response_id": previous_response_id,
+            "instructions": (
+                "Return only the complete corrected LaTeX-ready paragraph. Replace "
+                "every empty \\cite{} placeholder with a key from <verified_catalog> "
+                "only when that record directly supports the exact external clause. "
+                "If no supplied record supports the clause, narrowly remove or rewrite "
+                "that unsupported external attribution while preserving this paper's "
+                "own claims, method, evidence, numbers, heading, and figure/table "
+                "references. Never leave an empty citation, invent a key, source, "
+                "author, year, claim, or result, and never add a survey-style citation "
+                "list. A self-contained paragraph with zero citations is valid. "
+                + MANUSCRIPT_DASH_RULE
+            ),
+            "input": (
+                f"<section>{section}</section>\n"
+                f"<paragraph_purpose>{purpose}</paragraph_purpose>\n"
+                f"<verified_catalog>{catalog}</verified_catalog>\n"
+                f"<paragraph_with_empty_citations>{paragraph}</paragraph_with_empty_citations>"
+            ),
+            "text": {"verbosity": "low"},
+        }
+    )
+    revised = normalize_latex_ready_text(extract_output_text(response))
+    response_id = str(response.get("id") or "")
+    if not revised or not response_id:
+        raise StudioError("Citation placeholder repair did not return a paragraph.")
+    revised = local_survey_citations(revised)
+    if has_empty_citation_placeholder(revised):
+        # Some inexpensive models preserve the fail-safe sentinel even after
+        # receiving a bounded catalog. Use the catalog's relevance ordering as
+        # a deterministic final repair, never an invented key. Each unresolved
+        # position receives at most one verified record; if the catalog is
+        # empty we still fail closed below.
+        verified_keys = re.findall(r"(?m)^key=([^ |]+)", catalog)
+        key_iter = iter(dict.fromkeys(verified_keys))
+
+        def use_verified_key(match: re.Match[str]) -> str:
+            try:
+                return rf"\cite{{{next(key_iter)}}}"
+            except StopIteration:
+                return match.group(0)
+
+        revised = re.sub(
+            r"\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{\s*\}",
+            use_verified_key,
+            revised,
+        )
+        if has_empty_citation_placeholder(revised):
+            raise StudioError(
+                "Citation 自动修复后仍有未解决的 \\cite{}；候选未接受。"
+            )
+    return response_id, revised
 
 
 def drop_unresolved_citation_sentences(text: str) -> str:
@@ -4069,7 +6976,7 @@ def resolve_citations(
     payload: dict[str, Any] = {
         "model": model,
         "store": True,
-        "instructions": """Resolve missing scholarly citations for one AAAI paper
+        "instructions": """Resolve missing scholarly citations for one academic paper
 paragraph. Use web search and prefer primary sources: official proceedings pages,
 publisher pages, DOI records, arXiv abstracts, or OpenReview papers. Never use a blog
 or search-result page as bibliographic evidence. Return a revised LaTeX paragraph and
@@ -4138,67 +7045,230 @@ def call_openai(
     previous_response_id: str | None,
     purpose: str,
     required_heading: str | None,
-    reference_paragraph: str,
     comment: str,
     current_text: str,
+    architecture: dict[str, str] | None = None,
+    reference_context: dict[str, Any] | None = None,
+    reference_paragraph: str = "",
     bibliography_update: str = "",
     artifacts: list[str] | None = None,
     figure_states: dict[str, dict[str, Any]] | None = None,
     required_heading_style: str | None = None,
     include_section_context: bool | None = None,
 ) -> tuple[str, str, list[str]]:
+    fresh_rewrite = bool(
+        re.search(
+            r"\b(?:rewrite|redraft|start)\b.{0,24}\bfrom scratch\b|"
+            r"\bignore (?:the )?(?:previous|old)\b|\bfresh draft\b",
+            comment,
+            flags=re.IGNORECASE,
+        )
+    )
+    if fresh_rewrite:
+        previous_response_id = None
     previous_response_id = reusable_response_id(previous_response_id)
     section_meta = SECTION_MAP[section]
     section_path = PAPER / "sections" / section_meta["file"]
     if include_section_context is None:
         include_section_context = not previous_response_id
-    current_section = read_text(section_path, 24000) if include_section_context else ""
+    # Citation anti-repetition is a manuscript-state constraint, not a chat
+    # context constraint.  Full-draft writing reuses a response id after the
+    # first paragraph, so ``include_section_context`` is normally false.  The
+    # old implementation consequently counted citations in an empty string and
+    # allowed the same key to appear three or more times in a section.
+    complete_section = read_text(section_path, 500_000)
+    section_citations_already_used = citation_key_counts(
+        complete_section.replace(current_text.strip(), "", 1)
+        if current_text.strip()
+        else complete_section
+    )
+    current_section = complete_section[:24000] if include_section_context else ""
     if "awaiting paragraph-level drafting" in current_section.lower() or (
         section_meta.get("render") == "abstract"
         and "working abstract will be drafted" in current_section.lower()
     ):
         current_section = ""
+    if fresh_rewrite and current_text.strip():
+        current_section = current_section.replace(current_text.strip(), "")
+    current_section = bounded_prompt_text(
+        current_section,
+        PAPER_TEXT_CONTEXT_LIMITS["current_section"],
+        "current section",
+    )
+    current_text = bounded_prompt_text(
+        current_text,
+        PAPER_TEXT_CONTEXT_LIMITS["current_candidate"],
+        "current candidate",
+    )
+    purpose = bounded_prompt_text(
+        purpose, PAPER_TEXT_CONTEXT_LIMITS["purpose"], "paragraph purpose"
+    )
+    comment = bounded_prompt_text(
+        comment, PAPER_TEXT_CONTEXT_LIMITS["researcher_comment"], "researcher comment"
+    )
     stable_context = ""
-    evidence = section_evidence(section)
+    evidence = bounded_prompt_text(
+        section_evidence(section, artifacts),
+        PAPER_TEXT_CONTEXT_LIMITS["section_evidence"],
+        "section evidence",
+    )
     if not previous_response_id:
         bibliography_context = "\n".join(
             (section_meta["title"], purpose, current_text, current_section, evidence)
         )
+        prompt_bibliography = (
+            ""
+            if ONLINE_PROJECT_MODE
+            else writing_bibliography_catalog(bibliography_context)
+        )
         stable_context = f"""<conversation_bootstrap>
-<approved_outline>{read_text(PAPER / 'outline.txt', 22000)}</approved_outline>
-<working_abstract>{read_text(PAPER / 'working_abstract.txt', 10000)}</working_abstract>
-<writing_style>{writing_style_context()}</writing_style>
-<bibliography_catalog>{bibliography_prompt_catalog(bibliography_context)}</bibliography_catalog>
+<approved_outline>{bounded_prompt_text(approved_outline_context(), PAPER_TEXT_CONTEXT_LIMITS['outline'], 'approved outline')}</approved_outline>
+<working_abstract>{bounded_prompt_text(read_text(PAPER / 'working_abstract.txt', 10000), PAPER_TEXT_CONTEXT_LIMITS['working_abstract'], 'working abstract')}</working_abstract>
+<writing_style>{bounded_prompt_text(writing_style_context(), PAPER_TEXT_CONTEXT_LIMITS['writing_style'], 'writing style')}</writing_style>
+<bibliography_catalog>{bounded_prompt_text(prompt_bibliography, BIBLIOGRAPHY_PROMPT_MAX_CHARS, 'bibliography catalog')}</bibliography_catalog>
 <section_evidence>{evidence}</section_evidence>
 </conversation_bootstrap>"""
     bound_artifacts = artifact_writing_context(artifacts, figure_states)
+    architecture_json = bounded_prompt_text(
+        json.dumps(architecture or {}, ensure_ascii=False, indent=2),
+        PAPER_TEXT_CONTEXT_LIMITS["architecture"],
+        "paragraph architecture",
+    )
+    reference_context_json = bounded_prompt_text(
+        json.dumps(reference_context or {}, ensure_ascii=False, indent=2),
+        PAPER_TEXT_CONTEXT_LIMITS["reference_context"],
+        "reference context",
+    )
+    bound_artifacts_json = bounded_prompt_text(
+        json.dumps(bound_artifacts, ensure_ascii=False, indent=2),
+        PAPER_TEXT_CONTEXT_LIMITS["bound_artifacts"],
+        "bound artifacts",
+    )
     required_heading_command = heading_latex(
         required_heading, required_heading_style
     )
 
     venue = str(PROJECT_METADATA.get("venue", "academic")).strip() or "academic"
-    synthetic_fixture = bool(metrics_bundle().get("synthetic", False))
+    active_metrics = metrics_bundle()
+    lightweight_project = (
+        active_metrics.get("lightweight_project", {})
+        if isinstance(active_metrics, dict)
+        else {}
+    )
+    use_x_for_numbers = (
+        isinstance(lightweight_project, dict)
+        and lightweight_project.get("numeric_policy")
+        == "replace_quantitative_values_with_xx"
+    )
+    active_fixture = (
+        active_metrics.get("fixture", {}) if isinstance(active_metrics, dict) else {}
+    )
+    synthetic_fixture = bool(
+        active_fixture.get("synthetic", active_metrics.get("synthetic", False))
+        if isinstance(active_fixture, dict)
+        else active_metrics.get("synthetic", False)
+    )
+    executed_result_rows = any(
+        isinstance(artifact, dict) and bool(artifact.get("rows"))
+        for artifact in (
+            active_metrics.get("artifacts", {}).values()
+            if isinstance(active_metrics.get("artifacts"), dict)
+            else []
+        )
+    )
     measurement_marker_rule = (
+        "No experiment results are available. Replace every quantitative value in "
+        "manuscript prose with the literal xx, including counts, percentages, years, "
+        "thresholds, scores, dimensions, model counts, dataset sizes, and measurements. "
+        "Do not alter LaTeX command names, citation keys, labels, or section commands. "
+        "Never infer or copy a concrete number from the structural reference. In the "
+        "Experiments section, write the proposed setup and required experiments in "
+        "future tense and never claim that an outcome was observed. Keep each "
+        "plan-only experiment paragraph at or below 75 words."
+        if use_x_for_numbers
+        else
         "Every numerical measurement or outcome from the paper-writing fixture must "
-        "include the literal marker [SYNTHETIC]."
+        "include the literal marker [SYNTHETIC]. This fixture is a software skill test, "
+        "not an executed scientific study. Report only values explicitly supplied in "
+        "section_evidence or bound_artifacts; never claim confidence intervals, held-out "
+        "seed inference, non-inferiority, statistical significance, or a scientific "
+        "claim disposition unless those exact records are supplied. If the approved "
+        "future-study plan conflicts with the supplied toy evidence, describe the "
+        "fabricated pipeline test and preserve the unexecuted study as future work."
         if synthetic_fixture
-        else "The paper-writing fixture is verified real data; do not add a [SYNTHETIC] marker."
+        else (
+            "The supplied metrics are already executed, verified real measurements; "
+            "do not add a [SYNTHETIC] marker and do not describe populated results as "
+            "pending, pre-registered, planned, future work, or awaiting a run. Report "
+            "them in past/present tense and preserve the fixture's reduced-sample pilot "
+            "qualification rather than upgrading it to a full confirmatory study."
+        )
     )
     instructions = f"""You are an expert {venue} paper editor. Return only the proposed
 LaTeX-ready manuscript prose for the requested paragraph; do not explain your process.
 Write in precise academic English. Preserve the approved paper framing and evidence
 boundaries. Never invent a result, citation key, or experimental detail. Numerical
 measurements and outcomes must follow this fixture rule: {measurement_marker_rule}
+{MANUSCRIPT_DASH_RULE}
+Never invent a Figure, Table, Section, Appendix, equation, or page reference. Use only
+labels supplied in the project context or a label that you define locally in this same
+paragraph. A finished paragraph must not contain planning tokens such as TBD,
+[placeholder], [MISSING], [PENDING], [REVISION], or [LICENSE]. If evidence is absent,
+omit the unsupported detail or state the limitation as ordinary prose without a token.
+Every displayed equation must fit inside one conference-paper column. Split long
+expressions with an aligned, split, or multiline environment; never emit a single
+display line that can cross the column boundary.
+Preserve every evidence-defined metric's exact mathematical direction and semantics.
+Treat names such as score, margin, confidence, probability, log-probability, logit,
+distance, and loss as distinct quantities. If the evidence defines only a generic
+class score, write a generic score symbol (for example, \\(s_k(x)\\)); never silently
+replace it with a probability, logit, normalized confidence, or geometric distance.
+Before stating a formula, check that its range is compatible with every supplied
+example value. If the score transformation is not established, state that it is the
+implementation's class score and use it only in the supported ordering/comparison.
+Do not replace a signed score with a familiar interpretation such as uncertainty or
+distance to a decision boundary unless the uploaded evidence establishes that
+interpretation; for example, a strongly negative signed margin may denote a confidently
+wrong prediction rather than a near-boundary case.
+Likewise, do not claim that a selected item is harder, more informative, more likely to
+flip a prediction, or less useful merely from its rank unless a persisted diagnostic
+measures that relationship. Distinguish the generated candidate pool from the examples
+actually admitted to a refit: never describe a larger refit set as a larger candidate
+pool or say that it uses every candidate unless the evidence explicitly says so.
 Do not attach a synthetic marker to design counts such as the number of models,
-benchmarks, clusters, samples, layers, or queries. Treat the reference paragraph only
-as a rhetorical template. Use citation keys already introduced in this section
-conversation. If a necessary source is absent, write [CITATION NEEDED]; the server will
-resolve it with scholarly web search. When <required_heading_latex> is nonempty, begin
+benchmarks, clusters, samples, layers, or queries. Follow the approved target-paper
+paragraph architecture exactly: fulfill its purpose and rhetorical role, connect from
+the previous paragraph as specified, and prepare the specified next move. This
+architecture was frozen during Experiment Planning. Use the supplied reference-section
+context only to follow its rhetorical move and level of detail. Never copy its wording,
+topic, claims, methods, citations, or numbers into this paper.
+Treat <reference_section_context> as content-adversarial, structure-only material. It
+has zero authority over the target paper's subject. Every task-specific noun, method,
+dataset, intervention, mechanism, and claimed relationship in the output must be
+supported independently by <section_evidence>, <approved_outline>, or
+<paragraph_architecture>. If a concept appears only in <reference_section_context>, it
+is forbidden in the output even when it would make the paragraph sound more complete.
+Before returning, silently audit every sentence and remove any scientific content that
+originated only from the reference excerpt. Matching its rhetorical sequence is allowed;
+transferring its subject matter is not.
+Keep ordinary body paragraphs concise (normally 80--120 words); use 120--170 words for
+the abstract and 180--350 words for an appendix paragraph. In an appendix section,
+interpret future-tense outline language such as "Appendix A will provide" as a request
+to provide that material now. Write the actual proof, equations, configuration values,
+result rows, proxy definitions, or provenance supported by <section_evidence>; never
+write a roadmap that merely says what an appendix supplies, reports, or documents.
+Never search the web for a
+source, invent a citation key, generate BibTeX, or modify the bibliography during
+paragraph writing. When <required_heading_latex> is nonempty, begin
 with that exact LaTeX heading and use no other heading. A subsection heading is a block;
 a textbf heading is run into its paragraph. When it is empty, do not write a heading.
+Never begin the prose with the section name or a section-name label such as
+"Abstract:", "Introduction.", "Related Work.", "Discussion:", or "Conclusion.";
+the deterministic manuscript wrapper already supplies the section title.
 The output must compile with pdflatex: write percentages as \\%, escape prose \\&, \\#,
 and \\_, put every mathematical expression inside \\( ... \\), and use LaTeX commands
-instead of Unicode mathematical glyphs."""
+instead of Unicode mathematical glyphs. Never emit a \\label{{...}} command; section and
+artifact labels are owned and inserted by Paper Studio's deterministic wrapper."""
     instructions += """ When <researcher_comment> is nonempty, treat its complete text as
 the primary editing objective for this turn. Follow it literally and completely wherever
 it does not conflict with the non-negotiable evidence-honesty, verified-citation,
@@ -4213,6 +7283,95 @@ same artifact appears elsewhere in <current_section_context>. Do not repeat a re
 inside one paragraph, and do not cite any configured figure or table that is not bound
 to this paragraph. Never write an internal configured artifact ID in manuscript prose;
 use Figure~\\ref{{...}} or Table~\\ref{{...}}."""
+    instructions += """ Treat <citations_already_used_in_section> as a section-level
+anti-redundancy constraint. Do not reuse a cited key merely because it is the most
+familiar or broadly relevant source. Prefer zero citations for this paper's own claims,
+or a different verified source for a genuinely different external claim. Reuse a key
+only when the current paragraph makes a distinct source-specific claim that cannot be
+supported otherwise; never make the same key appear for a third time in one section."""
+    is_experimental_setup = _is_experiment_section(section) and bool(
+        re.search(
+            r"\b(?:experimental setup|protocol|vector extraction|calibration|"
+            r"dataset|baseline selection)\b",
+            purpose,
+            re.IGNORECASE,
+        )
+    )
+    if is_experimental_setup:
+        instructions += """ For an Experimental Setup or protocol paragraph, use a
+fixed compact format and avoid motivation or interpretation. Write one compact body
+paragraph that identifies the datasets, exact executed model, prompt count, seed,
+decoding, and then states the exact baseline count and every baseline name from
+experiment_setup_contract. Do not replace this list with procedural freeze language.
+Name only implementation details supplied in section_evidence.
+Do not expand baseline details into a literature review. Keep planned confirmatory
+inference explicitly separate from any synthetic software-test values."""
+        if ONLINE_PROJECT_MODE:
+            instructions += """ For every named external dataset and published baseline,
+place the literal marker \\cite{} immediately after its first mention. The hosted
+workflow has no bibliography and must never emit a citation key. Internal controls
+defined by this paper need no citation."""
+        else:
+            instructions += """ For datasets and published baselines, attach the verified
+introducing citation from <bibliography_catalog> at their first mention in the setup;
+internal controls defined by this paper need no citation."""
+    if _is_appendix_section(section):
+        instructions += """ Write only material supported by <section_evidence>.
+Configuration and provenance must reproduce the exact model, seed, prompt count,
+strength grid, token limit, elapsed time, memory, Python, platform, and machine fields
+from execution_records when present. Do not name a GPU, package version, dataset
+license, repository commit, branch, demonstration count, layer index, prompt text, or
+result cell unless that exact item is present in section_evidence. Omit any requested
+appendix field for which no execution record exists. Use LaTeX commands such as
+\\textbf{} and \\texttt{}; never output Markdown headings, asterisks, or backticks."""
+    if _is_synthesis_section(section):
+        instructions += """ The primary_comparison_outcome is a deterministic
+reading of the populated main table and overrides any optimistic claim wording in the
+approved plan. If its proposed method has zero wins, explicitly report that the stronger
+baseline outperformed it and do not claim better prediction, improved alignment,
+substantial explained variance, or validation of the predictive mechanism."""
+    if section_meta.get("render") == "abstract":
+        instructions += """ The Abstract must contain no citation commands. State the
+paper's motivation, method, evidence, and bounded conclusion self-containedly; leave
+literature attribution and dataset citations to the body. Do not emit \\cite{...} or
+\\cite{} even if the bibliography catalog contains relevant sources."""
+        if executed_result_rows:
+            instructions += """ The experiment has already run. Any [X], [X\\%], or
+[N] marker in the approved architecture is an obsolete planning placeholder, not an
+output requirement. Use exact measurements supplied in <section_evidence> when they
+directly support the claim. If a planned numerical claim is not supported there, omit
+or qualitatively narrow it; never emit a bracketed numerical placeholder and never
+invent a value."""
+        elif ONLINE_PROJECT_MODE:
+            instructions += """ This hosted project has no experiment-result input.
+Describe the evaluation as proposed future work. Do not say that this paper applies,
+evaluates, reports, shows, finds, demonstrates, or observes experimental outcomes.
+Use formulations such as "we will evaluate" or "the proposed evaluation will test",
+and do not imply that any experiment has already run."""
+    elif ONLINE_PROJECT_MODE:
+        instructions += """ Decide from the actual paragraph content whether any
+citation is needed; a paragraph may legitimately contain zero citations. Do not cite
+generic motivation, common knowledge, a self-contained definition, or this paper's own
+method, experiments, findings, and interpretations. Only when a specific prior work,
+externally sourced claim, method, model, dataset, benchmark, or metric genuinely needs
+attribution, place the exact literal marker \\cite{} immediately after that clause.
+The hosted workflow has no bibliography: never emit a citation key, author/year
+attribution, title, or BibTeX record. Mark every genuine citation obligation and never
+append a broad citation dump at the end of a paragraph. The \\cite{} markers are
+intentional output and must be preserved when the paragraph is accepted."""
+    else:
+        instructions += """ Decide from the actual paragraph content whether any
+citation is needed; a paragraph may legitimately contain zero citations. Do not cite
+generic motivation, common knowledge, a self-contained definition, or this paper's own
+method, experiments, findings, and interpretations. Only when a specific prior work,
+externally sourced claim, method, model, dataset, benchmark, or metric genuinely needs
+attribution, cite the exact clause. Select only real keys supplied in
+<bibliography_catalog>; those records are already verified in
+reports/01_LIT_SURVEY.html. Prefer the smallest directly supporting set and never append
+a survey-style citation dump to a broad sentence. Never use a key outside that catalog.
+If a genuinely necessary citation lacks support in the catalog, write the literal
+\\cite{} at that position. Every explicit author/year attribution (for example,
+Smith et al. (2024)) must carry a supporting citation command in the same sentence."""
 
     user_input = f"""<section>{section_meta['title']}</section>
 <paragraph_purpose>{purpose.strip()}</paragraph_purpose>
@@ -4220,16 +7379,33 @@ use Figure~\\ref{{...}} or Table~\\ref{{...}}."""
 <required_heading_style>{(required_heading_style or '').strip()}</required_heading_style>
 <required_heading_latex>{required_heading_command}</required_heading_latex>
 <researcher_comment>{comment.strip()}</researcher_comment>
-<current_candidate>{current_text.strip()}</current_candidate>
+<current_candidate>{'' if fresh_rewrite else current_text.strip()}</current_candidate>
 <current_section_context>{current_section}</current_section_context>
-<reference_paragraph>{reference_paragraph.strip()}</reference_paragraph>
-<bound_artifacts>{json.dumps(bound_artifacts, ensure_ascii=False, indent=2)}</bound_artifacts>
-{f"<bibliography_update>{bibliography_update}</bibliography_update>" if bibliography_update else ""}
+<paragraph_architecture>{architecture_json}</paragraph_architecture>
+<reference_section_context>{reference_context_json}</reference_section_context>
+<bound_artifacts>{bound_artifacts_json}</bound_artifacts>
+<citations_already_used_in_section>{json.dumps(section_citations_already_used, ensure_ascii=False)}</citations_already_used_in_section>
+{f"<bibliography_update>{bounded_prompt_text(bibliography_update, BIBLIOGRAPHY_PROMPT_MAX_CHARS, 'bibliography update')}</bibliography_update>" if bibliography_update else ""}
 {stable_context}
 
 Revise or draft exactly one coherent paragraph for the stated purpose. If required
-evidence or a citation key is unavailable, retain an explicit bracketed placeholder
-instead of guessing."""
+evidence or a citation key is unavailable, omit or narrowly qualify the unsupported
+claim instead of guessing or emitting a planning placeholder. The target project
+evidence is the sole content authority; the reference excerpt is never target-paper
+evidence.{(
+    ' Before writing any bracketed numerical placeholder, exhaustively check '
+    '<section_evidence>, including uploaded headline, aggregate, inference, and summary '
+    'objects. If the requested measurement is present there, use its exact value '
+    '(rounded only for readable reporting) and do not leave a placeholder for it.'
+    if stable_context else ''
+)}"""
+
+    prompt_chars = len(instructions) + len(user_input)
+    if prompt_chars > PAPER_TEXT_PROMPT_MAX_CHARS:
+        raise StudioError(
+            "Paper Studio paragraph prompt exceeded its cost budget: "
+            f"{prompt_chars} > {PAPER_TEXT_PROMPT_MAX_CHARS} characters."
+        )
 
     payload: dict[str, Any] = {
         "model": model,
@@ -4310,60 +7486,646 @@ instead of guessing."""
         remaining_reference_error = artifact_reference_error(text, bound_artifacts)
         if remaining_reference_error:
             raise StudioError("GPT 修正后仍然" + remaining_reference_error)
-    added: list[str] = []
-    if needs_citation_resolution(text):
-        if active_llm_provider() == "openai":
-            response_id, text, added = resolve_citations(
-                model=model,
-                previous_response_id=response_id,
-                section=section_meta["title"],
-                purpose=purpose,
-                paragraph=text,
+    if bound_artifacts and '"artifacts.' in evidence:
+        # A generation pass can copy every value yet attach one to the wrong
+        # row/column, silently change ``-1`` into a fraction-like phrase, or
+        # round .99/1.00/.99 into "all 1.00".  Numeric membership checks cannot
+        # catch those semantic mapping errors because each number is present
+        # somewhere in the same table.  Run a small evidence-only audit before
+        # citation editing so the accepted prose is checked against the exact
+        # bound rows rather than against model memory.
+        audit = post_openai(
+            {
+                "model": model,
+                "store": True,
+                # Use an independent verifier conversation.  Continuing the
+                # drafting conversation anchored the checker to the draft's
+                # mistaken row/column reading even after the exact table was
+                # supplied, so a wrong Refusal condition survived the audit.
+                "instructions": (
+                    "Return only the complete corrected LaTeX-ready paragraph. "
+                    "Audit every empirical statement against <bound_result_evidence>. "
+                    "For each reported value, verify its exact row, column, condition, "
+                    "multiplier sign, model, and metric. Preserve signed header values "
+                    "such as -1, 0, and +1 as explicit LaTeX numerals; never spell, "
+                    "reinterpret, or silently change them. Do not call near-equal "
+                    "values equal, saturated, all identical, at the floor, or at the "
+                    "ceiling unless every relevant cell exactly supports that claim. "
+                    "Recompute any stated difference from the supplied cells. Remove "
+                    "or narrow any claim the rows do not establish. Preserve the "
+                    "required heading, citations, and configured table or figure "
+                    "reference exactly once. Never invent a value, source, label, or "
+                    "experimental condition. "
+                    + MANUSCRIPT_DASH_RULE
+                ),
+                "input": (
+                    f"<bound_result_evidence>{evidence}</bound_result_evidence>\n"
+                    f"<paragraph_to_audit>{text}</paragraph_to_audit>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(audit))
+        response_id = str(audit.get("id") or "")
+        if not text or not response_id:
+            raise StudioError("图表证据审计没有返回修正版段落。")
+        remaining_reference_error = artifact_reference_error(text, bound_artifacts)
+        if remaining_reference_error:
+            raise StudioError("图表证据审计后仍然" + remaining_reference_error)
+        row_value_issues = bound_artifact_row_value_issues(text, evidence)
+        for _row_audit_attempt in range(2):
+            if not row_value_issues:
+                break
+            correction = post_openai(
+                {
+                    "model": model,
+                    "store": True,
+                    "instructions": (
+                        "Return only the complete corrected LaTeX-ready paragraph. "
+                        "A deterministic table validator found decimal values copied "
+                        "from a different named row. Correct every flagged sentence "
+                        "using the exact row and column values in <bound_result_evidence>. "
+                        "Remove a comparison if the supplied row does not support it. "
+                        "Preserve the required heading, citations, and configured "
+                        "artifact reference exactly once. Never invent, round, swap, "
+                        "or relabel a value or condition. "
+                        + MANUSCRIPT_DASH_RULE
+                    ),
+                    "input": (
+                        "<deterministic_row_violations>"
+                        + json.dumps(row_value_issues, ensure_ascii=False)
+                        + "</deterministic_row_violations>\n"
+                        f"<bound_result_evidence>{evidence}</bound_result_evidence>\n"
+                        f"<paragraph_to_correct>{text}</paragraph_to_correct>"
+                    ),
+                    "text": {"verbosity": "low"},
+                }
             )
-        else:
-            # Citation search needs OpenAI's web_search tool, which other
-            # providers' APIs don't support (post_openai refuses to send
-            # `tools` to them). Route straight into the same "search
-            # couldn't verify every claim" narrowing/dropping fallback
-            # below, instead of hard-failing the whole draft -- and never
-            # let a model-invented \cite key survive un-narrowed just
-            # because there was no search available to check it.
-            text = mark_unverified_citations_as_needed(text)
-    if "[CITATION NEEDED]" in text:
+            text = normalize_latex_ready_text(extract_output_text(correction))
+            response_id = str(correction.get("id") or "")
+            if not text or not response_id:
+                raise StudioError("跨行数值纠正没有返回修正版段落。")
+            row_value_issues = bound_artifact_row_value_issues(text, evidence)
+        if row_value_issues:
+            raise StudioError(
+                "正文仍包含来自错误表格行的数值，候选未接受："
+                + ", ".join(row_value_issues)
+            )
+        remaining_reference_error = artifact_reference_error(text, bound_artifacts)
+        if remaining_reference_error:
+            raise StudioError("跨行数值纠正后仍然" + remaining_reference_error)
+    tense_issues = (
+        unexecuted_experiment_tense_issues(section, text)
+        if ONLINE_PROJECT_MODE and use_x_for_numbers
+        else []
+    )
+    for plan_correction_attempt in range(3):
+        if not tense_issues:
+            break
+        target_words = 75 - (plan_correction_attempt * 10)
         correction = post_openai(
             {
                 "model": model,
                 "store": True,
                 "previous_response_id": response_id,
                 "instructions": (
-                    "Return only the complete revised LaTeX-ready paragraph. The "
-                    "citation resolver already searched once and could not verify "
-                    "every marked claim. Narrow or remove every unsupported clause so "
-                    "no [CITATION NEEDED] marker remains. Use only citation keys in "
-                    "the supplied verified bibliography; do not invent a key, source, "
-                    "claim, result, or detail. Preserve required headings, synthetic "
-                    "markers, and figure/table cross-references."
+                    "Return only the complete corrected LaTeX-ready paragraph. No "
+                    "experiment has been executed and no result is available. Rewrite "
+                    f"the paragraph in at most {target_words} words. This word limit is "
+                    "mandatory: delete secondary rationale before returning. Write every "
+                    "experimental action and artifact description in explicit future "
+                    "tense using will. Never write present or past result-like forms such "
+                    "as we report, we evaluate, Table compares, Figure shows, results "
+                    "indicate, or we observed. Preserve the core proposed protocol, "
+                    "literal xx values, citations, heading, and each configured figure "
+                    "or table reference exactly once. Do not add a claimed, predicted, "
+                    "or expected outcome."
                 ),
                 "input": (
-                    f"<verified_bibliography>{bibliography_prompt_catalog(text)}</verified_bibliography>\n"
-                    f"<paragraph>{text}</paragraph>"
+                    "Detected plan-only paragraph defects: "
+                    + "; ".join(tense_issues)
+                    + "\n<paragraph_to_correct>"
+                    + text
+                    + "</paragraph_to_correct>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = str(correction.get("id") or "")
+        if not text or not response_id:
+            raise StudioError("未执行实验的时态纠正没有返回修正版段落。")
+        tense_issues = unexecuted_experiment_tense_issues(section, text)
+        remaining_reference_error = artifact_reference_error(text, bound_artifacts)
+        if remaining_reference_error:
+            raise StudioError("实验计划时态纠正后仍然" + remaining_reference_error)
+    if tense_issues:
+        raise StudioError(
+            "实验计划段落经过三次收缩后仍不合格，候选未接受："
+            + ", ".join(tense_issues)
+        )
+    added: list[str] = []
+    if section_meta.get("render") == "abstract":
+        text = remove_manuscript_citations(text)
+    elif ONLINE_PROJECT_MODE:
+        text = online_citation_markers(text)
+    else:
+        text = local_survey_citations(text)
+        if needs_citation_resolution(text) or paragraph_requires_citation_audit(
+            section, purpose, text
+        ):
+            response_id, text = resolve_citations_from_survey(
+                model=model,
+                previous_response_id=response_id,
+                section=section,
+                purpose=purpose,
+                paragraph=text,
+            )
+    response_id, text = repair_empty_citation_placeholders(
+        model=model,
+        previous_response_id=response_id,
+        section=section,
+        purpose=purpose,
+        paragraph=text,
+    )
+    third_use_keys = sorted(
+        key
+        for key in citation_keys(text)
+        if section_citations_already_used.get(key, 0) >= 2
+    )
+    if third_use_keys:
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete corrected LaTeX-ready paragraph. The "
+                    "listed citation keys have already appeared at least twice in this "
+                    "section and may not be used again. Remove redundant attribution; "
+                    "when an external claim still genuinely needs support, use a "
+                    "different directly supporting key from verified_catalog. If no "
+                    "alternative supports it, narrowly remove or rewrite that external "
+                    "claim without changing this paper's own scientific content. Never "
+                    "invent a key, citation, number, or result."
+                ),
+                "input": (
+                    "<forbidden_third_use_keys>"
+                    + json.dumps(third_use_keys, ensure_ascii=False)
+                    + "</forbidden_third_use_keys>\n<verified_catalog>"
+                    + writing_bibliography_catalog(purpose + "\n" + text)
+                    + "</verified_catalog>\n<previous_paragraph>"
+                    + text
+                    + "</previous_paragraph>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = str(correction.get("id") or "")
+        if not text or not response_id:
+            raise StudioError("Citation 去重没有返回修正版段落。")
+        remaining_third_uses = sorted(set(third_use_keys) & citation_keys(text))
+        if remaining_third_uses:
+            raise StudioError(
+                "同一 section 的 citation key 仍将出现第三次，候选未接受："
+                + ", ".join(remaining_third_uses)
+            )
+    setup_issues = experimental_setup_issues(section, purpose, text)
+    if setup_issues:
+        setup_contract = experiment_setup_context()
+        execution_protocol = metrics_bundle().get("evaluation_protocol", {})
+        setup_names = [
+            str(item.get("name") or "").strip()
+            for item in [
+                *setup_contract.get("datasets", []),
+                *setup_contract.get("baselines", []),
+            ]
+            if str(item.get("name") or "").strip()
+        ]
+        setup_name_instruction = (
+            "Name every declared dataset and baseline exactly as supplied in "
+            "setup_contract: " + ", ".join(setup_names) + ". "
+            if setup_names
+            else "Do not invent datasets or baselines absent from the supplied contracts. "
+        )
+        required_models = [
+            str(item).strip()
+            for item in (
+                execution_protocol.get("models", [])
+                if isinstance(execution_protocol, dict)
+                else []
+            )
+            if str(item).strip()
+        ]
+        model_instruction = (
+            "Include each required model string verbatim: "
+            + "; ".join(required_models)
+            + ". "
+            if required_models
+            else "Do not invent a model name absent from execution_protocol. "
+        )
+        setup_citation_instruction = (
+            "Place the exact literal marker \\cite{} after the first mention of "
+            "each externally published dataset or baseline. Do not emit citation "
+            "keys because the hosted workflow has no bibliography. "
+            if ONLINE_PROJECT_MODE
+            else "Cite each externally published setup item at first mention using "
+            "only a directly supporting key in verified_catalog. "
+        )
+        setup_bibliography = (
+            ""
+            if ONLINE_PROJECT_MODE
+            else writing_bibliography_catalog(
+                " ".join(setup_names) + " experimental setup baselines datasets"
+            )
+        )
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only one compact LaTeX-ready Experimental Setup "
+                    "paragraph of at most 170 words. "
+                    + setup_name_instruction
+                    + model_instruction
+                    + "State only exact executed models, prompt counts, seeds, "
+                    "decoding, datasets, and baselines present in setup_contract or "
+                    "execution_protocol. "
+                    + setup_citation_instruction
+                    + "Do not discuss motivation, leakage, "
+                    "pre-registration, future work, or result interpretation."
+                ),
+                "input": (
+                    "Detected setup defects: "
+                    + "; ".join(setup_issues)
+                    + "\n<setup_contract>"
+                    + json.dumps(setup_contract, ensure_ascii=False)
+                    + "</setup_contract>\n<execution_protocol>"
+                    + json.dumps(execution_protocol, ensure_ascii=False)
+                    + "</execution_protocol>\n<verified_catalog>"
+                    + setup_bibliography
+                    + "</verified_catalog>\n<previous_paragraph>"
+                    + text
+                    + "</previous_paragraph>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = str(correction.get("id") or "")
+        remaining_setup_issues = experimental_setup_issues(section, purpose, text)
+        if not text or not response_id or remaining_setup_issues:
+            raise StudioError(
+                "Experimental Setup 仍未满足固定格式："
+                + ", ".join(remaining_setup_issues or setup_issues)
+            )
+    status_issues = real_result_status_issues(text)
+    for _status_attempt in range(2):
+        if not status_issues:
+            break
+        fixture_context = metrics_bundle().get("fixture", {})
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete corrected LaTeX-ready paragraph. The "
+                    "configured metrics are already executed real reduced-sample pilot "
+                    "measurements. Remove language that calls populated results pending, "
+                    "pre-registered, planned, future, or awaiting execution. Report only "
+                    "the supplied measured evidence in past/present tense; retain the "
+                    "reduced-sample pilot limitation and do not upgrade it to a full "
+                    "confirmatory study. Do not use 'confirmatory' as the status of this "
+                    "pilot's design, protocol, test, seeds, values, or study. Preserve "
+                    "citation keys, exact numbers, headings, "
+                    "and required figure/table references. Do not explain the correction."
+                ),
+                "input": (
+                    "Detected result-status contradictions: "
+                    + "; ".join(status_issues)
+                    + ".\n<executed_fixture>"
+                    + json.dumps(fixture_context, ensure_ascii=False)
+                    + "</executed_fixture>"
+                    + ".\n\n<previous_paragraph>"
+                    + text
+                    + "</previous_paragraph>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = str(correction.get("id") or "")
+        if not text or not response_id:
+            raise StudioError("GPT 没有返回修正结果状态后的正文。")
+        status_issues = real_result_status_issues(text)
+    if status_issues:
+        raise StudioError(
+            "真实结果正文仍含未来执行状态：" + ", ".join(status_issues)
+        )
+    execution_issues = execution_record_contradiction_issues(text)
+    if execution_issues:
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete corrected LaTeX-ready paragraph. "
+                    "Correct every contradiction with the supplied execution records. "
+                    "If elapsed time is below the configured hard stop, do not claim "
+                    "that the stop fired or that cells are missing. Reproduce recorded "
+                    "environment fields rather than calling them absent. Preserve "
+                    "supported measurements, citations, heading, and references."
+                ),
+                "input": (
+                    "Detected execution-record contradictions: "
+                    + "; ".join(execution_issues)
+                    + f".\n<section_evidence>{evidence}</section_evidence>"
+                    + f"\n<previous_paragraph>{text}</previous_paragraph>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = str(correction.get("id") or "")
+        remaining_execution_issues = execution_record_contradiction_issues(text)
+        if not text or not response_id or remaining_execution_issues:
+            raise StudioError(
+                "正文仍与执行记录矛盾，候选未接受："
+                + ", ".join(remaining_execution_issues or execution_issues)
+            )
+    appendix_issues = appendix_content_issues(section, text)
+    if appendix_issues:
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete corrected LaTeX-ready appendix "
+                    "paragraph. Replace the roadmap with the actual promised "
+                    "material using only section_evidence: give the proof or "
+                    "equations, concrete configuration, populated result summary, "
+                    "proxy definition, or recorded provenance. Preserve the exact "
+                    "required heading. Do not say what the appendix will, supplies, "
+                    "provides, reports, or documents. Never invent unavailable data."
+                ),
+                "input": (
+                    "Detected appendix problems: "
+                    + "; ".join(appendix_issues)
+                    + f".\n<section_evidence>{evidence}</section_evidence>"
+                    + f"\n<previous_paragraph>{text}</previous_paragraph>"
                 ),
                 "text": {"verbosity": "medium"},
             }
         )
         text = normalize_latex_ready_text(extract_output_text(correction))
-        response_id = correction.get("id")
-        if not text or not response_id:
-            raise StudioError("GPT 没有返回去除未验证论断后的正文。")
-        if "[CITATION NEEDED]" in text:
-            text = drop_unresolved_citation_sentences(text)
-            if not text or "[CITATION NEEDED]" in text:
-                raise StudioError("未验证论断无法安全移除；未生成候选。")
-        unknown_after_narrowing = citation_keys(text) - bibliography_keys()
-        if unknown_after_narrowing:
+        response_id = str(correction.get("id") or "")
+        remaining_appendix_issues = appendix_content_issues(section, text)
+        if not text or not response_id or remaining_appendix_issues:
             raise StudioError(
-                "GPT 缩窄论断时使用了未验证 citation keys："
-                + ", ".join(sorted(unknown_after_narrowing))
+                "附录仍然只是内容路线图，候选未接受："
+                + ", ".join(remaining_appendix_issues or appendix_issues)
+            )
+    completion_issues = manuscript_completion_placeholder_issues(text)
+    markup_issues = manuscript_markup_issues(text)
+    internal_reference_issues = unsupported_internal_reference_issues(text)
+    appendix_numeric_issues = unsupported_appendix_numeric_issues(
+        section, text, evidence
+    )
+    if (
+        completion_issues
+        or markup_issues
+        or internal_reference_issues
+        or appendix_numeric_issues
+    ):
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete corrected LaTeX-ready paragraph. "
+                    "Remove every planning placeholder, Markdown marker, model "
+                    "commentary, model-emitted top-level section heading, and every "
+                    "unsupported internal cross-reference. Use only evidence and labels supplied by the "
+                    "project. If a promised detail is unavailable, omit it or state "
+                    "the limitation as ordinary prose without brackets. Preserve "
+                    "supported claims, exact measurements, citations, required "
+                    "heading, and required configured artifact references. Never "
+                    "invent replacement data or labels."
+                ),
+                "input": (
+                    "Detected completion defects: "
+                    + "; ".join(
+                        completion_issues
+                        + markup_issues
+                        + internal_reference_issues
+                        + appendix_numeric_issues
+                    )
+                    + f".\n<previous_paragraph>{text}</previous_paragraph>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = str(correction.get("id") or "")
+        remaining_completion_issues = manuscript_completion_placeholder_issues(text)
+        remaining_markup_issues = manuscript_markup_issues(text)
+        remaining_internal_issues = unsupported_internal_reference_issues(text)
+        remaining_appendix_numeric_issues = unsupported_appendix_numeric_issues(
+            section, text, evidence
+        )
+        if (
+            not text
+            or not response_id
+            or remaining_completion_issues
+            or remaining_markup_issues
+            or remaining_internal_issues
+            or remaining_appendix_numeric_issues
+        ):
+            raise StudioError(
+                "正文仍包含规划占位符或不存在的内部引用，候选未接受："
+                + ", ".join(
+                    remaining_completion_issues
+                    + remaining_markup_issues
+                    + remaining_internal_issues
+                    + remaining_appendix_numeric_issues
+                    or completion_issues
+                    + markup_issues
+                    + internal_reference_issues
+                    + appendix_numeric_issues
+                )
+            )
+    no_result_issues = (
+        unexecuted_result_claim_issues(text)
+        if ONLINE_PROJECT_MODE and use_x_for_numbers
+        else []
+    )
+    for no_result_attempt in range(2):
+        if not no_result_issues:
+            break
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete corrected LaTeX-ready paragraph. This "
+                    "hosted project has no experiment-result input and no experiment "
+                    "has run. Remove every claimed observation, completed comparison, "
+                    "result-supported conclusion, tested-condition statement, and past "
+                    "tense study-completion claim. Preserve definitions and theoretical "
+                    "claims. Describe empirical work only as a proposed future protocol "
+                    "using will, and use literal xx for unavailable quantitative values. "
+                    "Preserve citations, headings, and configured artifact references."
+                ),
+                "input": (
+                    "Detected unsupported result claims: "
+                    + "; ".join(no_result_issues)
+                    + "\n<paragraph_to_correct>"
+                    + text
+                    + "</paragraph_to_correct>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = str(correction.get("id") or "")
+        if not text or not response_id:
+            raise StudioError("无实验结果状态纠正没有返回修正版段落。")
+        no_result_issues = unexecuted_result_claim_issues(text)
+    if no_result_issues:
+        raise StudioError(
+            "段落仍声称存在尚未执行的实验结果，候选未接受："
+            + ", ".join(no_result_issues)
+        )
+    comparison_issues = numeric_comparison_issues(text)
+    if comparison_issues:
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete corrected LaTeX-ready paragraph. "
+                    "Correct the prose direction of every numeric comparison to "
+                    "match the supplied values. Preserve all exact values, citations, "
+                    "headings, and artifact references. Do not invent or swap values."
+                ),
+                "input": (
+                    "Detected inverted comparisons: "
+                    + "; ".join(comparison_issues)
+                    + f".\n<previous_paragraph>{text}</previous_paragraph>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = str(correction.get("id") or "")
+        remaining_comparison_issues = numeric_comparison_issues(text)
+        if not text or not response_id or remaining_comparison_issues:
+            raise StudioError(
+                "数值比较方向仍与数值矛盾，候选未接受："
+                + ", ".join(remaining_comparison_issues or comparison_issues)
+            )
+    synthesis_issues = synthesis_comparison_issues(section, text)
+    if synthesis_issues:
+        outcome = primary_comparison_outcome(metrics_bundle())
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete corrected LaTeX-ready paragraph. "
+                    "The previous synthesis contradicted the populated primary "
+                    "comparison table. State the proposed method's negative result "
+                    "plainly, identify the actual stronger baseline, and narrow the "
+                    "paper's conclusion to what the smoke evidence supports. Preserve "
+                    "the heading contract and exact measured values. Do not invent a "
+                    "positive mechanism result or explain the correction."
+                ),
+                "input": (
+                    "<primary_comparison_outcome>"
+                    + json.dumps(outcome, ensure_ascii=False)
+                    + "</primary_comparison_outcome>\n<previous_paragraph>"
+                    + text
+                    + "</previous_paragraph>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = str(correction.get("id") or "")
+        remaining_synthesis_issues = synthesis_comparison_issues(section, text)
+        if text and response_id and remaining_synthesis_issues:
+            retry = post_openai(
+                {
+                    "model": model,
+                    "store": False,
+                    "instructions": (
+                        "Write only one concise LaTeX-ready conclusion paragraph. "
+                        "Mandatory factual opening: In the primary smoke comparison, "
+                        "IAA outperformed Steering Commutator on all six reported "
+                        "benchmark-metric cells. Explain that this falsifies the "
+                        "planned better-predictor claim while preserving only the "
+                        "same-state null and descriptive order-gap findings. Never "
+                        "say that Steering Commutator outperformed, improved, tracked "
+                        "more closely, or validated its predictive mechanism."
+                    ),
+                    "input": json.dumps(outcome, ensure_ascii=False),
+                    "text": {"verbosity": "low"},
+                }
+            )
+            text = normalize_latex_ready_text(extract_output_text(retry))
+            response_id = str(retry.get("id") or "")
+            remaining_synthesis_issues = synthesis_comparison_issues(section, text)
+        if not text or not response_id or remaining_synthesis_issues:
+            raise StudioError(
+                "总结段仍与主结果表矛盾，候选未接受："
+                + ", ".join(remaining_synthesis_issues or synthesis_issues)
+            )
+    placeholder_issues = (
+        numerical_placeholder_issues(text)
+        if section_meta.get("render") == "abstract" and executed_result_rows
+        else []
+    )
+    if placeholder_issues:
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete corrected LaTeX-ready abstract. The "
+                    "experiment is complete and measured values were supplied in "
+                    "section_evidence. Remove every bracketed numerical placeholder. "
+                    "Use an exact supplied measurement when it directly supports the "
+                    "claim; otherwise omit or qualitatively narrow that claim. Never "
+                    "invent a value. Preserve the reduced-sample pilot qualification "
+                    "and emit no citations."
+                ),
+                "input": (
+                    "Forbidden placeholders: "
+                    + ", ".join(placeholder_issues)
+                    + f".\n<previous_abstract>{text}</previous_abstract>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = str(correction.get("id") or "")
+        if not text or not response_id:
+            raise StudioError("GPT 没有返回去除数值占位符后的摘要。")
+        remaining_placeholders = numerical_placeholder_issues(text)
+        if remaining_placeholders:
+            raise StudioError(
+                "摘要仍包含数值占位符，未接受该候选："
+                + ", ".join(remaining_placeholders)
             )
     prose_issues = latex_prose_issues(text)
     if prose_issues:
@@ -4378,7 +8140,11 @@ instead of guessing."""
                     "citation key, and required figure/table reference. Escape prose "
                     "percent, ampersand, hash, and underscore characters; place all "
                     "mathematics inside LaTeX math delimiters; replace Unicode math "
-                    "glyphs with LaTeX commands. Do not explain the correction."
+                    "glyphs with LaTeX commands. If a displayed equation is too long "
+                    "for one ACL column, preserve the mathematics but split it into "
+                    "short lines with an aligned environment. "
+                    + MANUSCRIPT_DASH_RULE
+                    + " Do not explain the correction."
                 ),
                 "input": (
                     "The previous paragraph contains these LaTeX hazards: "
@@ -4398,8 +8164,39 @@ instead of guessing."""
             raise StudioError(
                 "GPT 修正后仍包含 LaTeX 风险字符：" + "; ".join(remaining_issues)
             )
+    if section_meta.get("render") == "abstract":
+        text = remove_manuscript_citations(text)
+    elif ONLINE_PROJECT_MODE:
+        response_id, text = resolve_citations_from_online_bibliography(
+            model=model,
+            previous_response_id=str(response_id or ""),
+            section=section,
+            purpose=purpose,
+            paragraph=online_citation_markers(text),
+        )
+    else:
+        text = local_survey_citations(text)
+    response_id, text = repair_empty_citation_placeholders(
+        model=model,
+        previous_response_id=str(response_id or ""),
+        section=section,
+        purpose=purpose,
+        paragraph=text,
+    )
+    for managed_label in (
+        str(section_meta.get("start_label") or ""),
+        str(section_meta.get("end_label") or ""),
+    ):
+        if managed_label:
+            text = re.sub(
+                rf"\s*\\label\{{{re.escape(managed_label)}\}}\s*",
+                " ",
+                text,
+            ).strip()
     text = enforce_required_heading(
-        text, required_heading, required_heading_style
+        strip_redundant_section_name_leadin(text, str(section_meta["title"])),
+        required_heading,
+        required_heading_style,
     )
     final_reference_error = artifact_reference_error(text, bound_artifacts)
     if final_reference_error:
@@ -4481,7 +8278,34 @@ def latex_escape_title(title: str) -> str:
         "~": r"\textasciitilde{}",
         "^": r"\textasciicircum{}",
     }
-    return "".join(replacements.get(character, character) for character in title)
+    escaped: list[str] = []
+    for index, character in enumerate(title):
+        already_escaped = index > 0 and title[index - 1] == "\\"
+        escaped.append(
+            character
+            if already_escaped
+            else replacements.get(character, character)
+        )
+    return "".join(escaped)
+
+
+def latex_escape_caption(caption: str) -> str:
+    """Escape prose specials while preserving already-valid inline math.
+
+    Figure captions are editable LaTeX-ready text, unlike plain paper titles.
+    Applying title escaping to the whole caption rewrites ``^`` inside
+    ``\\(...\\)`` and corrupts scientific notation.  Keep balanced inline math
+    verbatim and escape only the surrounding prose fragments.
+    """
+    parts = re.split(
+        r"(\\\(.*?\\\)|\\\[.*?\\\]|(?<!\\)\$.*?(?<!\\)\$)",
+        caption,
+        flags=re.DOTALL,
+    )
+    return "".join(
+        part if index % 2 else latex_escape_title(part)
+        for index, part in enumerate(parts)
+    )
 
 
 def replace_manuscript_title_source(source: str, title: str) -> str:
@@ -4493,14 +8317,14 @@ def call_openai_for_title(
     *, model: str, prompt: str, current_title: str, previous_response_id: str | None
 ) -> tuple[str, str]:
     previous_response_id = reusable_response_id(previous_response_id)
-    instructions = """You are an expert academic paper-title editor. Return exactly one
+    instructions = f"""You are an expert academic paper-title editor. Return exactly one
 plain-text title: no quotation marks, Markdown, commentary, alternatives, or LaTeX commands.
 Keep the title concise and venue-appropriate. Preserve the approved paper framing and claim
 boundary. Do not introduce a result, causal claim, novelty claim, or empirical conclusion not
-supported by the approved outline and working abstract."""
+supported by the approved outline and working abstract. {MANUSCRIPT_DASH_RULE}"""
     stable_context = ""
     if not previous_response_id:
-        stable_context = f"""<approved_outline>{read_text(PAPER / 'outline.txt', 22000)}</approved_outline>
+        stable_context = f"""<approved_outline>{approved_outline_context()}</approved_outline>
 <working_abstract>{read_text(PAPER / 'working_abstract.txt', 10000)}</working_abstract>"""
     payload: dict[str, Any] = {
         "model": model,
@@ -4601,25 +8425,59 @@ def sync_manuscript_bibliography_command() -> None:
     regardless of which pattern a given project's main.tex uses and
     regardless of what triggered this compile.
     """
-    main_path = PAPER / "main.tex"
-    if not main_path.exists():
-        return
-    main_source = main_path.read_text(encoding="utf-8")
     placeholder = "% Paper Studio enables the bibliography after the first accepted citation."
-    if manuscript_citation_keys():
-        updated = re.sub(
-            r"(?m)^" + re.escape(placeholder) + r"\s*$",
-            r"\\bibliography{references}",
-            main_source,
-        )
-    else:
-        updated = re.sub(
-            r"(?m)^\\bibliography\{[^}]*\}\s*$",
-            placeholder,
-            main_source,
-        )
-    if updated != main_source:
-        main_path.write_text(updated, encoding="utf-8")
+    bibliography_style = str(PROJECT_METADATA.get("bibliography_style") or "").strip()
+    enabled = (
+        (f"\\bibliographystyle{{{bibliography_style}}}\n" if bibliography_style else "")
+        + r"\bibliography{references}"
+    )
+    for target in (PAPER / "main.tex", PAPER / "sections" / "bibliography.tex"):
+        if not target.exists():
+            continue
+        source = target.read_text(encoding="utf-8")
+        if manuscript_citation_keys():
+            updated = re.sub(
+                r"(?m)^" + re.escape(placeholder) + r"\s*$",
+                lambda _match: enabled,
+                source,
+            )
+        else:
+            updated = re.sub(
+                r"(?m)^(?:\\bibliographystyle\{[^}]*\}\s*\n)?\\bibliography\{[^}]*\}\s*$",
+                placeholder,
+                source,
+            )
+        if updated != source:
+            target.write_text(updated, encoding="utf-8")
+
+
+def manuscript_bibliography_section_text() -> str:
+    """Return the venue-correct conditional bibliography section."""
+    if not manuscript_citation_keys():
+        return "% Paper Studio enables the bibliography after the first accepted citation.\n"
+    bibliography_style = str(PROJECT_METADATA.get("bibliography_style") or "").strip()
+    style_line = f"\\bibliographystyle{{{bibliography_style}}}\n" if bibliography_style else ""
+    return style_line + "\\bibliography{references}\n"
+
+
+def discard_empty_bibliography_cache_when_citations_exist() -> None:
+    """Remove a stale empty .bbl before citations are enabled again.
+
+    After the last cited paragraph is cleared, BibTeX can leave behind a
+    syntactically valid but empty ``main.bbl``.  If a later edit introduces the
+    first citation, pdflatex reads that stale file before latexmk gets a chance
+    to rerun BibTeX and fails at ``\\end{thebibliography}`` with "missing
+    \\item".  Absence of the generated cache is safe: latexmk then performs its
+    normal pdflatex -> bibtex -> pdflatex sequence from the current sources.
+    """
+    if not manuscript_citation_keys():
+        return
+    bbl_path = PAPER / "main.bbl"
+    if not bbl_path.exists():
+        return
+    bbl_source = bbl_path.read_text(encoding="utf-8", errors="replace")
+    if "\\begin{thebibliography}" in bbl_source and "\\bibitem" not in bbl_source:
+        bbl_path.unlink()
 
 
 def compile_paper() -> CompileResult:
@@ -4628,6 +8486,7 @@ def compile_paper() -> CompileResult:
         if not main.exists():
             return CompileResult(False, "paper/main.tex does not exist yet.")
         sync_manuscript_bibliography_command()
+        discard_empty_bibliography_cache_when_citations_exist()
         entrypoint_errors = manuscript_entrypoint_errors()
         if entrypoint_errors:
             return CompileResult(False, "\n".join(entrypoint_errors))
@@ -4696,10 +8555,14 @@ def compile_paper() -> CompileResult:
         return CompileResult(True, tail or "Compilation succeeded.")
 
 
-def full_draft_targets(state: dict[str, Any]) -> list[tuple[str, str]]:
-    """Return pending paragraphs in the project-owned batch writing order."""
+def full_draft_targets(
+    state: dict[str, Any], section_filter: str | None = None
+) -> list[tuple[str, str]]:
+    """Return pending paragraphs in batch order, optionally for one section."""
     targets: list[tuple[str, str]] = []
-    for section in batch_writing_order():
+    for section in draft_writing_order():
+        if section_filter and section != section_filter:
+            continue
         section_state = state.get("sections", {}).get(section, {})
         for paragraph in section_state.get("paragraphs", []):
             if not str(paragraph.get("accepted_text", "")).strip():
@@ -4707,8 +8570,37 @@ def full_draft_targets(state: dict[str, Any]) -> list[tuple[str, str]]:
     return targets
 
 
+def section_artifact_ids(state: dict[str, Any], section: str) -> list[str]:
+    """Return configured figures and tables owned by one writing section."""
+    bound: set[str] = set()
+    for paragraph in state.get("sections", {}).get(section, {}).get("paragraphs", []):
+        for artifact in paragraph.get("artifacts", []):
+            artifact_id = (
+                artifact
+                if isinstance(artifact, str)
+                else str(artifact.get("id") or "")
+                if isinstance(artifact, dict)
+                else ""
+            )
+            if artifact_id in FIGURES or artifact_id in TABLES:
+                bound.add(artifact_id)
+    return [
+        artifact_id
+        for artifact_id in [*FIGURE_ORDER, *TABLE_ORDER]
+        if artifact_id in bound
+    ]
+
+
 def full_draft_running(state: dict[str, Any]) -> bool:
     return (state.get("full_draft_job") or {}).get("status") == "running"
+
+
+def section_draft_running(state: dict[str, Any]) -> bool:
+    return (state.get("section_draft_job") or {}).get("status") == "running"
+
+
+def draft_batch_running(state: dict[str, Any]) -> bool:
+    return full_draft_running(state) or section_draft_running(state)
 
 
 def paragraph_by_id(
@@ -4716,11 +8608,11 @@ def paragraph_by_id(
 ) -> tuple[dict[str, Any], int]:
     section_state = state.get("sections", {}).get(section)
     if not isinstance(section_state, dict):
-        raise StudioError(f"全文生成找不到 section：{section}")
+        raise StudioError(f"批量写作找不到 section：{section}")
     for index, paragraph in enumerate(section_state.get("paragraphs", [])):
         if paragraph.get("id") == paragraph_id:
             return paragraph, index
-    raise StudioError(f"全文生成找不到段落：{section}/{paragraph_id}")
+    raise StudioError(f"批量写作找不到段落：{section}/{paragraph_id}")
 
 
 def accept_full_draft_paragraph(
@@ -4738,17 +8630,54 @@ def accept_full_draft_paragraph(
     if reference_error:
         raise StudioError(reference_error)
     if "[CITATION NEEDED]" in text:
-        raise StudioError("全文生成仍包含未解决的 [CITATION NEEDED]。")
-    unknown = sorted(citation_keys(text) - bibliography_keys())
-    if unknown:
-        raise StudioError("全文生成使用了未验证 citation keys：" + ", ".join(unknown))
+        raise StudioError("批量写作仍包含未解决的 [CITATION NEEDED]。")
+    validate_citations_for_accept(text, workflow="批量写作")
     prose_issues = latex_prose_issues(text)
     if prose_issues:
-        raise StudioError("全文生成包含 LaTeX 风险字符：" + "; ".join(prose_issues))
+        raise StudioError("批量写作包含 LaTeX 风险字符：" + "; ".join(prose_issues))
+    appendix_issues = appendix_content_issues(section, text)
+    if appendix_issues:
+        raise StudioError("批量写作的附录仍是路线图：" + "; ".join(appendix_issues))
+    comparison_issues = numeric_comparison_issues(text)
+    if comparison_issues:
+        raise StudioError("批量写作的数值比较方向错误：" + "; ".join(comparison_issues))
+    synthesis_issues = synthesis_comparison_issues(section, text)
+    if synthesis_issues:
+        raise StudioError("批量写作的总结与主结果表矛盾：" + "; ".join(synthesis_issues))
+    execution_issues = execution_record_contradiction_issues(text)
+    if execution_issues:
+        raise StudioError("批量写作与执行记录矛盾：" + "; ".join(execution_issues))
+    setup_issues = experimental_setup_issues(
+        section, str(paragraph.get("purpose") or ""), text
+    )
+    if setup_issues:
+        raise StudioError("批量写作的实验设置不完整：" + "; ".join(setup_issues))
+    completion_issues = manuscript_completion_placeholder_issues(text)
+    if completion_issues:
+        raise StudioError("批量写作仍含规划占位符：" + "; ".join(completion_issues))
+    markup_issues = manuscript_markup_issues(text)
+    if markup_issues:
+        raise StudioError("批量写作仍含 Markdown 标记：" + "; ".join(markup_issues))
+    internal_reference_issues = unsupported_internal_reference_issues(text)
+    if internal_reference_issues:
+        raise StudioError(
+            "批量写作含未配置的内部引用：" + "; ".join(internal_reference_issues)
+        )
+    appendix_numeric_issues = unsupported_appendix_numeric_issues(
+        section,
+        text,
+        section_evidence(
+            section, [str(item) for item in paragraph.get("artifacts", [])]
+        ),
+    )
+    if appendix_numeric_issues:
+        raise StudioError(
+            "批量写作的附录含无证据数字：" + "; ".join(appendix_numeric_issues)
+        )
     security_issues = online_latex_security_issues(text)
     if security_issues:
         raise StudioError(
-            "全文生成包含在线模式禁用的 LaTeX 命令：" + ", ".join(security_issues)
+            "批量写作包含在线模式禁用的 LaTeX 命令：" + ", ".join(security_issues)
         )
 
     target = PAPER / "sections" / SECTION_MAP[section]["file"]
@@ -4759,17 +8688,14 @@ def accept_full_draft_paragraph(
     previous_bibliography = read_text(bibliography_path, 10000)
     paragraph["accepted_text"] = text
     paragraph["candidate"] = None
+    auto_generate_bound_figure_captions(state, section, paragraph, text)
     section_source, accepted_section = render_section_source(
         section, section_state, state["figures"], state["tables"]
     )
     temporary = target.with_suffix(".tex.tmp")
     temporary.write_text(section_source, encoding="utf-8")
     os.replace(temporary, target)
-    bibliography_text = (
-        "\\bibliography{references}\n"
-        if manuscript_citation_keys()
-        else "% Paper Studio enables the bibliography after the first accepted citation.\n"
-    )
+    bibliography_text = manuscript_bibliography_section_text()
     bibliography_temporary = bibliography_path.with_suffix(".tex.tmp")
     bibliography_temporary.write_text(bibliography_text, encoding="utf-8")
     os.replace(bibliography_temporary, bibliography_path)
@@ -4817,17 +8743,37 @@ def update_full_draft_job(token: str, **updates: Any) -> dict[str, Any] | None:
         return job
 
 
-def full_draft_worker(token: str, model: str) -> None:
-    """Fill every pending paragraph through the normal GPT and LaTeX contracts."""
+def draft_batch_worker(
+    token: str,
+    model: str,
+    *,
+    job_key: str,
+    job_lock: threading.RLock,
+    cancelled_jobs: set[str],
+    section_filter: str | None,
+) -> None:
+    """Run a prose batch while keeping its product-specific job state isolated."""
     try:
+        if not ONLINE_PROJECT_MODE:
+            ensure_survey_bibliography()
         initial = load_state()
-        targets = full_draft_targets(initial)
+        initial_job = initial.get(job_key) or {}
+        section_filter = str(section_filter or "").strip()
+        artifact_ids = (
+            [str(item) for item in initial_job.get("artifact_ids", [])]
+            if section_filter
+            else None
+        )
+        # This also resumes figures whose prose was completed by an earlier
+        # Paper Studio version that stopped at a manual Prompt-approval gate.
+        schedule_ready_mechanism_figures(artifact_ids)
+        targets = full_draft_targets(initial, section_filter or None)
         for ordinal, (section, paragraph_id) in enumerate(targets, start=1):
-            with FULL_DRAFT_JOB_LOCK:
+            with job_lock:
                 state = load_state()
-                job = state.get("full_draft_job") or {}
+                job = state.get(job_key) or {}
                 if (
-                    token in CANCELLED_FULL_DRAFT_JOBS
+                    token in cancelled_jobs
                     or job.get("token") != token
                     or job.get("status") != "running"
                 ):
@@ -4835,7 +8781,7 @@ def full_draft_worker(token: str, model: str) -> None:
                 paragraph, paragraph_index = paragraph_by_id(state, section, paragraph_id)
                 if str(paragraph.get("accepted_text", "")).strip():
                     job.update(completed=ordinal, progress=int(ordinal * 100 / max(1, len(targets))))
-                    state["full_draft_job"] = job
+                    state[job_key] = job
                     save_state(state)
                     continue
                 section_state = state["sections"][section]
@@ -4849,11 +8795,12 @@ def full_draft_worker(token: str, model: str) -> None:
                 current_bib_fingerprint = bibliography_fingerprint()
                 bibliography_update = ""
                 if (
-                    previous_response_id
+                    not ONLINE_PROJECT_MODE
+                    and previous_response_id
                     and section_state.get("bibliography_fingerprint")
                     != current_bib_fingerprint
                 ):
-                    bibliography_update = bibliography_prompt_catalog(
+                    bibliography_update = writing_bibliography_catalog(
                         paragraph["purpose"] + "\n" + section_evidence(section)
                     )
                 figure_states = json.loads(json.dumps(state.get("figures", {})))
@@ -4862,7 +8809,7 @@ def full_draft_worker(token: str, model: str) -> None:
                     current_paragraph=paragraph_id,
                     progress_message=f"正在生成 {SECTION_MAP[section]['title']} · {paragraph_id}",
                 )
-                state["full_draft_job"] = job
+                state[job_key] = job
                 save_state(state)
 
             response_id, text, citations_added = call_openai(
@@ -4872,7 +8819,8 @@ def full_draft_worker(token: str, model: str) -> None:
                 purpose=paragraph["purpose"],
                 required_heading=paragraph.get("heading"),
                 required_heading_style=paragraph.get("heading_style"),
-                reference_paragraph=reference_excerpt(paragraph["reference_lines"]),
+                architecture=paragraph_architecture(paragraph),
+                reference_context=paragraph_reference_context(section, paragraph),
                 comment="",
                 current_text="",
                 bibliography_update=bibliography_update,
@@ -4881,11 +8829,11 @@ def full_draft_worker(token: str, model: str) -> None:
                 include_section_context=include_section_context,
             )
 
-            with FULL_DRAFT_JOB_LOCK:
+            with job_lock:
                 state = load_state()
-                job = state.get("full_draft_job") or {}
+                job = state.get(job_key) or {}
                 if (
-                    token in CANCELLED_FULL_DRAFT_JOBS
+                    token in cancelled_jobs
                     or job.get("token") != token
                     or job.get("status") != "running"
                 ):
@@ -4905,7 +8853,9 @@ def full_draft_worker(token: str, model: str) -> None:
                 paragraph.setdefault("history", []).append(
                     {
                         "candidate_id": candidate_id,
-                        "comment": "[DIRECT FULL DRAFT]",
+                        "comment": (
+                            "[SECTION DRAFT]" if section_filter else "[FULL DRAFT]"
+                        ),
                         "text": text,
                         "citations_added": citations_added,
                         "created_at": int(time.time()),
@@ -4921,62 +8871,123 @@ def full_draft_worker(token: str, model: str) -> None:
             # remains responsive and takes effect after this transactional paragraph.
             accept_full_draft_paragraph(state, section, paragraph, text)
 
-            with FULL_DRAFT_JOB_LOCK:
+            with job_lock:
                 latest = load_state()
                 latest["sections"][section] = state["sections"][section]
+                # Accepting a paragraph can atomically generate captions for its
+                # bound figures.  Dropping this state made the UI and final LaTeX
+                # fall back to temporary captions such as "F1" after every batch.
+                latest["figures"] = state["figures"]
                 latest["compile"] = state["compile"]
                 latest["model"] = model
-                job = latest.get("full_draft_job") or {}
+                job = latest.get(job_key) or {}
                 if job.get("status") == "running" and job.get("token") == token:
                     job.update(
                         completed=ordinal,
                         progress=int(ordinal * 100 / max(1, len(targets))),
                         progress_message=f"已写入并编译 {SECTION_MAP[section]['title']} · {paragraph_id}",
                     )
-                latest["full_draft_job"] = job
+                latest[job_key] = job
                 save_state(latest)
+                # Drawing starts at the semantic boundary: as soon as every
+                # paragraph required by a mechanism figure has been accepted.
+                schedule_ready_mechanism_figures(artifact_ids)
                 if job.get("status") != "running" or job.get("token") != token:
                     return
 
-        with FULL_DRAFT_JOB_LOCK:
+        with job_lock:
             state = load_state()
-            job = state.get("full_draft_job") or {}
+            job = state.get(job_key) or {}
             if job.get("token") == token and job.get("status") == "running":
-                materialize_direct_full_draft_artifacts(state)
                 synchronize_paragraph_editors_from_manuscript(state)
                 synchronize_artifact_workbenches_from_manuscript(
-                    state, build_table_previews=True
+                    state,
+                    build_table_previews=True,
+                    artifact_ids=artifact_ids,
+                )
+                materialize_batch_artifacts(state, artifact_ids)
+                quality_issues = (
+                    [] if section_filter else completed_manuscript_issues(state)
+                )
+                if quality_issues:
+                    raise StudioError(
+                        "全文生成后的确定性质量检查失败：" + "; ".join(quality_issues)
+                    )
+                pending_artifacts = pending_batch_artifacts(
+                    state, artifact_ids
                 )
                 job.update(
-                    status="completed",
+                    status="artifacts_pending" if pending_artifacts else "completed",
                     token=None,
                     progress=100,
                     completed=job.get("total", len(targets)),
-                    progress_message="全文初稿已写入 LaTeX 并完成 PDF 编译，可继续逐段修改。",
+                    progress_message=(
+                        (
+                            f"{SECTION_MAP[section_filter]['title']} 正文已写入 LaTeX；"
+                            "正在完成并确认绑定图表："
+                            if section_filter
+                            else "正文已全部写入 LaTeX；请在图表工作台完成并确认："
+                        )
+                        + "、".join(pending_artifacts)
+                        if pending_artifacts
+                        else (
+                            f"{SECTION_MAP[section_filter]['title']} 的正文与绑定图表均已完成，"
+                            "并已写入 LaTeX 和 PDF。"
+                            if section_filter
+                            else "全文初稿与全部图表已写入 LaTeX，并完成 PDF 编译。"
+                        )
+                    ),
+                    pending_artifacts=pending_artifacts,
                     finished_at=int(time.time()),
                 )
-                state["full_draft_job"] = job
+                state[job_key] = job
                 save_state(state)
     except Exception as exc:
-        with FULL_DRAFT_JOB_LOCK:
+        with job_lock:
             state = load_state()
-            job = state.get("full_draft_job") or {}
+            job = state.get(job_key) or {}
             if job.get("token") == token and job.get("status") == "running":
                 job.update(
                     status="failed",
                     token=None,
-                    progress_message=f"全文生成停在当前段落：{exc}",
+                    progress_message=(
+                        f"当前 Section 生成停在当前段落：{exc}"
+                        if section_filter
+                        else f"全文生成停在当前段落：{exc}"
+                    ),
                     finished_at=int(time.time()),
                 )
-                state["full_draft_job"] = job
+                state[job_key] = job
                 save_state(state)
     finally:
-        with FULL_DRAFT_JOB_LOCK:
-            CANCELLED_FULL_DRAFT_JOBS.discard(token)
+        with job_lock:
+            cancelled_jobs.discard(token)
+
+
+def full_draft_worker(token: str, model: str) -> None:
+    draft_batch_worker(
+        token,
+        model,
+        job_key="full_draft_job",
+        job_lock=FULL_DRAFT_JOB_LOCK,
+        cancelled_jobs=CANCELLED_FULL_DRAFT_JOBS,
+        section_filter=None,
+    )
+
+
+def section_draft_worker(token: str, model: str, section: str) -> None:
+    draft_batch_worker(
+        token,
+        model,
+        job_key="section_draft_job",
+        job_lock=SECTION_DRAFT_JOB_LOCK,
+        cancelled_jobs=CANCELLED_SECTION_DRAFT_JOBS,
+        section_filter=section,
+    )
 
 
 def start_full_draft_job(model: str) -> tuple[str, dict[str, Any]]:
-    """Create the canonical batch-writing job for either HTTP or CLI execution."""
+    """Create the independent full-paper drafting job."""
     provider = active_llm_provider()
     setup = api_setup_for_provider(provider)
     if not setup["configured"]:
@@ -4984,10 +8995,10 @@ def start_full_draft_job(model: str) -> tuple[str, dict[str, Any]]:
             f"{setup['provider_label']} API 未配置。请在{API_KEY_SETUP_LOCATION}运行 "
             f"{setup['setup_command']}，然后重新运行 {API_KEY_RESTART_COMMAND}。"
         )
-    if not (PAPER / ".outline-approved").exists():
+    if not outline_is_confirmed():
         raise StudioError("Outline 尚未确认，不能直接生成全文。")
     if not (PAPER / "main.tex").exists():
-        raise StudioError("paper/main.tex 不存在；请先由 paperwrite 建立论文 scaffold。")
+        raise StudioError("paper/main.tex 不存在；请先建立论文 scaffold。")
     model = model.strip()
     if not model:
         raise StudioError("模型名称不能为空。")
@@ -4995,8 +9006,21 @@ def start_full_draft_job(model: str) -> tuple[str, dict[str, Any]]:
         state = load_state()
         if full_draft_running(state):
             raise StudioError("全文初稿任务已经在运行。")
+        if section_draft_running(state):
+            raise StudioError("当前 Section 正在生成，请等待完成。")
+        refresh_full_draft_artifact_status(state)
+        if (state.get("full_draft_job") or {}).get("status") == "artifacts_pending":
+            pending = (state.get("full_draft_job") or {}).get("pending_artifacts", [])
+            raise StudioError(
+                "上一批正文的绑定图表仍在完成中：" + "、".join(pending)
+            )
         targets = full_draft_targets(state)
-        if not targets:
+        artifact_ids = None
+        artifact_or_quality_work = bool(
+            pending_batch_artifacts(state, artifact_ids)
+            or completed_manuscript_issues(state)
+        )
+        if not targets and not artifact_or_quality_work:
             raise StudioError("全部段落已经写入 LaTeX，无需再次批量生成。")
         token = uuid.uuid4().hex
         state["model"] = model
@@ -5004,14 +9028,79 @@ def start_full_draft_job(model: str) -> tuple[str, dict[str, Any]]:
             "token": token,
             "status": "running",
             "server_instance": SERVER_INSTANCE_TOKEN,
+            "server_pid": os.getpid(),
             "started_at": int(time.time()),
             "finished_at": None,
             "total": len(targets),
             "completed": 0,
             "progress": 0,
+            "scope": "full",
+            "section": "",
+            "artifact_ids": [],
             "current_section": "",
             "current_paragraph": "",
             "progress_message": "正在准备全文初稿…",
+        }
+        save_state(state)
+    return token, state
+
+
+def start_section_draft_job(model: str, section: str) -> tuple[str, dict[str, Any]]:
+    """Create a Section task that never reads or writes full-draft job state."""
+    provider = active_llm_provider()
+    setup = api_setup_for_provider(provider)
+    if not setup["configured"]:
+        raise StudioError(
+            f"{setup['provider_label']} API 未配置。请在{API_KEY_SETUP_LOCATION}运行 "
+            f"{setup['setup_command']}，然后重新运行 {API_KEY_RESTART_COMMAND}。"
+        )
+    if not outline_is_confirmed():
+        raise StudioError("Outline 尚未确认，不能生成当前 Section。")
+    if not (PAPER / "main.tex").exists():
+        raise StudioError("paper/main.tex 不存在；请先建立论文 scaffold。")
+    if section not in SECTION_MAP:
+        raise StudioError("当前 Section 不存在。")
+    if SECTION_MAP[section].get("writing_mode") == "plan_only":
+        raise StudioError("当前 Section 仅展示计划，不能生成正文。")
+    model = model.strip()
+    if not model:
+        raise StudioError("模型名称不能为空。")
+    with SECTION_DRAFT_JOB_LOCK:
+        state = load_state()
+        if section_draft_running(state):
+            raise StudioError("当前 Section 生成任务已经在运行。")
+        if full_draft_running(state):
+            raise StudioError("全文初稿正在生成，请等待完成。")
+        refresh_full_draft_artifact_status(state)
+        active = state.get("section_draft_job") or {}
+        if active.get("status") == "artifacts_pending":
+            raise StudioError(
+                "上一 Section 的绑定图表仍在完成中："
+                + "、".join(active.get("pending_artifacts", []))
+            )
+        targets = full_draft_targets(state, section)
+        artifact_ids = section_artifact_ids(state, section)
+        artifact_work = bool(
+            pending_batch_artifacts(state, artifact_ids)
+        )
+        if not targets and not artifact_work:
+            raise StudioError("当前 Section 的正文与绑定图表已经完成。")
+        token = uuid.uuid4().hex
+        state["model"] = model
+        state["section_draft_job"] = {
+            "token": token,
+            "status": "running",
+            "server_instance": SERVER_INSTANCE_TOKEN,
+            "server_pid": os.getpid(),
+            "started_at": int(time.time()),
+            "finished_at": None,
+            "total": len(targets),
+            "completed": 0,
+            "progress": 0,
+            "section": section,
+            "artifact_ids": artifact_ids,
+            "current_paragraph": "",
+            "progress_message": f"正在准备 {SECTION_MAP[section]['title']} 的全部内容…",
         }
         save_state(state)
     return token, state
@@ -5044,6 +9133,12 @@ def shutil_which(command: str) -> str | None:
 
 
 def paper_pdf_metadata() -> dict[str, Any]:
+    """Read metadata only from a stable, fully compiled PDF revision."""
+    with COMPILE_LOCK:
+        return _paper_pdf_metadata_unlocked()
+
+
+def _paper_pdf_metadata_unlocked() -> dict[str, Any]:
     """Return dimensions needed by the browser's crisp, interactive PDF viewer."""
     pdf = PAPER / "main.pdf"
     metadata: dict[str, Any] = {
@@ -5075,41 +9170,42 @@ def paper_pdf_metadata() -> dict[str, Any]:
 
 def paper_page_svg(page: int) -> Path:
     """Render and cache one paper page as vector SVG, preserving PDF sharpness."""
-    pdf = PAPER / "main.pdf"
-    metadata = paper_pdf_metadata()
-    if not pdf.exists() or page < 1 or page > int(metadata["page_count"]):
-        raise StudioError("PDF page does not exist.")
-    converter = shutil_which("pdftocairo")
-    if not converter:
-        raise StudioError("交互式 PDF 预览需要本地 pdftocairo。")
-    version_dir = PAPER_PAGE_DIR / str(int(pdf.stat().st_mtime_ns))
-    target = version_dir / f"page-{page}.svg"
-    if target.exists():
-        return target
-    version_dir.mkdir(parents=True, exist_ok=True)
-    temporary = version_dir / f"page-{page}-{uuid.uuid4().hex}.tmp"
-    process = subprocess.run(
-        [
-            converter,
-            "-svg",
-            "-f",
-            str(page),
-            "-l",
-            str(page),
-            str(pdf),
-            str(temporary),
-        ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    if process.returncode or not temporary.exists():
-        temporary.unlink(missing_ok=True)
-        raise StudioError(
-            (process.stderr or process.stdout).strip() or "无法渲染 PDF 页面。"
+    with COMPILE_LOCK:
+        pdf = PAPER / "main.pdf"
+        metadata = _paper_pdf_metadata_unlocked()
+        if not pdf.exists() or page < 1 or page > int(metadata["page_count"]):
+            raise StudioError("PDF page does not exist.")
+        converter = shutil_which("pdftocairo")
+        if not converter:
+            raise StudioError("交互式 PDF 预览需要本地 pdftocairo。")
+        version_dir = PAPER_PAGE_DIR / str(int(pdf.stat().st_mtime_ns))
+        target = version_dir / f"page-{page}.svg"
+        if target.exists():
+            return target
+        version_dir.mkdir(parents=True, exist_ok=True)
+        temporary = version_dir / f"page-{page}-{uuid.uuid4().hex}.tmp"
+        process = subprocess.run(
+            [
+                converter,
+                "-svg",
+                "-f",
+                str(page),
+                "-l",
+                str(page),
+                str(pdf),
+                str(temporary),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
-    temporary.replace(target)
-    return target
+        if process.returncode or not temporary.exists():
+            temporary.unlink(missing_ok=True)
+            raise StudioError(
+                (process.stderr or process.stdout).strip() or "无法渲染 PDF 页面。"
+            )
+        temporary.replace(target)
+        return target
 
 
 def parse_synctex_edit(output: str) -> tuple[Path, int]:
@@ -5377,6 +9473,50 @@ def run_checked(
     return output
 
 
+def mechanism_figure_type(figure_id: str) -> str:
+    """Classify a non-data figure by rhetorical job, not by a global house style."""
+    definition = FIGURES[figure_id]
+    searchable = " ".join(
+        [
+            str(definition.get("title") or ""),
+            str(definition.get("description") or ""),
+            " ".join(str(item) for item in definition.get("dimensions", [])),
+        ]
+    ).casefold()
+    if re.search(r"agent|tool|retriev|environment|memory|message|interaction", searchable):
+        return "agent_interaction"
+    if re.search(r"motivat|contrast|versus|vs\.?|null|problem|failure|counterexample", searchable):
+        return "motivation_contrast"
+    if re.search(
+        r"architect|module|router|routing|layer stack|attention|encoder|decoder|"
+        r"measurement|predictor|jacobian|pushforward|mechanism|hidden state",
+        searchable,
+    ):
+        return "model_architecture"
+    return "method_workflow"
+
+
+def mechanism_figure_evidence(
+    figure_id: str, state: dict[str, Any]
+) -> list[dict[str, str]]:
+    """Return only the accepted paragraphs explicitly required to draw this figure."""
+    evidence: list[dict[str, str]] = []
+    for section, paragraph_id in figure_generation_prerequisites(figure_id):
+        paragraph, _index = paragraph_by_id(state, section, paragraph_id)
+        accepted = str(paragraph.get("accepted_text") or "").strip()
+        if not accepted:
+            continue
+        evidence.append(
+            {
+                "section": section,
+                "paragraph_id": paragraph_id,
+                "purpose": str(paragraph.get("purpose") or "").strip(),
+                "accepted_text": accepted,
+            }
+        )
+    return evidence
+
+
 def mechanism_source(
     figure_id: str,
     state: dict[str, Any],
@@ -5386,6 +9526,14 @@ def mechanism_source(
     definition = FIGURES[figure_id]
     spec = initial_mechanism_spec(figure_id)
     wide = str(definition.get("width", "")).startswith("two-column")
+    figure_type = mechanism_figure_type(figure_id)
+    type_profile = ACL_FIGURE_TYPE_PROFILES[figure_type]
+    configured_description = str(definition.get("description") or "").strip()
+    if configured_description.casefold() == figure_id.casefold():
+        configured_description = str(definition["title"])
+    configured_caption = str(definition.get("caption") or "").strip()
+    if configured_caption.casefold() == figure_id.casefold():
+        configured_caption = str(definition["title"])
     format_contract = {
         "placement": "two-column figure*" if wide else "single-column figure",
         "canvas_in": spec["canvas_in"],
@@ -5396,9 +9544,9 @@ def mechanism_source(
             "keep all critical content in the central horizontal safe band because the "
             "landscape GPT Image draft will be cover-cropped to the paper aspect ratio"
             if wide
-            else "compact ACL-style introduction/motivation schematic with 2–3 aligned regions; "
-            "use flat tokens, a small transformation cue, and at most one restrained semantic "
-            "glyph; pure white background and readable at one-column width"
+            else f"compact single-column {type_profile['role'].lower()} with two or three "
+            "aligned visual groups; follow the type-specific object grammar and reading order; "
+            "pure white background and readable at one-column width"
         ),
         "final_output": (
             "Design a restrained final-quality ACL paper figure whose modules, tokens, paths, "
@@ -5408,27 +9556,91 @@ def mechanism_source(
     }
     pieces = [
         f"Figure task: {definition['title']}",
-        f"Required content: {definition['description']}",
+        f"Required content: {configured_description}",
+        f"Rhetorical type: {figure_type}",
+        "<acl_figure_type_profile>",
+        json.dumps(type_profile, ensure_ascii=False, indent=2),
+        "</acl_figure_type_profile>",
         "<paper_figure_format>",
         json.dumps(format_contract, ensure_ascii=False, indent=2),
         "</paper_figure_format>",
-        "Approved outline:",
-        read_text(PAPER / "outline.txt", 24000),
+        "<figure_content_contract>",
+        json.dumps(
+            {
+                "title": definition["title"],
+                "caption_intent": configured_caption,
+                "required_dimensions": definition.get("visible_dimensions")
+                or definition.get("dimensions", []),
+                "prohibited_empirical_inputs": definition.get("result_keys", []),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        "</figure_content_contract>",
+        "<cross_figure_distinction>",
+        json.dumps(
+            [
+                {
+                    "figure_id": other_id,
+                    "title": FIGURES[other_id]["title"],
+                    "rhetorical_type": mechanism_figure_type(other_id),
+                    "visual_signature_to_avoid_copying": ACL_FIGURE_TYPE_PROFILES[
+                        mechanism_figure_type(other_id)
+                    ]["visual_signature"],
+                }
+                for other_id in FIGURE_ORDER
+                if other_id != figure_id and FIGURES[other_id].get("kind") == "mechanism"
+            ],
+            ensure_ascii=False,
+            indent=2,
+        ),
+        "</cross_figure_distinction>",
     ]
-    for section in definition["source_sections"]:
-        accepted = state["sections"][section].get("accepted_text", "").strip()
-        if not accepted:
-            _, accepted = render_section_source(section, state["sections"][section])
-        pieces.extend([f"Accepted {section} prose:", accepted])
+    pieces.extend(
+        [
+            "<bound_paragraph_evidence>",
+            json.dumps(
+                mechanism_figure_evidence(figure_id, state),
+                ensure_ascii=False,
+                indent=2,
+            ),
+            "</bound_paragraph_evidence>",
+        ]
+    )
+    pieces.extend(
+        [
+            "<mechanism_figure_semantic_contract>",
+            (
+                "This is a mechanism or motivation schematic, not a results figure. "
+                "Do not request bar charts, curves, score rankings, higher/lower result "
+                "marks, numeric outcomes, or visual claims of empirical superiority. "
+                "Those belong in data figures even when the prose later reports them."
+            ),
+            (
+                "The image must be self-explanatory at its configured paper width: show "
+                "an explicit input, the paper's actual intervention/mechanism, and its "
+                "non-empirical output or decision. Every arrow must name a real source "
+                "and target; every branch must differ by structure or iconography as well "
+                "as color. Remove any glyph that has no one-clause manuscript-grounded meaning."
+            ),
+            (
+                "Do not put captions, explanatory sentences, or prose callouts inside the "
+                "figure. Use short noun labels only (maximum four words each). For a "
+                "single-column figure, request at most eight text labels and two core visual "
+                "groups; for a two-column figure, at most sixteen labels and four groups."
+            ),
+            "</mechanism_figure_semantic_contract>",
+        ]
+    )
     if current_prompt.strip():
         pieces.extend(
             [
-                "Current BioRender design prompt:",
+                "Current drawing prompt:",
                 current_prompt.strip(),
-                "Researcher instruction for regenerating the design prompt:",
+                "Researcher instruction for regenerating the drawing prompt:",
                 prompt_instruction.strip(),
                 (
-                    "Regenerate the complete BioRender prompt. Preserve fidelity to the "
+                    "Regenerate the complete drawing prompt. Preserve fidelity to the "
                     "paper, but explicitly apply the researcher's requested changes to "
                     "scope, layout, density, and visual hierarchy."
                 ),
@@ -5537,7 +9749,12 @@ def validate_mechanism_shape_spec(
     canvas = initial_mechanism_spec(figure_id)["canvas_in"]
     single_column = float(canvas[0]) < 5
     text_shapes = [item for item in shapes if str(item.get("text", "")).strip()]
-    max_shapes = 48 if single_column else 90
+    # Repeated token cells, expert tiles, state bars, and connector segments are
+    # normal in ACL mechanism figures. They are individually editable objects
+    # but do not create the same reading burden as labels. Keep a strict text
+    # cap while allowing the compact repeated glyph grammars seen in CAA,
+    # DeepSeekMoE, and conditional retrieval diagrams.
+    max_shapes = 64 if single_column else 100
     max_text_shapes = 14 if single_column else 28
     if len(shapes) > max_shapes or len(text_shapes) > max_text_shapes:
         raise StudioError(
@@ -5651,7 +9868,7 @@ GPT Image 草图绝对路径：{paths['draft']}
 1. 必须真实查看草图，把草图的视觉层级、主要模块、图标语义和流向作为重建依据；
    不得只把标题和 description 塞进一两个文本框。
 2. 至少 12 个独立可编辑元素，其中至少 4 个图形模块、2 条连接线；复杂方法图应更丰富。
-   单栏画布最多 48 个元素、14 个含文字元素，并且最多两个核心视觉分组；双栏最多 90/28。
+   单栏画布最多 64 个元素、14 个含文字元素，并且最多两个核心视觉分组；双栏最多 100/28。
 3. 所有元素都必须位于 0–1 画布内，互不遮挡，文字简短且拼写正确；不要照抄草图中的乱码。
    字号不得小于 7pt，每个文本必须完整落在自己的框内；框内标签最多 4 个词，说明句应删除。
    按实际英寸画布给文本框留足高度；宁可扩大框或删字，也不能依赖 overflow 裁切。
@@ -5724,7 +9941,7 @@ def generate_mechanism_prompt(
 ) -> tuple[str, str]:
     setup = api_setup_for_provider(str(state.get("llm_provider") or DEFAULT_PROVIDER))
     if not setup["configured"]:
-        raise StudioError(f"{setup['provider_label']} API 未配置，无法生成机制图设计 Prompt。")
+        raise StudioError(f"{setup['provider_label']} API 未配置，无法生成画图 Prompt。")
     paths = figure_paths(figure_id)
     FIGURE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     source = mechanism_source(
@@ -5735,15 +9952,29 @@ def generate_mechanism_prompt(
     )
     paths["source"].write_text(source, encoding="utf-8")
     figure_state = state["figures"][figure_id]
-    previous_response_id = reusable_response_id(figure_state.get("previous_response_id"))
+    # An explicit empty current prompt means "design afresh". Reusing an old
+    # response in that case silently drops the new paragraph evidence and type
+    # profile because the API receives only a compact revision turn.
+    previous_response_id = (
+        reusable_response_id(figure_state.get("previous_response_id"))
+        if current_prompt.strip()
+        else None
+    )
     api_input = source
     if previous_response_id:
         format_match = re.search(
             r"<paper_figure_format>.*?</paper_figure_format>", source, re.DOTALL
         )
         format_contract = format_match.group(0) if format_match else ""
-        api_input = f"""{format_contract}
-<current_biorender_prompt>{current_prompt.strip()}</current_biorender_prompt>
+        type_match = re.search(
+            r"<acl_figure_type_profile>.*?</acl_figure_type_profile>",
+            source,
+            re.DOTALL,
+        )
+        type_contract = type_match.group(0) if type_match else ""
+        api_input = f"""{type_contract}
+{format_contract}
+<current_image_prompt>{current_prompt.strip()}</current_image_prompt>
 <researcher_revision>{prompt_instruction.strip()}</researcher_revision>
 
 Return the complete revised image-generation prompt."""
@@ -5757,12 +9988,85 @@ Return the complete revised image-generation prompt."""
         payload["previous_response_id"] = previous_response_id
     response = post_openai(payload)
     response_id = str(response.get("id", "")).strip()
-    prompt = extract_output_text(response)
+    prompt = mechanism_prompt_with_contract_footer(
+        figure_id, extract_output_text(response)
+    )
     if not response_id:
         raise StudioError("GPT 没有返回可继续的 Figure conversation response id。")
     if not prompt:
-        raise StudioError("GPT 没有返回可用的机制图设计 Prompt。")
+        raise StudioError("GPT 没有返回可用的画图 Prompt。")
+    issues = mechanism_prompt_contract_issues(figure_id, prompt)
+    if issues:
+        repair_payload = {
+            "model": str(state.get("model") or DEFAULT_MODEL),
+            "store": True,
+            "instructions": FIGURE_PROMPT_INSTRUCTIONS,
+            "previous_response_id": response_id,
+            "input": (
+                "Rewrite the complete image-generation prompt. The previous answer "
+                "violated the mandatory mechanism-figure contract in these ways: "
+                + "; ".join(issues)
+                + ". Remove the violations instead of merely saying not to include them. "
+                "Return only the clean final prompt, with no analysis tags or commentary."
+            ),
+        }
+        repaired = post_openai(repair_payload)
+        response_id = str(repaired.get("id", "")).strip()
+        prompt = mechanism_prompt_with_contract_footer(
+            figure_id, extract_output_text(repaired)
+        )
+        remaining = mechanism_prompt_contract_issues(figure_id, prompt)
+        if not response_id or not prompt or remaining:
+            raise StudioError(
+                "GPT 机制图 Prompt 未通过语义契约：" + "；".join(remaining or issues)
+            )
     return response_id, prompt
+
+
+def mechanism_prompt_with_contract_footer(figure_id: str, prompt: str) -> str:
+    """Make the final image-facing instruction win over verbose model prose."""
+    wide = str(FIGURES[figure_id].get("width", "")).startswith("two-column")
+    limit = "sixteen" if wide else "eight"
+    footer = (
+        "Mandatory final rendering constraints: use no more than "
+        f"{limit} text labels total, each at most four words; omit any earlier label "
+        "request that exceeds this limit. Put no caption, explanatory sentence, "
+        "empirical chart, score ranking, or decorative unexplained glyph inside the figure."
+    )
+    return prompt.strip() + "\n\n" + footer
+
+
+def mechanism_prompt_contract_issues(figure_id: str, prompt: str) -> list[str]:
+    """Mechanically reject common prompt failures that create unreadable figures."""
+    normalized = re.sub(r"\s+", " ", prompt).strip().lower()
+    issues: list[str] = []
+    if re.search(r"</?analysis\b", normalized):
+        issues.append("contains analysis markup")
+    if re.search(
+        r"caption\s+(?:fragment|line)|with\s+(?:an?\s+)?inline\s+caption|"
+        r"(?:include|add|use|place)\s+(?:an?\s+)?(?:inline\s+)?caption",
+        normalized,
+    ):
+        issues.append("requests explanatory captions inside the figure")
+    if re.search(
+        r"(?:draw|show|include|add|use|request)\s+(?:an?\s+)?bar\s+charts?|"
+        r"bars?\s+(?:appear|are|should be).*?higher|"
+        r"(?:show|convey|encode|depict)\s+(?:the\s+)?performance\s+gap|"
+        r"(?:show|include|encode|depict)\s+(?:an?\s+)?(?:empirical|score)\s+ranking",
+        normalized,
+    ):
+        issues.append("encodes empirical results in a mechanism figure")
+    wide = str(FIGURES[figure_id].get("width", "")).startswith("two-column")
+    label_limit = r"(?:sixteen|16)" if wide else r"(?:eight|8)"
+    if not re.search(
+        rf"(?:at\s+most|no\s+more\s+than|maximum(?:\s+of)?|limit(?:ed)?\s+to)\s+"
+        rf"{label_limit}\s+(?:text\s+)?labels?",
+        normalized,
+    ):
+        issues.append(
+            "does not explicitly enforce the configured text-label limit"
+        )
+    return issues
 
 
 def draw_mechanism_draft(
@@ -5772,10 +10076,15 @@ def draw_mechanism_draft(
         raise StudioError("OPENAI_API_KEY 未配置，无法调用 GPT Image。")
     prompt = prompt.strip()
     if not prompt:
-        raise StudioError("请先生成并确认设计 Prompt。")
+        raise StudioError("请先生成并确认画图 Prompt。")
     paths = figure_paths(figure_id)
     FIGURE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+    # deliverable_stem may intentionally group artifacts below paper/fig/
+    # (for example typo_margin/F1_motivation).  The CLI receives the final
+    # nested filename and does not create its parent itself.
+    paths["pptx"].parent.mkdir(parents=True, exist_ok=True)
+    paths["pdf"].parent.mkdir(parents=True, exist_ok=True)
     spec = initial_mechanism_spec(figure_id)
     if paths["spec"].exists():
         spec.update(json.loads(paths["spec"].read_text(encoding="utf-8")))
@@ -5914,9 +10223,9 @@ def generate_prompt_worker(
             job_token,
             progress=45,
             progress_message=(
-                "GPT 正在按你的指令重写 BioRender 设计 Prompt…"
+                "GPT 正在按你的指令重写画图 Prompt…"
                 if current_prompt
-                else "GPT 正在把正文机制转成 BioRender 设计 Prompt…"
+                else "GPT 正在把正文机制转成画图 Prompt…"
             ),
         )
         response_id, prompt = generate_mechanism_prompt(
@@ -5946,8 +10255,8 @@ def generate_prompt_worker(
             prompt_history=prompt_history[-20:],
             prompt_approved_at=None,
             progress=100,
-            progress_message="设计 Prompt 已生成，等待你的确认。",
-            last_message="请检查或修改设计 Prompt；确认后才会调用 GPT Image。",
+            progress_message="画图 Prompt 已生成，等待你的确认。",
+            last_message="请检查或修改画图 Prompt；确认后才会调用 GPT Image。",
             job_token=None,
         )
     except Exception as exc:  # pragma: no cover - external process boundary
@@ -5999,6 +10308,195 @@ def draw_figure_worker(figure_id: str, job_token: str, prompt: str) -> None:
             CANCELLED_FIGURE_JOBS.discard(job_token)
 
 
+def finalize_automatic_mechanism_figure(figure_id: str) -> None:
+    """Insert an automatically built mechanism figure when prose writes are idle."""
+    with AUTOMATIC_MECHANISM_FINALIZE_LOCK:
+        with STATE_LOCK:
+            state = load_state()
+            figure_state = state["figures"][figure_id]
+            if figure_state.get("status") != "built":
+                return
+            # The full-draft worker owns section files while accepting prose.
+            # Its final materialization pass inserts figures that finish early.
+            if draft_batch_running(state):
+                return
+            paths = figure_paths(figure_id)
+            if not paths["pdf"].is_file() or not paths["pptx"].is_file():
+                return
+            ensure_figure_caption_before_approval(state, figure_id)
+            binding = first_artifact_binding(figure_id)
+            if not binding:
+                raise StudioError(f"{figure_id} 尚未绑定负责首次引用它的段落。")
+            section, paragraph_id = binding
+            figure_state.update(
+                status="approved",
+                approved_at=int(time.time()),
+                placement_after=figure_state.get("placement_after") or paragraph_id,
+                progress=100,
+                progress_message="对应段落完成后自动生成并插入论文。",
+                last_message="机制图已自动生成、插入并等待 PDF 编译。",
+            )
+            section_source, accepted = render_section_source(
+                section,
+                state["sections"][section],
+                state["figures"],
+                state["tables"],
+            )
+            target = PAPER / "sections" / SECTION_MAP[section]["file"]
+            temporary = target.with_suffix(".tex.tmp")
+            temporary.write_text(section_source, encoding="utf-8")
+            os.replace(temporary, target)
+            state["sections"][section]["accepted_text"] = accepted
+            compile_result = compile_paper()
+            if not compile_result.ok:
+                figure_state.update(
+                    status="built",
+                    approved_at=None,
+                    last_message="机制图已生成，但自动插入后的 LaTeX 编译失败："
+                    + compile_result.message,
+                )
+                save_state(state)
+                return
+            state["compile"] = {
+                "status": "ok",
+                "message": compile_result.message,
+                "updated_at": int(time.time()),
+            }
+            refresh_full_draft_artifact_status(state)
+            save_state(state)
+
+
+def automatic_mechanism_figure_worker(figure_id: str, job_token: str) -> None:
+    """Generate Prompt, draft, editable figure, and final PDF without a UI pause."""
+    try:
+        existing_state = load_state()
+        existing_prompt = str(
+            existing_state["figures"][figure_id].get("draw_prompt") or ""
+        ).strip()
+        if existing_prompt and completed_mechanism_draft_matches_prompt(
+            figure_id, existing_prompt
+        ):
+            update_figure_job(
+                figure_id,
+                job_token,
+                status="agent_generating",
+                progress=45,
+                progress_message="复用已完成的 GPT Image 草图，继续重建可编辑机制图…",
+            )
+            message = build_mechanism_figure(figure_id, job_token=job_token)
+            updated = update_figure_job(
+                figure_id,
+                job_token,
+                status="built",
+                revision=int(load_state()["figures"][figure_id].get("revision", 0)) + 1,
+                approved_at=None,
+                progress=100,
+                progress_message="机制图、可编辑 PPTX 与论文 PDF 已自动生成。",
+                last_message=message,
+                job_token=None,
+            )
+            if updated is not None:
+                finalize_automatic_mechanism_figure(figure_id)
+            return
+        update_figure_job(
+            figure_id,
+            job_token,
+            progress=15,
+            progress_message="对应段落已完成，正在自动生成画图 Prompt…",
+        )
+        state = load_state()
+        response_id, prompt = generate_mechanism_prompt(figure_id, state)
+        update_figure_job(
+            figure_id,
+            job_token,
+            status="image_generating",
+            previous_response_id=response_id,
+            draw_prompt=prompt,
+            prompt_approved_at=int(time.time()),
+            progress=35,
+            progress_message="画图 Prompt 已自动确认，正在生成机制图草图…",
+        )
+        draw_mechanism_draft(figure_id, prompt, job_token=job_token)
+        update_figure_job(
+            figure_id,
+            job_token,
+            status="agent_generating",
+            progress=60,
+            progress_message="草图已完成，正在重建可编辑 PPTX 与论文 PDF…",
+        )
+        message = build_mechanism_figure(figure_id, job_token=job_token)
+        updated = update_figure_job(
+            figure_id,
+            job_token,
+            status="built",
+            revision=int(load_state()["figures"][figure_id].get("revision", 0)) + 1,
+            approved_at=None,
+            progress=100,
+            progress_message="机制图、可编辑 PPTX 与论文 PDF 已自动生成。",
+            last_message=message,
+            job_token=None,
+        )
+        if updated is not None:
+            finalize_automatic_mechanism_figure(figure_id)
+    except Exception as exc:  # pragma: no cover - external process boundary
+        fail_figure_job(figure_id, job_token, exc)
+    finally:
+        with FIGURE_PROCESS_LOCK:
+            CANCELLED_FIGURE_JOBS.discard(job_token)
+
+
+def schedule_ready_mechanism_figures(
+    artifact_ids: list[str] | None = None,
+) -> list[str]:
+    """Start each ready, unfinished mechanism figure exactly once."""
+    if ONLINE_PROJECT_MODE:
+        # Hosted projects intentionally export labelled placeholders for mechanism
+        # figures. Starting the local image/PPTX worker here can only fail because
+        # those controls and credentials are deliberately unavailable, leaving every
+        # placeholder with a misleading red ``failed`` state after a successful draft.
+        return []
+    scheduled: list[tuple[str, str]] = []
+    allowed = set(artifact_ids) if artifact_ids is not None else None
+    with STATE_LOCK:
+        state = load_state()
+        for figure_id in FIGURE_ORDER:
+            if allowed is not None and figure_id not in allowed:
+                continue
+            definition = FIGURES[figure_id]
+            if definition.get("kind") != "mechanism":
+                continue
+            figure_state = state["figures"][figure_id]
+            if figure_state.get("status") in {
+                *FIGURE_RUNNING_STATUSES,
+                "built",
+                "approved",
+            }:
+                continue
+            ready, _reason = figure_generation_gate(figure_id, state)
+            if not ready:
+                continue
+            token = uuid.uuid4().hex
+            figure_state.update(
+                status="prompt_generating",
+                progress=5,
+                progress_message="对应段落已完成，机制图自动任务正在启动…",
+                last_message="",
+                approved_at=None,
+            )
+            begin_figure_job(figure_state, token)
+            scheduled.append((figure_id, token))
+        if scheduled:
+            save_state(state)
+    for figure_id, token in scheduled:
+        threading.Thread(
+            target=automatic_mechanism_figure_worker,
+            args=(figure_id, token),
+            daemon=True,
+            name=f"automatic-figure-{figure_id.lower()}-{token[:8]}",
+        ).start()
+    return [figure_id for figure_id, _token in scheduled]
+
+
 def completed_mechanism_draft_matches_job(
     figure_id: str, figure_state: dict[str, Any]
 ) -> bool:
@@ -6037,6 +10535,23 @@ def completed_mechanism_draft_matches_prompt(figure_id: str, prompt: str) -> boo
     except (OSError, KeyError, IndexError, json.JSONDecodeError):
         return False
     return latest_prompt == prompt.strip()
+
+
+def completed_mechanism_deliverables_match_current_draft(figure_id: str) -> bool:
+    """Verify that PDF/PPTX and shapes were built from the current image draft."""
+    paths = figure_paths(figure_id)
+    required = [paths["shapes"], paths["pptx"], paths["pdf"]]
+    if not all(path.is_file() for path in required):
+        return False
+    try:
+        shape_spec = json.loads(paths["shapes"].read_text(encoding="utf-8"))
+        current_provenance = mechanism_shape_provenance(figure_id)
+    except (OSError, json.JSONDecodeError, StudioError):
+        return False
+    if shape_spec.get("source_provenance") != current_provenance:
+        return False
+    shape_time = paths["shapes"].stat().st_mtime_ns
+    return all(path.stat().st_mtime_ns >= shape_time for path in (paths["pptx"], paths["pdf"]))
 
 
 def recover_interrupted_figure_jobs() -> None:
@@ -6134,6 +10649,8 @@ def build_mechanism_figure(
         raise StudioError("请先生成并检查机制图草稿。")
     FIGURE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
+    paths["pptx"].parent.mkdir(parents=True, exist_ok=True)
+    paths["pdf"].parent.mkdir(parents=True, exist_ok=True)
     if job_token:
         update_figure_job(
             figure_id,
@@ -6331,6 +10848,8 @@ def create_data_figure_code_with_local_agent(
 9. 不要在底部放长段叙述；把 finding 压缩为图内可读的短语，或不显示。
 10. 只使用 matplotlib 官方支持的 Artist/Text 参数；不要把 CSS/PPT 属性（例如
     tracking、letter-spacing）传给 matplotlib。
+11. 单序列图不显示冗余图例；序列含义写进标题、轴标签或 Caption，避免图例遮挡
+    数据点、数值标签或标题。多序列图例也必须避开数据区域。
 
 <traceable_results>
 {json.dumps(evidence, ensure_ascii=False, indent=2)}
@@ -6929,6 +11448,8 @@ def compose_data_figure(
     paths = figure_paths(figure_id)
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
     FIGURE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
+    for target in (paths["pdf"], paths["pptx"], paths["preview"]):
+        target.parent.mkdir(parents=True, exist_ok=True)
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix=f"compose-{figure_id.lower()}-", dir=STATE_DIR
@@ -7054,9 +11575,9 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
                 "name": "",
                 "eyebrow": "PAPER STUDIO",
                 "studio_title": "Paper Studio",
-                "subtitle": "等待 paperwrite 填入论文项目数据",
+                "subtitle": "等待载入论文项目数据",
                 "config_file": PROJECT_CONFIG_FILE.relative_to(ROOT).as_posix(),
-                "root": "" if ONLINE_PROJECT_MODE else str(ROOT.resolve()),
+                "root": "" if (ONLINE_PROJECT_MODE or DEMO_MODE) else str(ROOT.resolve()),
                 "loaded": False,
                 "venue": "",
                 "target": {},
@@ -7101,7 +11622,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         "studio_title": str(PROJECT_METADATA.get("studio_title", "Paper Studio")),
         "subtitle": str(PROJECT_METADATA.get("subtitle", "")),
         "config_file": PROJECT_CONFIG_FILE.relative_to(ROOT).as_posix(),
-        "root": "" if ONLINE_PROJECT_MODE else str(ROOT.resolve()),
+        "root": "" if (ONLINE_PROJECT_MODE or DEMO_MODE) else str(ROOT.resolve()),
         "loaded": True,
         "venue": str(PROJECT_METADATA.get("venue", "")),
         "target": {
@@ -7127,7 +11648,8 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
     }
     total_paragraphs = sum(
         len(section.get("paragraphs", []))
-        for section in state.get("sections", {}).values()
+        for section_id, section in state.get("sections", {}).items()
+        if SECTION_MAP.get(section_id, {}).get("writing_mode") != "plan_only"
     )
     pending_paragraphs = len(full_draft_targets(state))
     outline_confirmed = outline_is_confirmed()
@@ -7135,15 +11657,21 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         "available": outline_confirmed and api_key_configured,
         "pending_paragraphs": pending_paragraphs,
         "total_paragraphs": total_paragraphs,
-        "writing_order": batch_writing_order(),
+        "writing_order": draft_writing_order(),
         "job": result.pop("full_draft_job", None),
+    }
+    result["section_draft"] = {
+        "job": result.pop("section_draft_job", None),
     }
     title_editor = result.setdefault("title_editor", {})
     title_editor["current_title"] = manuscript_title_display()
     title_editor["conversation_active"] = bool(
         title_editor.pop("previous_response_id", None)
     )
-    for section in result["sections"].values():
+    for section_id, section in result["sections"].items():
+        section["writing_mode"] = SECTION_MAP.get(section_id, {}).get(
+            "writing_mode", "draft"
+        )
         section["conversation_active"] = bool(section.pop("previous_response_id", None))
         index = int(section.get("current_index", 0))
         paragraphs = section.pop("paragraphs", [])
@@ -7152,6 +11680,10 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
             bool(item.get("accepted_text")) for item in paragraphs
         )
         section["complete"] = section["completed_count"] == len(paragraphs)
+        section["structure_blueprint"] = [
+            {"id": item["id"], **paragraph_architecture(item)}
+            for item in paragraphs
+        ]
         section["paragraph_navigation"] = [
             {
                 "id": item["id"],
@@ -7174,6 +11706,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         ]
         if 0 <= index < len(paragraphs):
             item = paragraphs[index]
+            section["reference_context"] = paragraph_reference_context(section_id, item)
             section["current_paragraph"] = {
                 "id": item["id"],
                 "heading": item.get("heading"),
@@ -7184,13 +11717,14 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
                     for artifact_id in item.get("artifacts", [])
                     if (metadata := artifact_metadata(str(artifact_id))) is not None
                 ],
-                "reference_text": reference_excerpt(item["reference_lines"]),
+                "architecture": paragraph_architecture(item),
                 "candidate": item.get("candidate"),
                 "accepted_text": item.get("accepted_text", ""),
                 "position": index + 1,
                 "total": len(paragraphs),
             }
         else:
+            section["reference_context"] = {}
             section["current_paragraph"] = None
     pdf = PAPER / "main.pdf"
     pdf_metadata = paper_pdf_metadata()
@@ -7224,9 +11758,7 @@ def _remove_generated_path(path: Path) -> None:
     protected = {
         PAPER.resolve(),
         PROJECT_CONFIG_FILE.resolve(),
-        PARAGRAPH_PLAN_FILE.resolve(),
         (PAPER / "main.tex").resolve(),
-        (PAPER / "outline.txt").resolve(),
         (PAPER / "working_abstract.txt").resolve(),
         (PAPER / "references.bib").resolve(),
     }
@@ -7248,6 +11780,22 @@ def _configured_reset_input_paths() -> set[Path]:
                 _project_path(ROOT, shape_spec, f"{artifact_id}.shape_spec").resolve()
             )
     return protected
+
+
+def restore_source_figure_inputs() -> None:
+    """Restore verified reference-paper figures after generated outputs are cleared."""
+    for figure_id, definition in FIGURES.items():
+        if definition.get("kind") != "source":
+            continue
+        source_value = str(definition.get("source_asset") or "").strip()
+        if not source_value:
+            raise StudioError(f"来源图 {figure_id} 缺少 source_asset。")
+        source = _project_path(ROOT, source_value, f"figures.{figure_id}.source_asset")
+        if not source.is_file() or source.suffix.lower() != ".pdf":
+            raise StudioError(f"来源图 {figure_id} 的 PDF 不存在：{source_value}")
+        target = figure_paths(figure_id)["pdf"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
 
 
 def _clear_generated_tree(root: Path, protected_files: set[Path] | None = None) -> None:
@@ -7323,6 +11871,7 @@ def reset_generated_paper(model: str) -> dict[str, Any]:
     _clear_generated_tree(FIGURE_DIR, protected_inputs)
     _clear_generated_tree(FIGURE_SOURCE_DIR, protected_inputs)
     _clear_generated_tree(STATE_DIR)
+    restore_source_figure_inputs()
 
     for path in PAPER.glob("main.*"):
         if path.resolve() != main_path.resolve():
@@ -7391,6 +11940,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0]
+        if (
+            EMBEDDED_ONLY
+            and path != "/api/health"
+            and (
+                not EMBEDDED_PROXY_TOKEN
+                or self.headers.get("X-Research-Studio-Proxy", "") != EMBEDDED_PROXY_TOKEN
+            )
+        ):
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
         if path == "/":
             self.send_file(STATIC / "index.html", "text/html; charset=utf-8", cache=False)
         elif path == "/static/app.js":
@@ -7407,12 +11966,14 @@ class Handler(BaseHTTPRequestHandler):
                     },
                     "empty_project": EMPTY_PROJECT_MODE or not project_files_ready(),
                     "pid": os.getpid(),
+                    "embedded_only": EMBEDDED_ONLY,
                 }
             )
         elif path == "/api/state":
             self.send_json(public_state(load_state()))
         elif path == "/paper.pdf":
-            self.send_file(PAPER / "main.pdf", "application/pdf", cache=False)
+            with COMPILE_LOCK:
+                self.send_file(PAPER / "main.pdf", "application/pdf", cache=False)
         elif path.startswith("/paper-page/") and path.endswith(".svg"):
             match = re.fullmatch(r"/paper-page/(\d+)\.svg", path)
             if not match:
@@ -7435,6 +11996,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:  # noqa: N802
+        if (
+            EMBEDDED_ONLY
+            and (
+                not EMBEDDED_PROXY_TOKEN
+                or self.headers.get("X-Research-Studio-Proxy", "") != EMBEDDED_PROXY_TOKEN
+            )
+        ):
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
         try:
             body = self.read_json()
             if ONLINE_PROJECT_MODE and self.path in ONLINE_DISABLED_ARTIFACT_AGENT_PATHS:
@@ -7454,14 +12024,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.handle_compile()
             elif self.path == "/api/full-draft/start":
                 self.handle_full_draft_start(body)
+            elif self.path == "/api/section-draft/start":
+                self.handle_section_draft_start(body)
             elif self.path == "/api/full-draft/cancel":
                 self.handle_full_draft_cancel()
             elif self.path == "/api/llm-provider":
                 self.handle_llm_provider(body)
             elif self.path == "/api/llm-model":
                 self.handle_llm_model(body)
-            elif self.path == "/api/reset-conversation":
-                self.handle_reset(body)
             elif self.path == "/api/reset-generated-paper":
                 self.handle_reset_generated_paper(body)
             elif self.path == "/api/select-paragraph":
@@ -7519,8 +12089,8 @@ class Handler(BaseHTTPRequestHandler):
         if ONLINE_PROJECT_MODE:
             raise StudioError("在线写作会话统一使用共享 DeepSeek API，不支持切换服务商。")
         state = load_state()
-        if full_draft_running(state):
-            raise StudioError("全文初稿正在生成；请先停止任务再切换 LLM API。")
+        if draft_batch_running(state):
+            raise StudioError("批量写作任务正在生成；请等待任务完成后再切换 LLM API。")
         provider = str(body.get("provider") or "").strip().lower()
         if select_llm_provider(state, provider):
             save_state(state)
@@ -7530,8 +12100,8 @@ class Handler(BaseHTTPRequestHandler):
         if ONLINE_PROJECT_MODE:
             raise StudioError("在线写作会话统一使用共享 DeepSeek API，不支持切换模型。")
         state = load_state()
-        if full_draft_running(state):
-            raise StudioError("全文初稿正在生成；请先停止任务再切换写作模型。")
+        if draft_batch_running(state):
+            raise StudioError("批量写作任务正在生成；请等待任务完成后再切换写作模型。")
         model = str(body.get("model") or "").strip()
         if select_llm_model(state, model):
             save_state(state)
@@ -7539,8 +12109,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_title_generate(self, body: dict[str, Any]) -> None:
         state = load_state()
-        if full_draft_running(state):
-            raise StudioError("全文初稿正在生成；请等待完成或先停止任务。")
+        if draft_batch_running(state):
+            raise StudioError("批量写作任务正在生成；请等待任务完成。")
         editor = state["title_editor"]
         prompt = str(body.get("prompt", "")).strip()
         if not prompt:
@@ -7568,8 +12138,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"ok": True, "state": public_state(state)})
 
     def handle_title_save(self, body: dict[str, Any]) -> None:
-        if full_draft_running(load_state()):
-            raise StudioError("全文初稿正在生成；请等待完成或先停止任务。")
+        if draft_batch_running(load_state()):
+            raise StudioError("批量写作任务正在生成；请等待任务完成。")
         title = normalize_plain_title(str(body.get("title", "")))
         result = save_manuscript_title(title)
         state = load_state()
@@ -7581,7 +12151,9 @@ class Handler(BaseHTTPRequestHandler):
             "message": result.message,
             "updated_at": int(time.time()),
         }
+        refresh_full_draft_artifact_status(state)
         save_state(state)
+        schedule_ready_mechanism_figures()
         self.send_json({"ok": True, "state": public_state(state)})
 
     def require_figure(self, body: dict[str, Any]) -> str:
@@ -7589,6 +12161,10 @@ class Handler(BaseHTTPRequestHandler):
         if figure_id not in FIGURES:
             raise StudioError("Unknown paper figure.")
         return figure_id
+
+    def reject_online_placeholder_figure(self, figure_id: str) -> None:
+        if ONLINE_PROJECT_MODE and FIGURES[figure_id].get("kind") == "mechanism":
+            raise StudioError(ONLINE_PLACEHOLDER_FIGURE_MESSAGE)
 
     def require_panel(self, figure_id: str, body: dict[str, Any]) -> str:
         panel_id = str(body.get("panel_id", "")).lower()
@@ -7669,9 +12245,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_generate(self, body: dict[str, Any]) -> None:
         section = self.require_section(body)
+        if SECTION_MAP[section].get("writing_mode") == "plan_only":
+            raise StudioError("尚未上传实验结果；该 section 仅展示段落规划，不生成正文。")
+        if not ONLINE_PROJECT_MODE:
+            ensure_survey_bibliography()
         state = load_state()
-        if full_draft_running(state):
-            raise StudioError("全文初稿正在生成；请等待完成或先停止任务。")
+        if draft_batch_running(state):
+            raise StudioError("批量写作任务正在生成；请等待任务完成。")
         model = str(body.get("model") or state.get("model") or DEFAULT_MODEL).strip()
         section_state = state["sections"][section]
         paragraph = current_paragraph(section_state)
@@ -7684,7 +12264,6 @@ class Handler(BaseHTTPRequestHandler):
                 "reload before generating."
             )
         purpose = paragraph["purpose"]
-        reference = reference_excerpt(paragraph["reference_lines"])
         current_bib_fingerprint = bibliography_fingerprint()
         source_fingerprint = section_source_fingerprint(section)
         include_section_context = (
@@ -7693,11 +12272,12 @@ class Handler(BaseHTTPRequestHandler):
         )
         bibliography_update = ""
         if (
-            section_state.get("previous_response_id")
+            not ONLINE_PROJECT_MODE
+            and section_state.get("previous_response_id")
             and section_state.get("bibliography_fingerprint")
             != current_bib_fingerprint
         ):
-            bibliography_update = bibliography_prompt_catalog(
+            bibliography_update = writing_bibliography_catalog(
                 purpose + "\n" + section_evidence(section)
             )
         response_id, text, citations_added = call_openai(
@@ -7707,7 +12287,8 @@ class Handler(BaseHTTPRequestHandler):
             purpose=purpose,
             required_heading=paragraph.get("heading"),
             required_heading_style=paragraph.get("heading_style"),
-            reference_paragraph=reference,
+            architecture=paragraph_architecture(paragraph),
+            reference_context=paragraph_reference_context(section, paragraph),
             comment=str(body.get("comment", "")),
             current_text=str(body.get("current_text", "")),
             bibliography_update=bibliography_update,
@@ -7715,29 +12296,48 @@ class Handler(BaseHTTPRequestHandler):
             figure_states=state["figures"],
             include_section_context=include_section_context,
         )
-        candidate_id = uuid.uuid4().hex
-        section_state["previous_response_id"] = response_id
-        section_state["bibliography_fingerprint"] = bibliography_fingerprint()
-        section_state["conversation_section_fingerprint"] = source_fingerprint
-        paragraph["candidate"] = {
-            "id": candidate_id,
-            "text": text,
-            "purpose": purpose,
-            "citations_added": citations_added,
-            "created_at": int(time.time()),
-        }
-        paragraph["history"].append(
-            {
-                "candidate_id": candidate_id,
-                "comment": str(body.get("comment", "")),
+        # The model call is intentionally outside the lock, but it can outlive
+        # the browser request that started a batch-writing job. Never save the
+        # pre-call state here: doing so used to erase the newer full_draft_job
+        # (and any paragraphs it had accepted) when an automatic single-
+        # paragraph generation returned from another tab. Rebase this narrow
+        # candidate update onto the latest state while holding the same lock
+        # used to create/advance full-draft jobs.
+        with FULL_DRAFT_JOB_LOCK:
+            state = load_state()
+            if draft_batch_running(state):
+                raise StudioError(
+                    "批量写作已在单段生成期间启动；已丢弃这份过时候选，批量任务继续运行。"
+                )
+            section_state = state["sections"][section]
+            paragraph = current_paragraph(section_state)
+            if paragraph is None or (
+                requested_paragraph_id and paragraph["id"] != requested_paragraph_id
+            ):
+                raise StudioError("段落位置已在生成期间改变；已丢弃这份过时候选。")
+            candidate_id = uuid.uuid4().hex
+            section_state["previous_response_id"] = response_id
+            section_state["bibliography_fingerprint"] = bibliography_fingerprint()
+            section_state["conversation_section_fingerprint"] = source_fingerprint
+            paragraph["candidate"] = {
+                "id": candidate_id,
                 "text": text,
+                "purpose": purpose,
                 "citations_added": citations_added,
                 "created_at": int(time.time()),
             }
-        )
-        paragraph["history"] = paragraph["history"][-40:]
-        state["model"] = model
-        save_state(state)
+            paragraph["history"].append(
+                {
+                    "candidate_id": candidate_id,
+                    "comment": str(body.get("comment", "")),
+                    "text": text,
+                    "citations_added": citations_added,
+                    "created_at": int(time.time()),
+                }
+            )
+            paragraph["history"] = paragraph["history"][-40:]
+            state["model"] = model
+            save_state(state)
         self.send_json(
             {
                 "ok": True,
@@ -7748,13 +12348,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_accept(self, body: dict[str, Any]) -> None:
         section = self.require_section(body)
+        if SECTION_MAP[section].get("writing_mode") == "plan_only":
+            raise StudioError("尚未上传实验结果；该 section 仅展示段落规划，不能写入正文。")
         requested_paragraph_id = str(body.get("paragraph_id", "")).strip()
         candidate_id = str(body.get("candidate_id", ""))
         submitted_text = str(body.get("candidate_text", "")).strip()
         base_text = str(body.get("base_text", ""))
         state = load_state()
-        if full_draft_running(state):
-            raise StudioError("全文初稿正在生成；请等待完成或先停止任务。")
+        if draft_batch_running(state):
+            raise StudioError("批量写作任务正在生成；请等待任务完成。")
         section_state = state["sections"][section]
         paragraph = current_paragraph(section_state)
         if paragraph is None:
@@ -7775,6 +12377,13 @@ class Handler(BaseHTTPRequestHandler):
             paragraph.get("heading"),
             paragraph.get("heading_style"),
         )
+        text = (
+            remove_manuscript_citations(text)
+            if SECTION_MAP[section].get("render") == "abstract"
+            else online_citation_markers(text)
+            if ONLINE_PROJECT_MODE
+            else local_survey_citations(text)
+        )
         candidate["text"] = text
         bound_artifacts = artifact_writing_context(
             paragraph.get("artifacts", []), state.get("figures", {})
@@ -7782,41 +12391,48 @@ class Handler(BaseHTTPRequestHandler):
         reference_error = artifact_reference_error(text, bound_artifacts)
         if reference_error:
             raise StudioError(reference_error)
-        if needs_citation_resolution(text):
-            previous_response_id = section_state.get("previous_response_id")
-            response_id, text, citations_added = resolve_citations(
-                model=str(state.get("model") or DEFAULT_MODEL),
-                previous_response_id=previous_response_id,
-                section=SECTION_MAP[section]["title"],
-                purpose=paragraph["purpose"],
-                paragraph=text,
-            )
-            text = enforce_required_heading(
-                text,
-                paragraph.get("heading"),
-                paragraph.get("heading_style"),
-            )
-            section_state["previous_response_id"] = response_id
-            section_state["bibliography_fingerprint"] = bibliography_fingerprint()
-            candidate["text"] = text
-            candidate["citations_added"] = list(
-                dict.fromkeys(
-                    list(candidate.get("citations_added", [])) + citations_added
-                )
-            )
-            save_state(state)
         reference_error = artifact_reference_error(text, bound_artifacts)
         if reference_error:
             raise StudioError(reference_error)
-        if "[CITATION NEEDED]" in text:
+        validate_citations_for_accept(text, workflow="本地正文" if not ONLINE_PROJECT_MODE else "在线正文")
+        appendix_issues = appendix_content_issues(section, text)
+        if appendix_issues:
+            raise StudioError("附录候选仍是内容路线图：" + "; ".join(appendix_issues))
+        comparison_issues = numeric_comparison_issues(text)
+        if comparison_issues:
+            raise StudioError("候选的数值比较方向错误：" + "; ".join(comparison_issues))
+        synthesis_issues = synthesis_comparison_issues(section, text)
+        if synthesis_issues:
+            raise StudioError("候选总结与主结果表矛盾：" + "; ".join(synthesis_issues))
+        execution_issues = execution_record_contradiction_issues(text)
+        if execution_issues:
+            raise StudioError("候选与执行记录矛盾：" + "; ".join(execution_issues))
+        setup_issues = experimental_setup_issues(
+            section, str(paragraph.get("purpose") or ""), text
+        )
+        if setup_issues:
+            raise StudioError("实验设置候选不完整：" + "; ".join(setup_issues))
+        completion_issues = manuscript_completion_placeholder_issues(text)
+        if completion_issues:
+            raise StudioError("候选仍含规划占位符：" + "; ".join(completion_issues))
+        markup_issues = manuscript_markup_issues(text)
+        if markup_issues:
+            raise StudioError("候选仍含 Markdown 标记：" + "; ".join(markup_issues))
+        internal_reference_issues = unsupported_internal_reference_issues(text)
+        if internal_reference_issues:
             raise StudioError(
-                "联网检索后仍没有找到可验证的学术来源；候选已保留 "
-                "[CITATION NEEDED]，请修改该论断后重试。"
+                "候选含未配置的内部引用：" + "; ".join(internal_reference_issues)
             )
-        unknown = sorted(citation_keys(text) - bibliography_keys())
-        if unknown:
+        appendix_numeric_issues = unsupported_appendix_numeric_issues(
+            section,
+            text,
+            section_evidence(
+                section, [str(item) for item in paragraph.get("artifacts", [])]
+            ),
+        )
+        if appendix_numeric_issues:
             raise StudioError(
-                "联网检索后仍存在未验证 citation keys：" + ", ".join(unknown)
+                "附录候选含无证据数字：" + "; ".join(appendix_numeric_issues)
             )
         prose_issues = latex_prose_issues(text)
         if prose_issues:
@@ -7843,17 +12459,14 @@ class Handler(BaseHTTPRequestHandler):
         was_accepted = bool(paragraph.get("accepted_text"))
         paragraph["accepted_text"] = text
         paragraph["candidate"] = None
+        auto_generate_bound_figure_captions(state, section, paragraph, text)
         section_source, accepted_section = render_section_source(
             section, section_state, state["figures"], state["tables"]
         )
         temporary = target.with_suffix(".tex.tmp")
         temporary.write_text(section_source, encoding="utf-8")
         os.replace(temporary, target)
-        bibliography_text = (
-            "\\bibliography{references}\n"
-            if manuscript_citation_keys()
-            else "% Paper Studio enables the bibliography after the first accepted citation.\n"
-        )
+        bibliography_text = manuscript_bibliography_section_text()
         bibliography_temporary = bibliography_path.with_suffix(".tex.tmp")
         bibliography_temporary.write_text(bibliography_text, encoding="utf-8")
         os.replace(bibliography_temporary, bibliography_path)
@@ -7892,6 +12505,7 @@ class Handler(BaseHTTPRequestHandler):
             "message": compile_result.message,
             "updated_at": int(time.time()),
         }
+        refresh_full_draft_artifact_status(state)
         save_state(state)
         self.send_json({"ok": True, "state": public_state(state)})
 
@@ -7908,13 +12522,32 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json({"ok": result.ok, "message": result.message, "state": public_state(state)}, status=status)
 
     def handle_full_draft_start(self, body: dict[str, Any]) -> None:
-        model = str(body.get("model") or DEFAULT_MODEL).strip()
+        # The browser always submits its selected model, but API retries and
+        # automation may omit the field.  Falling back to the package-wide
+        # OpenAI default while the active provider is DeepSeek creates an
+        # invalid cross-provider request and also overwrites the saved model.
+        # Use the project's persisted selection first.
+        state = load_state()
+        model = str(body.get("model") or state.get("model") or DEFAULT_MODEL).strip()
         token, state = start_full_draft_job(model)
         threading.Thread(
             target=full_draft_worker,
             args=(token, model),
             daemon=True,
-            name=f"full-draft-{token[:8]}",
+            name=f"batch-draft-{token[:8]}",
+        ).start()
+        self.send_json({"ok": True, "state": public_state(state)}, status=202)
+
+    def handle_section_draft_start(self, body: dict[str, Any]) -> None:
+        state = load_state()
+        model = str(body.get("model") or state.get("model") or DEFAULT_MODEL).strip()
+        section = self.require_section(body)
+        token, state = start_section_draft_job(model, section)
+        threading.Thread(
+            target=section_draft_worker,
+            args=(token, model, section),
+            daemon=True,
+            name=f"section-draft-{section}-{token[:8]}",
         ).start()
         self.send_json({"ok": True, "state": public_state(state)}, status=202)
 
@@ -7936,24 +12569,9 @@ class Handler(BaseHTTPRequestHandler):
             save_state(state)
         self.send_json({"ok": True, "state": public_state(state)})
 
-    def handle_reset(self, body: dict[str, Any]) -> None:
-        section = self.require_section(body)
-        state = load_state()
-        if full_draft_running(state):
-            raise StudioError("全文初稿正在生成；不能同时重置 section 对话。")
-        model = str(body.get("model") or state.get("model") or DEFAULT_MODEL).strip()
-        if not model:
-            raise StudioError("模型名称不能为空。")
-        state["model"] = model
-        state["sections"][section]["previous_response_id"] = None
-        state["sections"][section]["bibliography_fingerprint"] = None
-        state["sections"][section]["conversation_section_fingerprint"] = None
-        save_state(state)
-        self.send_json({"ok": True, "state": public_state(state)})
-
     def handle_reset_generated_paper(self, body: dict[str, Any]) -> None:
-        if full_draft_running(load_state()):
-            raise StudioError("请先停止全文初稿任务，再清空生成内容。")
+        if draft_batch_running(load_state()):
+            raise StudioError("请先等待或停止批量写作任务，再清空生成内容。")
         confirmation = str(body.get("project_id", "")).strip()
         if confirmation != PROJECT_ID:
             raise StudioError("项目 ID 不匹配；未删除任何生成内容。")
@@ -8061,6 +12679,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_figure_generate(self, body: dict[str, Any]) -> None:
         figure_id = self.require_figure(body)
+        self.reject_online_placeholder_figure(figure_id)
+        if FIGURES[figure_id].get("kind") == "source":
+            raise StudioError("来源图已从参考论文的可追溯 PDF 载入，无需重新生成。")
         panel_id = self.require_panel(figure_id, body)
         state = load_state()
         ready, reason = figure_generation_gate(figure_id, state)
@@ -8070,7 +12691,7 @@ class Handler(BaseHTTPRequestHandler):
         if FIGURES[figure_id]["kind"] == "mechanism":
             if ONLINE_PROJECT_MODE:
                 raise StudioError("在线会话当前不运行机制图设计 Agent；论文对话、正文、标题、Caption、表格与 LLM 写作功能仍可正常使用。")
-            raise StudioError("机制图必须先生成并确认设计 Prompt，再调用 GPT Image。")
+            raise StudioError("机制图必须先生成并确认画图 Prompt，再调用 GPT Image。")
         if figure_state.get("status") in FIGURE_RUNNING_STATUSES:
             raise StudioError("该图已有任务正在运行。")
         if ONLINE_PROJECT_MODE:
@@ -8207,8 +12828,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_figure_prompt(self, body: dict[str, Any]) -> None:
         figure_id = self.require_figure(body)
+        self.reject_online_placeholder_figure(figure_id)
         if FIGURES[figure_id]["kind"] != "mechanism":
-            raise StudioError("数据图不使用图像设计 Prompt。")
+            raise StudioError("数据图不使用画图 Prompt。")
         state = load_state()
         ready, reason = figure_generation_gate(figure_id, state)
         if not ready:
@@ -8229,7 +12851,7 @@ class Handler(BaseHTTPRequestHandler):
             {
                 "status": "prompt_generating",
                 "progress": 5,
-                "progress_message": "设计 Prompt 任务已开始…",
+                "progress_message": "画图 Prompt 任务已开始…",
                 "last_message": "",
                 "prompt_approved_at": None,
                 "draw_prompt": current_prompt,
@@ -8246,7 +12868,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "GPT 正在根据该 section 正文生成设计 Prompt。",
+                "message": "GPT 正在根据该 section 正文生成画图 Prompt。",
                 "state": public_state(state),
             },
             status=202,
@@ -8254,6 +12876,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_figure_draw(self, body: dict[str, Any]) -> None:
         figure_id = self.require_figure(body)
+        self.reject_online_placeholder_figure(figure_id)
         if FIGURES[figure_id]["kind"] != "mechanism":
             raise StudioError("数据图不调用 GPT Image。")
         state = load_state()
@@ -8265,7 +12888,7 @@ class Handler(BaseHTTPRequestHandler):
             raise StudioError("该图已有任务正在运行。")
         prompt = str(body.get("draw_prompt", "")).strip()
         if not prompt:
-            raise StudioError("请先让 GPT 生成设计 Prompt，并检查后确认。")
+            raise StudioError("请先让 GPT 生成画图 Prompt，并检查后确认。")
         if completed_mechanism_draft_matches_prompt(figure_id, prompt):
             paths = figure_paths(figure_id)
             previous_status = str(figure_state.get("status", ""))
@@ -8305,7 +12928,7 @@ class Handler(BaseHTTPRequestHandler):
                 "draw_prompt": prompt,
                 "prompt_approved_at": now,
                 "progress": 5,
-                "progress_message": "已确认设计 Prompt，GPT Image 任务正在排队…",
+                "progress_message": "已确认画图 Prompt，GPT Image 任务正在排队…",
                 "last_message": "",
                 "approved_at": None,
             }
@@ -8328,6 +12951,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_figure_cancel(self, body: dict[str, Any]) -> None:
         figure_id = self.require_figure(body)
+        self.reject_online_placeholder_figure(figure_id)
         if FIGURES[figure_id]["kind"] != "mechanism":
             raise StudioError("数据图没有 GPT Image 调用可停止。")
         state = cancel_figure_job(figure_id)
@@ -8341,6 +12965,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_figure_build(self, body: dict[str, Any]) -> None:
         figure_id = self.require_figure(body)
+        self.reject_online_placeholder_figure(figure_id)
         if FIGURES[figure_id]["kind"] != "mechanism":
             raise StudioError("数据图由可复现脚本直接构建，无需 PPT 重建步骤。")
         state = load_state()
@@ -8378,6 +13003,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_figure_approve(self, body: dict[str, Any]) -> None:
         figure_id = self.require_figure(body)
+        self.reject_online_placeholder_figure(figure_id)
         state = load_state()
         ready, reason = figure_gate(figure_id, state)
         if not ready:
@@ -8387,9 +13013,12 @@ class Handler(BaseHTTPRequestHandler):
             raise StudioError("请先生成最终 PDF。")
         if FIGURES[figure_id]["kind"] == "data" and not state["figures"][figure_id].get("composed_at"):
             raise StudioError("请先用论文组合 Prompt 生成最终组合 PDF。")
-        if not paths["pptx"].exists():
+        if not paths["pptx"].exists() and FIGURES[figure_id]["kind"] != "source" and not (
+            ONLINE_PROJECT_MODE and FIGURES[figure_id]["kind"] == "data"
+        ):
             raise StudioError("插图缺少排版用的可编辑 PPTX，不能确认。")
         figure_state = state["figures"][figure_id]
+        ensure_figure_caption_before_approval(state, figure_id)
         section = FIGURES[figure_id]["source_sections"][0]
         section_path = PAPER / "sections" / SECTION_MAP[section]["file"]
         previous_source = read_text(section_path, 100000)
@@ -8422,6 +13051,7 @@ class Handler(BaseHTTPRequestHandler):
             "message": compile_result.message,
             "updated_at": int(time.time()),
         }
+        refresh_full_draft_artifact_status(state)
         save_state(state)
         self.send_json(
             {
@@ -8433,6 +13063,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_figure_caption_generate(self, body: dict[str, Any]) -> None:
         figure_id = self.require_figure(body)
+        # A mechanism figure remains a placeholder online, but its caption is
+        # manuscript text and must stay revisable when the citing paragraph or
+        # scientific definition changes.
         current_caption = str(body.get("current_caption", "")).strip()
         prompt_instruction = str(body.get("prompt_instruction", "")).strip()
         if len(prompt_instruction) > 4000:
@@ -8454,19 +13087,30 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_figure_caption(self, body: dict[str, Any]) -> None:
         figure_id = self.require_figure(body)
-        caption = str(body.get("caption", "")).strip()
+        caption = normalize_figure_caption_text(str(body.get("caption", "")))
         if not caption:
             raise StudioError("Caption 不能为空。")
-        if len(caption) > 2000:
-            raise StudioError("Caption 过长，请压缩到 2000 字符以内。")
+        caption_issues = figure_caption_issues(caption)
+        if caption_issues:
+            raise StudioError(
+                "Caption 必须是一句简短英文句子：" + "；".join(caption_issues)
+            )
 
         state = load_state()
         figure_state = state["figures"][figure_id]
         previous_caption = figure_state.get("caption")
         figure_state["caption"] = caption
+        figure_state["caption_source"] = "researcher"
+        figure_state["caption_generated_from_paragraph"] = ""
+        figure_state["caption_generated_from_sha256"] = ""
+        figure_state["caption_generated_at"] = None
+        figure_state["caption_last_error"] = ""
         figure_state["last_message"] = "Caption 已保存。"
 
-        if figure_state.get("status") == "approved":
+        online_placeholder = (
+            ONLINE_PROJECT_MODE and FIGURES[figure_id].get("kind") == "mechanism"
+        )
+        if figure_state.get("status") == "approved" or online_placeholder:
             section = FIGURES[figure_id]["source_sections"][0]
             section_path = PAPER / "sections" / SECTION_MAP[section]["file"]
             previous_source = read_text(section_path, 100000)
@@ -8511,6 +13155,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_figure_placement(self, body: dict[str, Any]) -> None:
         figure_id = self.require_figure(body)
+        self.reject_online_placeholder_figure(figure_id)
         state = load_state()
         definition = FIGURES[figure_id]
         section = definition["source_sections"][0]
@@ -8820,6 +13465,7 @@ class Handler(BaseHTTPRequestHandler):
             "message": compile_result.message,
             "updated_at": int(time.time()),
         }
+        refresh_full_draft_artifact_status(state)
         save_state(state)
         self.send_json(
             {
@@ -8955,6 +13601,14 @@ def main() -> None:
             print(f"ERROR: {exc}", file=sys.stderr)
             raise SystemExit(1) from None
         return
+    if not ONLINE_PROJECT_MODE and not EMBEDDED_ONLY and not DEMO_MODE:
+        print(
+            "ERROR: 本地论文编辑器只在 Research Studio 中提供。请运行 "
+            "`python3 -m research_avatar.research_studio.server --ensure-studios` "
+            "并打开 http://127.0.0.1:8780。",
+            file=sys.stderr,
+        )
+        raise SystemExit(2)
     if args.provider or args.model:
         state = load_state()
         if args.provider:
@@ -8967,18 +13621,32 @@ def main() -> None:
         recover_interrupted_table_jobs()
         state = load_state()
         prose_changed = synchronize_paragraph_editors_from_manuscript(state)
+        leadins_changed = repair_redundant_section_leadins_in_manuscript(state)
+        placeholder_refs_changed = repair_online_placeholder_references_in_manuscript(
+            state
+        )
         artifacts_changed = synchronize_artifact_workbenches_from_manuscript(
             state, build_table_previews=True
         )
-        if prose_changed or artifacts_changed:
+        if leadins_changed or placeholder_refs_changed:
+            compile_result = compile_paper()
+            state["compile"] = {
+                "status": "ok" if compile_result.ok else "error",
+                "message": compile_result.message,
+                "updated_at": int(time.time()),
+            }
+        if (
+            prose_changed
+            or leadins_changed
+            or placeholder_refs_changed
+            or artifacts_changed
+        ):
             save_state(state)
     server = StudioHTTPServer((args.host, args.port), Handler)
     url = f"http://{args.host}:{args.port}"
-    print(f"Paper Studio: {url}")
+    print(f"Paper editor backend: {url} (internal to Research Studio)")
     print(f"Workspace: {ROOT}")
     print(f"Model: {load_state().get('model') or DEFAULT_MODEL}")
-    if not args.no_browser:
-        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
 
     previous_sigterm = signal.getsignal(signal.SIGTERM)
 

@@ -6,11 +6,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DemoRunPlanMergeTests(unittest.TestCase):
-    def test_completed_result_is_nested_in_goal_and_results_page_is_not_separate(self):
+    def test_all_current_more_goals_are_shown_and_results_page_is_not_separate(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
-        hierarchy = source[source.index("const goalHierarchy"):source.index("const completedF2Rows")]
-        self.assertIn('completedExample ? resultProvenanceDemo() : ""', hierarchy)
-        self.assertIn('goal.id === "G2.1"', hierarchy)
+        hierarchy = source[source.index("const goalHierarchy"):source.index("const paperStudioScreenshots")]
+        self.assertIn("representativeGoalIds = runPlanDemoState.goals.map", hierarchy)
+        self.assertIn("六项任务依次核验来源", hierarchy)
         self.assertNotIn("完整计划没有丢失", source)
         self.assertNotIn('class="runplan-omitted"', source)
         self.assertNotIn('reportDocument("results"', source)
@@ -21,16 +21,15 @@ class DemoRunPlanMergeTests(unittest.TestCase):
         self.assertIn("逐项确认", source)
         self.assertNotIn("复制 /goal", source)
 
-    def test_completed_goal_contains_source_table_plot_and_hover_process(self):
+    def test_demo_uses_generic_evidence_examples(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
-        self.assertIn('class="result-shell source-table completed-source"', source)
-        self.assertIn('class="completed-chart"', source)
-        self.assertIn('class="provenance-tooltip"', source)
-        self.assertIn("40/40 数据单元已核验", source)
-        self.assertIn("每个数字都能查看结果路径、计算方法、命令和验证状态", source)
-        self.assertIn("<strong>运行命令</strong>", source)
-        style = (ROOT / "research_avatar/web/demo/style.css").read_text(encoding="utf-8")
-        self.assertIn(".expanded-goal>.completed-result", style)
+        self.assertIn("结构参考 · Ref Paper", source)
+        self.assertIn("目标证据 · T1–T4", source)
+        self.assertIn("✅ G1.1 · 训练动态", source)
+        self.assertNotIn("MORE", source)
+        self.assertNotIn("ByteDance 离线比较", source)
+        self.assertNotIn("40/40 数据单元已核验", source)
+        self.assertNotIn("results/typo_margin", source)
 
 
 if __name__ == "__main__":

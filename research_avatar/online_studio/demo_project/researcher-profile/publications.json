@@ -8,8 +8,8 @@
       "Trustworthy AI",
       "Natural Language Processing"
     ],
-    "citations_all": 398,
-    "h_index_all": 8,
+    "citations_all": 403,
+    "h_index_all": 9,
     "i10_index_all": 8
   },
   "publications": [
@@ -18,7 +18,7 @@
       "authors": "Y Xie*, C Zhou*, L Gao*, J Wu*, X Li, HY Zhou, S Liu, L Xing, J Zou, C Xie, ...",
       "venue": "ICLR 2025",
       "year": "2024",
-      "cited_by": 140,
+      "cited_by": 141,
       "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:u-x6o8ySG0sC",
       "abstract": "This paper introduces MedTrinity-25M, a comprehensive, large-scale multimodal dataset for medicine, covering over 25 million images across 10 modalities with multigranular annotations for more than 65 diseases. These multigranular annotations encompass both global information, such as modality and organ detection, and local information like ROI analysis, lesion texture, and region-wise correlations. Unlike the existing multimodal datasets, which are limited by the availability of image-text pairs, we have developed the first automated pipeline that scales up multimodal data by generating multigranular visual and textual annotations in the form of image-ROI-description triplets without the need for any paired text descriptions. Specifically, data from over 30 different sources have been collected, preprocessed, and grounded using domain-specific expert models to identify ROIs related to abnormal regions. We then build a comprehensive knowledge base and prompt multimodal large language models to perform retrieval-augmented generation with the identified ROIs as guidance, resulting in multigranular textual descriptions. Compared to existing datasets, MedTrinity-25M provides the most enriched annotations, supporting a comprehensive range of multimodal tasks such as captioning and report generation, as well as vision-centric tasks like classification and segmentation. We propose LLaVA-Tri by pretraining LLaVA on MedTrinity-25M, achieving state-of-the-art performance on VQA-RAD, SLAKE, and PathVQA, surpassing representative SOTA multimodal large language models. Furthermore, MedTrinity-25M can also be utilized to support large-scale pre-training of multimodal medical AI models, contributing to the development of future foundation models in the medical domain. We will make our dataset available.",
       "doi": null,
@@ -26,18 +26,26 @@
       "bibtex": "@inproceedings{xie2024medtrinity,\n  title = {Medtrinity-25m: A large-scale multimodal dataset with multigranular annotations for medicine},\n  author = {Y Xie* and C Zhou* and L Gao* and J Wu* and X Li and HY Zhou and S Liu and L Xing and J Zou and C Xie and ...},\n  booktitle = {ICLR 2025},\n  year = {2024}\n}",
       "arxiv_id": "2408.02900",
       "url_arxiv": "https://arxiv.org/abs/2408.02900",
-      "pdf_url": "https://arxiv.org/pdf/2408.02900",
       "task_type": "benchmark",
+      "pdf_url": "https://arxiv.org/pdf/2408.02900.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/xie2024medtrinity.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/xie2024medtrinity.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "3a565a638ff240b54406a2081aaf1b400cd3e4825c4ca114888206fd02634bb8",
+        "txt_sha256": "20c6b5314f5b109e6d1cf1e60b5a2d8421599dcd0fbcd94abd6c6b917508260d"
+      }
     },
     {
       "title": "Vuldetectbench: Evaluating the deep capability of vulnerability detection with large language models",
       "authors": "Y Liu*, L Gao*, M Yang*, Y Xie, P Chen, X Zhang, W Chen",
       "venue": "arXiv preprint arXiv:2406.07595",
       "year": "2024",
-      "cited_by": 65,
+      "cited_by": 66,
       "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:u5HHmVD_uO8C",
       "abstract": "Large Language Models (LLMs) have training corpora containing large amounts of program code, greatly improving the model's code comprehension and generation capabilities. However, sound comprehensive research on detecting program vulnerabilities, a more specific task related to code, and evaluating the performance of LLMs in this more specialized scenario is still lacking. To address common challenges in vulnerability analysis, our study introduces a new benchmark, VulDetectBench, specifically designed to assess the vulnerability detection capabilities of LLMs. The benchmark comprehensively evaluates LLM's ability to identify, classify, and locate vulnerabilities through five tasks of increasing difficulty. We evaluate the performance of 17 models (both open- and closed-source) and find that while existing models can achieve over 80% accuracy on tasks related to vulnerability identification and classification, they still fall short on specific, more detailed vulnerability analysis tasks, with less than 30% accuracy, making it difficult to provide valuable auxiliary information for professional vulnerability mining. Our benchmark effectively evaluates the capabilities of various LLMs at different levels in the specific task of vulnerability detection, providing a foundation for future research and improvements in this critical area of code security. VulDetectBench is publicly available at https://github.com/Sweetaroo/VulDetectBench.",
       "doi": null,
@@ -45,11 +53,19 @@
       "bibtex": "@misc{liu2024vuldetectbench,\n  title = {Vuldetectbench: Evaluating the deep capability of vulnerability detection with large language models},\n  author = {Y Liu* and L Gao* and M Yang* and Y Xie and P Chen and X Zhang and W Chen},\n  booktitle = {arXiv preprint arXiv:2406.07595},\n  year = {2024}\n}",
       "arxiv_id": "2406.07595",
       "url_arxiv": "https://arxiv.org/abs/2406.07595",
-      "pdf_url": "https://arxiv.org/pdf/2406.07595",
       "task_type": "benchmark",
+      "pdf_url": "https://arxiv.org/pdf/2406.07595.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/liu2024vuldetectbench.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/liu2024vuldetectbench.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "de907bef3dae536ad38e151585d929046a601d278674287609799e46f11a4d65",
+        "txt_sha256": "794469f61ab5d18bace067b852c372db4684a29f14cbbadd435c043b8c53dfea"
+      }
     },
     {
       "title": "Shaping the Safety Boundaries: Understanding and Defending Against Jailbreaks in Large Language Models",
@@ -62,20 +78,26 @@
       "doi": null,
       "bibtex_key": "gao2024shaping",
       "bibtex": "@inproceedings{gao2024shaping,\n  title = {Shaping the Safety Boundaries: Understanding and Defending Against Jailbreaks in Large Language Models},\n  author = {L Gao and J Geng and X Zhang and P Nakov and X Chen},\n  booktitle = {ACL 2025},\n  year = {2024}\n}",
-      "arxiv_id": "2412.17034",
-      "url_arxiv": "https://arxiv.org/abs/2412.17034",
-      "pdf_url": "https://arxiv.org/pdf/2412.17034",
       "task_type": "engineering",
+      "pdf_url": "https://aclanthology.org/2025.acl-long.1233.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/gao2024shaping.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/gao2024shaping.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "8c75c7439d49785db95ffd2892499816760f09c0a79ab4b3d7d00195151f6f91",
+        "txt_sha256": "44798785484ee0729c6513e2d9341bf2295a119d367f3f2d4a2d8ade5d3250ca"
+      }
     },
     {
       "title": "Audio jailbreak: An open comprehensive benchmark for jailbreaking large audio-language models",
       "authors": "Z Song, Q Jiang, M Cui, M Li, L Gao, Z Zhang, Z Xu, Y Wang, C Wang, ...",
       "venue": "ACL 2026",
       "year": "2025",
-      "cited_by": 25,
+      "cited_by": 26,
       "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:WF5omc3nYNoC",
       "abstract": "The rise of Large Audio Language Models (LAMs) brings both potential and risks, as their audio outputs may contain harmful or unethical content. However, current research lacks a systematic, quantitative evaluation of LAM safety especially against jailbreak attacks, which are challenging due to the temporal and semantic nature of speech. To bridge this gap, we introduce AJailBench, the first benchmark specifically designed to evaluate jailbreak vulnerabilities in LAMs. We begin by constructing AJailBench-Base, a dataset of 1,495 adversarial audio prompts spanning 10 policy-violating categories, converted from textual jailbreak attacks using realistic text to speech synthesis. Using this dataset, we evaluate several state-of-the-art LAMs and reveal that none exhibit consistent robustness across attacks. To further strengthen jailbreak testing and simulate more realistic attack conditions, we propose a method to generate dynamic adversarial variants. Our Audio Perturbation Toolkit (APT) applies targeted distortions across time, frequency, and amplitude domains. To preserve the original jailbreak intent, we enforce a semantic consistency constraint and employ Bayesian optimization to efficiently search for perturbations that are both subtle and highly effective. This results in AJailBench-APT, an extended dataset of optimized adversarial audio samples. Our findings demonstrate that even small, semantically preserved perturbations can significantly reduce the safety performance of leading LAMs, underscoring the need for more robust and semantically aware defense mechanisms.",
       "doi": null,
@@ -83,11 +105,19 @@
       "bibtex": "@inproceedings{song2025audio,\n  title = {Audio jailbreak: An open comprehensive benchmark for jailbreaking large audio-language models},\n  author = {Z Song and Q Jiang and M Cui and M Li and L Gao and Z Zhang and Z Xu and Y Wang and C Wang and ...},\n  booktitle = {ACL 2026},\n  year = {2025}\n}",
       "arxiv_id": "2505.15406",
       "url_arxiv": "https://arxiv.org/abs/2505.15406",
-      "pdf_url": "https://arxiv.org/pdf/2505.15406",
       "task_type": "benchmark",
+      "pdf_url": "https://arxiv.org/pdf/2505.15406.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/song2025audio.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/song2025audio.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "5ca9dc9f645256b04cd2c469e8f657d3324f7f43c134a3cbc04efa3d1190e746",
+        "txt_sha256": "f65404f43de7337935e01c41fab685656d0e3f1e06532cc5e1ad1ff7f51ff985"
+      }
     },
     {
       "title": "DyFlow: Dynamic Workflow Framework for Agentic Reasoning",
@@ -102,11 +132,19 @@
       "bibtex": "@inproceedings{wang2025dyflow,\n  title = {DyFlow: Dynamic Workflow Framework for Agentic Reasoning},\n  author = {Y Wang and Z Xu and Y Huang and X Wang and Z Song and L Gao and C Wang and X Tang and ...},\n  booktitle = {NeurIPS 2025},\n  year = {2025}\n}",
       "arxiv_id": "2509.26062",
       "url_arxiv": "https://arxiv.org/abs/2509.26062",
-      "pdf_url": "https://arxiv.org/pdf/2509.26062",
       "task_type": "engineering",
+      "pdf_url": "https://arxiv.org/pdf/2509.26062.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/wang2025dyflow.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/wang2025dyflow.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "24b58a4d8a1a073c96a0df743af12c4d673166cd71ee7dbdc176ed0fdf43a798",
+        "txt_sha256": "327843dbac3e4d02e229ecd9f23939498f104f7c94025e51ceb7e6a903a49a84"
+      }
     },
     {
       "title": "Socialmaze: A benchmark for evaluating social reasoning in large language models",
@@ -121,11 +159,19 @@
       "bibtex": "@misc{xu2025socialmaze,\n  title = {Socialmaze: A benchmark for evaluating social reasoning in large language models},\n  author = {Z Xu and Y Wang and Y Huang and J Ye and H Zhuang and Z Song and L Gao and C Wang and Z Chen and ...},\n  booktitle = {arXiv preprint arXiv:2505.23713},\n  year = {2025}\n}",
       "arxiv_id": "2505.23713",
       "url_arxiv": "https://arxiv.org/abs/2505.23713",
-      "pdf_url": "https://arxiv.org/pdf/2505.23713",
       "task_type": "benchmark",
+      "pdf_url": "https://arxiv.org/pdf/2505.23713.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/xu2025socialmaze.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/xu2025socialmaze.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "02de2024d6065deafa2f3fee0732039c195bc90d83123d0a8f5c472992077060",
+        "txt_sha256": "21fcc256fb2ac2592043f798fe3145cab80bda7a71e3695f3e771a944575338d"
+      }
     },
     {
       "title": "Do LLMs\" Feel\"? Emotion Circuits Discovery and Control",
@@ -140,49 +186,98 @@
       "bibtex": "@inproceedings{wang2025do,\n  title = {Do LLMs\" Feel\"? Emotion Circuits Discovery and Control},\n  author = {C Wang and Y Zhang and R Yu and Y Zheng and L Gao and Z Song and Z Xu and G Xia and H Zhang and ...},\n  booktitle = {ICML 2026},\n  year = {2025}\n}",
       "arxiv_id": "2510.11328",
       "url_arxiv": "https://arxiv.org/abs/2510.11328",
-      "pdf_url": "https://arxiv.org/pdf/2510.11328",
       "task_type": "theory",
+      "pdf_url": "https://arxiv.org/pdf/2510.11328.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/wang2025do.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/wang2025do.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "41d8baa1c4ef0664dd9c9b9988c8de2e1e77728e9e407500f95e8a430c21dd79",
+        "txt_sha256": "bcce5719b2fe6e5664b6fa151c7552c1540924410e82a5a1a9a7a2bd376f8beb"
+      }
     },
     {
       "title": "Word Form Matters: LLMs' Semantic Reconstruction under Typoglycemia",
       "authors": "C Wang, T Gu, Z Wei, L Gao, Z Song, X Chen",
       "venue": "ACL 2025 findings",
       "year": "2025",
-      "cited_by": 12,
+      "cited_by": 13,
       "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:IjCSPb-OGe4C",
       "abstract": "Human readers can efficiently comprehend scrambled words, a phenomenon known as Typoglycemia, primarily by relying on word form; if word form alone is insufficient, they further utilize contextual cues for interpretation. While advanced large language models (LLMs) exhibit similar abilities, the underlying mechanisms remain unclear. To investigate this, we conduct controlled experiments to analyze the roles of word form and contextual information in semantic reconstruction and examine LLM attention patterns. Specifically, we first propose SemRecScore, a reliable metric to quantify the degree of semantic reconstruction, and validate its effectiveness. Using this metric, we study how word form and contextual information influence LLMs' semantic reconstruction ability, identifying word form as the core factor in this process. Furthermore, we analyze how LLMs utilize word form and find that they rely on specialized attention heads to extract and process word form information, with this mechanism remaining stable across varying levels of word scrambling. This distinction between LLMs' fixed attention patterns primarily focused on word form and human readers' adaptive strategy in balancing word form and contextual information provides insights into enhancing LLM performance by incorporating human-like, context-aware mechanisms.",
       "doi": null,
       "bibtex_key": "wang2025word",
       "bibtex": "@inproceedings{wang2025word,\n  title = {Word Form Matters: LLMs' Semantic Reconstruction under Typoglycemia},\n  author = {C Wang and T Gu and Z Wei and L Gao and Z Song and X Chen},\n  booktitle = {ACL 2025 findings},\n  year = {2025}\n}",
-      "arxiv_id": "2503.01714",
-      "url_arxiv": "https://arxiv.org/abs/2503.01714",
-      "pdf_url": "https://arxiv.org/pdf/2503.01714",
       "task_type": "theory",
+      "pdf_url": "https://aclanthology.org/2025.findings-acl.866.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/wang2025word.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/wang2025word.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "50bfd0d0370be8ecafcb99f69a3844c3bddd651c55162dfc8e1159e68da14032",
+        "txt_sha256": "e22fd3fbcbd7a8ac2d034e03c42ec26e33c1a2a4961ae923e100d0f4f1142996"
+      }
+    },
+    {
+      "title": "Evaluate bias without manual test sets: A concept representation perspective for llms",
+      "authors": "L Gao, K Wan, W Liu, C Wang, Z Song, Z Xu, Y Wang, V Stoyanov, ...",
+      "venue": "arXiv preprint arXiv:2505.15524",
+      "year": "2025",
+      "cited_by": 9,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:Tyk-4Ss8FVUC",
+      "abstract": "Bias in Large Language Models (LLMs) significantly undermines their reliability and fairness. We focus on a common form of bias: when two reference concepts in the model's concept space, such as sentiment polarities (e.g., \"positive\" and \"negative\"), are asymmetrically correlated with a third, target concept, such as a reviewing aspect, the model exhibits unintended bias. For instance, the understanding of \"food\" should not skew toward any particular sentiment. Existing bias evaluation methods assess behavioral differences of LLMs by constructing labeled data for different social groups and measuring model responses across them, a process that requires substantial human effort and captures only a limited set of social concepts. To overcome these limitations, we propose BiasLens, a test-set-free bias analysis framework based on the structure of the model's vector space. BiasLens combines Concept Activation Vectors (CAVs) with Sparse Autoencoders (SAEs) to extract interpretable concept representations, and quantifies bias by measuring the variation in representational similarity between the target concept and each of the reference concepts. Even without labeled data, BiasLens shows strong agreement with traditional bias evaluation metrics (Spearman correlation r > 0.85). Moreover, BiasLens reveals forms of bias that are difficult to detect using existing methods. For example, in simulated clinical scenarios, a patient's insurance status can cause the LLM to produce biased diagnostic assessments. Overall, BiasLens offers a scalable, interpretable, and efficient paradigm for bias discovery, paving the way for improving fairness and transparency in LLMs.",
+      "doi": null,
+      "bibtex_key": "gao2025evaluate",
+      "bibtex": "@misc{gao2025evaluate,\n  title = {Evaluate bias without manual test sets: A concept representation perspective for llms},\n  author = {L Gao and K Wan and W Liu and C Wang and Z Song and Z Xu and Y Wang and V Stoyanov and ...},\n  booktitle = {arXiv preprint arXiv:2505.15524},\n  year = {2025}\n}",
+      "arxiv_id": "2505.15524",
+      "url_arxiv": "https://arxiv.org/abs/2505.15524",
+      "task_type": "theory",
+      "pdf_url": "https://arxiv.org/pdf/2505.15524.pdf",
+      "pdf_path": "researcher-profile/fulltext/pdf/gao2025evaluate.pdf",
+      "fulltext_path": "researcher-profile/fulltext/txt/gao2025evaluate.txt",
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "c7172b4fd9b6a0aa0eca16d1e854169b203f6ae189a50f1fcecff3fb7baabe9d",
+        "txt_sha256": "5a8e41985860470d4fdc0f38491580310c6050545fb8811adfe8036156d71335"
+      }
     },
     {
       "title": "Beyond survival: Evaluating llms in social deduction games with human-aligned strategies",
       "authors": "Z Song, Y Huang, J Liu, H Luo, C Wang, L Gao, Z Xu, M Han, X Chang, ...",
-      "venue": "arXiv preprint arXiv:2510.11389",
+      "venue": "EMNLP 2026",
       "year": "2025",
       "cited_by": 8,
       "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:roLk4NBRz8UC",
       "abstract": "Social deduction games like Werewolf combine language, reasoning, and strategy, providing a testbed for studying natural language and social intelligence. However, most studies reduce the game to LLM-based self-play, yielding templated utterances and anecdotal cases that overlook the richness of social gameplay. Evaluation further relies on coarse metrics such as survival time or subjective scoring due to the lack of quality reference data. To address these gaps, we curate a high-quality, human-verified multimodal Werewolf dataset containing over 100 hours of video, 32.4M utterance tokens, and 15 rule variants. Based on this dataset, we propose a novel strategy-alignment evaluation that leverages the winning faction's strategies as ground truth in two stages: 1) Speech evaluation, formulated as multiple-choice-style tasks that assess whether the model can adopt appropriate stances across five dimensions of social ability; and 2) Decision evaluation, which assesses the model's voting choices and opponent-role inferences. This framework enables a fine-grained evaluation of models' linguistic and reasoning capabilities, while capturing their ability to generate strategically coherent gameplay. Our experiments show that state-of-the-art LLMs show diverse performance, with roughly half remain below 0.50, revealing clear gaps in deception and counterfactual reasoning. We hope our dataset further inspires research on language, reasoning, and strategy in multi-agent interaction.",
       "doi": null,
       "bibtex_key": "song2025beyond",
-      "bibtex": "@misc{song2025beyond,\n  title = {Beyond survival: Evaluating llms in social deduction games with human-aligned strategies},\n  author = {Z Song and Y Huang and J Liu and H Luo and C Wang and L Gao and Z Xu and M Han and X Chang and ...},\n  booktitle = {arXiv preprint arXiv:2510.11389},\n  year = {2025}\n}",
+      "bibtex": "@inproceedings{song2025beyond,\n  title = {Beyond survival: Evaluating llms in social deduction games with human-aligned strategies},\n  author = {Z Song and Y Huang and J Liu and H Luo and C Wang and L Gao and Z Xu and M Han and X Chang and ...},\n  booktitle = {EMNLP 2026},\n  year = {2025}\n}",
       "arxiv_id": "2510.11389",
       "url_arxiv": "https://arxiv.org/abs/2510.11389",
-      "pdf_url": "https://arxiv.org/pdf/2510.11389",
       "task_type": "benchmark",
+      "pdf_url": "https://arxiv.org/pdf/2510.11389.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/song2025beyond.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/song2025beyond.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "3412b2900ea6d161811f24266d42c65ce68831e639b61b00d33bef9e8e5cd398",
+        "txt_sha256": "29eebe5b706673e8f38d69ed9d1f0534c0c400bdaaca469d8c29e4a8f292e15c"
+      }
     },
     {
       "title": "A fano-style accuracy upper bound for llm single-pass reasoning in multi-hop qa",
@@ -197,30 +292,19 @@
       "bibtex": "@inproceedings{wan2025fano,\n  title = {A fano-style accuracy upper bound for llm single-pass reasoning in multi-hop qa},\n  author = {K Wan and L Gao and H Mu and P Nakov and Y Wang and X Chen},\n  booktitle = {ICLR 2026},\n  year = {2025}\n}",
       "arxiv_id": "2509.21199",
       "url_arxiv": "https://arxiv.org/abs/2509.21199",
-      "pdf_url": "https://arxiv.org/pdf/2509.21199",
       "task_type": "theory",
+      "pdf_url": "https://arxiv.org/pdf/2509.21199.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/wan2025fano.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/wan2025fano.txt",
-      "fulltext_status": "downloaded"
-    },
-    {
-      "title": "Evaluate bias without manual test sets: A concept representation perspective for llms",
-      "authors": "L Gao, K Wan, W Liu, C Wang, Z Song, Z Xu, Y Wang, V Stoyanov, ...",
-      "venue": "arXiv preprint arXiv:2505.15524",
-      "year": "2025",
-      "cited_by": 8,
-      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:Tyk-4Ss8FVUC",
-      "abstract": "Bias in Large Language Models (LLMs) significantly undermines their reliability and fairness. We focus on a common form of bias: when two reference concepts in the model's concept space, such as sentiment polarities (e.g., \"positive\" and \"negative\"), are asymmetrically correlated with a third, target concept, such as a reviewing aspect, the model exhibits unintended bias. For instance, the understanding of \"food\" should not skew toward any particular sentiment. Existing bias evaluation methods assess behavioral differences of LLMs by constructing labeled data for different social groups and measuring model responses across them, a process that requires substantial human effort and captures only a limited set of social concepts. To overcome these limitations, we propose BiasLens, a test-set-free bias analysis framework based on the structure of the model's vector space. BiasLens combines Concept Activation Vectors (CAVs) with Sparse Autoencoders (SAEs) to extract interpretable concept representations, and quantifies bias by measuring the variation in representational similarity between the target concept and each of the reference concepts. Even without labeled data, BiasLens shows strong agreement with traditional bias evaluation metrics (Spearman correlation r > 0.85). Moreover, BiasLens reveals forms of bias that are difficult to detect using existing methods. For example, in simulated clinical scenarios, a patient's insurance status can cause the LLM to produce biased diagnostic assessments. Overall, BiasLens offers a scalable, interpretable, and efficient paradigm for bias discovery, paving the way for improving fairness and transparency in LLMs.",
-      "doi": null,
-      "bibtex_key": "gao2025evaluate",
-      "bibtex": "@misc{gao2025evaluate,\n  title = {Evaluate bias without manual test sets: A concept representation perspective for llms},\n  author = {L Gao and K Wan and W Liu and C Wang and Z Song and Z Xu and Y Wang and V Stoyanov and ...},\n  booktitle = {arXiv preprint arXiv:2505.15524},\n  year = {2025}\n}",
-      "arxiv_id": "2505.15524",
-      "url_arxiv": "https://arxiv.org/abs/2505.15524",
-      "pdf_url": "https://arxiv.org/pdf/2505.15524",
-      "task_type": "theory",
-      "pdf_path": "researcher-profile/fulltext/pdf/gao2025evaluate.pdf",
-      "fulltext_path": "researcher-profile/fulltext/txt/gao2025evaluate.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "85610fb03ce53b474b6a51c46b7f0c94600064ff1062e03fa44f5beb759f0ff0",
+        "txt_sha256": "a6a8830c57df4f953fe347dae5d85361dab75a127fab1936a71f7c2dfc9a2164"
+      }
     },
     {
       "title": "Adversarial Cooperative Rationalization: The Risk of Spurious Correlations in Even Clean Datasets",
@@ -233,13 +317,19 @@
       "doi": null,
       "bibtex_key": "liu2025adversarial",
       "bibtex": "@inproceedings{liu2025adversarial,\n  title = {Adversarial Cooperative Rationalization: The Risk of Spurious Correlations in Even Clean Datasets},\n  author = {W Liu and Z Niu and L Gao and Z Deng and J Wang and H Wang and R Li},\n  booktitle = {ICML 2025},\n  year = {2025}\n}",
-      "arxiv_id": "2505.02118",
-      "url_arxiv": "https://arxiv.org/abs/2505.02118",
-      "pdf_url": "https://arxiv.org/pdf/2505.02118",
       "task_type": "theory",
+      "pdf_url": "https://raw.githubusercontent.com/mlresearch/v267/main/assets/liu25av/liu25av.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/liu2025adversarial.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/liu2025adversarial.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "bd5e7350a4b19ed353ff872c6e07d8869b9f1f04159362386b9065dbec9e7adb",
+        "txt_sha256": "f9124221e21215cb76be9ef716467e074dfdfc4af014a110cf058e3b780e77f1"
+      }
     },
     {
       "title": "M3MAD-Bench: Are Multi-Agent Debates Really Effective Across Domains and Modalities?",
@@ -254,11 +344,19 @@
       "bibtex": "@inproceedings{li2026m3mad,\n  title = {M3MAD-Bench: Are Multi-Agent Debates Really Effective Across Domains and Modalities?},\n  author = {A Li and J Zhang and L Li and Y Duan and L Gao and M Chen and W Qin and S Li and F Ji and N Liu and L Cui and ...},\n  booktitle = {ACM MM 2026},\n  year = {2026}\n}",
       "arxiv_id": "2601.02854",
       "url_arxiv": "https://arxiv.org/abs/2601.02854",
-      "pdf_url": "https://arxiv.org/pdf/2601.02854",
       "task_type": "benchmark",
+      "pdf_url": "https://arxiv.org/pdf/2601.02854.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/li2026m3mad.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/li2026m3mad.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "811cb9a7bfbc1e7e084d1a03f88e718dfe8336ed9dc56a6e8e5cf0944ddd96d3",
+        "txt_sha256": "f632f8b0346e4d7cefbfdeccc541b45ac86c6652c982f36c06bdd2e345961e6d"
+      }
     },
     {
       "title": "Gta: Graph theory agent and benchmark for algorithmic graph reasoning with llms",
@@ -267,18 +365,17 @@
       "year": "2025",
       "cited_by": 4,
       "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:UebtZRa9Y70C",
-      "abstract": "Large Language Models (LLMs) are increasingly applied to tasks involving structured data, such as graphs. However, their ability to perform complex algorithmic reasoning over graph-structured inputs remains under-explored. Existing benchmarks typically focus on basic reasoning over small graphs or code generation for graph tasks, but they do not provide models with direct access to graph-structured data, which limits a comprehensive evaluation of their graph reasoning capabilities. To address this gap, we introduce Graph Theory Bench (GT Bench), a challenging new benchmark featuring 44 diverse graph problem types (ranging from connectivity to minimum-cost flow) across over 100,000 instances with varied input representations (natural language, structured language, adjacency list, adjacency matrix). GT Bench is designed specifically to evaluate the ability of LLMs to perform multi-step algorithmic reasoning on graph-structured tasks. Our evaluation uncovers a critical dependency between LLM performance and the chosen input graph representation, which varies with graph structure (e.g., density, topology). Based on these findings, we propose the Graph Theory Agent (GTA), a novel framework that enhances LLM graph reasoning by employing an adaptive input representation selector and decomposing the algorithmic solution into manageable sub-steps. Experiments demonstrate that GTA significantly improves the ability of LLMs to solve complex graph problems.",
+      "abstract": "Large Language Models are increasingly applied to structured graph data, but their ability to perform complex algorithmic graph reasoning remains under-explored. Graph Theory Bench contains 44 graph problem types and more than 100,000 instances represented as natural language, structured language, adjacency lists, and adjacency matrices. Evaluation reveals a strong dependency between model performance and graph representation. Graph Theory Agent addresses this issue with an adaptive representation selector and decomposition of algorithmic solutions into manageable substeps, significantly improving performance on complex graph problems.",
       "doi": null,
       "bibtex_key": "xu2025gta",
       "bibtex": "@misc{xu2025gta,\n  title = {Gta: Graph theory agent and benchmark for algorithmic graph reasoning with llms},\n  author = {Z Xu and Y Wang and Y Huang and C Wang and L Gao and Z Song and Z Chen and X Zhang and ...},\n  year = {2025}\n}",
-      "arxiv_id": null,
-      "url_arxiv": null,
-      "pdf_url": "https://openreview.net/pdf?id=bcGClKY3gQ",
       "task_type": "benchmark",
+      "pdf_url": "https://openreview.net/pdf?id=bcGClKY3gQ",
       "pdf_path": null,
       "fulltext_path": null,
-      "fulltext_status": "unavailable",
-      "fulltext_failure_reason": "Exact-title OpenReview PDF verified, but local acquisition was blocked by OpenReview challenge/HTTP 403 across canonical, attachment, stable-hash, API, and headless-browser routes; no arXiv or other open mirror was found."
+      "fulltext_status": "waived_by_researcher",
+      "fulltext_failure_reason": "Verified OpenReview PDF is blocked by browser verification (HTTP 403 in curl and local Playwright); no arXiv or author-hosted PDF was found.",
+      "fulltext_waiver": "Researcher explicitly authorized continuing without this OpenReview PDF on 2026-08-21."
     },
     {
       "title": "ServImage: An Image Generation and Editing Benchmark from Real-world Commercial Imaging Services",
@@ -293,11 +390,19 @@
       "bibtex": "@inproceedings{ji2026servimage,\n  title = {ServImage: An Image Generation and Editing Benchmark from Real-world Commercial Imaging Services},\n  author = {F Ji and J Yang and Z Song and L Gao and J Liang and Z Chen and J Zhang and X Chen},\n  booktitle = {ACL 2026},\n  year = {2026}\n}",
       "arxiv_id": "2604.24023",
       "url_arxiv": "https://arxiv.org/abs/2604.24023",
-      "pdf_url": "https://arxiv.org/pdf/2604.24023",
       "task_type": "benchmark",
+      "pdf_url": "https://arxiv.org/pdf/2604.24023.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/ji2026servimage.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/ji2026servimage.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "b6d1b3b30deb7b0bf3bbbb255c8fc444746a5cff4ac7f8b5f33d43b6fbfc22c9",
+        "txt_sha256": "c60af5e977c7d7fcdac99d795534f38ecc3c5f8789209259f57b7e7a137c9e85"
+      }
     },
     {
       "title": "Under the Shadow of Babel: How Language Shapes Reasoning in LLMs",
@@ -310,13 +415,19 @@
       "doi": null,
       "bibtex_key": "wang2025under",
       "bibtex": "@inproceedings{wang2025under,\n  title = {Under the Shadow of Babel: How Language Shapes Reasoning in LLMs},\n  author = {C Wang and Y Zhang and L Gao and Z Xu and Z Song and Y Wang and X Chen},\n  booktitle = {EMNLP 2025 findings},\n  year = {2025}\n}",
-      "arxiv_id": "2506.16151",
-      "url_arxiv": "https://arxiv.org/abs/2506.16151",
-      "pdf_url": "https://arxiv.org/pdf/2506.16151",
       "task_type": "theory",
+      "pdf_url": "https://aclanthology.org/2025.findings-emnlp.1321.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/wang2025under.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/wang2025under.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "c0014fc96e16c6b444073dbd487880203fb90fad5a9ce234c61dd967a4f192fd",
+        "txt_sha256": "3a720de651f8efba9a20879c13fef004c23fae923ce80246c1419f13ab9b85f8"
+      }
     },
     {
       "title": "When Personalization Tricks Detectors: The Feature-Inversion Trap in Machine-Generated Text Detection",
@@ -331,11 +442,19 @@
       "bibtex": "@inproceedings{gao2025when,\n  title = {When Personalization Tricks Detectors: The Feature-Inversion Trap in Machine-Generated Text Detection},\n  author = {L Gao and X Li and C Wang and M Li and W Liu and Z Song and J Zhang and R Yan and P Nakov and ...},\n  booktitle = {[Oral] ACL 2026},\n  year = {2025}\n}",
       "arxiv_id": "2510.12476",
       "url_arxiv": "https://arxiv.org/abs/2510.12476",
-      "pdf_url": "https://arxiv.org/pdf/2510.12476",
       "task_type": "theory",
+      "pdf_url": "https://arxiv.org/pdf/2510.12476.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/gao2025when.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/gao2025when.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "07ed7b26c8ab750f32c1e4f90bb6aa8d147ca84e06ab64047b11ab9053868b41",
+        "txt_sha256": "67c9aabcf40b3b01e4be344c5c54d9464feff3cd3d3aca1e747279844106e61b"
+      }
     },
     {
       "title": "The Cylindrical Representation Hypothesis for Language Model Steering",
@@ -350,11 +469,46 @@
       "bibtex": "@inproceedings{gao2026cylindrical,\n  title = {The Cylindrical Representation Hypothesis for Language Model Steering},\n  author = {L Gao and J Zhang and W Liu and F Ji and C Wang and Z Song and A Ghosh and Y Mohamed and ...},\n  booktitle = {ICML 2026},\n  year = {2026}\n}",
       "arxiv_id": "2605.01844",
       "url_arxiv": "https://arxiv.org/abs/2605.01844",
-      "pdf_url": "https://arxiv.org/pdf/2605.01844",
       "task_type": "theory",
+      "pdf_url": "https://arxiv.org/pdf/2605.01844.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/gao2026cylindrical.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/gao2026cylindrical.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "a68f401b6a1220c9b1ea9e3120caad8491a24a610a3036bd24c51f7ee83b1073",
+        "txt_sha256": "d3d756ffdabfedc1b8e74d4a9a0788ad5c4ade35617a9c1896ac5621d8396f4f"
+      }
+    },
+    {
+      "title": "Measure, Don't Optimize: Forecasting Recovery in LLM Unlearning",
+      "authors": "Z Song, H Liu, X Wang, S Li, X Li, L Gao, J Zhang, Z Lu, F Ji, X Chang, ...",
+      "venue": "arXiv preprint arXiv:2608.11408",
+      "year": "2026",
+      "cited_by": 0,
+      "url": "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=LzKcdl8AAAAJ&citation_for_view=LzKcdl8AAAAJ:MXK_kJrjxJIC",
+      "abstract": "The paper introduces J-Access, an inference-time audit that uses a Jacobian lens to project intermediate representations into vocabulary space and measure access to target concepts along a model's output pathway. Auditing 398 public unlearned models across eight methods shows that most retain access above a retain-only gold level. Pre-attack accessibility predicts recovery speed and extent at the model level but not which individual facts will return. Directly minimizing J-Access does not cause genuine deletion and instead teaches models to hide knowledge from the audit while increasing post-attack recovery. The authors recommend treating internal audits as independent diagnostics rather than optimization targets.",
+      "doi": null,
+      "bibtex_key": "song2026measure",
+      "bibtex": "@misc{song2026measure,\n  title = {Measure, Don't Optimize: Forecasting Recovery in LLM Unlearning},\n  author = {Z Song and H Liu and X Wang and S Li and X Li and L Gao and J Zhang and Z Lu and F Ji and X Chang and ...},\n  booktitle = {arXiv preprint arXiv:2608.11408},\n  year = {2026}\n}",
+      "arxiv_id": "2608.11408",
+      "url_arxiv": "https://arxiv.org/abs/2608.11408",
+      "task_type": "theory",
+      "pdf_url": "https://arxiv.org/pdf/2608.11408.pdf",
+      "pdf_path": "researcher-profile/fulltext/pdf/song2026measure.pdf",
+      "fulltext_path": "researcher-profile/fulltext/txt/song2026measure.txt",
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "c0867a4c558c93d63e722d78e5be4df39794ab4ce2dbd6ba1aa18f9c2779850f",
+        "txt_sha256": "d4d536c7f85eb60ccc86666e49db1ec617a63d674c00dad5542f00d3698ecd72"
+      }
     },
     {
       "title": "One Model, Multiple Goals: Adaptive Multi-Objective Learning for E-commerce Dialogue Systems",
@@ -369,20 +523,27 @@
       "bibtex": "@inproceedings{li2026one,\n  title = {One Model, Multiple Goals: Adaptive Multi-Objective Learning for E-commerce Dialogue Systems},\n  author = {M Li and J Xiang and E Zhou and L Gao and T Li and Q Zhang and X Zhang and X Chen},\n  booktitle = {KDD 2026},\n  year = {2026}\n}",
       "arxiv_id": "2606.09293",
       "url_arxiv": "https://arxiv.org/abs/2606.09293",
-      "pdf_url": "https://arxiv.org/pdf/2606.09293",
       "task_type": "engineering",
+      "pdf_url": "https://arxiv.org/pdf/2606.09293.pdf",
       "pdf_path": "researcher-profile/fulltext/pdf/li2026one.pdf",
       "fulltext_path": "researcher-profile/fulltext/txt/li2026one.txt",
-      "fulltext_status": "downloaded"
+      "fulltext_status": "downloaded",
+      "fulltext_extractor": "code_agent",
+      "fulltext_provenance": {
+        "method": "code-agent supervised semantic transcription",
+        "pdf_title_page_checked": true,
+        "semantic_paragraph_boundaries_checked": true,
+        "pdf_sha256": "70868e0782778325ce1aee6a74975aa8112d5c8db18f31d6beb58929b6321503",
+        "txt_sha256": "7de7cd045a86da78e6929e1f586bbdce9ac49b78c69b97abad81b5579cc24db1"
+      }
     }
   ],
-  "publication_count": 19,
+  "publication_count": 20,
   "truncated": false,
   "enrichment": {
-    "source": "exact-title arXiv/OpenReview crawl",
-    "abstracts_enriched": 19,
-    "arxiv_matches": 18,
-    "openreview_matches": 1
+    "enriched": 0,
+    "missed": 0,
+    "skipped_no_network": 20
   },
-  "bibtex_bank": "@inproceedings{xie2024medtrinity,\n  title = {Medtrinity-25m: A large-scale multimodal dataset with multigranular annotations for medicine},\n  author = {Y Xie* and C Zhou* and L Gao* and J Wu* and X Li and HY Zhou and S Liu and L Xing and J Zou and C Xie and ...},\n  booktitle = {ICLR 2025},\n  year = {2024}\n}\n\n@misc{liu2024vuldetectbench,\n  title = {Vuldetectbench: Evaluating the deep capability of vulnerability detection with large language models},\n  author = {Y Liu* and L Gao* and M Yang* and Y Xie and P Chen and X Zhang and W Chen},\n  booktitle = {arXiv preprint arXiv:2406.07595},\n  year = {2024}\n}\n\n@inproceedings{gao2024shaping,\n  title = {Shaping the Safety Boundaries: Understanding and Defending Against Jailbreaks in Large Language Models},\n  author = {L Gao and J Geng and X Zhang and P Nakov and X Chen},\n  booktitle = {ACL 2025},\n  year = {2024}\n}\n\n@inproceedings{song2025audio,\n  title = {Audio jailbreak: An open comprehensive benchmark for jailbreaking large audio-language models},\n  author = {Z Song and Q Jiang and M Cui and M Li and L Gao and Z Zhang and Z Xu and Y Wang and C Wang and ...},\n  booktitle = {ACL 2026},\n  year = {2025}\n}\n\n@inproceedings{wang2025dyflow,\n  title = {DyFlow: Dynamic Workflow Framework for Agentic Reasoning},\n  author = {Y Wang and Z Xu and Y Huang and X Wang and Z Song and L Gao and C Wang and X Tang and ...},\n  booktitle = {NeurIPS 2025},\n  year = {2025}\n}\n\n@misc{xu2025socialmaze,\n  title = {Socialmaze: A benchmark for evaluating social reasoning in large language models},\n  author = {Z Xu and Y Wang and Y Huang and J Ye and H Zhuang and Z Song and L Gao and C Wang and Z Chen and ...},\n  booktitle = {arXiv preprint arXiv:2505.23713},\n  year = {2025}\n}\n\n@inproceedings{wang2025do,\n  title = {Do LLMs\" Feel\"? Emotion Circuits Discovery and Control},\n  author = {C Wang and Y Zhang and R Yu and Y Zheng and L Gao and Z Song and Z Xu and G Xia and H Zhang and ...},\n  booktitle = {ICML 2026},\n  year = {2025}\n}\n\n@inproceedings{wang2025word,\n  title = {Word Form Matters: LLMs' Semantic Reconstruction under Typoglycemia},\n  author = {C Wang and T Gu and Z Wei and L Gao and Z Song and X Chen},\n  booktitle = {ACL 2025 findings},\n  year = {2025}\n}\n\n@misc{song2025beyond,\n  title = {Beyond survival: Evaluating llms in social deduction games with human-aligned strategies},\n  author = {Z Song and Y Huang and J Liu and H Luo and C Wang and L Gao and Z Xu and M Han and X Chang and ...},\n  booktitle = {arXiv preprint arXiv:2510.11389},\n  year = {2025}\n}\n\n@inproceedings{wan2025fano,\n  title = {A fano-style accuracy upper bound for llm single-pass reasoning in multi-hop qa},\n  author = {K Wan and L Gao and H Mu and P Nakov and Y Wang and X Chen},\n  booktitle = {ICLR 2026},\n  year = {2025}\n}\n\n@misc{gao2025evaluate,\n  title = {Evaluate bias without manual test sets: A concept representation perspective for llms},\n  author = {L Gao and K Wan and W Liu and C Wang and Z Song and Z Xu and Y Wang and V Stoyanov and ...},\n  booktitle = {arXiv preprint arXiv:2505.15524},\n  year = {2025}\n}\n\n@inproceedings{liu2025adversarial,\n  title = {Adversarial Cooperative Rationalization: The Risk of Spurious Correlations in Even Clean Datasets},\n  author = {W Liu and Z Niu and L Gao and Z Deng and J Wang and H Wang and R Li},\n  booktitle = {ICML 2025},\n  year = {2025}\n}\n\n@inproceedings{li2026m3mad,\n  title = {M3MAD-Bench: Are Multi-Agent Debates Really Effective Across Domains and Modalities?},\n  author = {A Li and J Zhang and L Li and Y Duan and L Gao and M Chen and W Qin and S Li and F Ji and N Liu and L Cui and ...},\n  booktitle = {ACM MM 2026},\n  year = {2026}\n}\n\n@misc{xu2025gta,\n  title = {Gta: Graph theory agent and benchmark for algorithmic graph reasoning with llms},\n  author = {Z Xu and Y Wang and Y Huang and C Wang and L Gao and Z Song and Z Chen and X Zhang and ...},\n  year = {2025}\n}\n\n@inproceedings{ji2026servimage,\n  title = {ServImage: An Image Generation and Editing Benchmark from Real-world Commercial Imaging Services},\n  author = {F Ji and J Yang and Z Song and L Gao and J Liang and Z Chen and J Zhang and X Chen},\n  booktitle = {ACL 2026},\n  year = {2026}\n}\n\n@inproceedings{wang2025under,\n  title = {Under the Shadow of Babel: How Language Shapes Reasoning in LLMs},\n  author = {C Wang and Y Zhang and L Gao and Z Xu and Z Song and Y Wang and X Chen},\n  booktitle = {EMNLP 2025 findings},\n  year = {2025}\n}\n\n@inproceedings{gao2025when,\n  title = {When Personalization Tricks Detectors: The Feature-Inversion Trap in Machine-Generated Text Detection},\n  author = {L Gao and X Li and C Wang and M Li and W Liu and Z Song and J Zhang and R Yan and P Nakov and ...},\n  booktitle = {[Oral] ACL 2026},\n  year = {2025}\n}\n\n@inproceedings{gao2026cylindrical,\n  title = {The Cylindrical Representation Hypothesis for Language Model Steering},\n  author = {L Gao and J Zhang and W Liu and F Ji and C Wang and Z Song and A Ghosh and Y Mohamed and ...},\n  booktitle = {ICML 2026},\n  year = {2026}\n}\n\n@inproceedings{li2026one,\n  title = {One Model, Multiple Goals: Adaptive Multi-Objective Learning for E-commerce Dialogue Systems},\n  author = {M Li and J Xiang and E Zhou and L Gao and T Li and Q Zhang and X Zhang and X Chen},\n  booktitle = {KDD 2026},\n  year = {2026}\n}"
+  "bibtex_bank": "@inproceedings{xie2024medtrinity,\n  title = {Medtrinity-25m: A large-scale multimodal dataset with multigranular annotations for medicine},\n  author = {Y Xie* and C Zhou* and L Gao* and J Wu* and X Li and HY Zhou and S Liu and L Xing and J Zou and C Xie and ...},\n  booktitle = {ICLR 2025},\n  year = {2024}\n}\n\n@misc{liu2024vuldetectbench,\n  title = {Vuldetectbench: Evaluating the deep capability of vulnerability detection with large language models},\n  author = {Y Liu* and L Gao* and M Yang* and Y Xie and P Chen and X Zhang and W Chen},\n  booktitle = {arXiv preprint arXiv:2406.07595},\n  year = {2024}\n}\n\n@inproceedings{gao2024shaping,\n  title = {Shaping the Safety Boundaries: Understanding and Defending Against Jailbreaks in Large Language Models},\n  author = {L Gao and J Geng and X Zhang and P Nakov and X Chen},\n  booktitle = {ACL 2025},\n  year = {2024}\n}\n\n@inproceedings{song2025audio,\n  title = {Audio jailbreak: An open comprehensive benchmark for jailbreaking large audio-language models},\n  author = {Z Song and Q Jiang and M Cui and M Li and L Gao and Z Zhang and Z Xu and Y Wang and C Wang and ...},\n  booktitle = {ACL 2026},\n  year = {2025}\n}\n\n@inproceedings{wang2025dyflow,\n  title = {DyFlow: Dynamic Workflow Framework for Agentic Reasoning},\n  author = {Y Wang and Z Xu and Y Huang and X Wang and Z Song and L Gao and C Wang and X Tang and ...},\n  booktitle = {NeurIPS 2025},\n  year = {2025}\n}\n\n@misc{xu2025socialmaze,\n  title = {Socialmaze: A benchmark for evaluating social reasoning in large language models},\n  author = {Z Xu and Y Wang and Y Huang and J Ye and H Zhuang and Z Song and L Gao and C Wang and Z Chen and ...},\n  booktitle = {arXiv preprint arXiv:2505.23713},\n  year = {2025}\n}\n\n@inproceedings{wang2025do,\n  title = {Do LLMs\" Feel\"? Emotion Circuits Discovery and Control},\n  author = {C Wang and Y Zhang and R Yu and Y Zheng and L Gao and Z Song and Z Xu and G Xia and H Zhang and ...},\n  booktitle = {ICML 2026},\n  year = {2025}\n}\n\n@inproceedings{wang2025word,\n  title = {Word Form Matters: LLMs' Semantic Reconstruction under Typoglycemia},\n  author = {C Wang and T Gu and Z Wei and L Gao and Z Song and X Chen},\n  booktitle = {ACL 2025 findings},\n  year = {2025}\n}\n\n@misc{gao2025evaluate,\n  title = {Evaluate bias without manual test sets: A concept representation perspective for llms},\n  author = {L Gao and K Wan and W Liu and C Wang and Z Song and Z Xu and Y Wang and V Stoyanov and ...},\n  booktitle = {arXiv preprint arXiv:2505.15524},\n  year = {2025}\n}\n\n@inproceedings{song2025beyond,\n  title = {Beyond survival: Evaluating llms in social deduction games with human-aligned strategies},\n  author = {Z Song and Y Huang and J Liu and H Luo and C Wang and L Gao and Z Xu and M Han and X Chang and ...},\n  booktitle = {EMNLP 2026},\n  year = {2025}\n}\n\n@inproceedings{wan2025fano,\n  title = {A fano-style accuracy upper bound for llm single-pass reasoning in multi-hop qa},\n  author = {K Wan and L Gao and H Mu and P Nakov and Y Wang and X Chen},\n  booktitle = {ICLR 2026},\n  year = {2025}\n}\n\n@inproceedings{liu2025adversarial,\n  title = {Adversarial Cooperative Rationalization: The Risk of Spurious Correlations in Even Clean Datasets},\n  author = {W Liu and Z Niu and L Gao and Z Deng and J Wang and H Wang and R Li},\n  booktitle = {ICML 2025},\n  year = {2025}\n}\n\n@inproceedings{li2026m3mad,\n  title = {M3MAD-Bench: Are Multi-Agent Debates Really Effective Across Domains and Modalities?},\n  author = {A Li and J Zhang and L Li and Y Duan and L Gao and M Chen and W Qin and S Li and F Ji and N Liu and L Cui and ...},\n  booktitle = {ACM MM 2026},\n  year = {2026}\n}\n\n@misc{xu2025gta,\n  title = {Gta: Graph theory agent and benchmark for algorithmic graph reasoning with llms},\n  author = {Z Xu and Y Wang and Y Huang and C Wang and L Gao and Z Song and Z Chen and X Zhang and ...},\n  year = {2025}\n}\n\n@inproceedings{ji2026servimage,\n  title = {ServImage: An Image Generation and Editing Benchmark from Real-world Commercial Imaging Services},\n  author = {F Ji and J Yang and Z Song and L Gao and J Liang and Z Chen and J Zhang and X Chen},\n  booktitle = {ACL 2026},\n  year = {2026}\n}\n\n@inproceedings{wang2025under,\n  title = {Under the Shadow of Babel: How Language Shapes Reasoning in LLMs},\n  author = {C Wang and Y Zhang and L Gao and Z Xu and Z Song and Y Wang and X Chen},\n  booktitle = {EMNLP 2025 findings},\n  year = {2025}\n}\n\n@inproceedings{gao2025when,\n  title = {When Personalization Tricks Detectors: The Feature-Inversion Trap in Machine-Generated Text Detection},\n  author = {L Gao and X Li and C Wang and M Li and W Liu and Z Song and J Zhang and R Yan and P Nakov and ...},\n  booktitle = {[Oral] ACL 2026},\n  year = {2025}\n}\n\n@inproceedings{gao2026cylindrical,\n  title = {The Cylindrical Representation Hypothesis for Language Model Steering},\n  author = {L Gao and J Zhang and W Liu and F Ji and C Wang and Z Song and A Ghosh and Y Mohamed and ...},\n  booktitle = {ICML 2026},\n  year = {2026}\n}\n\n@misc{song2026measure,\n  title = {Measure, Don't Optimize: Forecasting Recovery in LLM Unlearning},\n  author = {Z Song and H Liu and X Wang and S Li and X Li and L Gao and J Zhang and Z Lu and F Ji and X Chang and ...},\n  booktitle = {arXiv preprint arXiv:2608.11408},\n  year = {2026}\n}\n\n@inproceedings{li2026one,\n  title = {One Model, Multiple Goals: Adaptive Multi-Objective Learning for E-commerce Dialogue Systems},\n  author = {M Li and J Xiang and E Zhou and L Gao and T Li and Q Zhang and X Zhang and X Chen},\n  booktitle = {KDD 2026},\n  year = {2026}\n}"
 }

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Paper Logic Check"
-  short_description: "Audit a paper's narrative flow and argumentative closure"
-  default_prompt: "Use $paperlogiccheck to review the narrative logic of my compiled paper."

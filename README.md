@@ -6,7 +6,8 @@ Research Avatar 是一套面向**有经验研究者**的轻量级、个性化科
 
 ---
 
-[Online Paper Studio：注册、上传并开始写作 →](https://research-avatar-studio.yingtaomj.workers.dev/)
+[在线论文写作：注册、上传并开始写作 →](https://research-avatar-studio.yingtaomj.workers.dev/)
+
 
 ---
 
@@ -40,7 +41,6 @@ $profileconstruct 使用 ~/Downloads/scholar_profile.html
 
 论文写作或翻译功能需要调用 LLM API。使用前，请在**本机终端中配置相应服务的 API Key**：
 
-未明确请求翻译时，`$researchlit` 不会调用任何翻译 API；只有用户明确要求其他语言版本时才进行翻译。
 
 ```bash
 # 使用 OpenAI 时需要
@@ -54,61 +54,14 @@ export DEEPSEEK_API_KEY="粘贴你的 API key"
 
 ## 推荐使用方式
 
-推荐在**终端中的 Coding Agent** 执行科研流程：依次调用 `$profileconstruct`、`$researchlit`、`$ideagen`、`$expplan`、`$runplan`。
+建议在终端的 Coding Agent 中依次调用以下科研流程：
 
-论文写作用网页端：**[http://127.0.0.1:8765](http://127.0.0.1:8765)**。
+`$profileconstruct` → `$researchlit` → `$ideagen` → `$expplan` → `$runplan`
 
-全部流程和生成文件可以在 **[http://127.0.0.1:8780](http://127.0.0.1:8780)** 看到。
+各步骤的可视化结果将在 http://127.0.0.1:8780 展示。完成上述流程后，可在同一界面的论文写作窗口中继续撰写论文。
 
-远程用户可以直接打开
-**[Online Paper Studio](https://research-avatar-studio.yingtaomj.workers.dev/)**，注册后上传
-一个 Research Avatar 项目 ZIP 和自己的 OpenAI API key 即可开始写作。在原项目根目录用
-`python3 -m research_avatar.online_studio.package` 生成项目 ZIP；其中包含 `PROFILE.html`、
-01–05 报告、可追溯的 `results/`、出版记录，以及 `03` 已确认的结构参考论文文本，
-默认输出到 `outputs/paper-studio-evidence.zip`，不会把上传包散放在项目根目录，也
-只会额外带上 `03` 契约明确引用的绘图源码、schema、fixture 和预览，不会打包其余
-无关 fulltext 或旧实验结果。邮箱账户与登录
-会话持久保存在 Cloudflare D1；写作工作区和 API key 都是临时会话数据，请及时导出项目 ZIP。
+未明确请求翻译时，`$researchlit` 不会调用任何翻译 API。
 
-也可以在本地启动同一入口：
-
-```bash
-python3 -m research_avatar.online_studio --port 8876
-```
-
-本地访问 **[http://127.0.0.1:8876](http://127.0.0.1:8876)**。它支持邮箱密码
-账户与 Google 登录；公网部署说明、容器和 Nginx 示例见
-[`research_avatar/online_studio/README.md`](research_avatar/online_studio/README.md)。
-
-## 目录结构
-
-根目录优先展示研究者直接使用和交付的内容；这些目录会在对应 Skill 首次运行时创建：
-
-```text
-researcher-profile/   # 个性化研究者画像
-inputs/               # 用户导入的 Scholar HTML 等私有原始输入（本地忽略）
-data/                 # 实验固定的原始数据与下载缓存
-reports/              # 文献、Idea、实验计划与结果报告
-results/              # 可追溯实验结果
-code/                 # 可复现实验代码
-paper/                # LaTeX、图表、PPTX 与最终论文
-outputs/              # 上传 ZIP 等可再生成的导出物（本地忽略）
-```
-
-项目实现统一归档在 `research_avatar/`：
-
-```text
-research_avatar/
-├── online_studio/    # 登录、上传资料与临时 API key 的在线写作入口
-├── paper_studio/     # 论文写作工作台
-├── research_studio/  # 全流程浏览界面
-├── tools/            # CLI、校验器与科研工作流工具
-└── web/              # 在线 Demo、Cloudflare Functions 与迁移文件
-```
-
-`.agents/skills/` 是 Codex Skill 源，`.claude/skills/` 是自动同步的 Claude Code 镜像；`tests/` 保存回归测试。
-
----
 
 ## 具体实现
 
@@ -141,9 +94,9 @@ researcher-profile/PROFILE.html
 
 ### 论文写作：
 
-**1. 两种正文生成方式**——先确认 `paper/outline.txt`。随后可一键生成全文再逐段修改，也可从第一段开始逐段写。
+**1. 两种正文生成方式**——使用 Experiment Planning 中已经批准的段落结构，可一键生成全文再逐段修改，也可从第一段开始逐段写。
 
-**2. 可交互论文工作台**——Paper Studio 支持逐段对话、参考段落和 PDF 预览；修改后自动同步 LaTeX。
+**2. 可交互论文工作台**——支持逐段生成、直接编辑、参考段落和矢量 PDF 预览；只有显式 Accept 后才事务性写入 LaTeX 并重新编译。
 
 **3. 论文写作风格个性化**——参考你的目标会议论文与 Writing Style，并检查自引、引用和全文逻辑。
 
@@ -162,7 +115,8 @@ researcher-profile/PROFILE.html
 | `$ideagen` | 生成并核查候选 idea；可基于指定论文，或显式加入大胆候选 D1 |
 | `$expplan` | 逐段规划 Projected Paper 和待填图表，再反推出实验合同 |
 | `$runplan` | 把整个实验拆成 Goals，按依赖顺序逐项执行 |
-| `$paperwrite` | 模仿个人写作风格，完成正文、图表、编译与审查 |
+
+论文写作不由 Skill 启动：Research Studio 的论文阶段直接读取当前项目的已批准结构、参考论文和实验结果，并在浏览器中逐段调用 LLM API、确认后写入 LaTeX。
 
 ---
 

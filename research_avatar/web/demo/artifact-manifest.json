@@ -1,0 +1,27 @@
+{
+  "profile": {
+    "url": "artifacts/profile.html",
+    "source": "researcher-profile/PROFILE.html",
+    "sha256": "f7382fee0291902be8ac72cffa3fb1eb52e6c7e9a40f7b53859f2ea0bcfc1c38"
+  },
+  "literature": {
+    "url": "artifacts/literature.html",
+    "source": "reports/01_LIT_SURVEY.html",
+    "sha256": "27baf11a135d61237e0d1ec7433d6ff4b89a5ce9763622801b6e9dd8a009ff98"
+  },
+  "ideas": {
+    "url": "artifacts/ideas.html",
+    "source": "reports/02_IDEA_REPORT.html",
+    "sha256": "23b49c01c7d47ae84a40562e166727848585e7268dd941b822cc9553bb76e05e"
+  },
+  "expplan": {
+    "url": "artifacts/expplan.html",
+    "source": "reports/03_EXPERIMENT_PLAN.html",
+    "sha256": "a2a132583508bc38d950bd745889da18d8f313859e17d482698dac04d766a98c"
+  },
+  "runplan": {
+    "url": "artifacts/runplan.html",
+    "source": "reports/04_RUN_PLAN.html",
+    "sha256": "6d2560544bef6bf13e5f1371cde294b83e3fba53cd69cd44dee952d01c3f4d97"
+  }
+}

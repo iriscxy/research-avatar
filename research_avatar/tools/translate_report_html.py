@@ -25,7 +25,7 @@ PROTECTED_RE = re.compile(
     r"(?:doi:)?10\.\d{4,9}/[-._;()/:A-Za-z0-9]+|"
     r"arXiv:\d{4}\.\d{4,5}|"
     r"\[[^\]]+\]|`[^`]+`|"
-    r"(?<![A-Za-z0-9_])(?:[A-Z][A-Z0-9_-]{1,}|[A-Z][a-z]+(?:[A-Z][A-Za-z0-9]*)+|[A-Z]\d+)(?![A-Za-z0-9_])|"
+    r"(?<![A-Za-z0-9_])(?:[A-Z](?:[A-Z0-9_-]*[A-Z0-9])s?|[A-Z][a-z]+(?:[A-Z][A-Za-z0-9]*)+|[A-Z]\d+)(?![A-Za-z0-9_])|"
     r"(?<![A-Za-z0-9_])\d+(?:[.,]\d+)*%?(?![A-Za-z0-9_])"
 )
 
@@ -35,7 +35,35 @@ def normalize(text: str) -> str:
 
 
 def protected_tokens(text: str) -> list[str]:
-    return sorted(PROTECTED_RE.findall(text), key=lambda value: (value.lower(), value))
+    tokens = PROTECTED_RE.findall(text)
+    # English prose commonly pluralizes acronyms ("SAEs"), while a Chinese
+    # translation correctly drops that grammatical suffix ("SAE"). Preserve
+    # the acronym and its occurrence count, but do not treat the English-only
+    # plural marker as scientific metadata.
+    normalized = [
+        token[:-1]
+        if token.endswith("s") and re.fullmatch(r"[A-Z][A-Z0-9_-]{1,}s", token)
+        else token
+        for token in tokens
+    ]
+    return sorted(normalized, key=lambda value: (value.lower(), value))
+
+
+def protected_only_fragment(item: dict[str, Any]) -> bool:
+    """Return true when the API has nothing translatable around protected tokens."""
+    remaining = str(item.get("text") or "")
+    tokens = item.get("protected_tokens") or []
+    if not tokens:
+        return False
+    for token in tokens:
+        remaining = remaining.replace(str(token), "", 1)
+    month_words = {
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december",
+    }
+    if re.sub(r"[^A-Za-z]", "", remaining).lower() in month_words:
+        return True
+    return re.search(r"[A-Za-z0-9\u4e00-\u9fff]", remaining) is None
 
 
 class VisibleTextParser(HTMLParser):
@@ -239,6 +267,11 @@ def translate_batch(
         f"Translate every supplied HTML text fragment into {target_language}. "
         "Write fluent academic prose for a researcher. Preserve scientific meaning, uncertainty, "
         "claim strength, all numbers, IDs, acronyms, dataset/model/method names, and protected tokens exactly. "
+        "For each item, copy every string listed in protected_tokens verbatim into the translated text, "
+        "with the same spelling and count. If a fragment consists only of protected tokens plus punctuation "
+        "or separators, return that fragment unchanged. "
+        "Translate short ordinary English interface labels and section headings too; do not leave words such "
+        "as Problem, Approaches, Evaluation, or Gaps in English unless they appear in protected_tokens. "
         "Do not add, remove, summarize, explain, or invent evidence. Do not output HTML or Markdown. "
         "Return JSON with one items array. Return every item exactly once, in input order."
     )
@@ -318,11 +351,14 @@ def translate_html(
     parser.close()
     if not parser.items:
         raise RuntimeError("no translatable visible text was found")
-    translations: dict[str, str] = {}
+    translations: dict[str, str] = {
+        item["id"]: item["text"] for item in parser.items if protected_only_fragment(item)
+    }
+    api_items = [item for item in parser.items if item["id"] not in translations]
     response_ids: list[str] = []
-    for start in range(0, len(parser.items), batch_size):
+    for start in range(0, len(api_items), batch_size):
         response_id, translated = translate_batch(
-            parser.items[start : start + batch_size], target_language, config
+            api_items[start : start + batch_size], target_language, config
         )
         response_ids.append(response_id)
         translations.update(translated)

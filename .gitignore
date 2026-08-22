@@ -19,8 +19,22 @@ node_modules
 experiments/
 paper/
 
+# The committed read-only online demo carries exactly one frozen reference
+# context and its selected author-owned full text. Keep every other generated
+# paper/profile file ignored unless it is already tracked.
+!research_avatar/online_studio/demo_project/paper/
+research_avatar/online_studio/demo_project/paper/*
+!research_avatar/online_studio/demo_project/paper/reference_context.json
+
 # Local researcher and paper-run data. Skills regenerate these per project.
 researcher-profile/
+!research_avatar/online_studio/demo_project/researcher-profile/
+research_avatar/online_studio/demo_project/researcher-profile/*
+!research_avatar/online_studio/demo_project/researcher-profile/fulltext/
+research_avatar/online_studio/demo_project/researcher-profile/fulltext/*
+!research_avatar/online_studio/demo_project/researcher-profile/fulltext/txt/
+research_avatar/online_studio/demo_project/researcher-profile/fulltext/txt/*
+!research_avatar/online_studio/demo_project/researcher-profile/fulltext/txt/gao2024shaping.txt
 reports/
 results/
 code/
@@ -32,3 +46,11 @@ outputs/
 inputs/
 .paper_preflight/
 .online-paper-studio/
+
+# Local inputs, experiment/audit evidence, and temporary research notes are
+# produced while using the project; they are not part of the distributable app.
+/example.html
+/refpaper.pdf
+/try.txt
+/evaluations/
+/docs/acl-non-data-figure-style-study.md

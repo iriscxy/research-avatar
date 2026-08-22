@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 
-SCRIPT = Path(".agents/skills/paperwrite/scripts/plan_conformance.py").resolve()
+SCRIPT = Path("research_avatar/tools/plan_conformance.py").resolve()
 SPEC = importlib.util.spec_from_file_location("plan_conformance_fixture", SCRIPT)
 CONFORMANCE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CONFORMANCE)
@@ -100,6 +100,32 @@ class PlanConformanceTests(unittest.TestCase):
                 "artifact_panel_dimension_mismatch",
                 {item["issue"] for item in report["violations"]},
             )
+
+    def test_table_metric_columns_may_exclude_the_leading_row_identifier(self):
+        with TemporaryDirectory() as directory:
+            plan, paper, results = self.fixture(Path(directory))
+            prefix = '<script type="application/json" id="experiment-plan-contract">'
+            contract = json.loads(plan.read_text().removeprefix(prefix).removesuffix("</script>"))
+            contract["paper_artifacts"][1]["shell"]["column_labels"] = ["score"]
+            contract["approval_contract_sha256"] = CONFORMANCE.contract_digest(contract)
+            plan.write_text(prefix + json.dumps(contract) + "</script>")
+            code, report = self.run_check(plan, paper, results)
+            self.assertEqual(code, 0, report)
+
+    def test_figure_visible_dimensions_are_verified_from_render_config(self):
+        with TemporaryDirectory() as directory:
+            plan, paper, results = self.fixture(Path(directory))
+            prefix = '<script type="application/json" id="experiment-plan-contract">'
+            contract = json.loads(plan.read_text().removeprefix(prefix).removesuffix("</script>"))
+            contract["paper_artifacts"][0]["dimensions"] = ["budget", "accuracy"]
+            contract["paper_artifacts"][0]["visible_dimensions"] = ["budget", "accuracy"]
+            contract["approval_contract_sha256"] = CONFORMANCE.contract_digest(contract)
+            plan.write_text(prefix + json.dumps(contract) + "</script>")
+            config = json.loads((paper / "paper_studio.json").read_text())
+            config["figures"]["F1"]["visible_dimensions"] = ["budget", "accuracy"]
+            (paper / "paper_studio.json").write_text(json.dumps(config))
+            code, report = self.run_check(plan, paper, results)
+            self.assertEqual(code, 0, report)
 
     def test_posthoc_amendment_fails(self):
         with TemporaryDirectory() as directory:

@@ -1,18 +1,26 @@
-const app = { state: null, stage: 0, previewSignature: "", loading: false };
+const app = {
+  state: null,
+  stage: 0,
+  previewSignature: "",
+  loading: false,
+  artifactByStage: {},
+};
 const pipeline = document.querySelector("#pipeline");
 const previewFrame = document.querySelector("#preview-frame");
 const previewEmpty = document.querySelector("#preview-empty");
 const previewTitle = document.querySelector("#preview-title");
 const previewOpen = document.querySelector("#preview-open");
 const previewCommand = document.querySelector("#preview-command");
+const previewCommandCopy = document.querySelector("#preview-command-copy");
+const previewCopyStatus = document.querySelector("#preview-copy-status");
+const artifactTabs = document.querySelector("#artifact-tabs");
 const stageStorageKey = "research-studio.active-stage";
-const artifactSandbox = "allow-scripts allow-forms allow-popups allow-downloads";
+const artifactSandbox = "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads";
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
 const statusLabel = status => ({complete:"完成",in_progress:"进行中",waiting_confirmation:"等待确认",not_started:"未开始"}[status] || status);
 
-async function copyGoalFromArtifact(value) {
-  if (!value.startsWith("/goal ") || value.length > 20000) return false;
+async function copyText(value) {
   try {
     if (!navigator.clipboard || !window.isSecureContext) throw new Error("clipboard unavailable");
     await navigator.clipboard.writeText(value);
@@ -33,6 +41,11 @@ async function copyGoalFromArtifact(value) {
     area.remove();
     return copied;
   }
+}
+
+async function copyGoalFromArtifact(value) {
+  if (!value.startsWith("/goal ") || value.length > 20000) return false;
+  return copyText(value);
 }
 
 window.addEventListener("message", async event => {
@@ -62,11 +75,50 @@ function renderPipeline() {
 
 function renderStage() {
   const stage = app.state.stages[app.stage];
+  document.body.classList.toggle("paper-focus", stage.id === "paper");
   renderPipeline();
-  previewCommand.textContent = stage.command || "请在终端运行对应 Skill";
-  const primaryArtifact = stage.artifacts?.find(item => item.exists);
+  const command = stage.command || "等待该阶段生成内容";
+  const copyableCommand = command.startsWith("python3 -m ");
+  previewCommand.textContent = command;
+  previewCommandCopy.hidden = !copyableCommand;
+  previewCommandCopy.disabled = false;
+  previewCommandCopy.textContent = "复制命令";
+  previewCopyStatus.textContent = "";
+  const availableArtifacts = stage.artifacts?.filter(item => item.exists) || [];
+  const rememberedKey = app.artifactByStage[stage.id];
+  const primaryArtifact = availableArtifacts.find(item => item.key === rememberedKey)
+    || availableArtifacts.find(item => item.key === stage.default_artifact_key)
+    || availableArtifacts[0];
+  renderArtifactTabs(stage, primaryArtifact?.key || "");
   if (primaryArtifact) selectArtifact(primaryArtifact.key); else clearPreview();
 }
+
+function renderArtifactTabs(stage, selectedKey) {
+  const available = stage.artifacts?.filter(item => item.exists) || [];
+  artifactTabs.hidden = available.length < 2;
+  artifactTabs.innerHTML = available.map(artifact => (
+    `<button type="button" data-artifact-key="${escapeHtml(artifact.key)}" `
+    + `class="artifact-tab ${artifact.key === selectedKey ? "active" : ""}">`
+    + `${escapeHtml(artifact.key === "results" ? "实验结果" : artifact.key === "runplan" ? "执行计划" : artifact.title)}`
+    + "</button>"
+  )).join("");
+}
+
+previewCommandCopy.addEventListener("click", async () => {
+  const command = previewCommand.textContent.trim();
+  if (!command.startsWith("python3 -m ")) return;
+  previewCommandCopy.disabled = true;
+  const copied = await copyText(command);
+  previewCommandCopy.textContent = copied ? "已复制 ✓" : "复制失败";
+  previewCopyStatus.textContent = copied
+    ? "命令已复制，可粘贴到项目终端运行。"
+    : "浏览器无法访问剪贴板，请手动选择命令。";
+  window.setTimeout(() => {
+    previewCommandCopy.disabled = false;
+    previewCommandCopy.textContent = "复制命令";
+    previewCopyStatus.textContent = "";
+  }, 2200);
+});
 
 function clearPreview() {
   if (!app.previewSignature && !previewFrame.getAttribute("src")) return;
@@ -80,8 +132,10 @@ function selectArtifact(key) {
   const stage = app.state.stages[app.stage];
   const artifact = stage.artifacts.find(item => item.key === key && item.exists);
   if (!artifact) return;
+  app.artifactByStage[stage.id] = key;
+  renderArtifactTabs(stage, key);
   previewTitle.textContent = artifact.title || artifact.path;
-  previewOpen.href = artifact.url; previewOpen.hidden = false;
+  previewOpen.href = artifact.url; previewOpen.hidden = artifact.interactive === true;
   const signature = `${app.stage}:${artifact.key}:${artifact.size}:${artifact.modified_ns || 0}`;
   if (signature === app.previewSignature) return;
   app.previewSignature = signature;
@@ -96,6 +150,11 @@ function selectArtifact(key) {
   previewFrame.hidden = false; previewEmpty.hidden = true;
   document.querySelectorAll("[data-artifact-key]").forEach(button => button.classList.toggle("active", button.dataset.artifactKey === key));
 }
+
+artifactTabs.addEventListener("click", event => {
+  const button = event.target.closest("[data-artifact-key]");
+  if (button) selectArtifact(button.dataset.artifactKey);
+});
 
 async function loadState({preserveStage = true} = {}) {
   if (app.loading) return;

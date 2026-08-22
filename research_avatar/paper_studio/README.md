@@ -1,8 +1,13 @@
 # Paper Studio
 
-Local, section-aware drafting UI for `$paperwrite`.
+Section-aware drafting engine embedded in the local Research Studio. This is not
+a separate user-facing local product page: researchers open
+<http://127.0.0.1:8780>, then enter the paper-writing stage inside Research
+Studio. Its loopback backend rejects direct page access and is reachable only
+through Research Studio's same-origin proxy.
 
-Choose OpenAI or DeepSeek in the terminal, then configure the matching environment
+DeepSeek V4 Flash is the default low-cost writing provider. Choose OpenAI or DeepSeek
+in the terminal, then configure the matching environment
 before starting the server. The browser shows runtime status and provider-specific
 an editable writing-model field with non-binding suggestions (GPT-5/mini/nano or DeepSeek V4 Pro/Flash), but no provider
 or API-key settings panel:
@@ -14,31 +19,43 @@ export OPENAI_API_KEY="粘贴你的 API key"
 # DeepSeek
 export DEEPSEEK_API_KEY="粘贴你的 API key"
 
-python3 -m research_avatar.paper_studio.server --provider openai
-# or: --provider deepseek
+python3 -m research_avatar.research_studio.server --ensure-studios
 ```
 
-The system browser opens <http://127.0.0.1:8765> automatically unless startup
-explicitly includes `--no-browser`. API keys remain in the server process
-and is never sent to the browser. Enter it in the local terminal that launches
-Paper Studio, not in chat, a repository file, or a browser field. If the server
-was already running without the selected key, stop it and restart it after the export.
-Changing the provider at startup resets incompatible conversation IDs. GPT Image remains OpenAI-only.
+That command opens the single local user entry at <http://127.0.0.1:8780> and
+starts the underlying writer service as needed. API keys remain in the server
+process and are never sent to the browser. Enter them in the local terminal,
+not in chat, a repository file, or a browser field. If the writer was already
+running without the selected key, stop it and restart it after exporting the
+project. Changing the writer provider resets incompatible conversation IDs.
+GPT Image remains OpenAI-only.
 
 The application under `research_avatar/paper_studio/` is a reusable engine. Project-specific
 identity, section order and LaTeX filenames, result bindings, Figure/Table
 definitions, artifact order, and the metrics path live in
 `paper/paper_studio.json`. A new paper keeps the same HTML/JavaScript/Python
-application and supplies a new config plus `paper/paragraph_plan.json`, manuscript
+application and supplies a new config with embedded paragraph architecture, manuscript
 inputs, and `results/`. Changing `project.id` starts a fresh runtime state; editing
 other config fields within the same project preserves the current state.
 
-The Studio is not a blank writing form. `paper/paragraph_plan.json` divides each
-section into ordered paragraph tasks and maps every task to the corresponding
-passage in the reference paper. When a paragraph becomes current, the browser
-automatically asks GPT to draft it from that reference passage, the working
-abstract, the approved outline, the accepted section context, and the current
-experiment evidence. The researcher only comments on the generated candidate or
+When `reports/04_RUN_PLAN.html` declares a completed run, every goal is
+completed, and `reports/05_EXP_RESULT.html` exists, the Research Studio paper
+tab displays one explicit initialization command. Running it follows the run
+report's `source_plan` pointer, creates the Paper Studio project, and opens the
+Research Studio page. A local or reduced experiment variant is therefore never
+silently replaced by the canonical 03 plan. The generated metrics bundle keeps
+`05_EXP_RESULT.html` as its provenance source, and paragraph prompts receive
+only the result artifacts bound to that paragraph. The abstract is generated
+last from the compact executed result tables.
+
+The Studio is not a blank writing form. Each configured section carries the
+target-paper architecture approved during Experiment Planning: ordered paragraph
+tasks, each task's purpose and rhetorical role, its relation to the previous and
+next paragraph, and artifact bindings. The top of each section shows this complete
+blueprint. When a paragraph becomes current, the browser asks GPT to draft it from
+that approved architecture, the working abstract, accepted section context, and
+current experiment evidence. Reference-paper prose is never shown or sent during
+writing. The researcher only comments on the generated candidate or
 accepts it. Sections with multiple paragraphs expose a paragraph navigator:
 pending or candidate paragraphs may be edited in any order, accepted paragraphs
 remain selectable revision bases, and accepted prose is always assembled into
@@ -60,7 +77,7 @@ python3 -m research_avatar.paper_studio.server --direct-full-draft --provider op
 # or: --provider deepseek
 ```
 
-An explicit model override is optional: `--model gpt-5-nano`. The command exits
+An explicit model override is optional: `--model deepseek-v4-flash`. The command exits
 only after every pending paragraph has passed the normal write-and-compile
 transaction, or reports the paragraph where the job failed. Opening Paper Studio
 later shows the same accepted paragraphs and PDF because CLI and UI share one
@@ -74,25 +91,31 @@ Chat Completions providers keep the equivalent history in the running Studio
 process and safely re-bootstrap after a restart. Developer instructions are sent
 on every request.
 
-If a generated paragraph contains `[CITATION NEEDED]` or an unknown citation key,
-the OpenAI provider can continue the same section conversation with the Responses
-API `web_search` tool. DeepSeek reports that this
-OpenAI-only citation-verification step requires switching providers. The resolver
-accepts only structured citation records whose scholarly
-source URL appears in the search response, appends their BibTeX entries to
-`paper/references.bib`, and returns the revised paragraph. Unverified citations
-remain explicit placeholders.
+Citation obligations apply in every manuscript section. The local editor selects only
+real keys already present in `paper/references.bib` and verified by
+`reports/01_LIT_SURVEY.html`; it never searches the web or appends BibTeX during
+paragraph generation, and unresolved `\cite{}` cannot be accepted. The online editor
+keeps the same obligations as literal `\cite{}` placeholders and never selects keys.
 
 `Accept → LaTeX` is transactional: it rejects stale candidates and unknown
 citation keys; writes only the section's fixed file under `paper/sections/`;
 compiles immediately; and restores the previous file if compilation fails.
+
+The writing panel also offers `一键生成当前 Section`. It uses the same
+paragraph generator, acceptance checks, citation constraints, transactional
+LaTeX writes, and compilation path as ordinary paragraph writing, but limits
+the task to unfinished paragraphs and bound figures/tables in the selected
+Section. It has its own `/api/section-draft/start` endpoint and
+`section_draft_job` state; it never creates, updates, or displays the
+`full_draft_job` used by **直接生成全文初稿**. Accepted paragraphs and every
+other Section remain unchanged.
 
 The **Figures** workspace is section-aware: it uses each configured figure's
 `source_sections`, paragraph dependencies, artifact dependencies, and result keys
 to decide where the figure appears and when it becomes available.
 
 Mechanism figures follow an explicit human gate from `$figureppt`: GPT first
-turns the bound section prose into a BioRender design prompt automatically when
+turns the bound section prose into a drawing prompt automatically when
 the ready figure is first opened. For later regeneration, the researcher supplies
 a concrete instruction (for example, simplify the composition or make it
 single-column); GPT receives the current Prompt plus that instruction and rewrites
@@ -142,14 +165,8 @@ real-browser matrix when changing web behavior:
 
 ```bash
 make test
-python3 .agents/skills/paperstudio/scripts/browser_matrix.py --url http://127.0.0.1:8765
+python3 research_avatar/paper_studio/browser_matrix.py --url http://127.0.0.1:8780/paper-studio
 ```
 
-Run the same matrix against an empty shell started on another port; it verifies
-that the reusable Studio opens without `paper/` while all mutation controls stay
-disabled:
-
-```bash
-python3 -m research_avatar.paper_studio.server --empty --port 8766
-python3 .agents/skills/paperstudio/scripts/browser_matrix.py --url http://127.0.0.1:8766
-```
+The unit suite covers the empty embedded shell without exposing a second local
+paper-editor page.

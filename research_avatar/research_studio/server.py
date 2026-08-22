@@ -39,16 +39,51 @@ ROOT = Path(os.environ.get("RESEARCH_AVATAR_ROOT", Path.cwd())).resolve()
 STATIC = Path(__file__).resolve().parent / "static"
 DEMO = PACKAGE_ROOT / "web" / "demo"
 PAPER_STUDIO_URL = "http://127.0.0.1:8765"
+PAPER_STUDIO_ROUTE = "/paper-studio"
+PAPER_STUDIO_PROXY_TOKEN = hashlib.sha256(
+    f"research-studio-paper-proxy:{ROOT}".encode("utf-8")
+).hexdigest()
 PAPER_STUDIO_STARTUP_TIMEOUT_SECONDS = 15.0
 PAPER_STUDIO_LOCK = threading.Lock()
 PAPER_STUDIO_PROCESS: subprocess.Popen[bytes] | None = None
-PROFILE_JOB_LOCK = threading.RLock()
-PROFILE_JOB: dict[str, Any] = {
-    "status": "idle",
-    "message": "等待在终端运行 $profileconstruct。",
-    "logs": [],
-}
 LOCAL_URL_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
+def paper_workspace_root() -> Path:
+    """Return the project whose Paper Studio is embedded in this control plane.
+
+    Research artifacts and the displayed manuscript usually share ``ROOT``.  A
+    reconstruction or comparison run, however, may intentionally keep its paper
+    in an isolated project.  Supporting that as an explicit override prevents a
+    test workspace from taking over the whole Research Studio and making the
+    profile, survey, and idea tabs appear empty.
+    """
+    configured = os.environ.get("RESEARCH_AVATAR_PAPER_ROOT", "").strip()
+    if not configured:
+        return ROOT
+    candidate = Path(configured).expanduser()
+    if not candidate.is_absolute():
+        candidate = ROOT / candidate
+    return candidate.resolve()
+
+
+def artifact_workspace_root(
+    key: str, root: Path = ROOT, overlay_root: Path | None = None
+) -> Path:
+    """Choose the overlay artifact when present, otherwise the main project.
+
+    This gives reconstruction projects a complete merged pipeline: stages they
+    actually produced are shown from the reconstruction, while genuinely
+    absent stages (usually researcher profile and idea selection) retain the
+    canonical project's content.
+    """
+    if key not in ARTIFACTS:
+        raise KeyError(key)
+    overlay = (overlay_root or paper_workspace_root()).resolve()
+    relative = ARTIFACTS[key][0]
+    if overlay != root.resolve() and (overlay / relative).is_file():
+        return overlay
+    return root.resolve()
 
 
 class StudioHTTPServer(ThreadingHTTPServer):
@@ -207,6 +242,13 @@ def idea_report_state(path: Path) -> dict[str, Any]:
     selection = extract_script_json(path, "idea-selection")
     if not selection:
         selected_match = re.search(r"\bdata-selected-idea=[\"']([^\"']+)[\"']", source)
+        if not selected_match:
+            selected_match = re.search(
+                r"<article\b[^>]*\bdata-idea-id=[\"']([^\"']+)[\"']"
+                r"[^>]*\bdata-selected=[\"']true[\"']",
+                source,
+                flags=re.IGNORECASE,
+            )
         selection = {"selected_id": selected_match.group(1) if selected_match else ""}
     selected_id = str(selection.get("selected_id", ""))
     selected = next((item for item in candidates if item["id"] == selected_id), None)
@@ -232,6 +274,15 @@ def record_idea_selection(path: Path, idea_id: str, reason: str = "") -> dict[st
         "confirmed_at": dt.datetime.now().astimezone().isoformat(timespec="seconds"),
     }
     source = read_text(path)
+    original_nonselected_cards = {
+        match.group(1): match.group(2)
+        for match in re.finditer(
+            r'<article\b[^>]*\bdata-idea-id=["\']([^"\']+)["\'][^>]*>(.*?)</article>',
+            source,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if match.group(1) != idea_id
+    }
     payload = json.dumps(selection, ensure_ascii=False).replace("</", "<\\/")
     script = f'<script type="application/json" id="idea-selection">{payload}</script>'
     pattern = re.compile(
@@ -280,6 +331,17 @@ def record_idea_selection(path: Path, idea_id: str, reason: str = "") -> dict[st
         count=1,
         flags=re.IGNORECASE | re.DOTALL,
     )
+    updated_nonselected_cards = {
+        match.group(1): match.group(2)
+        for match in re.finditer(
+            r'<article\b[^>]*\bdata-idea-id=["\']([^"\']+)["\'][^>]*>(.*?)</article>',
+            source,
+            re.IGNORECASE | re.DOTALL,
+        )
+        if match.group(1) != idea_id
+    }
+    if updated_nonselected_cards != original_nonselected_cards:
+        raise ValueError("Idea selection must preserve every non-selected idea card in full")
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(source, encoding="utf-8")
     temporary.replace(path)
@@ -381,9 +443,13 @@ def record_expplan_approval(path: Path) -> dict[str, Any]:
     contract["approval_status"] = "approved"
     contract["approved_at"] = approved_at
     contract["approval_channel"] = "Research Studio"
+    contract["approval_contract_version"] = contract.get("contract_version", 1)
     unsigned = {
         key: value for key, value in contract.items()
-        if key not in {"approval_status", "approved_at", "approval_channel", "approval_contract_sha256"}
+        if key not in {
+            "approval_status", "approved_at", "approval_channel",
+            "approval_contract_sha256", "approval_contract_version",
+        }
     }
     canonical = json.dumps(unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     contract["approval_contract_sha256"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -397,11 +463,18 @@ def record_expplan_approval(path: Path) -> dict[str, Any]:
     source = pattern.sub(lambda _match: script, source, count=1)
     approval_copy = (
         f"<p><b>Approved by the researcher on {approved_at} through Research Studio.</b> "
-        "This signed experiment design may now be converted into executable goals by <code>$runplan</code>.</p>"
+        "This signed experiment design may now be converted into executable goals.</p>"
     )
     source = re.sub(
         r"(<h2>\s*3\.\s*Approval\s*</h2>)\s*<p>.*?</p>",
         lambda match: match.group(1) + approval_copy,
+        source,
+        count=1,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    source = re.sub(
+        r'<div class="approval-box">.*?</div>',
+        '<div class="approval-box">' + approval_copy + '</div>',
         source,
         count=1,
         flags=re.IGNORECASE | re.DOTALL,
@@ -447,6 +520,52 @@ def file_record(root: Path, key: str) -> dict[str, Any]:
     }
 
 
+def rewrite_artifact_html_links(source: str) -> str:
+    """Route sibling workflow-report links through Research Studio.
+
+    Reports are authored for direct filesystem viewing, where links such as
+    ``01_LIT_SURVEY.html`` are correct.  When the same report is mounted at
+    ``/artifact/ideas``, that relative URL would incorrectly resolve to
+    ``/artifact/01_LIT_SURVEY.html``.  Rewrite only known local artifacts and
+    preserve fragments. External links open in a new top-level tab because the
+    report itself is rendered in a sandboxed iframe; navigating that iframe to
+    sites with ``frame-ancestors 'none'`` would otherwise look like a broken
+    link.
+    """
+    rendered = source
+    for key, (relative, mime) in ARTIFACTS.items():
+        if not mime.startswith("text/html"):
+            continue
+        filename = re.escape(Path(relative).name)
+        pattern = re.compile(
+            rf'(?P<prefix>\bhref\s*=\s*(?P<quote>["\']))'
+            rf'(?:\./)?(?:reports/)?{filename}(?P<fragment>#[^"\']*)?'
+            rf'(?P=quote)',
+            re.IGNORECASE,
+        )
+        rendered = pattern.sub(
+            lambda match: (
+                f'{match.group("prefix")}/artifact/{key}'
+                f'{match.group("fragment") or ""}{match.group("quote")}'
+            ),
+            rendered,
+        )
+    anchor_pattern = re.compile(r"<a\b[^>]*>", re.IGNORECASE)
+
+    def external_link_target(match: re.Match[str]) -> str:
+        tag = match.group(0)
+        href_match = re.search(r'\bhref\s*=\s*(["\'])(https?://[^"\']+)\1', tag, re.IGNORECASE)
+        if not href_match or re.search(r"\btarget\s*=", tag, re.IGNORECASE):
+            return tag
+        additions = ' target="_blank"'
+        if not re.search(r"\brel\s*=", tag, re.IGNORECASE):
+            additions += ' rel="noopener noreferrer"'
+        return f"{tag[:-1]}{additions}>"
+
+    rendered = anchor_pattern.sub(external_link_target, rendered)
+    return rendered
+
+
 def status_for(exists: bool, *, approved: bool | None = None) -> str:
     if not exists:
         return "not_started"
@@ -470,7 +589,7 @@ def profile_stage(root: Path) -> dict[str, Any]:
         "id": "profile",
         "title": "研究画像",
         "status": status_for(profile.exists()),
-        "command": "$profileconstruct 使用 /path/to/scholar_profile.html",
+        "command": "上传完整的 Google Scholar HTML",
         "metrics": [
             {"label": "Researcher", "value": name or "Pending"},
             {"label": "Publications", "value": str(count) if count else "—"},
@@ -486,7 +605,7 @@ def literature_stage(root: Path) -> dict[str, Any]:
         "id": "literature",
         "title": "文献 Survey",
         "status": status_for(literature["exists"]),
-        "command": "$researchlit",
+        "command": "等待文献 Survey 生成",
         "metrics": [
             {"label": "Survey", "value": "Ready" if literature["exists"] else "Pending"},
         ],
@@ -502,7 +621,7 @@ def ideas_stage(root: Path) -> dict[str, Any]:
         "id": "ideas",
         "title": "Idea 选择",
         "status": status_for(ideas["exists"], approved=bool(idea_selection["selected_id"]) if ideas["exists"] else None),
-        "command": "$ideagen",
+        "command": "等待 Idea 报告生成并选择",
         "metrics": [
             {"label": "Idea report", "value": "Ready" if ideas["exists"] else "Pending"},
             {"label": "Human pick", "value": idea_selection["selected_id"] or "Pending"},
@@ -523,7 +642,7 @@ def expplan_stage(root: Path) -> dict[str, Any]:
         "id": "expplan",
         "title": "实验设计",
         "status": status_for(artifact["exists"], approved=approved),
-        "command": "$expplan",
+        "command": "等待实验设计生成并确认",
         "metrics": [
             {"label": "Approval", "value": contract.get("approval_status", "Pending")},
             {"label": "Venue", "value": target.get("venue", "—")},
@@ -548,20 +667,33 @@ def runplan_stage(root: Path) -> dict[str, Any]:
     completed = [goal for goal in goals if goal.get("status") == "completed"]
     proposed_id = plan.get("proposed_goal_id")
     proposed = next((goal for goal in goals if goal.get("id") == proposed_id), {})
+    visible_artifacts = [item for item in (results_artifact, artifact) if item["exists"]]
+    if not visible_artifacts:
+        visible_artifacts = [artifact]
     return {
         "id": "runplan",
         "title": "实验执行",
         "status": "in_progress" if artifact["exists"] and len(completed) < len(goals) else status_for(artifact["exists"]),
-        "command": f"/goal Complete {proposed_id}: {proposed.get('title', '')}" if proposed_id else "$runplan",
+        "command": (
+            f"执行 {proposed_id}: {proposed.get('title', '')}"
+            if proposed_id else "等待实验执行计划"
+        ),
         "metrics": [
             {"label": "Goals", "value": f"{len(completed)} / {len(goals)}"},
             {"label": "Current", "value": proposed_id or plan.get("active_goal_id") or "—"},
             {"label": "Acquisitions", "value": str(len(plan.get("acquisition_contracts", [])))},
-            {"label": "State", "value": str(plan.get("state", "Pending"))},
+            {
+                "label": "State",
+                "value": str(plan.get("state") or plan.get("status") or "Pending"),
+            },
         ],
-        # Run Plan is the single execution-facing page. Completed goal cards
-        # embed their verified tables/plots and link into 05 for full provenance.
-        "artifacts": [artifact],
+        # Once results exist, make the evidence-bearing result report the
+        # default execution view. Keep the run plan beside it so the acquisition
+        # hierarchy and the values it produced remain independently inspectable.
+        "artifacts": visible_artifacts,
+        "default_artifact_key": (
+            "results" if results_artifact["exists"] else "runplan"
+        ),
         "results_backend": results_artifact,
         "message": proposed.get("instructions", plan.get("exact_next_authorized_action", "等待实验计划批准。")),
         "goals": [
@@ -578,8 +710,61 @@ def runplan_stage(root: Path) -> dict[str, Any]:
     }
 
 
+def ensure_paper_project_from_completed_run(root: Path) -> dict[str, Any]:
+    """Initialize Paper Studio from the exact plan and results of a completed run."""
+    config_path = root / "paper/paper_studio.json"
+    if config_path.is_file():
+        return {"created": False, "reason": "already_configured"}
+
+    run_path = root / ARTIFACTS["runplan"][0]
+    results_path = root / ARTIFACTS["results"][0]
+    run_state = extract_script_json(run_path, "run-plan-state")
+    goals = run_state.get("goals", [])
+    completed = (
+        (run_state.get("status") or run_state.get("state")) == "completed"
+        and isinstance(goals, list)
+        and bool(goals)
+        and all(
+            isinstance(goal, dict) and goal.get("status") == "completed"
+            for goal in goals
+        )
+    )
+    if not completed or not results_path.is_file():
+        return {"created": False, "reason": "run_or_results_incomplete"}
+
+    # The run report is authoritative because it may point at a reduced/local
+    # variant rather than reports/03_EXPERIMENT_PLAN.html.
+    source_plan = str(run_state.get("source_plan") or ARTIFACTS["expplan"][0])
+    plan_path = (root / source_plan).resolve()
+    try:
+        plan_path.relative_to(root.resolve())
+    except ValueError as exc:
+        raise RuntimeError("Run Plan source_plan points outside the project") from exc
+    if not plan_path.is_file():
+        raise RuntimeError(f"Run Plan source plan does not exist: {source_plan}")
+
+    from research_avatar.tools.init_paper_studio_from_pipeline import initialize
+
+    summary = initialize(root, plan_path, results_path)
+    return {"created": True, "reason": "completed_run", **summary}
+
+
 def paper_stage(root: Path) -> dict[str, Any]:
     config = load_json(root / "paper/paper_studio.json")
+    run_state = extract_script_json(
+        root / ARTIFACTS["runplan"][0], "run-plan-state"
+    )
+    run_goals = run_state.get("goals", [])
+    experiment_ready = (
+        (run_state.get("status") or run_state.get("state")) == "completed"
+        and isinstance(run_goals, list)
+        and bool(run_goals)
+        and all(
+            isinstance(goal, dict) and goal.get("status") == "completed"
+            for goal in run_goals
+        )
+        and (root / ARTIFACTS["results"][0]).is_file()
+    )
     runtime = load_json(root / "paper/.paper_studio/state.json")
     sections = runtime.get("sections", {}) if isinstance(runtime.get("sections"), dict) else {}
     accepted = 0
@@ -603,7 +788,16 @@ def paper_stage(root: Path) -> dict[str, Any]:
         tables.get(table_id, {}).get("status") == "approved"
         for table_id in configured_tables
     )
-    project_complete = bool(config) and all_content_complete and all_figures_complete and all_tables_complete and compile_state.get("status") == "completed"
+    # Paper Studio reports a successful live compile as ``ok``; older saved
+    # projects used ``completed``.  Treat both as terminal success so a fully
+    # approved imported paper does not remain permanently "in progress".
+    project_complete = (
+        bool(config)
+        and all_content_complete
+        and all_figures_complete
+        and all_tables_complete
+        and compile_state.get("status") in {"ok", "completed"}
+    )
     config_path = root / "paper/paper_studio.json"
     studio_artifact = {
         "key": "paper_studio",
@@ -611,7 +805,7 @@ def paper_stage(root: Path) -> dict[str, Any]:
         "exists": bool(config),
         "size": config_path.stat().st_size if config_path.exists() else 0,
         "modified_ns": config_path.stat().st_mtime_ns if config_path.exists() else 0,
-        "url": PAPER_STUDIO_URL if config else "",
+        "url": f"{PAPER_STUDIO_ROUTE}/" if config else "",
         "title": "Paper Studio · 可交互论文写作",
         "interactive": True,
     }
@@ -619,7 +813,14 @@ def paper_stage(root: Path) -> dict[str, Any]:
         "id": "paper",
         "title": "论文写作",
         "status": "complete" if project_complete else ("in_progress" if config else "not_started"),
-        "command": "$paperwrite",
+        "command": (
+            "Paper Studio 已就绪"
+            if config else (
+                "python3 -m research_avatar.tools.init_paper_studio_from_pipeline "
+                "--from-run-plan --open"
+                if experiment_ready else "等待实验执行完成并生成 05_EXP_RESULT.html"
+            )
+        ),
         "metrics": [
             {"label": "Project", "value": project.get("name", "—")},
             {"label": "Paragraphs", "value": f"{accepted} / {total}" if total else "—"},
@@ -631,16 +832,32 @@ def paper_stage(root: Path) -> dict[str, Any]:
         # stage artifact silently replaces the editing workflow with a viewer.
         "artifacts": [studio_artifact],
         "message": "Paper Studio 逐段确认后写入 LaTeX，并保持图表与结果绑定。",
-        "paper_studio": {"configured": bool(config), "url": PAPER_STUDIO_URL},
+        "paper_studio": {
+            "configured": bool(config),
+            "url": f"{PAPER_STUDIO_ROUTE}/" if config else "",
+            "experiment_ready": experiment_ready,
+        },
     }
 
 
-def build_state(root: Path = ROOT) -> dict[str, Any]:
+def build_state(
+    root: Path = ROOT, paper_root: Path | None = None
+) -> dict[str, Any]:
+    paper_root = (paper_root or root).resolve()
+    profile_root = artifact_workspace_root("profile", root, paper_root)
+    literature_root = artifact_workspace_root("literature", root, paper_root)
+    ideas_root = artifact_workspace_root("ideas", root, paper_root)
+    expplan_root = artifact_workspace_root("expplan", root, paper_root)
+    runplan_root = artifact_workspace_root("runplan", root, paper_root)
     stages = [
-        profile_stage(root), literature_stage(root), ideas_stage(root),
-        expplan_stage(root), runplan_stage(root), paper_stage(root),
+        profile_stage(profile_root),
+        literature_stage(literature_root),
+        ideas_stage(ideas_root),
+        expplan_stage(expplan_root),
+        runplan_stage(runplan_root),
+        paper_stage(paper_root),
     ]
-    paper_config = load_json(root / "paper/paper_studio.json")
+    paper_config = load_json(paper_root / "paper/paper_studio.json")
     paper_project = paper_config.get("project", {}) if isinstance(paper_config.get("project"), dict) else {}
     exp_contract = extract_script_json(root / ARTIFACTS["expplan"][0], "experiment-plan-contract")
     return {
@@ -648,6 +865,7 @@ def build_state(root: Path = ROOT) -> dict[str, Any]:
         "project": {
             "name": paper_project.get("name") or exp_contract.get("selected_idea") or root.name,
             "root": str(root),
+            "paper_root": str(paper_root),
             "mode": "project",
         },
         "stages": stages,
@@ -657,7 +875,8 @@ def build_state(root: Path = ROOT) -> dict[str, Any]:
 
 
 def paper_studio_status() -> dict[str, Any]:
-    config = load_json(ROOT / "paper/paper_studio.json")
+    paper_root = paper_workspace_root()
+    config = load_json(paper_root / "paper/paper_studio.json")
     configured_project = config.get("project", {}) if isinstance(config, dict) else {}
     expected_project_id = (
         str(configured_project.get("id", "")).strip() or "__paper_studio_empty__"
@@ -684,19 +903,25 @@ def paper_studio_status() -> dict[str, Any]:
             }
         project = payload.get("project", {}) if isinstance(payload, dict) else {}
         root = str(project.get("root", "")).strip()
-        same_workspace = bool(root) and Path(root).resolve() == ROOT.resolve()
+        same_workspace = bool(root) and Path(root).resolve() == paper_root
         served_project_id = str(
             project.get("id") or payload.get("project_id") or ""
         ).strip()
-        same_project = bool(expected_project_id) and served_project_id == expected_project_id
+        empty_project = bool(payload.get("empty_project", False))
+        same_project = (
+            bool(expected_project_id)
+            and served_project_id == expected_project_id
+            and not (empty_project and expected_project_id != "__paper_studio_empty__")
+        )
         return {
             "running": True,
             "same_workspace": same_workspace,
             "same_project": same_project,
             "project_id": served_project_id,
             "expected_project_id": expected_project_id,
-            "empty_project": bool(payload.get("empty_project", False)),
+            "empty_project": empty_project,
             "pid": payload.get("pid"),
+            "embedded_only": bool(payload.get("embedded_only", False)),
             "url": PAPER_STUDIO_URL,
         }
     return {
@@ -711,22 +936,32 @@ def paper_studio_alive() -> bool:
     return bool(paper_studio_status()["running"])
 
 
+def paper_project_configured(root: Path | None = None) -> bool:
+    return ((root or paper_workspace_root()) / "paper/paper_studio.json").is_file()
+
+
 def start_paper_studio() -> dict[str, Any]:
     global PAPER_STUDIO_PROCESS
+    paper_root = paper_workspace_root()
     with PAPER_STUDIO_LOCK:
+        if not paper_project_configured():
+            return {"ok": False, "error": "当前项目没有 Paper Studio 配置。"}
         initial = paper_studio_status()
         if initial["running"] and not initial["same_workspace"]:
             return {
                 "ok": False,
                 "error": f"{PAPER_STUDIO_URL} is already serving a different workspace.",
             }
-        if initial["running"] and not initial.get("same_project", False):
+        if initial["running"] and (
+            not initial.get("same_project", False)
+            or not initial.get("embedded_only", False)
+        ):
             stale_pid = initial.get("pid")
             if not isinstance(stale_pid, int) or stale_pid <= 1 or stale_pid == os.getpid():
                 return {
                     "ok": False,
                     "error": (
-                        f"{PAPER_STUDIO_URL} is serving stale Paper Studio project "
+                        f"{PAPER_STUDIO_URL} is serving a stale or directly exposed Paper Studio "
                         f"{initial.get('project_id') or '(unknown)'} and did not expose a safe PID."
                     ),
                 }
@@ -743,13 +978,30 @@ def start_paper_studio() -> dict[str, Any]:
             initial = paper_studio_status()
         if initial["running"]:
             return {"ok": True, "url": PAPER_STUDIO_URL, "already_running": True}
-        workspace_hash = hashlib.sha256(str(ROOT).encode("utf-8")).hexdigest()[:12]
+        workspace_hash = hashlib.sha256(str(paper_root).encode("utf-8")).hexdigest()[:12]
         log_path = Path(tempfile.gettempdir()) / f"paper-studio-{workspace_hash}.log"
         if PAPER_STUDIO_PROCESS is None or PAPER_STUDIO_PROCESS.poll() is not None:
             log_handle = log_path.open("ab")
+            child_environment = os.environ.copy()
+            # The embedded editor runs with the selected paper project as its
+            # working directory. Preserve the package checkout on sys.path so
+            # `python -m research_avatar...` keeps working for overlay projects
+            # that live below the repository root.
+            package_parent = str(PACKAGE_ROOT.parent)
+            existing_pythonpath = child_environment.get("PYTHONPATH", "")
+            child_environment["PYTHONPATH"] = os.pathsep.join(
+                value for value in (package_parent, existing_pythonpath) if value
+            )
+            child_environment.update(
+                {
+                    "PAPER_STUDIO_EMBEDDED_ONLY": "1",
+                    "PAPER_STUDIO_PROXY_TOKEN": PAPER_STUDIO_PROXY_TOKEN,
+                }
+            )
             PAPER_STUDIO_PROCESS = subprocess.Popen(
                 [sys.executable, "-m", "research_avatar.paper_studio.server", "--no-browser"],
-                cwd=ROOT,
+                cwd=paper_root,
+                env=child_environment,
                 stdin=subprocess.DEVNULL,
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
@@ -793,10 +1045,9 @@ def ensure_project_studios(
     paper = start_paper_studio()
     if not paper.get("ok"):
         raise RuntimeError(str(paper.get("error") or "Paper Studio failed to start"))
-    urls = [str(research["url"]), str(paper["url"])]
+    urls = [str(research["url"])]
     if open_browser:
-        for url in urls:
-            webbrowser.open(url)
+        webbrowser.open(urls[0])
     return {"research_studio": research, "paper_studio": paper, "urls": urls}
 
 
@@ -822,262 +1073,6 @@ def open_project_terminal() -> dict[str, Any]:
     except OSError as error:
         return {"ok": False, "error": str(error)}
     return {"ok": True, "cwd": str(ROOT)}
-
-
-def profile_job_state() -> dict[str, Any]:
-    with PROFILE_JOB_LOCK:
-        state = json.loads(json.dumps(PROFILE_JOB, ensure_ascii=False))
-    state["progress"] = profile_progress_state(state)
-    return state
-
-
-def _json_object(path: Path) -> dict[str, Any]:
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return value if isinstance(value, dict) else {}
-
-
-def _style_fulltext_count(style_text: str) -> int:
-    """Read the declared full-paper evidence count without counting unrelated numbers."""
-    patterns = (
-        r"(?:exactly\s+)?(\w+)\s+(?:unique\s+)?representative full papers",
-        r"(?:both\s+)?the\s+\d+\s+abstracts.*?and\s+(\w+)\s+representative full papers",
-    )
-    number_words = {
-        "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
-        "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
-        "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
-    }
-    for pattern in patterns:
-        match = re.search(pattern, style_text, re.IGNORECASE | re.DOTALL)
-        if match:
-            token = match.group(1).lower()
-            return int(token) if token.isdigit() else number_words.get(token, 0)
-    return 0
-
-
-def _profile_style_target(root: Path) -> int:
-    skill = root / ".agents/skills/profileconstruct/SKILL.md"
-    if skill.exists():
-        match = re.search(r"exactly\s+(\d+)\s+unique representative full papers", read_text(skill), re.IGNORECASE)
-        if match:
-            return int(match.group(1))
-    return 0
-
-
-def profile_progress_state(job: dict[str, Any], root: Path = ROOT) -> dict[str, Any]:
-    """Derive honest, refresh-safe progress from canonical artifacts and current logs."""
-    publication_data = _json_object(root / ARTIFACTS["publications"][0])
-    rows = publication_data.get("publications", [])
-    if not isinstance(rows, list):
-        rows = []
-    total = int(job.get("publication_count") or publication_data.get("publication_count") or len(rows) or 0)
-    abstracts = sum(bool(row.get("abstract")) for row in rows if isinstance(row, dict))
-    classified = sum(bool(row.get("task_type")) for row in rows if isinstance(row, dict))
-    coverage = publication_data.get("fulltext_coverage", {})
-    if not isinstance(coverage, dict):
-        coverage = {}
-    covered = int(coverage.get("rows_covered") or sum(
-        bool(row.get("fulltext_path")) for row in rows if isinstance(row, dict)
-    ))
-    pdfs = int(coverage.get("unique_pdf_contents") or 0)
-    if not pdfs:
-        pdf_dir = root / "researcher-profile/fulltext/pdf"
-        pdfs = len(list(pdf_dir.glob("*.pdf"))) if pdf_dir.exists() else 0
-
-    profile_path = root / ARTIFACTS["profile"][0]
-    publications_path = root / ARTIFACTS["publications"][0]
-    style_text = read_text(profile_path) if profile_path.exists() else ""
-    style_read = _style_fulltext_count(style_text)
-    style_target = _profile_style_target(root)
-    started_at = int(job.get("started_at") or 0)
-
-    relevant_paths = [publications_path, profile_path]
-    fulltext_dir = root / "researcher-profile/fulltext"
-    if fulltext_dir.exists():
-        relevant_paths.extend(path for path in fulltext_dir.rglob("*") if path.is_file())
-    mtimes = [int(path.stat().st_mtime) for path in relevant_paths if path.exists()]
-    last_activity = max([started_at, *mtimes], default=started_at)
-
-    logs = "\n".join(str(line) for line in job.get("logs", [])).lower()
-    status = str(job.get("status", "idle"))
-    if status == "complete":
-        current_phase = 8
-    elif status in {"queued", "idle"}:
-        current_phase = 0
-    elif "cleanup" in logs or "whitelist" in logs or "phase 8" in logs:
-        current_phase = 8
-    elif ((profile_path.exists() and int(profile_path.stat().st_mtime) >= started_at)
-          or "phase 7" in logs):
-        current_phase = 7
-    elif "habits.json" in logs or "workflow preferences" in logs or "phase 6" in logs:
-        current_phase = 6
-    elif "known dead-ends" in logs or "phase 5" in logs:
-        current_phase = 5
-    elif "writing style" in logs or "phase 4" in logs:
-        current_phase = 4
-    elif "task_type" in logs or "classif" in logs or "phase 3" in logs:
-        current_phase = 3
-    elif "fetch_fulltext" in logs or "profile_enrich" in logs or "phase 2" in logs:
-        current_phase = 2
-    elif publications_path.exists() and int(publications_path.stat().st_mtime) >= started_at and total and classified >= total:
-        current_phase = 3
-    else:
-        current_phase = 1
-
-    definitions = (
-        (1, "读取 Scholar", f"{total or 0} 篇记录"),
-        (2, "摘要与全文获取", f"摘要 {abstracts}/{total or '—'} · 全文覆盖 {covered}/{total or '—'} · 唯一 PDF {pdfs}"),
-        (3, "论文类型分类", f"{classified}/{total or '—'} 已分类"),
-        (4, "研究身份与写作风格", f"阅读全文 {style_read}/{style_target or '—'}"),
-        (5, "失败经验与隐性知识", "可用证据归纳"),
-        (6, "实验与工作流偏好", "读取可用历史"),
-        (7, "生成完整研究画像", "PROFILE.html"),
-        (8, "清理与最终校验", "检查 canonical artifacts"),
-    )
-    phases = []
-    for number, title, detail in definitions:
-        if status == "complete" or (current_phase and number < current_phase):
-            phase_status = "complete"
-        elif number == current_phase and status in {"running", "queued"}:
-            phase_status = "running"
-        elif number == current_phase and status == "failed":
-            phase_status = "failed"
-        else:
-            phase_status = "pending"
-        phases.append({"number": number, "title": title, "detail": detail, "status": phase_status})
-    current_title = next((item[1] for item in definitions if item[0] == current_phase), "等待开始")
-    phase_fraction = 0.0
-    if current_phase == 1:
-        phase_fraction = 1.0 if total else 0.0
-    elif current_phase == 2 and total:
-        phase_fraction = min(1.0, (abstracts + covered) / (2 * total))
-    elif current_phase == 3 and total:
-        phase_fraction = min(1.0, classified / total)
-    elif current_phase == 4 and style_target:
-        phase_fraction = min(1.0, style_read / style_target)
-    elif current_phase == 7:
-        phase_fraction = float(profile_path.exists())
-    progress_percent = ((max(0, current_phase - 1) + phase_fraction) / len(definitions) * 100) if current_phase else 0
-    return {
-        "current_phase": current_phase,
-        "phase_total": len(definitions),
-        "current_title": current_title,
-        "percent": 100 if status == "complete" else round(progress_percent),
-        "elapsed_seconds": max(0, int(time.time()) - started_at) if started_at else 0,
-        "last_activity_at": last_activity or None,
-        "seconds_since_activity": max(0, int(time.time()) - last_activity) if last_activity else None,
-        "metrics": {
-            "scholar": total, "abstracts": abstracts, "covered": covered,
-            "pdfs": pdfs, "classified": classified, "style_read": style_read,
-            "style_target": style_target,
-        },
-        "phases": phases,
-    }
-
-
-def update_profile_job(**values: Any) -> None:
-    with PROFILE_JOB_LOCK:
-        PROFILE_JOB.update(values)
-
-
-def clear_profile_job() -> dict[str, Any]:
-    """Dismiss a finished profile job without touching generated artifacts."""
-    with PROFILE_JOB_LOCK:
-        if PROFILE_JOB.get("status") in {"queued", "running"}:
-            raise RuntimeError("profileconstruct 仍在运行，暂时不能清除。")
-        PROFILE_JOB.clear()
-        PROFILE_JOB.update({
-            "status": "idle",
-            "message": "等待上传完整的 Scholar HTML。",
-            "logs": [],
-        })
-        return json.loads(json.dumps(PROFILE_JOB, ensure_ascii=False))
-
-
-def append_profile_log(line: str) -> None:
-    clean = " ".join(line.strip().split())
-    if not clean:
-        return
-    with PROFILE_JOB_LOCK:
-        logs = PROFILE_JOB.setdefault("logs", [])
-        logs.append(clean[:1200])
-        del logs[:-80]
-
-
-def profileconstruct_command(codex: str, prompt: str, root: Path = ROOT) -> list[str]:
-    """Build a persistent Codex session so skills can use their own sub-agents."""
-    return [
-        codex, "--search", "-c", "sandbox_workspace_write.network_access=true",
-        "-s", "workspace-write", "-a", "never", "-C", str(root),
-        "exec", "--color", "never", prompt,
-    ]
-
-
-def run_profileconstruct_job(upload_path: Path, publication_count: int, input_name: str) -> None:
-    """Run the full profileconstruct skill with the uploaded Scholar page."""
-    codex = shutil.which("codex")
-    if not codex:
-        update_profile_job(status="failed", message="未找到 Codex CLI，无法自动生成。")
-        return
-    prompt = (
-        "$profileconstruct 使用 researcher-profile/.scholar-upload.html 作为已经完整展开的 Google Scholar HTML。"
-        "这是 Research Studio 中用户明确授权的调用；直接执行该 skill，不要再次询问 HTML 来源。"
-    )
-    command = profileconstruct_command(codex, prompt)
-    update_profile_job(
-        status="running",
-        message="Coding Agent 正在构建研究画像；可以切换 Tab，任务会继续运行。",
-        publication_count=publication_count,
-        input_name=input_name,
-        started_at=int(time.time()),
-        logs=["Scholar HTML 完整性检查通过。", "已启动 $profileconstruct。"],
-    )
-    try:
-        process = subprocess.Popen(
-            command,
-            cwd=ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
-        )
-        if process.stdout:
-            for line in process.stdout:
-                append_profile_log(line)
-        return_code = process.wait()
-        profile_ready = (ROOT / ARTIFACTS["profile"][0]).exists()
-        publications_ready = (ROOT / ARTIFACTS["publications"][0]).exists()
-        if return_code == 0 and profile_ready and publications_ready:
-            update_profile_job(
-                status="complete",
-                message="研究画像已生成；身份、研究脉络、写作风格与实验习惯均在同一个 PROFILE.html 中查看。",
-                completed_at=int(time.time()),
-            )
-        else:
-            missing = []
-            if not profile_ready:
-                missing.append("PROFILE.html")
-            if not publications_ready:
-                missing.append("publications.json")
-            missing_text = ", ".join(missing)
-            if return_code == 0:
-                message = f"Coding Agent 已结束，但未生成 {missing_text}。可查看日志、清除提示后重新上传。"
-            else:
-                detail = f"；缺少 {missing_text}" if missing else ""
-                message = f"$profileconstruct 未完成（exit {return_code}{detail}）。可清除提示后重新上传。"
-            update_profile_job(
-                status="failed",
-                message=message,
-                completed_at=int(time.time()),
-            )
-    except OSError as error:
-        append_profile_log(str(error))
-        update_profile_job(status="failed", message="无法启动 Coding Agent。")
-    finally:
-        upload_path.unlink(missing_ok=True)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1116,10 +1111,78 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Request body must be a JSON object.")
         return payload
 
+    def proxy_paper_studio(self, method: str) -> None:
+        """Serve the internal Paper Studio engine under the Research Studio origin."""
+        started = start_paper_studio()
+        if not started.get("ok"):
+            self.send_json(
+                {"ok": False, "error": started.get("error", "论文编辑器启动失败。")},
+                HTTPStatus.BAD_GATEWAY,
+            )
+            return
+        upstream_path = self.path[len(PAPER_STUDIO_ROUTE) :] or "/"
+        if not upstream_path.startswith("/"):
+            upstream_path = "/" + upstream_path
+        body = None
+        if method == "POST":
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                self.send_json({"ok": False, "error": "Invalid request size."}, 400)
+                return
+            if length < 0 or length > 32 * 1024 * 1024:
+                self.send_json({"ok": False, "error": "Request too large."}, 413)
+                return
+            body = self.rfile.read(length)
+        headers = {"X-Research-Studio-Proxy": PAPER_STUDIO_PROXY_TOKEN}
+        for name in ("Content-Type", "Range", "If-None-Match", "If-Modified-Since"):
+            value = self.headers.get(name)
+            if value:
+                headers[name] = value
+        request = urllib.request.Request(
+            PAPER_STUDIO_URL + upstream_path,
+            data=body,
+            headers=headers,
+            method=method,
+        )
+        try:
+            response = LOCAL_URL_OPENER.open(request, timeout=300)
+        except urllib.error.HTTPError as error:
+            response = error
+        except (urllib.error.URLError, OSError) as error:
+            self.send_json({"ok": False, "error": f"论文编辑器连接失败：{error}"}, 502)
+            return
+        with response:
+            payload = response.read()
+            self.send_response(response.status)
+            for name in (
+                "Content-Type",
+                "Content-Disposition",
+                "Accept-Ranges",
+                "Content-Range",
+                "ETag",
+                "Last-Modified",
+            ):
+                value = response.headers.get(name)
+                if value:
+                    self.send_header(name, value)
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.write_body(payload)
+
     def do_GET(self) -> None:  # noqa: N802
         request_path = unquote(urlparse(self.path).path)
+        if request_path == PAPER_STUDIO_ROUTE:
+            self.send_response(HTTPStatus.PERMANENT_REDIRECT)
+            self.send_header("Location", PAPER_STUDIO_ROUTE + "/")
+            self.end_headers()
+            return
+        if request_path.startswith(PAPER_STUDIO_ROUTE + "/"):
+            self.proxy_paper_studio("GET")
+            return
         if request_path == "/api/state":
-            self.send_json(build_state())
+            self.send_json(build_state(ROOT, paper_workspace_root()))
             return
         if request_path == "/api/paper-studio/status":
             self.send_json(paper_studio_status())
@@ -1130,13 +1193,18 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": "unknown artifact"}, HTTPStatus.NOT_FOUND)
                 return
             relative, mime = ARTIFACTS[key]
-            target = ROOT / relative
+            target = artifact_workspace_root(key) / relative
             if not target.exists() or not target.is_file():
                 self.send_json({"error": "artifact not found"}, HTTPStatus.NOT_FOUND)
                 return
             if key == "publications":
                 rendered = render_publications_html(target).encode()
                 self.send_bytes(rendered, "text/html; charset=utf-8")
+            elif mime.startswith("text/html"):
+                rendered = rewrite_artifact_html_links(
+                    target.read_text(encoding="utf-8", errors="replace")
+                ).encode("utf-8")
+                self.send_bytes(rendered, mime)
             else:
                 self.send_bytes(target.read_bytes(), mime)
             return
@@ -1174,12 +1242,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         request_path = urlparse(self.path).path
+        if request_path.startswith(PAPER_STUDIO_ROUTE + "/"):
+            self.proxy_paper_studio("POST")
+            return
         if request_path == "/api/idea-selection":
             try:
                 payload = self.read_json()
                 idea_id = str(payload.get("idea_id", "")).strip()
                 reason = str(payload.get("reason", "")).strip()
-                selection = record_idea_selection(ROOT / ARTIFACTS["ideas"][0], idea_id, reason)
+                idea_root = artifact_workspace_root("ideas")
+                selection = record_idea_selection(idea_root / ARTIFACTS["ideas"][0], idea_id, reason)
             except (ValueError, json.JSONDecodeError) as error:
                 self.send_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_REQUEST)
                 return
@@ -1187,7 +1259,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if request_path == "/api/expplan/approve":
             try:
-                approval = record_expplan_approval(ROOT / ARTIFACTS["expplan"][0])
+                expplan_root = artifact_workspace_root("expplan")
+                approval = record_expplan_approval(expplan_root / ARTIFACTS["expplan"][0])
             except ValueError as error:
                 self.send_json({"ok": False, "error": str(error)}, HTTPStatus.BAD_REQUEST)
                 return
@@ -1214,6 +1287,13 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8780)
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument(
+        "--paper-root",
+        help=(
+            "optional overlay project for Literature/Experiment/Paper stages; "
+            "missing artifacts fall back to the main workspace"
+        ),
+    )
+    parser.add_argument(
         "--ensure",
         action="store_true",
         help="reuse the current server or start it once in the background",
@@ -1221,9 +1301,13 @@ def main() -> None:
     parser.add_argument(
         "--ensure-studios",
         action="store_true",
-        help="reuse or start both Research Studio and Paper Studio, then open them",
+        help="start Research Studio and its embedded paper editor, then open Research Studio",
     )
     args = parser.parse_args()
+    if args.paper_root:
+        os.environ["RESEARCH_AVATAR_PAPER_ROOT"] = str(
+            Path(args.paper_root).expanduser().resolve()
+        )
     if args.ensure_studios:
         result = ensure_project_studios(
             args.host,
@@ -1231,7 +1315,10 @@ def main() -> None:
             open_browser=not args.no_browser,
         )
         print(f"Research Studio ready: {result['research_studio']['url']}")
-        print(f"Paper Studio ready: {result['paper_studio']['url']}")
+        print(
+            "Paper editor ready inside Research Studio: "
+            f"{result['research_studio']['url']} (论文写作 Tab)"
+        )
         return
     if args.ensure:
         result = ensure_research_studio(args.host, args.port)

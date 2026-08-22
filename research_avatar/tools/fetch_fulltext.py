@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Fetch abstracts + full-text PDFs for a Scholar publication list.
 
-Stdlib-only (urllib + xml.etree) plus the external ``pdftotext`` binary for
-text extraction. Multi-source, resumable, cache-first (W2/W3): nothing is
+Stdlib-only (urllib + xml.etree). This tool acquires PDFs; the executing code
+agent performs semantic-order transcription afterward. Multi-source, resumable,
+cache-first (W2/W3): nothing is
 re-downloaded or clobbered; a run can be interrupted and resumed.
 
 Per paper, in priority order:
@@ -30,7 +31,6 @@ import argparse
 import json
 import os
 import re
-import subprocess
 import time
 import urllib.parse
 import urllib.request
@@ -282,17 +282,6 @@ def download_pdf(url: str, dest: Path) -> bool:
     return True
 
 
-def extract_text(pdf: Path, txt: Path) -> int:
-    try:
-        subprocess.run(["pdftotext", "-q", str(pdf), str(txt)],
-                       check=True, timeout=120)
-    except Exception:  # noqa: BLE001
-        return 0
-    if txt.exists():
-        return len(txt.read_text("utf-8", "replace"))
-    return 0
-
-
 # --------------------------------------------------------------------------- #
 # per-paper
 # --------------------------------------------------------------------------- #
@@ -371,8 +360,12 @@ def process(p: dict, outdir: Path, use_s2: bool, delay: float) -> dict:
     pdf_path = pdf_dir / f"{key}.pdf"
     txt_path = txt_dir / f"{key}.txt"
 
-    # resume: already have text
-    if txt_path.exists() and len(txt_path.read_text("utf-8", "replace")) > 500:
+    # Resume only transcripts explicitly recorded as code-agent extractions.
+    if (
+        p.get("fulltext_extractor") == "code_agent"
+        and txt_path.exists()
+        and len(txt_path.read_text("utf-8", "replace")) > 500
+    ):
         rec["txt_chars"] = len(txt_path.read_text("utf-8", "replace"))
         rec["pdf_source"] = "cached"
         rec["status"] = "done"
@@ -403,8 +396,7 @@ def process(p: dict, outdir: Path, use_s2: bool, delay: float) -> dict:
         time.sleep(delay)
 
     if got:
-        rec["txt_chars"] = extract_text(pdf_path, txt_path)
-        rec["status"] = "done" if rec["txt_chars"] > 500 else "pdf_no_text"
+        rec["status"] = "pdf_ready_for_agent"
     else:
         rec["status"] = "abstract_only" if abstract else "nothing"
     return rec

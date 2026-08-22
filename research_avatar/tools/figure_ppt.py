@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""figure_ppt.py — model-figure pipeline: paper → BioRender prompt → gpt-image → editable PPT → PDF.
+"""figure_ppt.py — model-figure pipeline: paper → drawing prompt → gpt-image → editable PPT → PDF.
 
 The mechanism (per the researcher):
   1. GENPROMPT  the fixed "expert scientific-figure designer" META_PROMPT (system) + the paper
-                (user), nothing appended, via GPT chat → a BioRender-style image prompt written
+                (user), nothing appended, via GPT chat → a publication-ready drawing prompt written
                 into spec.draw_prompt. The draw prompt is GENERATED from the paper, not hand-written.
   2. DRAW       that prompt drives an image model VERBATIM (nothing appended):
                 --provider openai (gpt-image-1, OPENAI_API_KEY). Every draw is
@@ -47,17 +47,36 @@ from pathlib import Path
 # ---------- the fixed prompt-generation meta-prompt (verbatim, per the researcher) ----------
 META_PROMPT = (
     "You are an expert designer of figures for ACL-family NLP papers. Read the supplied manuscript "
-    "content and return only one complete, production-ready GPT Image prompt for a restrained academic "
+    "and optional reference-figure visual grammar. The manuscript is the only source of scientific content; "
+    "the visual grammar is an abstraction from several peer papers and may guide composition, iconography, "
+    "visual density, and operation-bearing geometry, but its paper-specific content must never be copied. "
+    "Return only one complete, production-ready GPT Image prompt for a restrained academic "
     "diagram. First identify the figure's single scientific message and the minimum visual structure "
-    "needed to communicate it. Follow common ACL figure conventions: pure white background, flat vector "
+    "needed to communicate it. Make that message independently decodable by an unfamiliar reader: the "
+    "visual must explicitly encode the source or input, the mechanism or decision criterion, and the "
+    "resulting output or contrast whenever those roles exist. If two branches perform different operations, "
+    "give them different operation-bearing geometry, ordering, markers, or direct labels; never express the "
+    "scientific difference only by color or by naming otherwise identical paths. Preserve the manuscript's "
+    "causal and temporal boundaries: training-only objects must remain in training, inference-only objects "
+    "must remain in inference, and a downstream object must never be drawn before the operation that produces "
+    "it. Do not introduce an acronym, "
+    "symbol, or glyph unless its meaning is defined next to it or visually demonstrated. Before returning the "
+    "prompt, perform a cold-reader check: without the manuscript or caption, the intended one-sentence reading "
+    "must follow from the requested visual encodings. Reject a composition that is attractive but only shows "
+    "component names, equal boxes, or unexplained arrows instead of the load-bearing mechanism. Follow common "
+    "ACL figure conventions: pure white background, flat vector "
     "geometry, thin consistent strokes, compact alignment, generous whitespace, precise typography, "
     "two to four clearly related regions, and a muted colorblind-safe palette of three to five colors. "
     "Use tokens, small semantic glyphs, arrows, brackets, paths, matrices, or modules only when they "
-    "encode the mechanism. Prefer an Illustrator/TikZ-like schematic over a decorative BioRender poster. "
+    "encode the mechanism. Prefer a clean academic schematic over decorative poster art. "
     "Do not add people, scenery, mascots, photorealistic objects, gradients, glow, glass, 3D depth, glossy "
     "buttons, heavy shadows, or marketing-style visual drama unless the manuscript explicitly requires "
-    "them. Do not default to oversized text cards or a generic box-and-arrow flowchart; small boxes and "
-    "panels are acceptable when they precisely encode tokens, states, or modules. Keep labels short and "
+    "them. Do not default to oversized text cards or a generic box-and-arrow flowchart. A collection of "
+    "rectangles whose only content is text is not a scientific mechanism figure. Use recognizable semantic "
+    "pictograms, miniature records or profiles, token groups, ranked strips, masks, checks, contrasting paths, "
+    "or other manuscript-grounded visual objects so operations are shown rather than merely named. Small "
+    "boxes and panels are acceptable only when they organize a subsystem or precisely encode tokens, states, "
+    "or modules. Keep labels short and "
     "print-readable. Specify exact spatial composition, visual encoding, minimal verbatim labels, aspect "
     "ratio, safe crop band, and column-size readability. Stay faithful to the evidence, do not invent "
     "results, and never put result charts in a method figure. Return the image-generation prompt only, "
@@ -86,8 +105,21 @@ def _openai_chat(model, system, user):
 
 def cmd_genprompt(args):
     paper = Path(args.paper).read_text(encoding="utf-8", errors="replace")
-    # only the meta-prompt (system) + the paper (user); nothing appended.
-    prompt = _openai_chat(args.model, META_PROMPT, paper)
+    grammar_path = getattr(args, "visual_grammar", None)
+    visual_grammar = ""
+    if grammar_path:
+        visual_grammar = Path(grammar_path).read_text(
+            encoding="utf-8", errors="replace"
+        ).strip()
+    user_payload = "MANUSCRIPT EVIDENCE\n" + paper
+    if visual_grammar:
+        user_payload += (
+            "\n\nREFERENCE-FIGURE VISUAL GRAMMAR\n"
+            + visual_grammar
+            + "\n\nUse this only as an abstract visual prior. Do not copy any referenced "
+            "paper's scientific content, labels, layout identity, or artwork."
+        )
+    prompt = _openai_chat(args.model, META_PROMPT, user_payload)
     if args.spec and os.path.exists(args.spec):
         spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
         spec["draw_prompt"] = prompt
@@ -258,6 +290,11 @@ def cmd_buildshapes(args):
                                            IX(sh["x2"]), IY(sh["y2"]))
             c.line.color.rgb = RGBColor.from_string(_hx(sh.get("color", "5B6B73")))
             c.line.width = Pt(sh.get("weight", 2))
+            if sh.get("dash"):
+                ln = c.line._get_or_add_ln()
+                for existing in list(ln.findall(qn("a:prstDash"))):
+                    ln.remove(existing)
+                ln.append(ln.makeelement(qn("a:prstDash"), {"val": "dash"}))
             _flat(c)  # flat — connectors must not inherit or reference the theme drop-shadow either
             if k == "arrow":
                 ln = c.line._get_or_add_ln()
@@ -323,9 +360,10 @@ def shape_spec_html(spec):
             stroke = "#" + _hx(sh.get("color", "5B6B73"))
             stroke_w = float(sh.get("weight", 2)) * 96 / 72
             marker = ' marker-end="url(#arrowhead)"' if kind == "arrow" else ""
+            dash = f' stroke-dasharray="{stroke_w * 4:.3f},{stroke_w * 3:.3f}"' if sh.get("dash") else ""
             parts.append(
                 f'<line x1="{x1:.3f}" y1="{y1:.3f}" x2="{x2:.3f}" y2="{y2:.3f}" '
-                f'stroke="{stroke}" stroke-width="{stroke_w:.3f}"{marker}/>'
+                f'stroke="{stroke}" stroke-width="{stroke_w:.3f}"{dash}{marker}/>'
             )
             continue
         x, y = float(sh["x"]) * width, float(sh["y"]) * height
@@ -543,6 +581,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     gp = sub.add_parser("genprompt"); gp.add_argument("--paper", required=True)
     gp.add_argument("--spec"); gp.add_argument("--model", default="gpt-4o")
+    gp.add_argument("--visual-grammar")
     for name in ("draw", "build", "buildshapes", "all"):
         p = sub.add_parser(name); p.add_argument("spec"); p.add_argument("--out")
         if name in ("draw", "all"):

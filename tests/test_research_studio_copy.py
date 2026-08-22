@@ -8,6 +8,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ResearchStudioCopyTests(unittest.TestCase):
+    def test_pipeline_tabs_keep_paper_workspace_compact_dimensions(self):
+        css = (ROOT / "research_avatar/research_studio/static/style.css").read_text(encoding="utf-8")
+        self.assertIn("grid-template-columns:repeat(6,minmax(112px,1fr))", css)
+        self.assertIn(".pipeline-button{position:relative;min-height:40px;padding:6px 9px", css)
+        self.assertNotIn("grid-template-columns:1fr 1fr", css)
+
     def test_parent_copy_bridge_keeps_the_artifact_sandbox(self):
         app = (ROOT / "research_avatar/research_studio/static/app.js").read_text(encoding="utf-8")
         index = (ROOT / "research_avatar/research_studio/static/index.html").read_text(encoding="utf-8")
@@ -16,9 +22,9 @@ class ResearchStudioCopyTests(unittest.TestCase):
         self.assertIn('value.startsWith("/goal ")', app)
         self.assertIn('type: "research-studio-copy-goal-result"', app)
         self.assertIn('document.execCommand("copy")', app)
-        self.assertIn('sandbox="allow-scripts allow-forms allow-popups allow-downloads"', index)
+        self.assertIn('sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"', index)
         self.assertNotIn("allow-same-origin", index)
-        self.assertIn("/app.js?v=20260816-interactive-paper-studio", index)
+        self.assertIn("/app.js?v=20260822-result-tabs", index)
 
     def test_run_plan_button_can_request_the_parent_bridge(self):
         state = {

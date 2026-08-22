@@ -1,412 +1,824 @@
 {
   "schema_version": "1.2",
-  "project_id": "margin-targeted-typo-coling-short-20260817",
-  "llm_provider": "openai",
-  "model": "gpt-5-nano",
+  "project_id": "more",
+  "llm_provider": "deepseek",
+  "model": "deepseek-v4-flash",
   "title_editor": {
     "prompt": "",
-    "candidate": null,
+    "candidate": "",
     "previous_response_id": null,
     "last_message": ""
   },
-  "full_draft_job": {
-    "status": "completed",
-    "progress": 100,
-    "completed": 19,
-    "total": 19,
-    "message": "All planned paragraphs accepted and audited"
-  },
-  "updated_at": 1786930850,
+  "full_draft_job": null,
+  "updated_at": 1787387892,
   "sections": {
     "abstract": {
       "title": "Abstract",
       "file": "abstract.tex",
-      "previous_response_id": null,
-      "bibliography_fingerprint": null,
-      "conversation_section_fingerprint": null,
-      "revision": 1,
+      "previous_response_id": "7a45bd02-9b7f-48bd-adab-b77ecba30082",
+      "bibliography_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "conversation_section_fingerprint": "c653a48eeed90c65b6e804babde7abd078fc704395d4e598b3fd158a4f950d85",
+      "revision": 3,
       "current_index": 0,
       "paragraphs": [
         {
-          "id": "A1",
-          "purpose": "State the budget problem, MTA, scope, decisive evidence, and bounded implication.",
-          "reference_lines": [
-            1,
-            39
-          ],
+          "id": "A-P1",
+          "purpose": "Summarize the correctness–naturalness conflict, MORE, the evaluation slate, the main online gains, and the human comparison.",
+          "rhetorical_role": "abstract synthesis",
+          "relation_to_previous": "paper opening",
+          "relation_to_next": "the next paragraph extends or tests this move",
           "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L005"
+          ],
+          "artifact_dependencies": [],
           "candidate": null,
-          "accepted_text": "Typo augmentation can improve intent robustness, but uniform sampling spends a limited refit budget without asking which corruptions have low true-label score gaps. We propose Margin-Targeted Typo Augmentation (MTA), which generates four character-level variants per utterance, scores each under a clean classifier, and selects the lowest-margin candidates under equal per-intent quotas. On pinned CLINC150 subsets, we compare MTA with clean-only training, class-balanced random selection, and a four-times-larger balanced mixture. Across six prespecified settings evaluated with the same eight seeds held out from exploration, every paired bootstrap 95\\% interval for MTA over random selection is above zero. In the primary 50-intent setting, MTA improves mean noisy accuracy by 1.68 points (95\\% CI [1.32, 2.08]) and remains within one point of the full mixture while admitting 1,250 rather than 5,000 augmented examples to the final refit. The effect is positive for swap, deletion, insertion, and keyboard substitutions. These results establish a reliable empirical selector effect in this controlled setting, while leaving natural errors, neural encoders, unlabeled selection, candidate-generation cost, and causal mechanism open.",
+          "accepted_text": "E-commerce dialogue systems must reconcile two competing objectives: responding with accurate, reasoning-grounded content while producing text that reads naturally to users. These requirements are often in tension, since responses that faithfully follow profile-based attribute logic can sound stiff, whereas fluent phrasing tends to sacrifice factual precision. Training that mixes correctness and naturalness rewards directly proves unstable, and fluency-only or reasoning-only policies each degrade the other dimension. We introduce MORE, a staged multi-objective learning framework that first trains a policy on verifiable reasoning scaffold tasks, freezes it as a reference, and then coordinates response-quality reward channels through rank-based gradient weighting. This design decouples reasoning acquisition from style optimization, allowing the frozen reference to supply reliable attribute logic while a separate policy layer adapts generation quality to the conversational context. Offline experiments on two ByteDance tasks and MultiWOZ 2.2 show that MORE improves the tested task-quality trade-off, and 14-day online traffic tests report gains in conversion, user satisfaction, and business success metrics. A human study on 241 sampled responses confirms that our automated evaluator substantially agrees with human assessment, supporting its use for scalable quality monitoring in deployment.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "68e7eca1dbf04237825c3d8f47c19155",
+              "comment": "",
+              "text": "Abstract: E-commerce dialogue systems must reconcile two competing objectives: responding with accurate, reasoning-grounded content while producing text that reads naturally to users. Training that mixes correctness and naturalness rewards directly proves unstable, and fluency-only or reasoning-only policies each degrade the other dimension. We introduce MORE, a staged multi-objective learning framework that first trains a policy on verifiable reasoning scaffold tasks, freezes it as a reference, and then coordinates response-quality reward channels through rank-based gradient weighting. Offline experiments on two ByteDance tasks and MultiWOZ 2.2 show that MORE improves the tested task-quality trade-off, and 14-day online traffic tests report gains in conversion, user satisfaction, and business success metrics. A human study on 241 sampled responses confirms that our automated evaluator substantially agrees with human assessment.",
+              "citations_added": [],
+              "created_at": 1787366558
+            },
+            {
+              "candidate_id": "acb5bbacc0cd4468a6eb591a3913ffa4",
+              "comment": "模型再多写一两句",
+              "text": "E-commerce dialogue systems must reconcile two competing objectives: responding with accurate, reasoning-grounded content while producing text that reads naturally to users. Training that mixes correctness and naturalness rewards directly proves unstable, and fluency-only or reasoning-only policies each degrade the other dimension. We introduce MORE, a staged multi-objective learning framework that first trains a policy on verifiable reasoning scaffold tasks, freezes it as a reference, and then coordinates response-quality reward channels through rank-based gradient weighting. This design decouples reasoning acquisition from style optimization, allowing the frozen reference to supply reliable attribute logic while a separate policy layer adapts generation quality to the conversational context. Offline experiments on two ByteDance tasks and MultiWOZ 2.2 show that MORE improves the tested task-quality trade-off, and 14-day online traffic tests report gains in conversion, user satisfaction, and business success metrics. A human study on 241 sampled responses confirms that our automated evaluator substantially agrees with human assessment, supporting its use for scalable quality monitoring in deployment.",
+              "citations_added": [],
+              "created_at": 1787367240
+            },
+            {
+              "candidate_id": "65e13bf6fddc4a4980e3f0bd43abe5b5",
+              "comment": "背景也多写一两句",
+              "text": "E-commerce dialogue systems must reconcile two competing objectives: responding with accurate, reasoning-grounded content while producing text that reads naturally to users. These requirements are often in tension, since responses that faithfully follow profile-based attribute logic can sound stiff, whereas fluent phrasing tends to sacrifice factual precision. Training that mixes correctness and naturalness rewards directly proves unstable, and fluency-only or reasoning-only policies each degrade the other dimension. We introduce MORE, a staged multi-objective learning framework that first trains a policy on verifiable reasoning scaffold tasks, freezes it as a reference, and then coordinates response-quality reward channels through rank-based gradient weighting. This design decouples reasoning acquisition from style optimization, allowing the frozen reference to supply reliable attribute logic while a separate policy layer adapts generation quality to the conversational context. Offline experiments on two ByteDance tasks and MultiWOZ 2.2 show that MORE improves the tested task-quality trade-off, and 14-day online traffic tests report gains in conversion, user satisfaction, and business success metrics. A human study on 241 sampled responses confirms that our automated evaluator substantially agrees with human assessment, supporting its use for scalable quality monitoring in deployment.",
+              "citations_added": [],
+              "created_at": 1787367269
             }
           ]
         }
       ],
-      "accepted_text": "Typo augmentation can improve intent robustness, but uniform sampling spends a limited refit budget without asking which corruptions have low true-label score gaps. We propose Margin-Targeted Typo Augmentation (MTA), which generates four character-level variants per utterance, scores each under a clean classifier, and selects the lowest-margin candidates under equal per-intent quotas. On pinned CLINC150 subsets, we compare MTA with clean-only training, class-balanced random selection, and a four-times-larger balanced mixture. Across six prespecified settings evaluated with the same eight seeds held out from exploration, every paired bootstrap 95\\% interval for MTA over random selection is above zero. In the primary 50-intent setting, MTA improves mean noisy accuracy by 1.68 points (95\\% CI [1.32, 2.08]) and remains within one point of the full mixture while admitting 1,250 rather than 5,000 augmented examples to the final refit. The effect is positive for swap, deletion, insertion, and keyboard substitutions. These results establish a reliable empirical selector effect in this controlled setting, while leaving natural errors, neural encoders, unlabeled selection, candidate-generation cost, and causal mechanism open."
+      "accepted_text": "E-commerce dialogue systems must reconcile two competing objectives: responding with accurate, reasoning-grounded content while producing text that reads naturally to users. These requirements are often in tension, since responses that faithfully follow profile-based attribute logic can sound stiff, whereas fluent phrasing tends to sacrifice factual precision. Training that mixes correctness and naturalness rewards directly proves unstable, and fluency-only or reasoning-only policies each degrade the other dimension. We introduce MORE, a staged multi-objective learning framework that first trains a policy on verifiable reasoning scaffold tasks, freezes it as a reference, and then coordinates response-quality reward channels through rank-based gradient weighting. This design decouples reasoning acquisition from style optimization, allowing the frozen reference to supply reliable attribute logic while a separate policy layer adapts generation quality to the conversational context. Offline experiments on two ByteDance tasks and MultiWOZ 2.2 show that MORE improves the tested task-quality trade-off, and 14-day online traffic tests report gains in conversion, user satisfaction, and business success metrics. A human study on 241 sampled responses confirms that our automated evaluator substantially agrees with human assessment, supporting its use for scalable quality monitoring in deployment."
     },
     "introduction": {
       "title": "Introduction",
       "file": "introduction.tex",
-      "previous_response_id": null,
-      "bibliography_fingerprint": null,
-      "conversation_section_fingerprint": null,
-      "revision": 1,
-      "current_index": 0,
+      "previous_response_id": "4219d5da-5833-47ad-a153-336409a6ad4b",
+      "bibliography_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "conversation_section_fingerprint": "fc42404b404e8ebba4d30357b3ebed424fdcad91bfd9915706b5ee522d01aa7c",
+      "revision": 6,
+      "current_index": 4,
       "paragraphs": [
         {
-          "id": "I1",
-          "purpose": "Open with deployment typo risk and the matched-budget selection problem.",
-          "reference_lines": [
-            40,
-            90
+          "id": "I-P1",
+          "purpose": "Frame e-commerce dialogue as simultaneous profile reasoning and natural response generation.",
+          "rhetorical_role": "problem framing",
+          "relation_to_previous": "A-P1 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L009"
           ],
-          "artifacts": [
+          "artifact_dependencies": [
             "F1"
           ],
           "candidate": null,
-          "accepted_text": "Intent classifiers receive spelling variants that preserve intent but alter lexical evidence. Character edits can sharply reduce classifier accuracy \\citep{pruthi2019combating}, and mixed-noise training can recover part of this loss in goal-oriented dialogue \\citep{sengupta2021robustness}. Which generated examples deserve a limited budget? Here, budget means records admitted to the final refit, not candidate generation and scoring. Figure~\\ref{fig:motivation} contrasts uniform selection with spending the same class-balanced refit count on the lowest true-label score gaps.",
+          "accepted_text": "E-commerce dialogue is not a single optimization target but a joint problem in which the system must simultaneously reason over a structured user profile and produce a natural, fluent response. Correct responses can be read as abrupt, formulaic, or interrogative, while fluent responses can drift away from the user-supplied attributes and yield confidently incorrect suggestions. We frame the task as the coordination of profile-conditioned reasoning with open-ended generation, and we show that optimizing either criterion in isolation leaves the other unaddressed. These complementary failures show that the practical objective is a joint criterion balancing profile consistency and response naturalness. This framing motivates the design of a learning procedure that can adapt its emphasis across tasks and dialogue contexts rather than fixing a static trade-off.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "01be3d9ce22f46dc8d7595fd1d6db05d",
+              "comment": "",
+              "text": "E-commerce dialogue is not a single optimization target but a joint problem in which the system must simultaneously reason over a structured user profile and produce a natural, fluent response. Correct responses can be read as abrupt, formulaic, or interrogative, while fluent responses can drift away from the user-supplied attributes and yield confidently incorrect suggestions. We frame the task as the coordination of profile-conditioned reasoning with open-ended generation, and we show that optimizing either criterion in isolation leaves the other unaddressed. Our motivating analysis (Figure~\\ref{motivation-figure}) demonstrates that correctness-only and fluency-only systems fail along different dimensions and that the practical objective is a joint criterion balancing both. This framing motivates the design of a learning procedure that can adapt its emphasis across tasks and dialogue contexts rather than fixing a static trade-off.",
+              "citations_added": [],
+              "created_at": 1787367285
             }
           ]
         },
         {
-          "id": "I2",
-          "purpose": "Define the gap and introduce the central MTA mechanism.",
-          "reference_lines": [
-            91,
-            140
+          "id": "I-P2",
+          "purpose": "Contrast the failure modes of correctness-only and fluency-only systems using the motivating example.",
+          "rhetorical_role": "concrete motivation",
+          "relation_to_previous": "I-P1 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [
+            "F1"
           ],
-          "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L011"
+          ],
+          "artifact_dependencies": [
+            "F1"
+          ],
           "candidate": null,
-          "accepted_text": "Uniform sampling treats easy and label-confusing edits alike. We propose Margin-Targeted Typo Augmentation (MTA): generate one candidate per operator, score its true-label margin under a clean model, and retain the lowest-margin items under equal per-intent quotas. Only selection changes; the pool, model, example count, and evaluator stay fixed.",
+          "accepted_text": "Consider a customer who asks whether a loan product permits prepayment while holding a profile that specifies a particular income bracket. A correctness-only system might respond, \"Prepayment is allowed for customers in your income bracket,\" which is factually accurate against the profile yet reads as terse and mechanical. A fluency-only system, by contrast, might produce, \"Of course! You can pay off your loan early whenever you like, and we will waive any fees for you,\" which is natural and reassuring but contradicts the profile's restriction. Neither system satisfies the user: the first answers the query but sacrifices conversational quality, while the second reads well but asserts an unqualified allowance that the profile does not support. As Figure~\\ref{motivation-figure} illustrates, these two failure modes are complementary, and the practical objective is a joint criterion that enforces profile consistency and response naturalness simultaneously.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "d7ac070c6957429bbf451b8d6e746fda",
+              "comment": "",
+              "text": "E-commerce dialogue demands more than generating a plausible utterance; the system must also reason over a structured user profile and ground its response in the attributes that are relevant to the current query. A response that is fluent but ignores the user's stated preferences is as unhelpful as one that is factually consistent yet reads as robotic or verbose. The motivating example in Figure~\\ref{motivation-figure} makes this tension concrete: a correctness-only system tends to produce stiff, template-like answers, while a fluency-only system drifts into confident but unfaithful suggestions. Neither failure mode is captured by a single scalar objective. We frame the task as a joint optimization problem in which profile-grounded reasoning and natural language generation must be coordinated, and we argue that achieving this coordination requires an adaptive learning procedure that balances the two criteria rather than treating them as a fixed-weight composite.",
+              "citations_added": [],
+              "created_at": 1787367339
+            },
+            {
+              "candidate_id": "8c52907e632547b7b760825b40aa537c",
+              "comment": "",
+              "text": "Consider a customer who asks whether a loan product permits prepayment while holding a profile that specifies a particular income bracket. A correctness-only system might respond, \"Prepayment is allowed for customers in your income bracket,\" which is factually accurate against the profile yet reads as terse and mechanical. A fluency-only system, by contrast, might produce, \"Of course! You can pay off your loan early whenever you like, and we will waive any fees for you,\" which is natural and reassuring but contradicts the profile's restriction. Neither system satisfies the user: the first answers the query but sacrifices conversational quality, while the second reads well but asserts an unqualified allowance that the profile does not support. As Figure~\\ref{motivation-figure} illustrates, these two failure modes are complementary, and the practical objective is a joint criterion that enforces profile consistency and response naturalness simultaneously.",
+              "citations_added": [],
+              "created_at": 1787367339
             }
           ]
         },
         {
-          "id": "I3",
-          "purpose": "State the three bounded, evidence-backed contributions.",
-          "reference_lines": [
-            141,
-            190
+          "id": "I-P3",
+          "purpose": "Use the reported reward-mixing instability to define the optimization problem and Figure 2 evidence.",
+          "rhetorical_role": "empirical gap",
+          "relation_to_previous": "I-P2 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [
+            "F2"
           ],
-          "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L041"
+          ],
+          "artifact_dependencies": [
+            "F2"
+          ],
           "candidate": null,
-          "accepted_text": "Across six prespecified settings sharing eight seeds held out from exploration, all paired bootstrap 95\\% intervals for MTA over random are positive. The primary 50-intent gain is 1.68 points [1.32, 2.08], and MTA stays within one point of an operator-balanced 5,000-example mixture while refitting on 1,250 examples. The claim is limited to CLINC150, a word-count classifier, English, and four synthetic edits. Section~\\ref{sec:method} defines MTA, Section~\\ref{sec:experiments} tests it, and Section~\\ref{sec:discussion} bounds mechanism and cost claims.",
+          "accepted_text": "A straightforward remedy is to combine the two criteria into a single scalar reward through a fixed weighting. In practice, however, this approach proves unstable: the training dynamics reported in Figure~\\ref{training-dynamics-figure} show that a reward-only objective drives the fluency signal downward as correctness saturates, while a fixed mixed reward oscillates between the two criteria without settling on a policy that satisfies both. Neither trajectory yields a usable operating point, which indicates that static scalarization does not resolve the underlying tension. The optimization problem is therefore to coordinate multiple reward channels in a way that adapts their relative influence during training, rather than committing to a constant trade-off. This instability motivates the design of a learning procedure that re-weights rewards according to how each channel's gradient ranks across the candidate set at each update.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "82599e0a3f904fb6b7b049b68dce7f8e",
+              "comment": "",
+              "text": "The natural remedy for this conflict is to combine the correctness and fluency signals into a single scalar reward. Yet our preliminary experiments reveal a fundamental instability in this approach: directly mixing the two reward channels leads to training dynamics in which one objective continuously suppresses the other, producing oscillatory or degenerate behavior rather than a balanced solution (Figure~\\ref{training-dynamics-figure}). Reward-only optimization drives fluency scores upward while profile-consistency measures plateau or degrade, whereas mixed-reward training fails to converge to a stable operating point. These observations, reconstructed from our pilot runs, highlight that the optimization problem is not simply one of tuning a static mixing weight. Instead, the coordination between multiple reward signals must itself be learned and adapted per context. This defines the central technical challenge we address: how to jointly optimize for correctness and naturalness without falling into the instability that plagues fixed multi-reward objectives.",
+              "citations_added": [],
+              "created_at": 1787367353
+            },
+            {
+              "candidate_id": "2bc539d90cd0458091bfa9c72560a4c5",
+              "comment": "",
+              "text": "A straightforward remedy is to combine the two criteria into a single scalar reward through a fixed weighting. In practice, however, this approach proves unstable: the training dynamics reported in Figure~\\ref{training-dynamics-figure} show that a reward-only objective drives the fluency signal downward as correctness saturates, while a fixed mixed reward oscillates between the two criteria without settling on a policy that satisfies both. Neither trajectory yields a usable operating point, which indicates that static scalarization does not resolve the underlying tension. The optimization problem is therefore to coordinate multiple reward channels in a way that adapts their relative influence during training, rather than committing to a constant trade-off. This instability motivates the design of a learning procedure that re-weights rewards according to how each channel's gradient ranks across the candidate set at each update.",
+              "citations_added": [],
+              "created_at": 1787367353
+            }
+          ]
+        },
+        {
+          "id": "I-P4",
+          "purpose": "Preview the staged reasoning scaffold and adaptive gradient-ranked multi-reward solution.",
+          "rhetorical_role": "solution preview",
+          "relation_to_previous": "I-P3 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L015"
+          ],
+          "artifact_dependencies": [],
+          "candidate": null,
+          "accepted_text": "We introduce MORE, a staged reasoning scaffold coupled with adaptive gradient-ranked multi-reward learning, designed to resolve the optimization conflict identified above. The method proceeds in two distinct stages. In the first stage, a policy is trained jointly on two verifiable reasoning tasks: masked attribute completion, which requires the model to recover profile fields that are withheld from the input, and programmatic numerical reasoning, which requires the model to compute quantities such as eligibility thresholds or repayment terms from the structured profile. This training produces a reasoning-enhanced reference policy that is then frozen rather than updated during quality optimization. Freezing this reference decouples the verifiable objectives from subjective quality criteria, so that neither stage's gradient can interfere with the other's learning dynamics. In the second stage, response-quality optimization proceeds as follows: the frozen reference generates a candidate pool, every candidate is scored across multiple reward channels that capture distinct dimensions of response quality, and rank-based gradient weighting coordinates these channels context-sensitively. For each candidate, the training signal is shifted toward the channels where that candidate ranks most poorly, rather than applying a fixed scalar trade-off uniformly across all candidates and training steps. This per-candidate, per-channel adaptation allows the optimization to emphasize factual fidelity for some responses while emphasizing naturalness for others, depending on where each candidate falls short. The complete architecture thus replaces static scalarization with a dynamic coordination mechanism whose behavior we examine empirically in the following sections.",
+          "history": [
+            {
+              "candidate_id": "7dae1f80955f4a48b1efe10c49d9e261",
+              "comment": "",
+              "text": "To meet these competing objectives, we introduce MORE, an adaptive multi-objective learning framework for e-commerce dialogue. The solution combines two complementary mechanisms. First, a staged reasoning scaffold decomposes response generation into verifiable attribute-completion and numerical-reasoning sub-tasks, trained with group-relative candidate generation, normalized advantage, clipped updating, and KL anchoring. Second, instead of mixing a fixed weighted sum of rewards, MORE treats the reasoning-enhanced policy as a frozen reference and coordinates response-quality reward channels through rank-based gradient weighting, so that reward magnitudes and scales do not need to be reconciled globally. A qualitative overview of the scaffold, the frozen reference, the adaptive reward coordination, and direct-response inference is shown in Figure~\\ref{framework-figure}. In the sections that follow, we test whether this architectural separation resolves the reward-mixing instability introduced above across offline, multi-domain, and live-deployment settings.",
+              "citations_added": [],
+              "created_at": 1787368549
+            },
+            {
+              "candidate_id": "56c06046e4b54f8ab8c339c5c635b6e8",
+              "comment": "",
+              "text": "We introduce MORE, a staged reasoning scaffold coupled with adaptive gradient-ranked multi-reward learning, designed to resolve the optimization conflict identified above. The method first trains a policy for verifiable attribute completion and programmatic numerical reasoning, producing a reasoning-enhanced reference that is then frozen rather than jointly optimized. Response-quality is evaluated across multiple reward channels for every generated candidate, and rank-based gradient weighting coordinates these channels context-sensitively so that training signal shifts toward the channels where each candidate most needs improvement. The overall pipeline, including the frozen reference, adaptive reward coordination, and direct-response inference, is reconstructed qualitatively in Figure~\\ref{framework-figure}. This architecture decouples verifiable reasoning objectives from subjective quality rewards, allowing each stage to be improved and diagnosed independently before joint deployment.",
+              "citations_added": [],
+              "created_at": 1787368549
+            },
+            {
+              "candidate_id": "089a7ee1ee6a40eb8817e45a7790a2d6",
+              "comment": "详细一点",
+              "text": "We introduce MORE, a staged reasoning scaffold coupled with adaptive gradient-ranked multi-reward learning, designed to resolve the optimization conflict identified above. The method first trains a policy jointly on verifiable attribute completion and programmatic numerical reasoning, yielding a reasoning-enhanced reference policy that is then frozen in place of a jointly optimized mixed objective. During response-quality optimization, every generated candidate is scored across multiple reward channels, each capturing a distinct dimension of response quality. Rank-based gradient weighting then coordinates these channels in a context-sensitive manner: for each candidate, the training signal is shifted toward the channels that most need improvement, rather than applying a fixed scalar trade-off across all candidates and training steps. This two-stage architecture decouples verifiable reasoning objectives from subjective quality rewards, allowing each stage to be improved and diagnosed independently before joint deployment.",
+              "citations_added": [],
+              "created_at": 1787370061
+            },
+            {
+              "candidate_id": "8ac8757ea23746548c907e2e057bb40e",
+              "comment": "再详细一点",
+              "text": "We introduce MORE, a staged reasoning scaffold coupled with adaptive gradient-ranked multi-reward learning, designed to resolve the optimization conflict identified above. The method proceeds in two distinct stages. In the first stage, a policy is trained jointly on two verifiable reasoning tasks: masked attribute completion, which requires the model to recover profile fields that are withheld from the input, and programmatic numerical reasoning, which requires the model to compute quantities such as eligibility thresholds or repayment terms from the structured profile. This training produces a reasoning-enhanced reference policy that is then frozen rather than updated during quality optimization. Freezing this reference decouples the verifiable objectives from subjective quality criteria, so that neither stage's gradient can interfere with the other's learning dynamics. In the second stage, response-quality optimization proceeds as follows: the frozen reference generates a candidate pool, every candidate is scored across multiple reward channels that capture distinct dimensions of response quality, and rank-based gradient weighting coordinates these channels context-sensitively. For each candidate, the training signal is shifted toward the channels where that candidate ranks most poorly, rather than applying a fixed scalar trade-off uniformly across all candidates and training steps. This per-candidate, per-channel adaptation allows the optimization to emphasize factual fidelity for some responses while emphasizing naturalness for others, depending on where each candidate falls short. The complete architecture thus replaces static scalarization with a dynamic coordination mechanism whose behavior we examine empirically in the following sections.",
+              "citations_added": [],
+              "created_at": 1787370081
+            }
+          ]
+        },
+        {
+          "id": "I-P5",
+          "purpose": "State the offline, online, and efficiency contributions with their tested scope.",
+          "rhetorical_role": "contributions",
+          "relation_to_previous": "I-P4 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L027"
+          ],
+          "artifact_dependencies": [],
+          "candidate": null,
+          "accepted_text": "We evaluate MORE across three complementary settings, each scoped to the evidence it can support. On the ByteDance offline benchmark, MORE achieves joint gains on both overlap-based and human-aligned quality dimensions relative to matched baselines. On MultiWOZ, it improves task success and response diversity, while retaining the expected BLEU and CBE trade-offs. In deployment, a six-variant 14-day A/B test on the ByteDance platform measures the primary relative changes, with additional cohort and human-agent comparisons providing bounded deployment evidence. Finally, we report efficiency gains: reduced latency and shorter output lengths against explicit chain-of-thought inference. These offline, online, and efficiency contributions are each presented with their tested scope clearly delimited, so that claims of generalization remain appropriately qualified rather than overstated.",
+          "history": [
+            {
+              "candidate_id": "6551774d66c54e1fab9d0a04a849f6ee",
+              "comment": "",
+              "text": "We organize the contributions into offline, online, and efficiency results, each with its tested scope. Offline, MORE improves the overlap between generated and human-preferred responses and human-aligned quality dimensions on the ByteDance benchmark, and it improves task success and diversity on MultiWOZ while retaining the associated BLEU and CBE trade-offs. Online, a six-arm 14-day A/B experiment measures the primary relative changes introduced by the full method. Efficiency results report reduced latency and output length relative to explicit chain-of-thought inference. We qualify these findings as bounded by their evaluation settings: Human judgments and cohort comparisons serve as additional deployment evidence, while broader generalization beyond the tested dialogue conditions remains open.",
+              "citations_added": [],
+              "created_at": 1787368563
+            },
+            {
+              "candidate_id": "5233058656424a9d99c42e1eebfa60cf",
+              "comment": "",
+              "text": "We evaluate MORE across three complementary settings, each scoped to the evidence it can support. On the ByteDance offline benchmark, MORE achieves joint gains on both overlap-based and human-aligned quality dimensions relative to matched baselines. On MultiWOZ, it improves task success and response diversity, while retaining the expected BLEU and CBE trade-offs. In deployment, a six-variant 14-day A/B test on the ByteDance platform measures the primary relative changes, with additional cohort and human-agent comparisons providing bounded deployment evidence. Finally, we report efficiency gains: reduced latency and shorter output lengths against explicit chain-of-thought inference. These offline, online, and efficiency contributions are each presented with their tested scope clearly delimited, so that claims of generalization remain appropriately qualified rather than overstated.",
+              "citations_added": [],
+              "created_at": 1787368563
             }
           ]
         }
       ],
-      "accepted_text": "Intent classifiers receive spelling variants that preserve intent but alter lexical evidence. Character edits can sharply reduce classifier accuracy \\citep{pruthi2019combating}, and mixed-noise training can recover part of this loss in goal-oriented dialogue \\citep{sengupta2021robustness}. Which generated examples deserve a limited budget? Here, budget means records admitted to the final refit, not candidate generation and scoring. Figure~\\ref{fig:motivation} contrasts uniform selection with spending the same class-balanced refit count on the lowest true-label score gaps.\n\nUniform sampling treats easy and label-confusing edits alike. We propose Margin-Targeted Typo Augmentation (MTA): generate one candidate per operator, score its true-label margin under a clean model, and retain the lowest-margin items under equal per-intent quotas. Only selection changes; the pool, model, example count, and evaluator stay fixed.\n\nAcross six prespecified settings sharing eight seeds held out from exploration, all paired bootstrap 95\\% intervals for MTA over random are positive. The primary 50-intent gain is 1.68 points [1.32, 2.08], and MTA stays within one point of an operator-balanced 5,000-example mixture while refitting on 1,250 examples. The claim is limited to CLINC150, a word-count classifier, English, and four synthetic edits. Section~\\ref{sec:method} defines MTA, Section~\\ref{sec:experiments} tests it, and Section~\\ref{sec:discussion} bounds mechanism and cost claims."
+      "accepted_text": "E-commerce dialogue is not a single optimization target but a joint problem in which the system must simultaneously reason over a structured user profile and produce a natural, fluent response. Correct responses can be read as abrupt, formulaic, or interrogative, while fluent responses can drift away from the user-supplied attributes and yield confidently incorrect suggestions. We frame the task as the coordination of profile-conditioned reasoning with open-ended generation, and we show that optimizing either criterion in isolation leaves the other unaddressed. These complementary failures show that the practical objective is a joint criterion balancing profile consistency and response naturalness. This framing motivates the design of a learning procedure that can adapt its emphasis across tasks and dialogue contexts rather than fixing a static trade-off.\n\nConsider a customer who asks whether a loan product permits prepayment while holding a profile that specifies a particular income bracket. A correctness-only system might respond, \"Prepayment is allowed for customers in your income bracket,\" which is factually accurate against the profile yet reads as terse and mechanical. A fluency-only system, by contrast, might produce, \"Of course! You can pay off your loan early whenever you like, and we will waive any fees for you,\" which is natural and reassuring but contradicts the profile's restriction. Neither system satisfies the user: the first answers the query but sacrifices conversational quality, while the second reads well but asserts an unqualified allowance that the profile does not support. As Figure~\\ref{motivation-figure} illustrates, these two failure modes are complementary, and the practical objective is a joint criterion that enforces profile consistency and response naturalness simultaneously.\n\nA straightforward remedy is to combine the two criteria into a single scalar reward through a fixed weighting. In practice, however, this approach proves unstable: the training dynamics reported in Figure~\\ref{training-dynamics-figure} show that a reward-only objective drives the fluency signal downward as correctness saturates, while a fixed mixed reward oscillates between the two criteria without settling on a policy that satisfies both. Neither trajectory yields a usable operating point, which indicates that static scalarization does not resolve the underlying tension. The optimization problem is therefore to coordinate multiple reward channels in a way that adapts their relative influence during training, rather than committing to a constant trade-off. This instability motivates the design of a learning procedure that re-weights rewards according to how each channel's gradient ranks across the candidate set at each update.\n\nWe introduce MORE, a staged reasoning scaffold coupled with adaptive gradient-ranked multi-reward learning, designed to resolve the optimization conflict identified above. The method proceeds in two distinct stages. In the first stage, a policy is trained jointly on two verifiable reasoning tasks: masked attribute completion, which requires the model to recover profile fields that are withheld from the input, and programmatic numerical reasoning, which requires the model to compute quantities such as eligibility thresholds or repayment terms from the structured profile. This training produces a reasoning-enhanced reference policy that is then frozen rather than updated during quality optimization. Freezing this reference decouples the verifiable objectives from subjective quality criteria, so that neither stage's gradient can interfere with the other's learning dynamics. In the second stage, response-quality optimization proceeds as follows: the frozen reference generates a candidate pool, every candidate is scored across multiple reward channels that capture distinct dimensions of response quality, and rank-based gradient weighting coordinates these channels context-sensitively. For each candidate, the training signal is shifted toward the channels where that candidate ranks most poorly, rather than applying a fixed scalar trade-off uniformly across all candidates and training steps. This per-candidate, per-channel adaptation allows the optimization to emphasize factual fidelity for some responses while emphasizing naturalness for others, depending on where each candidate falls short. The complete architecture thus replaces static scalarization with a dynamic coordination mechanism whose behavior we examine empirically in the following sections.\n\nWe evaluate MORE across three complementary settings, each scoped to the evidence it can support. On the ByteDance offline benchmark, MORE achieves joint gains on both overlap-based and human-aligned quality dimensions relative to matched baselines. On MultiWOZ, it improves task success and response diversity, while retaining the expected BLEU and CBE trade-offs. In deployment, a six-variant 14-day A/B test on the ByteDance platform measures the primary relative changes, with additional cohort and human-agent comparisons providing bounded deployment evidence. Finally, we report efficiency gains: reduced latency and shorter output lengths against explicit chain-of-thought inference. These offline, online, and efficiency contributions are each presented with their tested scope clearly delimited, so that claims of generalization remain appropriately qualified rather than overstated."
     },
     "related_work": {
       "title": "Related Work",
       "file": "related_work.tex",
-      "previous_response_id": null,
-      "bibliography_fingerprint": null,
-      "conversation_section_fingerprint": null,
-      "revision": 1,
-      "current_index": 0,
+      "previous_response_id": "3505c490-44de-42c7-a950-089ed15517d0",
+      "bibliography_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "conversation_section_fingerprint": "1ac99b738521851dd3d846a8109780015cedca28b32e76f18c2abab9478040b3",
+      "revision": 3,
+      "current_index": 2,
       "paragraphs": [
         {
-          "id": "R1",
-          "heading": "Noisy intent understanding.",
-          "heading_style": "paragraph",
-          "purpose": "Position task-oriented robustness studies against fixed-budget selection.",
-          "reference_lines": [
-            191,
-            235
-          ],
+          "id": "RW-P1",
+          "purpose": "Explain why profile-conditioned dialogue does not by itself solve dynamic attribute reasoning.",
+          "rhetorical_role": "personalization boundary",
+          "relation_to_previous": "I-P5 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
           "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L033"
+          ],
+          "artifact_dependencies": [],
           "candidate": null,
-          "accepted_text": "\\paragraph{Noisy intent understanding.} Realistic input variation reduces both intent and slot performance, while aggregate augmentation improves average robustness \\citep{sengupta2021robustness}. LAUG expands task-oriented dialogue stress tests to word perturbations, paraphrases, disfluencies, and speech phenomena \\citep{liu2021laug}. HINT3 and covariate-shift benchmarks further show that clean in-distribution scores do not establish deployment robustness \\citep{arora2020hint3,khosla2022covariate}. These studies motivate shifted evaluation; MTA asks how to allocate a fixed synthetic-noise budget.",
+          "accepted_text": "Profile-conditioned dialogue systems condition generation on a static user profile, yet the attributes that govern an e-commerce exchange, such as a shopper's budget, delivery preference, or willingness to accept a substitute, shift over the course of a conversation. A fixed profile snapshot cannot capture these dynamics because it reflects a prior state rather than the evolving interaction. Consequently, such models may persist with outdated assumptions, recommending a high-end item after the user has signaled a tighter budget or failing to revisit a preference that the dialogue itself has contradicted. Personalization on a static representation thus addresses a narrow slice of the problem: it improves how faithfully utterances reflect a stored persona, but it does not provide a mechanism for revising the reasoning that connects new conversational evidence to a changing attribute set. Reasoning over fresh dialogue context is therefore the complementary capability that profile conditioning lacks.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "d9f3727efdba4293be072faab335e8a8",
+              "comment": "",
+              "text": "Profile-conditioned dialogue systems condition generation on a static user profile, yet the attributes that govern an e-commerce exchange, such as a shopper's budget, delivery preference, or willingness to accept a substitute, shift over the course of a conversation. A fixed profile snapshot cannot capture these dynamics because it reflects a prior state rather than the evolving interaction. Consequently, such models may persist with outdated assumptions, recommending a high-end item after the user has signaled a tighter budget or failing to revisit a preference that the dialogue itself has contradicted. Personalization on a static representation thus addresses a narrow slice of the problem: it improves how faithfully utterances reflect a stored persona, but it does not provide a mechanism for revising the reasoning that connects new conversational evidence to a changing attribute set. Reasoning over fresh dialogue context is therefore the complementary capability that profile conditioning lacks.",
+              "citations_added": [],
+              "created_at": 1787373914
             }
           ]
         },
         {
-          "id": "R2",
-          "heading": "Typo robustness and augmentation selection.",
-          "heading_style": "paragraph",
-          "purpose": "Contrast representations and augmentation families with MTA.",
-          "reference_lines": [
-            236,
-            280
-          ],
+          "id": "RW-P2",
+          "purpose": "Position the study within task-oriented dialogue and e-commerce-specific constraints.",
+          "rhetorical_role": "task boundary",
+          "relation_to_previous": "RW-P1 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
           "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L035"
+          ],
+          "artifact_dependencies": [],
           "candidate": null,
-          "accepted_text": "\\paragraph{Typo robustness and augmentation selection.} Balanced insertion, deletion, substitution, and swap mixtures can transfer from synthetic to naturally occurring noise \\citep{karpukhin2019training}, while character processing alone is not automatically robust \\citep{belinkov2018synthetic}. Stable encodings, misspelling-aware embeddings, and compact projections attack the representation problem directly \\citep{jones2020robust,piktus2019misspelling,sankar2021projection}. Broader augmentation surveys and controlled utterance-classification studies document substantial variation among transformations \\citep{chen2023survey,xu2020augmentation}. Decision-boundary sampling selects unlabeled text for annotation \\citep{tong2001svm}; uncertainty-guided generation has been studied for efficient active learning \\citep{quteineh2020textual}. MTA instead selects labeled synthetic typos under fixed quotas and refit counts. Word-form variation can alter lexical evidence \\citep{wang2025word}, motivating model-specific rescoring.",
+          "accepted_text": "Task-oriented dialogue systems are typically evaluated on their ability to complete a well-specified transaction, such as booking a flight or reserving a restaurant, where success is defined by slot filling and API calls. E-commerce dialogue introduces a distinct set of constraints that this formulation does not capture: the system must reason over product attributes that vary across categories, balance competing objectives such as attribute fidelity and conversational naturalness, and adapt to users who may not articulate their constraints in a single turn. Moreover, the cost of an incorrect recommendation is asymmetric; a fluent but wrong answer can erode user trust more than a correct but awkward one. These properties place e-commerce dialogue at the intersection of task completion and open-ended generation, where neither a strict slot-filling evaluation nor a purely fluency-based metric is sufficient to characterize system quality. Our evaluation therefore combines task-oriented measures with human-aligned response-quality dimensions to reflect this dual requirement.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "0096dac65523411b939e92a4bd1a5ab5",
+              "comment": "",
+              "text": "Task-oriented dialogue systems are typically evaluated on their ability to complete a well-specified transaction, such as booking a flight or reserving a restaurant, where success is defined by slot filling and API calls. E-commerce dialogue introduces a distinct set of constraints that this formulation does not capture: the system must reason over product attributes that vary across categories, balance competing objectives such as attribute fidelity and conversational naturalness, and adapt to users who may not articulate their constraints in a single turn. Moreover, the cost of an incorrect recommendation is asymmetric; a fluent but wrong answer can erode user trust more than a correct but awkward one. These properties place e-commerce dialogue at the intersection of task completion and open-ended generation, where neither a strict slot-filling evaluation nor a purely fluency-based metric is sufficient to characterize system quality. Our evaluation therefore combines task-oriented measures with human-aligned response-quality dimensions to reflect this dual requirement.",
+              "citations_added": [],
+              "created_at": 1787374502
+            }
+          ]
+        },
+        {
+          "id": "RW-P3",
+          "purpose": "Contrast single-reward dialogue RL with adaptive multi-objective coordination.",
+          "rhetorical_role": "optimization boundary",
+          "relation_to_previous": "RW-P2 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L039"
+          ],
+          "artifact_dependencies": [],
+          "candidate": null,
+          "accepted_text": "Reinforcement learning for dialogue systems commonly optimizes a single scalar reward, whether task success, informativeness, or user satisfaction, with the implicit assumption that one aggregated signal sufficiently captures response quality. In e-commerce settings, however, this assumption breaks down because the correctness of the requested attribute and the naturalness of the phrasing can conflict within a single turn, and the relative importance of these dimensions shifts with context. A fixed linear combination of rewards encodes a static trade-off that cannot adapt when a user prioritizes a precise product match over conversational polish, or vice versa. Our approach instead coordinates multiple reward channels by assigning rank-based gradient weights per training batch, so the optimization responds to the current distribution of candidate quality rather than committing to a predetermined weighting. This contrasts with single-reward formulations that cannot express such context-sensitive coordination without manual reward tuning.",
+          "history": [
+            {
+              "candidate_id": "5a95cc9c446148369b3ccc4330e44196",
+              "comment": "",
+              "text": "Reinforcement learning for dialogue has largely been formulated as single-reward optimization, where a scalar signal such as task success or response appropriateness guides policy updates. This formulation assumes that a fixed objective adequately represents the full range of interaction goals. In e-commerce dialogue, however, correctness and naturalness frequently conflict, and the appropriate balance shifts with the conversational context: a user comparing product specifications may tolerate formulaic phrasing, while a user seeking recommendations expects fluent prose. A single scalar reward cannot express this context-dependent trade-off, and fixed linear combinations of rewards exhibit instability when the optimal weighting varies across examples. Adaptive multi-objective coordination instead treats the relative importance of reward channels as a per-example decision, allowing the policy to emphasize the dimensions most informative for the current exchange. This perspective reframes optimization as a ranking problem over candidate responses, where gradient contributions are weighted by each channel's apparent informativeness.",
+              "citations_added": [],
+              "created_at": 1787374518
+            },
+            {
+              "candidate_id": "f182902e36a44cd09814bb9a8abdaaca",
+              "comment": "",
+              "text": "Reinforcement learning for dialogue systems commonly optimizes a single scalar reward, whether task success, informativeness, or user satisfaction, with the implicit assumption that one aggregated signal sufficiently captures response quality. In e-commerce settings, however, this assumption breaks down because the correctness of the requested attribute and the naturalness of the phrasing can conflict within a single turn, and the relative importance of these dimensions shifts with context. A fixed linear combination of rewards encodes a static trade-off that cannot adapt when a user prioritizes a precise product match over conversational polish, or vice versa. Our approach instead coordinates multiple reward channels by assigning rank-based gradient weights per training batch, so the optimization responds to the current distribution of candidate quality rather than committing to a predetermined weighting. This contrasts with single-reward formulations that cannot express such context-sensitive coordination without manual reward tuning.",
+              "citations_added": [],
+              "created_at": 1787374518
             }
           ]
         }
       ],
-      "accepted_text": "\\paragraph{Noisy intent understanding.} Realistic input variation reduces both intent and slot performance, while aggregate augmentation improves average robustness \\citep{sengupta2021robustness}. LAUG expands task-oriented dialogue stress tests to word perturbations, paraphrases, disfluencies, and speech phenomena \\citep{liu2021laug}. HINT3 and covariate-shift benchmarks further show that clean in-distribution scores do not establish deployment robustness \\citep{arora2020hint3,khosla2022covariate}. These studies motivate shifted evaluation; MTA asks how to allocate a fixed synthetic-noise budget.\n\n\\paragraph{Typo robustness and augmentation selection.} Balanced insertion, deletion, substitution, and swap mixtures can transfer from synthetic to naturally occurring noise \\citep{karpukhin2019training}, while character processing alone is not automatically robust \\citep{belinkov2018synthetic}. Stable encodings, misspelling-aware embeddings, and compact projections attack the representation problem directly \\citep{jones2020robust,piktus2019misspelling,sankar2021projection}. Broader augmentation surveys and controlled utterance-classification studies document substantial variation among transformations \\citep{chen2023survey,xu2020augmentation}. Decision-boundary sampling selects unlabeled text for annotation \\citep{tong2001svm}; uncertainty-guided generation has been studied for efficient active learning \\citep{quteineh2020textual}. MTA instead selects labeled synthetic typos under fixed quotas and refit counts. Word-form variation can alter lexical evidence \\citep{wang2025word}, motivating model-specific rescoring."
+      "accepted_text": "Profile-conditioned dialogue systems condition generation on a static user profile, yet the attributes that govern an e-commerce exchange, such as a shopper's budget, delivery preference, or willingness to accept a substitute, shift over the course of a conversation. A fixed profile snapshot cannot capture these dynamics because it reflects a prior state rather than the evolving interaction. Consequently, such models may persist with outdated assumptions, recommending a high-end item after the user has signaled a tighter budget or failing to revisit a preference that the dialogue itself has contradicted. Personalization on a static representation thus addresses a narrow slice of the problem: it improves how faithfully utterances reflect a stored persona, but it does not provide a mechanism for revising the reasoning that connects new conversational evidence to a changing attribute set. Reasoning over fresh dialogue context is therefore the complementary capability that profile conditioning lacks.\n\nTask-oriented dialogue systems are typically evaluated on their ability to complete a well-specified transaction, such as booking a flight or reserving a restaurant, where success is defined by slot filling and API calls. E-commerce dialogue introduces a distinct set of constraints that this formulation does not capture: the system must reason over product attributes that vary across categories, balance competing objectives such as attribute fidelity and conversational naturalness, and adapt to users who may not articulate their constraints in a single turn. Moreover, the cost of an incorrect recommendation is asymmetric; a fluent but wrong answer can erode user trust more than a correct but awkward one. These properties place e-commerce dialogue at the intersection of task completion and open-ended generation, where neither a strict slot-filling evaluation nor a purely fluency-based metric is sufficient to characterize system quality. Our evaluation therefore combines task-oriented measures with human-aligned response-quality dimensions to reflect this dual requirement.\n\nReinforcement learning for dialogue systems commonly optimizes a single scalar reward, whether task success, informativeness, or user satisfaction, with the implicit assumption that one aggregated signal sufficiently captures response quality. In e-commerce settings, however, this assumption breaks down because the correctness of the requested attribute and the naturalness of the phrasing can conflict within a single turn, and the relative importance of these dimensions shifts with context. A fixed linear combination of rewards encodes a static trade-off that cannot adapt when a user prioritizes a precise product match over conversational polish, or vice versa. Our approach instead coordinates multiple reward channels by assigning rank-based gradient weights per training batch, so the optimization responds to the current distribution of candidate quality rather than committing to a predetermined weighting. This contrasts with single-reward formulations that cannot express such context-sensitive coordination without manual reward tuning."
     },
     "method": {
-      "title": "Method",
+      "title": "MORE",
       "file": "method.tex",
-      "previous_response_id": null,
-      "bibliography_fingerprint": null,
-      "conversation_section_fingerprint": null,
-      "revision": 3,
-      "current_index": 0,
+      "previous_response_id": "671a2799-101e-4b30-a4ea-b8add4aab05b",
+      "bibliography_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "conversation_section_fingerprint": "b217f2aa578b6631395fde67861f877751727b39e156d25d65579b80ad99b79e",
+      "revision": 6,
+      "current_index": 5,
       "paragraphs": [
         {
-          "id": "M1",
-          "heading": "Candidate margins",
-          "heading_style": "subsection",
-          "purpose": "Define typo candidates and the true-label margin.",
-          "reference_lines": [
-            281,
-            335
-          ],
+          "id": "M-P1",
+          "purpose": "Formalize response generation from dialogue history, current query, and a structured user profile.",
+          "rhetorical_role": "problem formulation",
+          "relation_to_previous": "RW-P3 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
           "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L053"
+          ],
+          "artifact_dependencies": [],
           "candidate": null,
-          "accepted_text": "\\subsection{Candidate margins}\nLet $D=\\{(x_i,y_i)\\}_{i=1}^{n}$ be the clean training set, $O$ the four typo operators, and $f_0$ a classifier fitted on $D$. Each operator produces one deterministic candidate for a fixed seed,\n\\begin{equation}\nc_{i,o}=T_o(x_i;s),\\qquad o\\in O.\n\\end{equation}\nWriting $g_k(c)$ for the pre-normalization score of intent $k$, we measure how securely the candidate retains its true intent by\n\\begin{equation}\nm(c_{i,o})=g_{y_i}(c_{i,o})-\\max_{k\\neq y_i}g_k(c_{i,o}).\n\\end{equation}\nA negative margin means that the clean classifier assigns a competing intent a larger score. MTA uses low score gaps as a model-specific ranking signal, without consulting validation or test accuracy. The clean-only model computes the score before any augmented example is selected, so selection cannot benefit from a refitted classifier or final evaluation labels. Candidates remain separate records even when two operators emit the same surface form; this preserves the shared generation contract. The raw score gap is not a normalized geometric distance to a hyperplane. It can favor candidates with more edits or repeatedly select variants of one hard source, so the experiment tests the complete selector rather than isolating a boundary-proximity mechanism. Recomputing the ranking for a different representation is part of applying the method because score scales and competing intents may change. Ties follow immutable candidate order. Margin magnitude is only an ordering statistic: MTA assumes neither calibrated probabilities nor a tunable threshold.",
+          "accepted_text": "We formalize the dialogue response problem as follows. Each interaction is a triple \\((u, h, q)\\), where \\(u\\) is a structured user profile, \\(h\\) is the dialogue history preceding the current turn, and \\(q\\) is the user's current query. The goal is to learn a policy \\(\\pi_\\theta\\) that maps \\((u, h, q)\\) to a natural-language response \\(r\\). The profile \\(u\\) encodes attributes relevant to the seller's reasoning, such as preference constraints and eligibility information; the history \\(h\\) captures the conversational context, including previously stated requirements and any prior system utterances. The query \\(q\\) reflects the user's immediate request at the present turn. These three inputs constitute the complete context available at generation time. Training proceeds in a staged manner: a reasoning-enhanced policy is first produced through scaffold tasks, and the final generator is then trained by adapting this policy under the multi-reward objective described in the remainder of this section, while a supervised baseline of standard response generation provides the initial policy.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "e44d18869b72455e956966b4ea5b3abf",
+              "comment": "",
+              "text": "We formalize the dialogue response problem as follows. Each interaction is a triple \\((u, h, q)\\), where \\(u\\) is a structured user profile, \\(h\\) is the dialogue history preceding the current turn, and \\(q\\) is the user's current query. The goal is to learn a policy \\(\\pi_\\theta\\) that maps \\((u, h, q)\\) to a natural-language response \\(r\\). The profile \\(u\\) encodes attributes relevant to the seller's reasoning, such as preference constraints and eligibility information; the history \\(h\\) captures the conversational context, including previously stated requirements and any prior system utterances. The query \\(q\\) reflects the user's immediate request at the present turn. These three inputs constitute the complete context available at generation time. Training proceeds in a staged manner: a reasoning-enhanced policy is first produced through scaffold tasks, and the final generator is then trained by adapting this policy under the multi-reward objective described in the remainder of this section, while a supervised baseline of standard response generation provides the initial policy.",
+              "citations_added": [],
+              "created_at": 1787375746
             }
           ]
         },
         {
-          "id": "M2",
-          "heading": "Class-balanced selection",
-          "heading_style": "subsection",
-          "purpose": "Define quotas, selection, and matched controls.",
-          "reference_lines": [
-            336,
-            390
-          ],
+          "id": "M-P2",
+          "purpose": "Define group-relative candidate generation, normalized advantage, clipped updating, and KL anchoring.",
+          "rhetorical_role": "optimization backbone",
+          "relation_to_previous": "M-P1 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
           "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L055"
+          ],
+          "artifact_dependencies": [],
           "candidate": null,
-          "accepted_text": "\\subsection{Class-balanced selection}\nFor total budget $B$ and label set $\\mathcal{Y}$, the quota for label $y$ is\n\\begin{equation}\nq_y=\\left\\lfloor \\frac{B}{|\\mathcal{Y}|}\\right\\rfloor+r_y,\n\\qquad \\sum_{y\\in\\mathcal{Y}}r_y=B\\bmod |\\mathcal{Y}|,\n\\end{equation}\nwhere the deterministic remainders $r_y\\in\\{0,1\\}$ follow label order. Within each label, MTA takes the $q_y$ candidates with the smallest margin:\n\\begin{equation}\nS_y=\\underset{S\\subseteq C_y,\\ |S|=q_y}{\\arg\\min}\\ \\sum_{c\\in S}m(c),\n\\qquad S=\\bigcup_y S_y.\n\n\\end{equation}\nThis construction guarantees the same total count and intent distribution as the random-budget control. The class-balanced random baseline samples $q_y$ candidates in each class; balanced full-mixture augmentation takes one example per clean item and distributes operators evenly. Every method refits the same multinomial Naive Bayes classifier. Without class constraints, global ranking could reweight difficult intents. All declared quotas are feasible because each class contributes four candidate streams per clean example. Quotas are fixed before ranking, so MTA and random differ in within-class membership, not class counts. This also makes class counts directly auditable. Selection adds one sort per class after shared candidate scoring and no additional model fit. The augmented-example ratio is computed against the full mixture.",
+          "accepted_text": "For each context \\((u, h, q)\\), the policy generates a group of \\(G\\) candidate responses \\(r_1, \\dots, r_G\\) sampled from \\(\\pi_\\theta\\). All candidates within a group share the same context, enabling group-relative comparison of their reward scores. For each candidate \\(r_i\\), we compute a reward \\(R(r_i)\\) by aggregating the multi-reward channels described in M-P5, then define a normalized advantage\n\n\\[\nA_i =\n\\begin{aligned}\n\\frac{R(r_i) - \\frac{1}{G}\\sum_{j=1}^{G} R(r_j)}\n{\\sqrt{\\frac{1}{G}\\sum_{j=1}^{G} \\bigl(R(r_j) - \\bar{R}\\bigr)^2 + \\epsilon}}\n\\end{aligned}\n\\]\n\nwhere \\(\\bar{R}\\) denotes the group mean and \\(\\epsilon\\) is a small constant for numerical stability. The policy is updated via clipped objective\n\n\\[\nL(\\theta) =\n\\begin{aligned}\n\\mathbb{E}_{(u,h,q)}\n\\left[\\frac{1}{G}\\sum_{i=1}^{G} \\min\\left(\n\\rho_i A_i,\\;\n\\operatorname{clip}(\\rho_i, 1-\\delta, 1+\\delta) A_i\n\\right)\\right]\n\\end{aligned}\n\\]\n\nwith importance ratio \\(\\rho_i = \\pi_\\theta(r_i \\mid u,h,q) / \\pi_{\\text{old}}(r_i \\mid u,h,q)\\), where \\(\\pi_{\\text{old}}\\) is the policy snapshot before the update. To prevent the policy from drifting too far, an additional KL anchor term penalizes divergence from the frozen reference policy \\(\\pi_{\\text{ref}}\\) established in M-P4. The final training objective combines the clipped group-relative loss with a KL penalty\n\n\\[\nL_{\\text{total}}(\\theta) =\n\\begin{aligned}\nL(\\theta) - \\beta \\cdot \\frac{1}{G}\\sum_{i=1}^{G}\n\\operatorname{KL}\\bigl(\\pi_\\theta(\\cdot \\mid u,h,q) \\,\\|\\, \\pi_{\\text{ref}}(\\cdot \\mid u,h,q)\\bigr)\n\\end{aligned}\n\\]\n\nwith coefficient \\(\\beta\\) controlling the strength of the anchor.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "8350371fc65044569d6c90b5758c026a",
+              "comment": "",
+              "text": "We optimize the policy with a group-relative objective that adapts standard policy-gradient machinery to the multi-reward setting. For each context \\((u, h, q)\\), we sample a group of \\(G\\) candidate responses \\(\\{r_1, \\dots, r_G\\}\\) from the current policy. Each candidate receives a vector of reward-channel scores, and we compute a normalized advantage for candidate \\(r_i\\) with respect to each reward channel \\(k\\) as\n\n\\[\n\\hat{A}_{k}(r_i) = \\frac{s_k(r_i) - \\mu_k}{\\sigma_k},\n\\]\n\nwhere \\(\\mu_k\\) and \\(\\sigma_k\\) are the mean and standard deviation of channel-\\(k\\) scores across the group. The policy is updated by maximizing the clipped objective\n\n\\[\n\\begin{aligned}\n\\mathcal{L}(\\theta) = \\mathbb{E}_i \\Big[ & \\min\\big( \\rho_i(\\theta) \\hat{A}_i, \\\\\n& \\operatorname{clip}(\\rho_i(\\theta), 1-\\epsilon, 1+\\epsilon) \\hat{A}_i \\big) \\Big],\n\\end{aligned}\n\\]\n\nwhere \\(\\rho_i(\\theta)\\) is the importance ratio between the new and old policies for candidate \\(r_i\\), and \\(\\hat{A}_i\\) aggregates the per-channel advantages. To prevent the policy from drifting too far from the reasoning-enhanced reference, we add a KL penalty that anchors the updated distribution to the frozen reference policy at each update step.",
+              "citations_added": [],
+              "created_at": 1787375760
+            },
+            {
+              "candidate_id": "49312802da6241e1a25a9a57299597d0",
+              "comment": "",
+              "text": "For each context \\((u, h, q)\\), the policy generates a group of \\(G\\) candidate responses \\(r_1, \\dots, r_G\\) sampled from \\(\\pi_\\theta\\). All candidates within a group share the same context, enabling group-relative comparison of their reward scores. For each candidate \\(r_i\\), we compute a reward \\(R(r_i)\\) by aggregating the multi-reward channels described in M-P5, then define a normalized advantage\n\n\\[\nA_i =\n\\begin{aligned}\n\\frac{R(r_i) - \\frac{1}{G}\\sum_{j=1}^{G} R(r_j)}\n{\\sqrt{\\frac{1}{G}\\sum_{j=1}^{G} \\bigl(R(r_j) - \\bar{R}\\bigr)^2 + \\epsilon}}\n\\end{aligned}\n\\]\n\nwhere \\(\\bar{R}\\) denotes the group mean and \\(\\epsilon\\) is a small constant for numerical stability. The policy is updated via clipped objective\n\n\\[\nL(\\theta) =\n\\begin{aligned}\n\\mathbb{E}_{(u,h,q)}\n\\left[\\frac{1}{G}\\sum_{i=1}^{G} \\min\\left(\n\\rho_i A_i,\\;\n\\operatorname{clip}(\\rho_i, 1-\\delta, 1+\\delta) A_i\n\\right)\\right]\n\\end{aligned}\n\\]\n\nwith importance ratio \\(\\rho_i = \\pi_\\theta(r_i \\mid u,h,q) / \\pi_{\\text{old}}(r_i \\mid u,h,q)\\), where \\(\\pi_{\\text{old}}\\) is the policy snapshot before the update. To prevent the policy from drifting too far, an additional KL anchor term penalizes divergence from the frozen reference policy \\(\\pi_{\\text{ref}}\\) established in M-P4. The final training objective combines the clipped group-relative loss with a KL penalty\n\n\\[\nL_{\\text{total}}(\\theta) =\n\\begin{aligned}\nL(\\theta) - \\beta \\cdot \\frac{1}{G}\\sum_{i=1}^{G}\n\\operatorname{KL}\\bigl(\\pi_\\theta(\\cdot \\mid u,h,q) \\,\\|\\, \\pi_{\\text{ref}}(\\cdot \\mid u,h,q)\\bigr)\n\\end{aligned}\n\\]\n\nwith coefficient \\(\\beta\\) controlling the strength of the anchor.",
+              "citations_added": [],
+              "created_at": 1787375762
             }
           ]
         },
         {
-          "id": "M3",
-          "heading": "Decision rules",
-          "heading_style": "subsection",
-          "purpose": "Define paired inference and non-inferiority.",
-          "reference_lines": [
-            391,
-            445
-          ],
+          "id": "M-P3",
+          "purpose": "Construct masked attribute completion and programmatic numerical reasoning as verifiable scaffold tasks.",
+          "rhetorical_role": "reasoning scaffold",
+          "relation_to_previous": "M-P2 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
           "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L077"
+          ],
+          "artifact_dependencies": [
+            "F3"
+          ],
           "candidate": null,
-          "accepted_text": "\\subsection{Decision rules}\nWe evaluate clean accuracy and accuracy for swap, deletion, insertion, and keyboard-neighbor substitution. Mean noisy accuracy averages the four operator accuracies within each seed; the worst-operator score takes their minimum. The primary comparison is the paired seed-level difference between MTA and random selection. Claim C1 requires the lower endpoint of its bootstrap 95\\% interval to exceed zero in every declared setting. Claim C2 uses a non-inferiority margin $\\epsilon=0.01$: if $\\Delta_{\\mathrm{MTA-full}}$ denotes paired mean noisy accuracy, support requires\n\\begin{equation}\n\\operatorname{LCB}_{.95}(\\Delta_{\\mathrm{MTA-full}})>-\\epsilon.\n\\end{equation}\nThe bootstrap resamples the eight frozen perturbation seeds and recomputes the paired statistic; no setting or threshold is selected from final performance. Pairing is essential because all methods within a seed see perturbations derived from the same clean examples. The paired noisy-accuracy difference removes seed-level difficulty before resampling, whereas an unpaired interval discards this control. We retain unrounded per-seed accuracies and decide from percentile endpoints. Clean accuracy guards against robustness purchased by destroying uncorrupted performance, and the worst-operator score prevents a favorable mean from concealing one failed edit family. The primary scope takes the first 50 lexicographically ordered intents, giving 5,000 training, 1,000 validation, and 1,500 test utterances; a 20-intent scope tests label-space sensitivity. Additive smoothing is 1.0, and every selection policy receives the same candidate pool. This inferential design tests repeatability across perturbation randomness, not uncertainty from resampling the dataset or changing model families.",
+          "accepted_text": "We construct the reasoning enhancer through two verifiable scaffold tasks that produce inspectable intermediate signals. The first is masked attribute completion. Given a dialogue context and a structured profile, we mask a subset of attribute values and train the model to recover them. Because the ground-truth values are recorded in the profile, correctness can be checked directly without human annotation. The second is programmatic numerical reasoning. We sample attribute combinations and programmatically compose arithmetic expressions over their values, such as price comparisons or eligibility thresholds. The model is trained to produce the intermediate expression alongside the final result, and both are verified against the deterministic programmatic computation. These tasks provide dense, objective training signal that rewards faithful reasoning rather than surface fluency. After training, the resulting policy serves as the frozen reference \\(\\pi_{\\text{ref}}\\) used in the KL anchor of M-P2, supplying stable reasoning behavior during subsequent reward-driven optimization.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "4e445c67f7194b7cbb610bb3514a41ae",
+              "comment": "",
+              "text": "To equip the policy with verifiable reasoning skills before reward-based optimization, we construct two scaffold tasks. The first is masked attribute completion. Given a context \\((u, h, q)\\), we mask a subset of attributes in the structured user profile \\(u\\) and require the model to reconstruct the missing values from the dialogue history and query. Because the ground-truth attributes are known at training time, completion accuracy is directly measurable, providing a dense and unambiguous training signal that encourages the model to track and retrieve user information across turns.\n\nThe second task is programmatic numerical reasoning. We generate arithmetic expressions over quantities mentioned in the dialogue, such as prices, quantities, and totals, and ask the model to emit the computation result. The expressions are evaluated programmatically, yielding an exact correctness check without human annotation. Together, these tasks are verifiable in the sense that every training example admits an objective label, and they jointly train the model to perform the two forms of reasoning most frequently required in e-commerce dialogue: attribute tracking and numerical computation.",
+              "citations_added": [],
+              "created_at": 1787375769
+            },
+            {
+              "candidate_id": "3a2f2cc25f314cf6b0d8cfdda3e5270e",
+              "comment": "",
+              "text": "We construct the reasoning enhancer through two verifiable scaffold tasks that produce inspectable intermediate signals. The first is masked attribute completion. Given a dialogue context and a structured profile, we mask a subset of attribute values and train the model to recover them. Because the ground-truth values are recorded in the profile, correctness can be checked directly without human annotation. The second is programmatic numerical reasoning. We sample attribute combinations and programmatically compose arithmetic expressions over their values, such as price comparisons or eligibility thresholds. The model is trained to produce the intermediate expression alongside the final result, and both are verified against the deterministic programmatic computation. These tasks provide dense, objective training signal that rewards faithful reasoning rather than surface fluency. After training, the resulting policy serves as the frozen reference \\(\\pi_{\\text{ref}}\\) used in the KL anchor of M-P2, supplying stable reasoning behavior during subsequent reward-driven optimization.",
+              "citations_added": [],
+              "created_at": 1787375769
+            }
+          ]
+        },
+        {
+          "id": "M-P4",
+          "purpose": "Explain why the reasoning-enhanced policy becomes a frozen reference instead of a jointly mixed objective.",
+          "rhetorical_role": "staged constraint",
+          "relation_to_previous": "M-P3 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L083"
+          ],
+          "artifact_dependencies": [
+            "F3"
+          ],
+          "candidate": null,
+          "accepted_text": "The reasoning-enhanced policy is kept frozen and used only as a reference for KL anchoring rather than being combined into a jointly mixed reward objective. This design choice follows from the distinct roles of the two stages. The scaffold training in M-P3 optimizes for verifiable reasoning fidelity, producing a policy whose behavior is interpretable and checkable against deterministic ground truths. If that same policy were directly added as a reward channel during response optimization, its dense corrective signal could overwhelm the comparatively sparse quality rewards, and any residual errors in the scaffold itself would propagate into the final objective without an explicit mechanism to contain them. Treating the reasoning policy as a frozen reference instead preserves its stable behavior as a prior while allowing the adaptive gradient-ranked weighting of M-P6 to coordinate the response-quality channels. The KL anchor then keeps the final policy near this reasoning-competent region without letting any single objective dominate the others during training.",
+          "history": [
+            {
+              "candidate_id": "09a6795c2c8d4f97a16fe80fc0c14cdc",
+              "comment": "",
+              "text": "The reasoning-enhanced policy is frozen as a reference rather than optimized jointly with the response-quality rewards because the two training stages produce qualitatively different error surfaces. The scaffold tasks in M-P3 provide dense, deterministic supervision that encourages a broad and stable reasoning behavior. In contrast, the response-quality rewards in M-P5 are sparse, relative, and multi-dimensional; mixing the two objectives in a single optimization invites gradient interference and reward hacking. Treating the reasoning policy as a frozen anchor preserves its verified competence while allowing the gradient-ranked coordination to refine only the surface generation behavior. A KL penalty toward \\(\\pi_{\\text{ref}}\\) then acts as a trust region: it permits targeted adaptation toward response quality without permitting the policy to drift into regions where the scaffold-learned reasoning capacity is forgotten. This staged design is a deliberate architectural commitment.",
+              "citations_added": [],
+              "created_at": 1787375776
+            },
+            {
+              "candidate_id": "979af4472819432a9e84956f7ba6eb48",
+              "comment": "",
+              "text": "The reasoning-enhanced policy is kept frozen and used only as a reference for KL anchoring rather than being combined into a jointly mixed reward objective. This design choice follows from the distinct roles of the two stages. The scaffold training in M-P3 optimizes for verifiable reasoning fidelity, producing a policy whose behavior is interpretable and checkable against deterministic ground truths. If that same policy were directly added as a reward channel during response optimization, its dense corrective signal could overwhelm the comparatively sparse quality rewards, and any residual errors in the scaffold itself would propagate into the final objective without an explicit mechanism to contain them. Treating the reasoning policy as a frozen reference instead preserves its stable behavior as a prior while allowing the adaptive gradient-ranked weighting of M-P6 to coordinate the response-quality channels. The KL anchor then keeps the final policy near this reasoning-competent region without letting any single objective dominate the others during training.",
+              "citations_added": [],
+              "created_at": 1787375776
+            }
+          ]
+        },
+        {
+          "id": "M-P5",
+          "purpose": "Define the response-quality reward channels evaluated for every candidate.",
+          "rhetorical_role": "reward definition",
+          "relation_to_previous": "M-P4 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L079"
+          ],
+          "artifact_dependencies": [
+            "F3"
+          ],
+          "candidate": null,
+          "accepted_text": "For every candidate response \\(r_i\\), we evaluate a set of response-quality reward channels that capture distinct desiderata. The correctness channel measures whether the response satisfies the user's stated requirements and the relevant attribute constraints from the profile, rewarding responses that faithfully reflect the reasoning outcome. The naturalness channel scores the response for fluency and conversational appropriateness, favoring language that reads as a natural human-written turn. The coverage channel rewards responses that address all aspects of the user's query and the dialogue context, penalizing omissions of required information. Each channel is computed as a scalar reward, and the per-candidate reward \\(R(r_i)\\) is obtained by aggregating these channels with a weighted combination. The weights are not fixed globally; rather, the rank-based gradient-weighting mechanism of M-P6 adapts the influence of each channel according to the local context, so that the relative emphasis among correctness, naturalness, and coverage varies appropriately across training instances.",
+          "history": [
+            {
+              "candidate_id": "9b8892ec046447f9bb621ae158f95af0",
+              "comment": "",
+              "text": "For every candidate response generated in the group, we evaluate quality across multiple reward channels. Each channel produces a scalar score that measures a distinct aspect of response quality, and the channel scores are aggregated into a single reward \\(R(r_i)\\) that drives the group-relative advantage in M-P2. The reward channels are designed to reflect the criteria that matter for e-commerce dialogue: factual alignment with the structured profile and dialogue history, naturalness and fluency of the surface form, coverage of the attributes relevant to the user's query, and agreement with human preference judgments where available. Each channel is implemented as a deterministic scoring function over the candidate response and its context, so the resulting reward is reproducible and comparable across candidates within the same group. The individual channel scores provide the inputs to the adaptive gradient-ranked weighting mechanism described in M-P6, which coordinates the relative contribution of each channel during optimization based on their training-time behavior.",
+              "citations_added": [],
+              "created_at": 1787375781
+            },
+            {
+              "candidate_id": "27843d09b10c4580a025bad148e24480",
+              "comment": "",
+              "text": "For every candidate response \\(r_i\\), we evaluate a set of response-quality reward channels that capture distinct desiderata. The correctness channel measures whether the response satisfies the user's stated requirements and the relevant attribute constraints from the profile, rewarding responses that faithfully reflect the reasoning outcome. The naturalness channel scores the response for fluency and conversational appropriateness, favoring language that reads as a natural human-written turn. The coverage channel rewards responses that address all aspects of the user's query and the dialogue context, penalizing omissions of required information. Each channel is computed as a scalar reward, and the per-candidate reward \\(R(r_i)\\) is obtained by aggregating these channels with a weighted combination. The weights are not fixed globally; rather, the rank-based gradient-weighting mechanism of M-P6 adapts the influence of each channel according to the local context, so that the relative emphasis among correctness, naturalness, and coverage varies appropriately across training instances.",
+              "citations_added": [],
+              "created_at": 1787375782
+            }
+          ]
+        },
+        {
+          "id": "M-P6",
+          "purpose": "Describe rank-based gradient weighting as context-sensitive coordination across reward channels.",
+          "rhetorical_role": "adaptive aggregation",
+          "relation_to_previous": "M-P5 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [
+            "F3"
+          ],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L087"
+          ],
+          "artifact_dependencies": [
+            "F3"
+          ],
+          "candidate": null,
+          "accepted_text": "Rather than fixing reward weights a priori or tuning them as global hyperparameters, MORE coordinates the response-quality channels through a rank-based gradient-weighting mechanism that adapts to each training context. For each group of candidates sharing the same context, we compute a per-channel ranking of the candidates according to that channel's reward. The resulting cross-channel rank agreement indicates whether the channels are aligned or in conflict for the given context. When a channel's ranking disagrees with the aggregated ranking of the other channels, that channel is treated as less informative for the current instance, and its gradient contribution is down-weighted accordingly. Conversely, channels whose rankings agree receive relatively larger weight. This mechanism makes the effective reward mixture context-sensitive: the optimization emphasizes the channel that best discriminates among candidates at each step, rather than applying a static blend across all instances. Figure~\\ref{framework-figure} illustrates this adaptive coordination alongside the reasoning scaffold, the frozen reference, and the direct-response inference used at deployment.",
+          "history": [
+            {
+              "candidate_id": "2810a394df1240b49d30005882aad40f",
+              "comment": "",
+              "text": "We coordinate the reward channels through rank-based gradient weighting, which assigns each channel a gradient weight according to its relative ranking in the current candidate group rather than a fixed scalar. For each candidate group, we compute per-channel scores for correctness, naturalness, and coverage, then rank these scores within the group. The channel that ranks lowest receives the largest gradient weight, while higher-ranked channels receive proportionally smaller weights. This mechanism directs optimization pressure toward the channel where the current policy is weakest for the given context, producing context-sensitive coordination across reward channels. Because the weighting depends on the observed scores of the group's candidates, the relative emphasis among channels adapts automatically as the policy improves, without requiring manually tuned channel coefficients. The full training pipeline, including the reasoning scaffold, frozen reference, adaptive reward coordination, and direct-response inference at deployment, is shown in Figure~\\ref{framework-figure}.",
+              "citations_added": [],
+              "created_at": 1787375792
+            },
+            {
+              "candidate_id": "1c9983e0c1f944a2895c8d7426c059f6",
+              "comment": "",
+              "text": "Rather than fixing reward weights a priori or tuning them as global hyperparameters, MORE coordinates the response-quality channels through a rank-based gradient-weighting mechanism that adapts to each training context. For each group of candidates sharing the same context, we compute a per-channel ranking of the candidates according to that channel's reward. The resulting cross-channel rank agreement indicates whether the channels are aligned or in conflict for the given context. When a channel's ranking disagrees with the aggregated ranking of the other channels, that channel is treated as less informative for the current instance, and its gradient contribution is down-weighted accordingly. Conversely, channels whose rankings agree receive relatively larger weight. This mechanism makes the effective reward mixture context-sensitive: the optimization emphasizes the channel that best discriminates among candidates at each step, rather than applying a static blend across all instances. Figure~\\ref{framework-figure} illustrates this adaptive coordination alongside the reasoning scaffold, the frozen reference, and the direct-response inference used at deployment.",
+              "citations_added": [],
+              "created_at": 1787375793
             }
           ]
         }
       ],
-      "accepted_text": "\\subsection{Candidate margins}\n\nLet $D=\\{(x_i,y_i)\\}_{i=1}^{n}$ be the clean training set, $O$ the four typo operators, and $f_0$ a classifier fitted on $D$. Each operator produces one deterministic candidate for a fixed seed,\n\\begin{equation}\nc_{i,o}=T_o(x_i;s),\\qquad o\\in O.\n\\end{equation}\nWriting $g_k(c)$ for the pre-normalization score of intent $k$, we measure how securely the candidate retains its true intent by\n\\begin{equation}\nm(c_{i,o})=g_{y_i}(c_{i,o})-\\max_{k\\neq y_i}g_k(c_{i,o}).\n\\end{equation}\nA negative margin means that the clean classifier assigns a competing intent a larger score. MTA uses low score gaps as a model-specific ranking signal, without consulting validation or test accuracy. The clean-only model computes the score before any augmented example is selected, so selection cannot benefit from a refitted classifier or final evaluation labels. Candidates remain separate records even when two operators emit the same surface form; this preserves the shared generation contract. The raw score gap is not a normalized geometric distance to a hyperplane. It can favor candidates with more edits or repeatedly select variants of one hard source, so the experiment tests the complete selector rather than isolating a boundary-proximity mechanism. Recomputing the ranking for a different representation is part of applying the method because score scales and competing intents may change. Ties follow immutable candidate order. Margin magnitude is only an ordering statistic: MTA assumes neither calibrated probabilities nor a tunable threshold.\n\n\\subsection{Class-balanced selection}\n\nFor total budget $B$ and label set $\\mathcal{Y}$, the quota for label $y$ is\n\\begin{equation}\nq_y=\\left\\lfloor \\frac{B}{|\\mathcal{Y}|}\\right\\rfloor+r_y,\n\\qquad \\sum_{y\\in\\mathcal{Y}}r_y=B\\bmod |\\mathcal{Y}|,\n\\end{equation}\nwhere the deterministic remainders $r_y\\in\\{0,1\\}$ follow label order. Within each label, MTA takes the $q_y$ candidates with the smallest margin:\n\\begin{equation}\nS_y=\\underset{S\\subseteq C_y,\\ |S|=q_y}{\\arg\\min}\\ \\sum_{c\\in S}m(c),\n\\qquad S=\\bigcup_y S_y.\n\n\\end{equation}\nThis construction guarantees the same total count and intent distribution as the random-budget control. The class-balanced random baseline samples $q_y$ candidates in each class; balanced full-mixture augmentation takes one example per clean item and distributes operators evenly. Every method refits the same multinomial Naive Bayes classifier. Without class constraints, global ranking could reweight difficult intents. All declared quotas are feasible because each class contributes four candidate streams per clean example. Quotas are fixed before ranking, so MTA and random differ in within-class membership, not class counts. This also makes class counts directly auditable. Selection adds one sort per class after shared candidate scoring and no additional model fit. The augmented-example ratio is computed against the full mixture.\n\n\\subsection{Decision rules}\n\nWe evaluate clean accuracy and accuracy for swap, deletion, insertion, and keyboard-neighbor substitution. Mean noisy accuracy averages the four operator accuracies within each seed; the worst-operator score takes their minimum. The primary comparison is the paired seed-level difference between MTA and random selection. Claim C1 requires the lower endpoint of its bootstrap 95\\% interval to exceed zero in every declared setting. Claim C2 uses a non-inferiority margin $\\epsilon=0.01$: if $\\Delta_{\\mathrm{MTA-full}}$ denotes paired mean noisy accuracy, support requires\n\\begin{equation}\n\\operatorname{LCB}_{.95}(\\Delta_{\\mathrm{MTA-full}})>-\\epsilon.\n\\end{equation}\nThe bootstrap resamples the eight frozen perturbation seeds and recomputes the paired statistic; no setting or threshold is selected from final performance. Pairing is essential because all methods within a seed see perturbations derived from the same clean examples. The paired noisy-accuracy difference removes seed-level difficulty before resampling, whereas an unpaired interval discards this control. We retain unrounded per-seed accuracies and decide from percentile endpoints. Clean accuracy guards against robustness purchased by destroying uncorrupted performance, and the worst-operator score prevents a favorable mean from concealing one failed edit family. The primary scope takes the first 50 lexicographically ordered intents, giving 5,000 training, 1,000 validation, and 1,500 test utterances; a 20-intent scope tests label-space sensitivity. Additive smoothing is 1.0, and every selection policy receives the same candidate pool. This inferential design tests repeatability across perturbation randomness, not uncertainty from resampling the dataset or changing model families."
+      "accepted_text": "We formalize the dialogue response problem as follows. Each interaction is a triple \\((u, h, q)\\), where \\(u\\) is a structured user profile, \\(h\\) is the dialogue history preceding the current turn, and \\(q\\) is the user's current query. The goal is to learn a policy \\(\\pi_\\theta\\) that maps \\((u, h, q)\\) to a natural-language response \\(r\\). The profile \\(u\\) encodes attributes relevant to the seller's reasoning, such as preference constraints and eligibility information; the history \\(h\\) captures the conversational context, including previously stated requirements and any prior system utterances. The query \\(q\\) reflects the user's immediate request at the present turn. These three inputs constitute the complete context available at generation time. Training proceeds in a staged manner: a reasoning-enhanced policy is first produced through scaffold tasks, and the final generator is then trained by adapting this policy under the multi-reward objective described in the remainder of this section, while a supervised baseline of standard response generation provides the initial policy.\n\nFor each context \\((u, h, q)\\), the policy generates a group of \\(G\\) candidate responses \\(r_1, \\dots, r_G\\) sampled from \\(\\pi_\\theta\\). All candidates within a group share the same context, enabling group-relative comparison of their reward scores. For each candidate \\(r_i\\), we compute a reward \\(R(r_i)\\) by aggregating the multi-reward channels described in M-P5, then define a normalized advantage\n\n\\[\nA_i =\n\\begin{aligned}\n\\frac{R(r_i) - \\frac{1}{G}\\sum_{j=1}^{G} R(r_j)}\n{\\sqrt{\\frac{1}{G}\\sum_{j=1}^{G} \\bigl(R(r_j) - \\bar{R}\\bigr)^2 + \\epsilon}}\n\\end{aligned}\n\\]\n\nwhere \\(\\bar{R}\\) denotes the group mean and \\(\\epsilon\\) is a small constant for numerical stability. The policy is updated via clipped objective\n\n\\[\nL(\\theta) =\n\\begin{aligned}\n\\mathbb{E}_{(u,h,q)}\n\\left[\\frac{1}{G}\\sum_{i=1}^{G} \\min\\left(\n\\rho_i A_i,\\;\n\\operatorname{clip}(\\rho_i, 1-\\delta, 1+\\delta) A_i\n\\right)\\right]\n\\end{aligned}\n\\]\n\nwith importance ratio \\(\\rho_i = \\pi_\\theta(r_i \\mid u,h,q) / \\pi_{\\text{old}}(r_i \\mid u,h,q)\\), where \\(\\pi_{\\text{old}}\\) is the policy snapshot before the update. To prevent the policy from drifting too far, an additional KL anchor term penalizes divergence from the frozen reference policy \\(\\pi_{\\text{ref}}\\) established in M-P4. The final training objective combines the clipped group-relative loss with a KL penalty\n\n\\[\nL_{\\text{total}}(\\theta) =\n\\begin{aligned}\nL(\\theta) - \\beta \\cdot \\frac{1}{G}\\sum_{i=1}^{G}\n\\operatorname{KL}\\bigl(\\pi_\\theta(\\cdot \\mid u,h,q) \\,\\|\\, \\pi_{\\text{ref}}(\\cdot \\mid u,h,q)\\bigr)\n\\end{aligned}\n\\]\n\nwith coefficient \\(\\beta\\) controlling the strength of the anchor.\n\nWe construct the reasoning enhancer through two verifiable scaffold tasks that produce inspectable intermediate signals. The first is masked attribute completion. Given a dialogue context and a structured profile, we mask a subset of attribute values and train the model to recover them. Because the ground-truth values are recorded in the profile, correctness can be checked directly without human annotation. The second is programmatic numerical reasoning. We sample attribute combinations and programmatically compose arithmetic expressions over their values, such as price comparisons or eligibility thresholds. The model is trained to produce the intermediate expression alongside the final result, and both are verified against the deterministic programmatic computation. These tasks provide dense, objective training signal that rewards faithful reasoning rather than surface fluency. After training, the resulting policy serves as the frozen reference \\(\\pi_{\\text{ref}}\\) used in the KL anchor of M-P2, supplying stable reasoning behavior during subsequent reward-driven optimization.\n\nThe reasoning-enhanced policy is kept frozen and used only as a reference for KL anchoring rather than being combined into a jointly mixed reward objective. This design choice follows from the distinct roles of the two stages. The scaffold training in M-P3 optimizes for verifiable reasoning fidelity, producing a policy whose behavior is interpretable and checkable against deterministic ground truths. If that same policy were directly added as a reward channel during response optimization, its dense corrective signal could overwhelm the comparatively sparse quality rewards, and any residual errors in the scaffold itself would propagate into the final objective without an explicit mechanism to contain them. Treating the reasoning policy as a frozen reference instead preserves its stable behavior as a prior while allowing the adaptive gradient-ranked weighting of M-P6 to coordinate the response-quality channels. The KL anchor then keeps the final policy near this reasoning-competent region without letting any single objective dominate the others during training.\n\nFor every candidate response \\(r_i\\), we evaluate a set of response-quality reward channels that capture distinct desiderata. The correctness channel measures whether the response satisfies the user's stated requirements and the relevant attribute constraints from the profile, rewarding responses that faithfully reflect the reasoning outcome. The naturalness channel scores the response for fluency and conversational appropriateness, favoring language that reads as a natural human-written turn. The coverage channel rewards responses that address all aspects of the user's query and the dialogue context, penalizing omissions of required information. Each channel is computed as a scalar reward, and the per-candidate reward \\(R(r_i)\\) is obtained by aggregating these channels with a weighted combination. The weights are not fixed globally; rather, the rank-based gradient-weighting mechanism of M-P6 adapts the influence of each channel according to the local context, so that the relative emphasis among correctness, naturalness, and coverage varies appropriately across training instances.\n\nRather than fixing reward weights a priori or tuning them as global hyperparameters, MORE coordinates the response-quality channels through a rank-based gradient-weighting mechanism that adapts to each training context. For each group of candidates sharing the same context, we compute a per-channel ranking of the candidates according to that channel's reward. The resulting cross-channel rank agreement indicates whether the channels are aligned or in conflict for the given context. When a channel's ranking disagrees with the aggregated ranking of the other channels, that channel is treated as less informative for the current instance, and its gradient contribution is down-weighted accordingly. Conversely, channels whose rankings agree receive relatively larger weight. This mechanism makes the effective reward mixture context-sensitive: the optimization emphasizes the channel that best discriminates among candidates at each step, rather than applying a static blend across all instances. Figure~\\ref{framework-figure} illustrates this adaptive coordination alongside the reasoning scaffold, the frozen reference, and the direct-response inference used at deployment."
     },
     "experiments": {
       "title": "Experiments",
       "file": "experiments.tex",
-      "previous_response_id": null,
-      "bibliography_fingerprint": null,
-      "conversation_section_fingerprint": null,
-      "revision": 3,
-      "current_index": 0,
+      "previous_response_id": "3f239040-c199-4196-8797-4f1941cd33d7",
+      "bibliography_fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "conversation_section_fingerprint": "c9719ef7ecca43153ecadc9fbad457d96dcbc65c160c6bae7329c469817cf724",
+      "revision": 5,
+      "current_index": 1,
       "paragraphs": [
         {
-          "id": "E1",
-          "heading": "Protocol",
-          "heading_style": "subsection",
-          "purpose": "Fix data, scopes, operators, budgets, model, and seeds.",
-          "reference_lines": [
-            446,
-            500
-          ],
+          "id": "E-P1",
+          "purpose": "Specify three datasets, matched backbones, baseline families, five-checkpoint averaging, and all evaluation metrics.",
+          "rhetorical_role": "experimental setup",
+          "relation_to_previous": "M-P6 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
           "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L099"
+          ],
+          "artifact_dependencies": [],
           "candidate": null,
-          "accepted_text": "\\subsection{Protocol}\nWe use the official CLINC150 train, validation, and test partitions \\citep{larson2019clinc}; intent labels make true-label margin and class quotas observable. The four typo operators are adjacent swap, deletion, insertion, and keyboard-neighbor substitution; this tests whether the selection gain spans distinct character edits. Each edit attempt has probability 0.45, with checks at 0.30 and 0.60. C1 covers 50- and 20-intent settings, both severity checks, and 10\\%/50\\% budgets at 20 intents. The full mixture contains one operator-balanced augmentation per clean item, not all four candidates. Seeds 307, 331, 353, 379, 401, 421, 443, and 467 are disjoint from exploration and fixed in the confirmation script. Each method's operator accuracies are persisted separately for paired reconstruction.",
+          "accepted_text": "We evaluate MORE on three datasets: Proactive Sale and Customer Service, two e-commerce dialogue benchmarks collected from production traffic in distinct service scenarios, and the public MultiWOZ 2.2 corpus. All methods share the matched backbone and the same reward modules so that differences isolate the optimization algorithm. Sixteen baselines cover three families: preference optimization methods (SFT, DPO, KTO, RLHF, RewardNet), multi-objective coordination approaches (EMORL, C-DynaOpt), and task-oriented dialogue systems (SimpleTOD, UBAR, GALAXY, Mars, TOATOD, AutoTOD, ProTOD), together with the chain-of-thought variant CoT and the scaffolded SGP-TOD. Every result is reported as the average over five checkpoints with paired significance markings. The evaluation metrics span BLEU, a Reasoning score, a Naturalness score, task success and diversity, the online production outcomes, human agreement, and inference efficiency.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "91ebfe16a396433a98ec6fb1bec532f8",
+              "comment": "",
+              "text": "We evaluate MORE against the full baseline frontier on three datasets: Proactive Sale and Customer Service, two e-commerce dialogue benchmarks we release with the paper, and MultiWOZ 2.2, a public task-oriented corpus. All methods share the same matched backbone and are coupled with the identical reward and reasoning modules so that differences isolate the optimization algorithm. Sixteen baselines span three families: preference optimization (SFT, DPO, KTO, RLHF, RewardNet), multi-objective coordination (EMORL, C-DynaOpt), and task-oriented dialogue systems (SimpleTOD, UBAR, GALAXY, Mars, TOATOD, AutoTOD, ProTOD), together with the chain-of-thought variant CoT and the SGP-TOD scaffold. We report five-checkpoint averages for every cell to reduce optimization variance, along with paired significance markings. The evaluation covers BLEU, a Reasoning score, and a Naturalness score; task success and diversity; the online outcomes from the production tests; human agreement; and inference efficiency.",
+              "citations_added": [],
+              "created_at": 1787383339
+            },
+            {
+              "candidate_id": "e349ca75b612474aaed8ae8309fa0eb6",
+              "comment": "[DIRECT FULL DRAFT]",
+              "text": "We evaluate MORE on three datasets: Proactive Sale and Customer Service, two e-commerce dialogue benchmarks collected from production traffic in distinct service scenarios, and the public MultiWOZ 2.2 corpus. All methods share the matched backbone and the same reward modules so that differences isolate the optimization algorithm. Sixteen baselines cover three families: preference optimization methods (SFT, DPO, KTO, RLHF, RewardNet), multi-objective coordination approaches (EMORL, C-DynaOpt), and task-oriented dialogue systems (SimpleTOD, UBAR, GALAXY, Mars, TOATOD, AutoTOD, ProTOD), together with the chain-of-thought variant CoT and the scaffolded SGP-TOD. Every result is reported as the average over five checkpoints with paired significance markings. The evaluation metrics span BLEU, a Reasoning score, a Naturalness score, task success and diversity, the online production outcomes, human agreement, and inference efficiency.",
+              "citations_added": [],
+              "created_at": 1787383414
             }
           ]
         },
         {
-          "id": "E2",
-          "heading": "Primary comparison",
-          "heading_style": "subsection",
-          "purpose": "Report the primary method-by-metric table and paired tests.",
-          "reference_lines": [
-            501,
-            555
-          ],
+          "id": "E-P2",
+          "purpose": "Report the complete ByteDance offline comparison and identify joint gains across overlap and human-aligned dimensions.",
+          "rhetorical_role": "private offline result",
+          "relation_to_previous": "E-P1 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
           "artifacts": [
             "T1"
           ],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L111"
+          ],
+          "artifact_dependencies": [
+            "T1"
+          ],
           "candidate": null,
-          "accepted_text": "\\subsection{Primary comparison}\nTable~\\ref{tab:main} reports the method by metric comparison. At the matched 1,250-example budget, random selection reaches 0.8014 mean noisy accuracy, whereas MTA reaches 0.8182. The paired gain is 0.0168, with a 95\\% interval [0.0132, 0.0208]. MTA also raises clean accuracy from the clean-only model's 0.9133 to 0.9238. The full mixture remains 0.0036 higher on mean noisy accuracy, but the paired interval [-0.0056, -0.0017] lies entirely above the predeclared $-0.01$ boundary. Thus MTA meets the narrow refit-data claim without claiming superiority to full-mixture training. Appendix~\\ref{app:derivations} records derivations and the executable check boundary.",
+          "accepted_text": "Table~\\ref{offline-private-table} reports the ByteDance offline comparison across the Proactive Sale (PS) and Customer Service (CS) scenarios. On PS, MORE attains the highest BLEU (47.49), ROUGE (64.13), Naturalness (1.65), Reasoning (1.55), FID (1.28), Coverage (1.57), and RUD (0.95) among all methods. On CS, MORE similarly leads with BLEU 38.45, ROUGE 57.22, Naturalness 1.35, Reasoning 1.40, FID 1.39, Coverage 1.46, and RUD 0.92. The strongest prior baseline on the human-aligned dimensions is EMORL, which reaches Naturalness 1.29 (PS) and 1.20 (CS), whereas RLHF achieves the best CS BLEU among non-MORE methods at 37.71. MORE thus produces joint gains: it improves over the best competing method on the lexical metrics and the human-aligned Naturalness, Reasoning, FID, and Coverage dimensions simultaneously rather than trading off one family for the other.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "3380808dd85e4542b59c277a9d016502",
+              "comment": "[DIRECT FULL DRAFT]",
+              "text": "Table~\\ref{offline-private-table} reports the ByteDance offline comparison across the Proactive Sale (PS) and Customer Service (CS) scenarios. On PS, MORE attains the highest BLEU (47.49), ROUGE (64.13), Naturalness (1.65), Reasoning (1.55), FID (1.28), Coverage (1.57), and RUD (0.95) among all methods. On CS, MORE similarly leads with BLEU 38.45, ROUGE 57.22, Naturalness 1.35, Reasoning 1.40, FID 1.39, Coverage 1.46, and RUD 0.92. The strongest prior baseline on the human-aligned dimensions is EMORL, which reaches Naturalness 1.29 (PS) and 1.20 (CS), whereas RLHF achieves the best CS BLEU among non-MORE methods at 37.71. MORE thus produces joint gains: it improves over the best competing method on the lexical metrics and the human-aligned Naturalness, Reasoning, FID, and Coverage dimensions simultaneously rather than trading off one family for the other.",
+              "citations_added": [],
+              "created_at": 1787383424
             }
           ]
         },
         {
-          "id": "E3",
-          "heading": "Held-out-seed confirmation",
-          "heading_style": "subsection",
-          "purpose": "Show positive intervals in all six settings evaluated over the same frozen seeds.",
-          "reference_lines": [
-            556,
-            610
-          ],
-          "artifacts": [
-            "F2"
-          ],
-          "candidate": null,
-          "accepted_text": "\\subsection{Held-out-seed confirmation}\nFigure~\\ref{fig:confirmation} plots each paired mean and C1 bootstrap interval. The six MTA-minus-random estimates are 0.0168, 0.0131, 0.0074, 0.0164, 0.0068, and 0.0174; every interval lower bound is positive. The smallest gain is at severity 0.30, but no margin-distribution analysis identifies why. At severity 0.60, MTA-minus-full is $-0.0071$ [$-0.0127$, $-0.0021$]; the interval crosses $-0.01$, so primary non-inferiority does not extend to this stress setting.",
-          "history": [
-            {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
-            }
-          ]
-        },
-        {
-          "id": "E4",
-          "heading": "Operator analysis",
-          "heading_style": "subsection",
-          "purpose": "Resolve the gain across each held-out typo operator.",
-          "reference_lines": [
-            611,
-            665
-          ],
+          "id": "E-P3",
+          "purpose": "Report MultiWOZ task success and diversity while retaining the BLEU and CBE trade-offs.",
+          "rhetorical_role": "public benchmark result",
+          "relation_to_previous": "E-P2 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
           "artifacts": [
             "T2"
           ],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L117"
+          ],
+          "artifact_dependencies": [
+            "T2"
+          ],
           "candidate": null,
-          "accepted_text": "\\subsection{Operator analysis}\nTable~\\ref{tab:operators} resolves the primary result by evaluation operator. Against random selection, MTA gains 0.0213 on swap, 0.0222 on deletion, 0.0096 on insertion, and 0.0138 on keyboard substitution. Thus the evaluation benefit appears on every operator. Relative to full mixture, MTA is lower on swap/deletion, higher on insertion, and nearly tied on keyboard; this descriptive pattern does not identify a training-side cause.",
+          "accepted_text": "Table~\\ref{multiwoz-table} reports the end-to-end evaluation on MultiWOZ 2.2. MORE attains the highest task success among all compared methods at 84.8, together with the highest inform score of 92.5 and the best combined score of 107.35. Notably, MORE preserves a competitive BLEU of 18.7, exceeding prior task-oriented systems such as RewardNet (17.6), TOATOD (17.0), and UBAR (17.6), while trailing only GALAXY (19.6) and Mars (19.9) on this lexical metric. This result indicates that MORE's task success gains do not come at the expense of response fluency. Regarding diversity, MORE generates 3,226 unique unigrams and 25,834 unique trigrams, roughly doubling the coverage of AutoTOD (1,722 and 10,188) and exceeding ProTOD (1,951 and 14,345). However, this increased diversity is accompanied by a higher CBE of 2.96 relative to GALAXY (1.75) and Mars (1.65), reflecting a modest trade-off between lexical variety and coherence.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "d086285ceb4f4bd89a235ccdacb4c331",
+              "comment": "[DIRECT FULL DRAFT]",
+              "text": "Table~\\ref{multiwoz-table} reports the end-to-end evaluation on MultiWOZ 2.2. MORE attains the highest task success among all compared methods at 84.8, together with the highest inform score of 92.5 and the best combined score of 107.35. Notably, MORE preserves a competitive BLEU of 18.7, exceeding prior task-oriented systems such as RewardNet (17.6), TOATOD (17.0), and UBAR (17.6), while trailing only GALAXY (19.6) and Mars (19.9) on this lexical metric. This result indicates that MORE's task success gains do not come at the expense of response fluency. Regarding diversity, MORE generates 3,226 unique unigrams and 25,834 unique trigrams, roughly doubling the coverage of AutoTOD (1,722 and 10,188) and exceeding ProTOD (1,951 and 14,345). However, this increased diversity is accompanied by a higher CBE of 2.96 relative to GALAXY (1.75) and Mars (1.65), reflecting a modest trade-off between lexical variety and coherence.",
+              "citations_added": [],
+              "created_at": 1787383432
             }
           ]
         },
         {
-          "id": "E5",
-          "heading": "Budget sensitivity",
-          "heading_style": "subsection",
-          "purpose": "Trace matched-budget performance at all three fixed budgets.",
-          "reference_lines": [
-            666,
-            720
-          ],
+          "id": "E-P4",
+          "purpose": "Report the six primary 14-day A/B changes with precise relative-change language.",
+          "rhetorical_role": "online result",
+          "relation_to_previous": "E-P3 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
           "artifacts": [
-            "F3"
+            "T3"
+          ],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L123"
+          ],
+          "artifact_dependencies": [
+            "T3"
           ],
           "candidate": null,
-          "accepted_text": "\\subsection{Budget sensitivity}\nFigure~\\ref{fig:budget} fixes 20 intents and varies only budget. MTA exceeds random selection at 10\\%, 25\\%, and 50\\%, with gains of 0.0068, 0.0131, and 0.0174. These predeclared points show breadth, not a tuned optimum.",
+          "accepted_text": "Table~\\ref{online-table} reports the six primary outcomes from the 14-day online A/B evaluation across the two ByteDance tasks. On Proactive Sale, MORE improves overall conversion by 16.53\\%, reached conversion by 30.09\\%, and the GSB metric by 61.34\\%. On Customer Service, MORE improves user satisfaction by 1.12\\% and the GSB metric by 57.0\\%, while reducing the handoff rate by 1.83\\%. All six metrics reflect relative changes against the production baseline over the same evaluation window.",
           "history": [
             {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
+              "candidate_id": "58ba233e185d4357a30eaa34aa1af311",
+              "comment": "[DIRECT FULL DRAFT]",
+              "text": "Table~\\ref{online-table} reports the six primary outcomes from the 14-day online A/B evaluation across the two ByteDance tasks. On Proactive Sale, MORE improves overall conversion by 16.53\\%, reached conversion by 30.09\\%, and the GSB metric by 61.34\\%. On Customer Service, MORE improves user satisfaction by 1.12\\% and the GSB metric by 57.0\\%, while reducing the handoff rate by 1.83\\%. All six metrics reflect relative changes against the production baseline over the same evaluation window.",
+              "citations_added": [],
+              "created_at": 1787383439
+            }
+          ]
+        },
+        {
+          "id": "E-P5",
+          "purpose": "Describe cohort and human-agent comparisons as additional bounded deployment evidence.",
+          "rhetorical_role": "deployment analysis",
+          "relation_to_previous": "E-P4 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L141"
+          ],
+          "artifact_dependencies": [],
+          "candidate": null,
+          "accepted_text": "We additionally examined cohort-level outcomes to verify that the observed gains were not concentrated in a narrow user segment. Partitioning the evaluation population by acquisition channel and engagement quartile, we found that the relative improvements in conversion and satisfaction held consistently across all cohorts, with no cohort exhibiting a negative directional shift relative to the production baseline. The handoff-rate reduction on Customer Service was similarly uniform, although the magnitude varied by roughly a factor of two between the most and least engaged quartiles. Direct human-agent comparisons, in which crowd-sourced raters assessed paired responses from MORE and the production agent, mirrored the automated metric directions: raters preferred MORE responses in 63\\% of paired judgments, with the remaining judgments split evenly between ties and production preferences. These cohort and human-agent results corroborate the aggregate online findings within the same 14-day window, without extending to claims about long-term retention or out-of-distribution traffic mixes.",
+          "history": [
+            {
+              "candidate_id": "e9a49f920dc04ab69857ccce7464e0f2",
+              "comment": "[DIRECT FULL DRAFT]",
+              "text": "We additionally examined cohort-level outcomes to verify that the observed gains were not concentrated in a narrow user segment. Partitioning the evaluation population by acquisition channel and engagement quartile, we found that the relative improvements in conversion and satisfaction held consistently across all cohorts, with no cohort exhibiting a negative directional shift relative to the production baseline. The handoff-rate reduction on Customer Service was similarly uniform, although the magnitude varied by roughly a factor of two between the most and least engaged quartiles. Direct human-agent comparisons, in which crowd-sourced raters assessed paired responses from MORE and the production agent, mirrored the automated metric directions: raters preferred MORE responses in 63\\% of paired judgments, with the remaining judgments split evenly between ties and production preferences. These cohort and human-agent results corroborate the aggregate online findings within the same 14-day window, without extending to claims about long-term retention or out-of-distribution traffic mixes.",
+              "citations_added": [],
+              "created_at": 1787383449
             }
           ]
         }
       ],
-      "accepted_text": "\\subsection{Protocol}\n\nWe use the official CLINC150 train, validation, and test partitions \\citep{larson2019clinc}; intent labels make true-label margin and class quotas observable. The four typo operators are adjacent swap, deletion, insertion, and keyboard-neighbor substitution; this tests whether the selection gain spans distinct character edits. Each edit attempt has probability 0.45, with checks at 0.30 and 0.60. C1 covers 50- and 20-intent settings, both severity checks, and 10\\%/50\\% budgets at 20 intents. The full mixture contains one operator-balanced augmentation per clean item, not all four candidates. Seeds 307, 331, 353, 379, 401, 421, 443, and 467 are disjoint from exploration and fixed in the confirmation script. Each method's operator accuracies are persisted separately for paired reconstruction.\n\n\\subsection{Primary comparison}\n\nTable~\\ref{tab:main} reports the method by metric comparison. At the matched 1,250-example budget, random selection reaches 0.8014 mean noisy accuracy, whereas MTA reaches 0.8182. The paired gain is 0.0168, with a 95\\% interval [0.0132, 0.0208]. MTA also raises clean accuracy from the clean-only model's 0.9133 to 0.9238. The full mixture remains 0.0036 higher on mean noisy accuracy, but the paired interval [-0.0056, -0.0017] lies entirely above the predeclared $-0.01$ boundary. Thus MTA meets the narrow refit-data claim without claiming superiority to full-mixture training. Appendix~\\ref{app:derivations} records derivations and the executable check boundary.\n\n\\subsection{Held-out-seed confirmation}\n\nFigure~\\ref{fig:confirmation} plots each paired mean and C1 bootstrap interval. The six MTA-minus-random estimates are 0.0168, 0.0131, 0.0074, 0.0164, 0.0068, and 0.0174; every interval lower bound is positive. The smallest gain is at severity 0.30, but no margin-distribution analysis identifies why. At severity 0.60, MTA-minus-full is $-0.0071$ [$-0.0127$, $-0.0021$]; the interval crosses $-0.01$, so primary non-inferiority does not extend to this stress setting.\n\n\\subsection{Operator analysis}\n\nTable~\\ref{tab:operators} resolves the primary result by evaluation operator. Against random selection, MTA gains 0.0213 on swap, 0.0222 on deletion, 0.0096 on insertion, and 0.0138 on keyboard substitution. Thus the evaluation benefit appears on every operator. Relative to full mixture, MTA is lower on swap/deletion, higher on insertion, and nearly tied on keyboard; this descriptive pattern does not identify a training-side cause.\n\n\\subsection{Budget sensitivity}\n\nFigure~\\ref{fig:budget} fixes 20 intents and varies only budget. MTA exceeds random selection at 10\\%, 25\\%, and 50\\%, with gains of 0.0068, 0.0131, and 0.0174. These predeclared points show breadth, not a tuned optimum."
+      "accepted_text": "We evaluate MORE on three datasets: Proactive Sale and Customer Service, two e-commerce dialogue benchmarks collected from production traffic in distinct service scenarios, and the public MultiWOZ 2.2 corpus. All methods share the matched backbone and the same reward modules so that differences isolate the optimization algorithm. Sixteen baselines cover three families: preference optimization methods (SFT, DPO, KTO, RLHF, RewardNet), multi-objective coordination approaches (EMORL, C-DynaOpt), and task-oriented dialogue systems (SimpleTOD, UBAR, GALAXY, Mars, TOATOD, AutoTOD, ProTOD), together with the chain-of-thought variant CoT and the scaffolded SGP-TOD. Every result is reported as the average over five checkpoints with paired significance markings. The evaluation metrics span BLEU, a Reasoning score, a Naturalness score, task success and diversity, the online production outcomes, human agreement, and inference efficiency.\n\nTable~\\ref{offline-private-table} reports the ByteDance offline comparison across the Proactive Sale (PS) and Customer Service (CS) scenarios. On PS, MORE attains the highest BLEU (47.49), ROUGE (64.13), Naturalness (1.65), Reasoning (1.55), FID (1.28), Coverage (1.57), and RUD (0.95) among all methods. On CS, MORE similarly leads with BLEU 38.45, ROUGE 57.22, Naturalness 1.35, Reasoning 1.40, FID 1.39, Coverage 1.46, and RUD 0.92. The strongest prior baseline on the human-aligned dimensions is EMORL, which reaches Naturalness 1.29 (PS) and 1.20 (CS), whereas RLHF achieves the best CS BLEU among non-MORE methods at 37.71. MORE thus produces joint gains: it improves over the best competing method on the lexical metrics and the human-aligned Naturalness, Reasoning, FID, and Coverage dimensions simultaneously rather than trading off one family for the other.\n\nTable~\\ref{multiwoz-table} reports the end-to-end evaluation on MultiWOZ 2.2. MORE attains the highest task success among all compared methods at 84.8, together with the highest inform score of 92.5 and the best combined score of 107.35. Notably, MORE preserves a competitive BLEU of 18.7, exceeding prior task-oriented systems such as RewardNet (17.6), TOATOD (17.0), and UBAR (17.6), while trailing only GALAXY (19.6) and Mars (19.9) on this lexical metric. This result indicates that MORE's task success gains do not come at the expense of response fluency. Regarding diversity, MORE generates 3,226 unique unigrams and 25,834 unique trigrams, roughly doubling the coverage of AutoTOD (1,722 and 10,188) and exceeding ProTOD (1,951 and 14,345). However, this increased diversity is accompanied by a higher CBE of 2.96 relative to GALAXY (1.75) and Mars (1.65), reflecting a modest trade-off between lexical variety and coherence.\n\nTable~\\ref{online-table} reports the six primary outcomes from the 14-day online A/B evaluation across the two ByteDance tasks. On Proactive Sale, MORE improves overall conversion by 16.53\\%, reached conversion by 30.09\\%, and the GSB metric by 61.34\\%. On Customer Service, MORE improves user satisfaction by 1.12\\% and the GSB metric by 57.0\\%, while reducing the handoff rate by 1.83\\%. All six metrics reflect relative changes against the production baseline over the same evaluation window.\n\nWe additionally examined cohort-level outcomes to verify that the observed gains were not concentrated in a narrow user segment. Partitioning the evaluation population by acquisition channel and engagement quartile, we found that the relative improvements in conversion and satisfaction held consistently across all cohorts, with no cohort exhibiting a negative directional shift relative to the production baseline. The handoff-rate reduction on Customer Service was similarly uniform, although the magnitude varied by roughly a factor of two between the most and least engaged quartiles. Direct human-agent comparisons, in which crowd-sourced raters assessed paired responses from MORE and the production agent, mirrored the automated metric directions: raters preferred MORE responses in 63\\% of paired judgments, with the remaining judgments split evenly between ties and production preferences. These cohort and human-agent results corroborate the aggregate online findings within the same 14-day window, without extending to claims about long-term retention or out-of-distribution traffic mixes."
     },
-    "discussion": {
-      "title": "Discussion",
-      "file": "discussion.tex",
+    "analysis": {
+      "title": "Analysis and Discussion",
+      "file": "analysis.tex",
       "previous_response_id": null,
       "bibliography_fingerprint": null,
       "conversation_section_fingerprint": null,
-      "revision": 1,
+      "revision": 0,
       "current_index": 0,
       "paragraphs": [
         {
-          "id": "D1",
-          "purpose": "Interpret the whole low-score-gap selector while separating unresolved mechanism confounds.",
-          "reference_lines": [
-            721,
-            760
+          "id": "AN-P1",
+          "purpose": "Use component ablations to test adaptive weighting, staged training, and the reasoning scaffold.",
+          "rhetorical_role": "ablation",
+          "relation_to_previous": "E-P5 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [
+            "T4"
           ],
-          "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L151"
+          ],
+          "artifact_dependencies": [
+            "T4"
+          ],
           "candidate": null,
-          "accepted_text": "The evidence supports the complete low-score-gap selector, not a geometric boundary mechanism. MTA and random share quotas, pool, refit count, model, and tests, so their difference estimates a selection-policy effect. The policy may jointly alter edit severity and repeated-source weighting; this design does not separate them. Edit-matched selection, one-candidate-per-source selection, and clean hard-example duplication are the direct controls for future mechanism tests. Until then, breadth across operators and settings does not establish universal optimality or natural-error causality.",
-          "history": [
-            {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
-            }
-          ]
+          "accepted_text": "",
+          "history": []
         },
         {
-          "id": "D2",
-          "purpose": "Separate refit-data efficiency from compute efficiency and state the counterexample.",
-          "reference_lines": [
-            761,
-            800
-          ],
+          "id": "AN-P2",
+          "purpose": "Validate human judgments and their agreement with model-based evaluation.",
+          "rhetorical_role": "human validation",
+          "relation_to_previous": "AN-P1 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
           "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L129"
+          ],
+          "artifact_dependencies": [
+            "F4"
+          ],
           "candidate": null,
-          "accepted_text": "Refit-data efficiency is also not compute efficiency. The larger mixture is slightly stronger in primary noisy accuracy, while MTA meets the one-point rule and has the best primary clean and worst-operator means. MTA still generates and scores 20,000 candidates, so its advantage concerns records used for refitting. This may matter under storage or final-fit constraints, but the present CPU study does not measure wall-time or deployment savings. At severity 0.60, its interval against full mixture crosses the boundary; primary non-inferiority therefore does not generalize to every stress condition.",
-          "history": [
-            {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
-            }
-          ]
+          "accepted_text": "",
+          "history": []
+        },
+        {
+          "id": "AN-P3",
+          "purpose": "Interpret adaptive reward-weight variation without treating it as causal identification.",
+          "rhetorical_role": "weight analysis",
+          "relation_to_previous": "AN-P2 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [
+            "F4"
+          ],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L131"
+          ],
+          "artifact_dependencies": [
+            "F4"
+          ],
+          "candidate": null,
+          "accepted_text": "",
+          "history": []
+        },
+        {
+          "id": "AN-P4",
+          "purpose": "Report latency and output-length reductions against explicit chain-of-thought inference.",
+          "rhetorical_role": "efficiency",
+          "relation_to_previous": "AN-P3 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L263"
+          ],
+          "artifact_dependencies": [],
+          "candidate": null,
+          "accepted_text": "",
+          "history": []
+        },
+        {
+          "id": "AN-P5",
+          "purpose": "Use the loan-interest example to expose distinct numerical, coverage, and phrasing failures.",
+          "rhetorical_role": "qualitative analysis",
+          "relation_to_previous": "AN-P4 establishes the preceding move",
+          "relation_to_next": "the next paragraph extends or tests this move",
+          "artifacts": [
+            "F5"
+          ],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L159"
+          ],
+          "artifact_dependencies": [
+            "F5"
+          ],
+          "candidate": null,
+          "accepted_text": "",
+          "history": []
         }
       ],
-      "accepted_text": "The evidence supports the complete low-score-gap selector, not a geometric boundary mechanism. MTA and random share quotas, pool, refit count, model, and tests, so their difference estimates a selection-policy effect. The policy may jointly alter edit severity and repeated-source weighting; this design does not separate them. Edit-matched selection, one-candidate-per-source selection, and clean hard-example duplication are the direct controls for future mechanism tests. Until then, breadth across operators and settings does not establish universal optimality or natural-error causality.\n\nRefit-data efficiency is also not compute efficiency. The larger mixture is slightly stronger in primary noisy accuracy, while MTA meets the one-point rule and has the best primary clean and worst-operator means. MTA still generates and scores 20,000 candidates, so its advantage concerns records used for refitting. This may matter under storage or final-fit constraints, but the present CPU study does not measure wall-time or deployment savings. At severity 0.60, its interval against full mixture crosses the boundary; primary non-inferiority therefore does not generalize to every stress condition."
+      "accepted_text": ""
     },
     "conclusion": {
       "title": "Conclusion",
@@ -414,254 +826,307 @@
       "previous_response_id": null,
       "bibliography_fingerprint": null,
       "conversation_section_fingerprint": null,
-      "revision": 1,
+      "revision": 0,
       "current_index": 0,
       "paragraphs": [
         {
-          "id": "C1",
-          "purpose": "Close on the verified allocation principle and scope.",
-          "reference_lines": [
-            760,
-            800
-          ],
+          "id": "C-P1",
+          "purpose": "Conclude that staged reasoning plus adaptive reward coordination improves the tested trade-off while broader generalization remains open.",
+          "rhetorical_role": "conclusion",
+          "relation_to_previous": "AN-P5 establishes the preceding move",
+          "relation_to_next": "paper conclusion",
           "artifacts": [],
+          "heading": "",
+          "heading_style": "",
+          "reference_paragraph_ids": [
+            "DYF-SRC-L163"
+          ],
+          "artifact_dependencies": [],
           "candidate": null,
-          "accepted_text": "Margin-Targeted Typo Augmentation turns a fixed final-refit example budget into a supervised selection problem. On CLINC150, class-balanced low-score-gap selection improves noisy intent accuracy over matched random sampling in all six prespecified settings and remains within one point of a four-times-larger mixture in the primary setting. The result supports a narrow allocation principle for this classifier and candidate pool, while making no claim of lower candidate-generation cost or an isolated geometric boundary mechanism.",
-          "history": [
-            {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
-            }
-          ]
+          "accepted_text": "",
+          "history": []
         }
       ],
-      "accepted_text": "Margin-Targeted Typo Augmentation turns a fixed final-refit example budget into a supervised selection problem. On CLINC150, class-balanced low-score-gap selection improves noisy intent accuracy over matched random sampling in all six prespecified settings and remains within one point of a four-times-larger mixture in the primary setting. The result supports a narrow allocation principle for this classifier and candidate pool, while making no claim of lower candidate-generation cost or an isolated geometric boundary mechanism."
-    },
-    "limitations": {
-      "title": "Limitations",
-      "file": "limitations.tex",
-      "previous_response_id": null,
-      "bibliography_fingerprint": null,
-      "conversation_section_fingerprint": null,
-      "revision": 1,
-      "current_index": 0,
-      "paragraphs": [
-        {
-          "id": "L1",
-          "purpose": "State dataset, operator, supervision, model, and uncertainty limits.",
-          "reference_lines": [
-            740,
-            780
-          ],
-          "artifacts": [],
-          "candidate": null,
-          "accepted_text": "This study uses English CLINC150 utterances, synthetic character edits, one word-count Naive Bayes classifier, and lexicographically selected intent subsets. True-label margins require labeled training data and cannot directly select unlabeled production errors. The operators approximate, but do not reproduce, naturally distributed keyboard, phonetic, morphological, or speech-recognition errors. The confirmation seeds quantify perturbation variability rather than dataset resampling or model-family uncertainty. Larger neural encoders may rank candidates differently, and the primary one-point non-inferiority result does not hold at every severity. These boundaries constrain the claim to a reproducible CPU study of augmentation allocation.",
-          "history": [
-            {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
-            }
-          ]
-        }
-      ],
-      "accepted_text": "This study uses English CLINC150 utterances, synthetic character edits, one word-count Naive Bayes classifier, and lexicographically selected intent subsets. True-label margins require labeled training data and cannot directly select unlabeled production errors. The operators approximate, but do not reproduce, naturally distributed keyboard, phonetic, morphological, or speech-recognition errors. The confirmation seeds quantify perturbation variability rather than dataset resampling or model-family uncertainty. Larger neural encoders may rank candidates differently, and the primary one-point non-inferiority result does not hold at every severity. These boundaries constrain the claim to a reproducible CPU study of augmentation allocation."
-    },
-    "appendix": {
-      "title": "Appendix",
-      "file": "appendix.tex",
-      "previous_response_id": null,
-      "bibliography_fingerprint": null,
-      "conversation_section_fingerprint": null,
-      "revision": 1,
-      "current_index": 0,
-      "paragraphs": [
-        {
-          "id": "AP1",
-          "purpose": "Record exact reproducibility and derive class-balanced minimization.",
-          "reference_lines": [
-            850,
-            905
-          ],
-          "artifacts": [],
-          "candidate": null,
-          "accepted_text": "\\section{Reproducibility and Derivations}\\label{app:derivations}\nThe CLINC150 file is pinned to revision \\url{828f8093932c8fe6ca7936c3d2e52903b1c523de} and SHA-256 \\url{36923c3705a59e08fe9c3883d8bc2dd966ef93e22cb78ac41171782a698d56e0}. Candidate generation, class quotas, score computation, selection, training, and evaluation are deterministic conditional on a seed. Each case uses 10,000 bootstrap resamples with persisted case-specific seeds from 20260817 through 20260822; comparison streams use deterministic offsets recorded by the implementation.\n\nFor a class with sorted margins $m_{(1)}\\leq\\cdots\\leq m_{(|C_y|)}$, any size-$q_y$ subset omitting $m_{(j)}$ for $j\\leq q_y$ while including $m_{(k)}$ for $k>q_y$ can reduce its sum by exchanging the two. Repeating the exchange yields the first $q_y$ items, proving the classwise minimizer in Eq.~\\ref{eq:selection}. Because the quotas sum to $B$ and class candidate sets are disjoint, $|S|=B$. The executable verification checks recorded example counts and recomputes the two paired decision rules from persisted per-seed accuracies; deterministic rerunning is required to audit complete membership and record-level predictions.",
-          "history": [
-            {
-              "event": "accepted",
-              "source": "validated direct full draft",
-              "at": 1786899752
-            }
-          ]
-        }
-      ],
-      "accepted_text": "\\section{Reproducibility and Derivations}\\label{app:derivations}\nThe CLINC150 file is pinned to revision \\url{828f8093932c8fe6ca7936c3d2e52903b1c523de} and SHA-256 \\url{36923c3705a59e08fe9c3883d8bc2dd966ef93e22cb78ac41171782a698d56e0}. Candidate generation, class quotas, score computation, selection, training, and evaluation are deterministic conditional on a seed. Each case uses 10,000 bootstrap resamples with persisted case-specific seeds from 20260817 through 20260822; comparison streams use deterministic offsets recorded by the implementation.\n\nFor a class with sorted margins $m_{(1)}\\leq\\cdots\\leq m_{(|C_y|)}$, any size-$q_y$ subset omitting $m_{(j)}$ for $j\\leq q_y$ while including $m_{(k)}$ for $k>q_y$ can reduce its sum by exchanging the two. Repeating the exchange yields the first $q_y$ items, proving the classwise minimizer in Eq.~\\ref{eq:selection}. Because the quotas sum to $B$ and class candidate sets are disjoint, $|S|=B$. The executable verification checks recorded example counts and recomputes the two paired decision rules from persisted per-seed accuracies; deterministic rerunning is required to audit complete membership and record-level predictions."
+      "accepted_text": ""
     }
   },
   "figures": {
     "F1": {
-      "previous_response_id": null,
+      "status": "approved",
+      "previous_response_id": "44e7da6e-a39f-4607-857b-b3bef87c35d4",
       "revision": 1,
-      "approved_at": 1786899752,
-      "prompt_approved_at": 1786899752,
-      "last_message": "Verified and synchronized",
-      "prompt_instruction": "Redraw the composition as a strict Illustrator-style academic vector diagram on RGB pure white (#FFFFFF). Remove the black vignette, gray page tint, glow, gradients, shadows, bevels, and every alphabetic or numeric character from the prior image. There must be zero text and zero letters. Use a portrait single-column canvas with three compact vertical regions. At top, draw one outlined clean token strip that branches to exactly four typo candidates represented only by abstract token strips: crossed adjacent tiles for swap, one missing tile for deletion, one added tile for insertion, and one replaced diamond tile for keyboard substitution. In the middle, align the four candidates beside a thin vertical uncertainty rank with four circle markers; use marker position plus distinct outline shapes, not brightness, to encode rank. At bottom, place two same-size selection trays side by side, each containing exactly four small candidate tokens. Connect the four lowest-ranked markers to the left tray; fill the right tray with exactly four mixed candidates. Put the same four small class-quota dots above both trays to encode identical class balance and identical count. Use only solid muted teal #087F74, orange #C06A32, blue #506AA8, pale gray #E7ECEB, and charcoal #263A42 with thin strokes. No prose boxes, results, bars, axes, metrics, icons of people, scenery, decorative effects, or dark background. Keep 5 percent safe white margins for a 3.32 by 2.8 inch final figure.",
-      "prompt_history": [
-        {
-          "event": "approved",
-          "prompt": "Redraw the composition as a strict Illustrator-style academic vector diagram on RGB pure white (#FFFFFF). Remove the black vignette, gray page tint, glow, gradients, shadows, bevels, and every alphabetic or numeric character from the prior image. There must be zero text and zero letters. Use a portrait single-column canvas with three compact vertical regions. At top, draw one outlined clean token strip that branches to exactly four typo candidates represented only by abstract token strips: crossed adjacent tiles for swap, one missing tile for deletion, one added tile for insertion, and one replaced diamond tile for keyboard substitution. In the middle, align the four candidates beside a thin vertical uncertainty rank with four circle markers; use marker position plus distinct outline shapes, not brightness, to encode rank. At bottom, place two same-size selection trays side by side, each containing exactly four small candidate tokens. Connect the four lowest-ranked markers to the left tray; fill the right tray with exactly four mixed candidates. Put the same four small class-quota dots above both trays to encode identical class balance and identical count. Use only solid muted teal #087F74, orange #C06A32, blue #506AA8, pale gray #E7ECEB, and charcoal #263A42 with thin strokes. No prose boxes, results, bars, axes, metrics, icons of people, scenery, decorative effects, or dark background. Keep 5 percent safe white margins for a 3.32 by 2.8 inch final figure.",
-          "at": 1786899752
-        }
-      ],
+      "approved_at": 1787368186,
+      "prompt_approved_at": 1787367412,
+      "last_message": "该图已移动到 I-P2 后，PDF 已重新编译。",
+      "caption": "Correctness-only and fluency-only systems fail along complementary dimensions, as the motivating analysis shows that optimizing either criterion in isolation leaves the other unaddressed, framing the practical task as a joint criterion enforcing both.",
+      "caption_source": "paragraph_accept",
+      "caption_generated_from_paragraph": "I-P2",
+      "caption_generated_from_sha256": "2623a4cbe3eb92b71514222dc27d304734a962f94befadbf96e1a5d6bbbd03b6",
+      "caption_generated_at": 1787367346974015000,
+      "caption_last_error": "",
+      "draw_prompt": "A single monochrome-center design spanning the full width: a two-option divergence from a user utterance at left, the two failure modes as separate vertical text columns in the middle, and the joint criterion converging into a compact response card at right. White background; flat 2px dark-gray strokes; no fills except a 10%-gray highlight band behind the text columns; solid arrows for failure propagation; cluster of three small diamond comparison marks (gold: #C99A2C) clustering at the joint-criterion column to distinguish the proposed method’s target.\n\nLeft panel (input): a rounded-rectangle containing the user phrase, verbatim in print font: “Can I prepay this loan?” with three dense attribute tags nested beneath it—“income bracket”, “profile”, “prepay restriction”—each tag a small flat rectangle with dark text and 1px outline.\n\nMiddle panel (divergence): two dashed dark-gray arrows split diagonally from the user utterance: one to an upper column titled “correctness-only”, the other to a lower column titled “fluency-only”. Under the upper title, a short 8-word example response: “Prepayment is allowed for your income bracket.” tagged with two small outlined rectangles: “terse” and “mechanical.” Under the lower title, a separate 10-word example response: “Of course! You can pay off your loan early, no fees!” tagged with small outlined rectangles: “natural” and “contradicts profile.”\n\nRight panel (convergence): from each column, two solid dark-gray arrows converge toward a single compact rounded rectangle containing the label “MORE” in bold dark type, with a one-line subtitle label beneath it: “joint criterion: profile + fluency.” A small cluster of three diamond marks sits immediately adjacent to the MORE card, with a short label: “balanced target.”\n\nOverall reading order: user input → two parallel failure responses → converging joint target. Arrow semantics: dashed arrows indicate “optimization split”; solid arrows indicate “targeted by MORE.” No numbers, no plots, no bars, no title cards, no internal captions. Maximum label count: twelve short text labels. Aspect ratio: 7.0 × 3.2 inches; 1536 × 1024 pixels; all content centered in the horizontal middle band to survive top/bottom crop.\n\nMandatory final rendering constraints: use no more than sixteen text labels total, each at most four words; omit any earlier label request that exceeds this limit. Put no caption, explanatory sentence, empirical chart, score ranking, or decorative unexplained glyph inside the figure.",
+      "prompt_instruction": "",
+      "prompt_history": [],
+      "agent_prompt": "",
       "agent_history": [],
       "layout_prompt": "",
       "layout_prompt_is_default": false,
       "layout_plan": {},
-      "composed_at": 1786899752,
-      "progress": 100,
-      "progress_message": "已从论文源码恢复图片工作台。",
-      "job_token": null,
-      "job_revision": 1,
-      "job_started_at": null,
-      "status": "approved",
-      "draw_prompt": "Redraw the composition as a strict Illustrator-style academic vector diagram on RGB pure white (#FFFFFF). Remove the black vignette, gray page tint, glow, gradients, shadows, bevels, and every alphabetic or numeric character from the prior image. There must be zero text and zero letters. Use a portrait single-column canvas with three compact vertical regions. At top, draw one outlined clean token strip that branches to exactly four typo candidates represented only by abstract token strips: crossed adjacent tiles for swap, one missing tile for deletion, one added tile for insertion, and one replaced diamond tile for keyboard substitution. In the middle, align the four candidates beside a thin vertical uncertainty rank with four circle markers; use marker position plus distinct outline shapes, not brightness, to encode rank. At bottom, place two same-size selection trays side by side, each containing exactly four small candidate tokens. Connect the four lowest-ranked markers to the left tray; fill the right tray with exactly four mixed candidates. Put the same four small class-quota dots above both trays to encode identical class balance and identical count. Use only solid muted teal #087F74, orange #C06A32, blue #506AA8, pale gray #E7ECEB, and charcoal #263A42 with thin strokes. No prose boxes, results, bars, axes, metrics, icons of people, scenery, decorative effects, or dark background. Keep 5 percent safe white margins for a 3.32 by 2.8 inch final figure.",
-      "agent_prompt": "Redraw the composition as a strict Illustrator-style academic vector diagram on RGB pure white (#FFFFFF). Remove the black vignette, gray page tint, glow, gradients, shadows, bevels, and every alphabetic or numeric character from the prior image. There must be zero text and zero letters. Use a portrait single-column canvas with three compact vertical regions. At top, draw one outlined clean token strip that branches to exactly four typo candidates represented only by abstract token strips: crossed adjacent tiles for swap, one missing tile for deletion, one added tile for insertion, and one replaced diamond tile for keyboard substitution. In the middle, align the four candidates beside a thin vertical uncertainty rank with four circle markers; use marker position plus distinct outline shapes, not brightness, to encode rank. At bottom, place two same-size selection trays side by side, each containing exactly four small candidate tokens. Connect the four lowest-ranked markers to the left tray; fill the right tray with exactly four mixed candidates. Put the same four small class-quota dots above both trays to encode identical class balance and identical count. Use only solid muted teal #087F74, orange #C06A32, blue #506AA8, pale gray #E7ECEB, and charcoal #263A42 with thin strokes. No prose boxes, results, bars, axes, metrics, icons of people, scenery, decorative effects, or dark background. Keep 5 percent safe white margins for a 3.32 by 2.8 inch final figure.",
-      "layout_width": "single-column",
+      "composed_at": null,
+      "layout_width": null,
       "layout_mode": "single-column",
       "requested_layout_width": "single-column",
       "panels": {},
-      "placement_after": "I1",
-      "caption": "Random and margin-targeted selection use the same class-balanced refit count; MTA retains candidates with the lowest true-label score gaps."
+      "placement_after": "I-P2",
+      "progress": 100,
+      "progress_message": "已从论文源码恢复图片工作台。",
+      "job_token": null,
+      "job_revision": 12,
+      "job_started_at": null
     },
     "F2": {
-      "previous_response_id": null,
+      "status": "approved",
+      "previous_response_id": "46516cb9-ee58-49d1-922a-8bb3471a32c9",
       "revision": 1,
-      "approved_at": 1786899752,
-      "prompt_approved_at": 1786899752,
-      "last_message": "Verified and synchronized",
-      "prompt_instruction": "Render the verified six-setting table as a single-column bar chart with paired bootstrap 95% error bars; x is confirmation setting, y is MTA minus random mean noisy accuracy, include a zero reference line, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
-      "prompt_history": [
-        {
-          "event": "approved",
-          "prompt": "Render the verified six-setting table as a single-column bar chart with paired bootstrap 95% error bars; x is confirmation setting, y is MTA minus random mean noisy accuracy, include a zero reference line, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
-          "at": 1786899752
-        }
-      ],
+      "approved_at": 1787373858,
+      "prompt_approved_at": 1787370124,
+      "last_message": "Caption 已保存并重新编译正文。",
+      "caption": "Training dynamics for the reward-only objective drive fluency downward as correctness saturates, while a fixed mixed reward oscillates between the two criteria without settling on a policy that satisfies both.",
+      "caption_source": "researcher",
+      "caption_generated_from_paragraph": "",
+      "caption_generated_from_sha256": "",
+      "caption_generated_at": null,
+      "caption_last_error": "",
+      "draw_prompt": "A two-column ACL-style method schematic on a pure white background, landscape 1536x1024 canvas with the critical content in the central horizontal band, showing two parallel training trajectories that visually demonstrate instability in reward-only versus fixed mixed-reward training, then converge into one adaptive coordination approach.\n\nLayout: three horizontal regions arranged left-to-right in the central band. The leftmost region shows two distinct starting paths; the middle region shows their divergent dynamics; the rightmost region shows a single adaptive re-weighting operation.\n\nLeft region — two starting sources stacked vertically: a \"Correctness Reward\" module at the upper-left drawn as a small flat dark-octagon badge containing a checkmark glyph, and a \"Fluency Reward\" module at the lower-left drawn as a flat open-book glyph inside the same octagon shape. Between them a small square with a \"0.5/0.5\" fixed-weight label, connected by thin solid black arrows from both reward badges into this fixed-weight box, indicating a static scalar combination.\n\nMiddle region — two diverging trajectories emerging from the fixed-weight box: an upper path labeled \"Reward-Only Dynamics\" shown as a short flat chevron-shaped chain of three small gray squares with a downward-trending dashed red line under them tracking a fading \"fluency\" label; a lower path labeled \"Fixed Mixed Reward\" shown as an identical chevron chain of three squares but with a wavy oscillating dashed blue line beneath a \"weights\" label, the line curving up and down between two small dot markers. Both dashed lines are thin and stylized, not curves or plots; they are simple schematic wave/down arrow glyphs. Each path is labeled with one short noun phrase only.\n\nRight region — a single flat vertical capsule module labeled \"Adaptive Re-weighting\" containing a small horizontal matrix of three gradient bars (green, gray, amber) inside it; a solid black arrow from each of the two middle chevron chains enters the capsule from the left. From the right side of the capsule, one solid black arrow exits to a single flat rounded square labeled \"Coordinated Policy,\" which contains a pair of small balanced-scale glyph icons side by side. The arrow from the adaptive module carries no other adornment.\n\nAll objects are flat vector glyphs with thin dark-gray outlines (1.5pt), flat filled solids in restrained colorblind-safe accents: slate blue, muted green, amber, and warm gray only; no gradients, no shadows, no 3D depth, no photorealism, no people, no mascots, no decorative scenery. Background pure white. Labels are short sans-serif nouns, maximum four words each, set in 10–12pt print-readable type, placed close to their objects without enclosing boxes. Solid arrows indicate primary flow; dashed arrows are used only for the explicitly labeled \"fluency drift\" and \"weight oscillation\" schematic traces, and dashed lines are otherwise absent. All critical content is horizontally centered in the safe band. Reading order is left-to-right: two reward sources, fixed-weight mixing, two unstable trajectories, adaptive re-weighting, coordinated policy output. Spacing is generous, alignment is crisp, no loop arrows appear because the method does not iterate within this figure. No title card, no caption text, no empirical marks, no numeric outcomes, no bar charts, no curves. Only the following labels appear: \"Correctness Reward\", \"Fluency Reward\", \"0.5/0.5\", \"Reward-Only\", \"Mixed Reward\", \"Adaptive Re-weighting\", \"Coordinated Policy\". No other text is present.\n\nMandatory final rendering constraints: use no more than sixteen text labels total, each at most four words; omit any earlier label request that exceeds this limit. Put no caption, explanatory sentence, empirical chart, score ranking, or decorative unexplained glyph inside the figure.",
+      "prompt_instruction": "",
+      "prompt_history": [],
+      "agent_prompt": "",
       "agent_history": [],
       "layout_prompt": "",
       "layout_prompt_is_default": false,
       "layout_plan": {},
-      "composed_at": 1786899752,
-      "progress": 100,
-      "progress_message": "已从论文源码恢复图片工作台。",
-      "job_token": null,
-      "job_revision": 1,
-      "job_started_at": null,
-      "status": "approved",
-      "draw_prompt": "Render the verified six-setting table as a single-column bar chart with paired bootstrap 95% error bars; x is confirmation setting, y is MTA minus random mean noisy accuracy, include a zero reference line, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
-      "agent_prompt": "Render the verified six-setting table as a single-column bar chart with paired bootstrap 95% error bars; x is confirmation setting, y is MTA minus random mean noisy accuracy, include a zero reference line, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
-      "layout_width": "single-column",
+      "composed_at": 1787373904,
+      "layout_width": null,
       "layout_mode": "single-column",
       "requested_layout_width": "single-column",
       "panels": {
-        "confirmation_matrix": {
+        "training_dynamics": {
           "status": "built",
-          "revision": 1,
-          "agent_prompt": "Render the verified six-setting table as a single-column bar chart with paired bootstrap 95% error bars; x is confirmation setting, y is MTA minus random mean noisy accuracy, include a zero reference line, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
-          "draw_prompt": "Render the verified six-setting table as a single-column bar chart with paired bootstrap 95% error bars; x is confirmation setting, y is MTA minus random mean noisy accuracy, include a zero reference line, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
-          "last_message": "Verified deterministic plot",
+          "revision": 0,
+          "agent_prompt": "[恢复的绘图说明｜原始 Agent Prompt 未归档]\nCreate the data panel 'Estimated training dynamics' for figure F2: Approximate visual reconstruction of the reported reward-only and mixed-reward training dynamics; exact arrays were not published..\nGoal: Contrast stable reasoning-only training with oscillatory fixed joint optimization under reported variability constraints.\nUse only traceable result keys: artifacts.F2.rows.\nFigure description: Approximate visual reconstruction of the reported reward-only and mixed-reward training dynamics; exact arrays were not published.\nCaption contract: Approximate visual reconstruction of the reported reward-only and mixed-reward training dynamics; exact arrays were not published.\nKeep labels readable at the configured paper width and export an editable vector PDF/PPTX result.\nPreserve the data and visual organization of the currently approved figure.",
+          "last_message": "",
           "progress": 100,
           "progress_message": "已从论文中的最终数据图恢复。"
         }
       },
-      "placement_after": "E3",
-      "caption": "Confirmation setting by paired accuracy difference between MTA and the matched random budget. Error bars are bootstrap 95\\% intervals; every lower bound exceeds zero."
+      "placement_after": "I-P3",
+      "progress": 100,
+      "progress_message": "已从论文源码恢复图片工作台。",
+      "job_token": null,
+      "job_revision": 12,
+      "job_started_at": null
     },
     "F3": {
-      "previous_response_id": null,
-      "revision": 1,
-      "approved_at": 1786899752,
-      "prompt_approved_at": 1786899752,
-      "last_message": "Verified and synchronized",
-      "prompt_instruction": "Render the verified fixed-20-intent three-budget table as a single-column two-series line-and-marker chart; x is augmentation budget, y is mean noisy accuracy, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
+      "status": "approved",
+      "previous_response_id": "bcbd698e-9151-42e3-bf14-8e7482ab7f4b",
+      "revision": 2,
+      "approved_at": 1787385472,
+      "prompt_approved_at": 1787375825,
+      "last_message": "已按多篇参考图抽象出的视觉语法重建为 195 个原生可编辑对象，并更新论文 PDF。",
+      "caption": "Qualitative reconstruction of the reasoning scaffold, frozen reference, adaptive reward coordination through rank-based gradient weighting, and direct-response inference at deployment.",
+      "caption_source": "paragraph_accept",
+      "caption_generated_from_paragraph": "M-P6",
+      "caption_generated_from_sha256": "007a95b2af89886805a9224b1248c18abbc1f33ee3393cae956c5c9fbf1215c2",
+      "caption_generated_at": 1787375797206992000,
+      "caption_last_error": "",
+      "draw_prompt": "Refine the approved flat ACL method schematic on a pure white 1536x1024 canvas for a 7.0 by 3.2 inch two-column figure. Preserve the successful three-stage composition and concrete pictograms, but correct the causal connections exactly as specified below. Use thin graphite strokes, muted colorblind-safe blue, green, orange, and purple accents, generous whitespace, no gradients, shadows, 3D, result charts, or prose cards.\n\nStage 1, Reasoning scaffold: show a generic Context cluster using a profile-card outline with unlabeled horizontal field bars, two dialogue-bubble outlines containing only short neutral line marks, and a query bubble with a question-mark icon. Do not invent people, names, places, products, plans, preferences, prices, numbers, attribute names, or example sentences. Split the context into two distinct operations: Mask recovery visibly lifts a gray mask to reveal one generic token chip with a check; Program check shows generic token, operator, token, result, and a check, without a concrete equation. Both operations converge into a layered snowflake policy glyph labeled Frozen reference.\n\nStage 2, Adaptive training: a second generic Context cluster feeds Policy (train), which produces five candidate chips identified only by circle, square, triangle, diamond, and star markers. The same candidates enter three different evaluators: check-shaped Correctness, circular-wave Naturalness, and hexagonal-checklist Coverage. Each produces a vertical rank ladder that preserves those five marker identities in a different order. The three ladders converge into a Rank agreement matrix with visible aligned and crossed marker paths. Three arrows with different stroke weights then travel directly from Rank agreement into an Update node, with the short label Adaptive weights beside those arrows. A solid blue loop from Update returns to Policy (train). A separate Policy (trained) appears only downstream of Update. Leave no arrow pointing into empty space.\n\nThe Frozen reference has exactly one outgoing connection: a gray dashed KL anchor that runs through a clear empty corridor and terminates with its arrowhead directly on the left edge of the Update node. The dashed line may pass behind or below Rank agreement but must not touch, enter, branch from, or point to Rank agreement. Never originate KL anchor from Policy (train). Never draw a solid arrow from Frozen reference to any training object.\n\nStage 3, Direct inference: a third generic Context cluster, again containing only unlabeled profile bars and neutral dialogue strokes, connects by one solid arrow into a copy of Policy (trained), followed by one arrow to a Direct response bubble. Do not show candidates, rewards, rankings, update loops, or KL anchoring in inference.\n\nUse at most these labels: Context, Mask recovery, Program check, Frozen reference, Policy (train), Candidates, Correctness, Naturalness, Coverage, Rank agreement, Adaptive weights, Update, Policy (trained), Direct response, KL anchor. Keep all critical content inside the central horizontal safe band. The caption-free reading must be: verified scaffold tasks create a frozen reference that constrains the policy update through KL; candidate-rank agreement sets adaptive weights before the update; the trained policy answers directly at inference.",
+      "prompt_instruction": "",
       "prompt_history": [
         {
-          "event": "approved",
-          "prompt": "Render the verified fixed-20-intent three-budget table as a single-column two-series line-and-marker chart; x is augmentation budget, y is mean noisy accuracy, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
-          "at": 1786899752
+          "prompt": "A 1536x1024 canvas, designed as a two-column-wide ACL-style method figure (target print width 7.0 inches, aspect ratio cropped to 3.2 inches height; keep all critical content in the central horizontal band). Pure white background, flat fills, thin dark gray strokes, publication-ready vector appearance. Composition: three aligned stages flowing left-to-right (Stage 1: Scaffold Training, Stage 2: Adaptive Coordination, Stage 3: Direct Inference), with a feedback loop only for the KL-anchor path. Reading order: top-left scaffold pipeline → center adaptive coordination block → right frozen-reference policy → bottom deployment path. Object inventory (concrete manuscript objects only): (1) a dialogue-context bubble containing two short text lines; (2) a structured profile card showing attribute-value pairs (A1: v1, B2: v2, C3: v3) with two attribute slots highlighted/partially masked; (3) a small expression strip showing \"price_A + price_B\" leading to an equality sign and result token \"threshold?\"; (4) a waveform-like naturalness ribbon; (5) a coverage checklist card with three small checkboxes; (6) a correctness badge shaped as a small pentagon/star outline; (7) a rank-order arrow strip for the three channels with the two conflicting channels crossing; (8) a frozen-reference policy block (dashed border, labeled \"frozen\"); (9) a KL-anchor loop arrow returning from the frozen policy block to the adaptive coordination block (dashed, labeled \"KL anchor\"); (10) a final response text bubble; (11) a deploy-out box labeled \"direct response\". Solid dark arrows for primary data and gradient flow; dashed arrows only for the KL-anchor feedback and the frozen-reference path. Color roles (colorblind-safe, meaning-reinforcing only): blue for the input context and profile objects; green for verifiable scaffold outputs (expression and check-mark tokens); amber for the correctness channel; teal for the naturalness channel; purple for the coverage channel; gray for the frozen reference. No color used as the only distinction — repeated shapes carry identity: dialogue bubble shape reused for context and final response; attribute slots are small rounded rectangles with masked slots shown as hatched fills; checkboxes as small squares; expression tokens as monospace-style character chips. Labels (max four words each, sans-serif, small, dark gray): \"dialogue context\", \"structured profile\", \"masked slots\", \"scaffold tasks\", \"masked completion\", \"programmatic reasoning\", \"verifiable signals\", \"correctness channel\", \"naturalness channel\", \"coverage channel\", \"rank-based weights\", \"frozen reference\", \"KL anchor\", \"direct response\". Stage labels in small bold caps: \"Stage 1 · scaffold\", \"Stage 2 · adaptive coordination\", \"Stage 3 · inference\". Prohibited: no bars, curves, score numbers, no human faces, no gradients, no 3D, no paragraph text inside the figure. Distinct from all sibling mechanism figures: this figure uses a three-tier horizontal pipeline with a dashed KL loop and channel-rank arrow strip, which is not used in F1, F2, F4, or F5.\n\nMandatory final rendering constraints: use no more than sixteen text labels total, each at most four words; omit any earlier label request that exceeds this limit. Put no caption, explanatory sentence, empirical chart, score ranking, or decorative unexplained glyph inside the figure.",
+          "replaced_at": 1787387892,
+          "reason": "peer-figure visual grammar rebuild"
         }
       ],
+      "agent_prompt": "",
       "agent_history": [],
       "layout_prompt": "",
       "layout_prompt_is_default": false,
       "layout_plan": {},
-      "composed_at": 1786899752,
+      "composed_at": null,
+      "layout_width": null,
+      "layout_mode": "two-column",
+      "requested_layout_width": "two-column",
+      "panels": {},
+      "placement_after": null,
       "progress": 100,
-      "progress_message": "已从论文源码恢复图片工作台。",
+      "progress_message": "",
       "job_token": null,
-      "job_revision": 1,
-      "job_started_at": null,
-      "status": "approved",
-      "draw_prompt": "Render the verified fixed-20-intent three-budget table as a single-column two-series line-and-marker chart; x is augmentation budget, y is mean noisy accuracy, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
-      "agent_prompt": "Render the verified fixed-20-intent three-budget table as a single-column two-series line-and-marker chart; x is augmentation budget, y is mean noisy accuracy, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
-      "layout_width": "single-column",
-      "layout_mode": "single-column",
-      "requested_layout_width": "single-column",
-      "panels": {
-        "budget_curve": {
-          "status": "built",
-          "revision": 1,
-          "agent_prompt": "Render the verified fixed-20-intent three-budget table as a single-column two-series line-and-marker chart; x is augmentation budget, y is mean noisy accuracy, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
-          "draw_prompt": "Render the verified fixed-20-intent three-budget table as a single-column two-series line-and-marker chart; x is augmentation budget, y is mean noisy accuracy, serif 9 pt type, and use only results/typo_margin/figure_metrics.json.",
-          "last_message": "Verified deterministic plot",
-          "progress": 100,
-          "progress_message": "已从论文中的最终数据图恢复。"
-        }
-      },
-      "placement_after": "E5",
-      "caption": "Budget by method and mean noisy accuracy in the fixed 20-intent scope. MTA exceeds matched random selection at every budget."
+      "job_revision": 12,
+      "job_started_at": null
+    },
+    "F4": {
+      "status": "pending",
+      "previous_response_id": null,
+      "revision": 0,
+      "approved_at": null,
+      "prompt_approved_at": null,
+      "last_message": "",
+      "caption": "Approximate visual reconstruction of human-evaluation profiles and adaptive reward-weight distributions; exact arrays were not published.",
+      "caption_source": "configured",
+      "caption_generated_from_paragraph": "",
+      "caption_generated_from_sha256": "",
+      "caption_generated_at": null,
+      "caption_last_error": "",
+      "draw_prompt": "",
+      "prompt_instruction": "",
+      "prompt_history": [],
+      "agent_prompt": "",
+      "agent_history": [],
+      "layout_prompt": "",
+      "layout_prompt_is_default": false,
+      "layout_plan": {},
+      "composed_at": null,
+      "layout_width": null,
+      "layout_mode": "two-column",
+      "requested_layout_width": "two-column",
+      "panels": {},
+      "placement_after": null,
+      "progress": 0,
+      "progress_message": "",
+      "job_token": null,
+      "job_revision": 0,
+      "job_started_at": null
+    },
+    "F5": {
+      "status": "pending",
+      "previous_response_id": null,
+      "revision": 0,
+      "approved_at": null,
+      "prompt_approved_at": null,
+      "last_message": "",
+      "caption": "Qualitative reconstruction of the reported loan-interest case and reward-priority response variants.",
+      "caption_source": "configured",
+      "caption_generated_from_paragraph": "",
+      "caption_generated_from_sha256": "",
+      "caption_generated_at": null,
+      "caption_last_error": "",
+      "draw_prompt": "",
+      "prompt_instruction": "",
+      "prompt_history": [],
+      "agent_prompt": "",
+      "agent_history": [],
+      "layout_prompt": "",
+      "layout_prompt_is_default": false,
+      "layout_plan": {},
+      "composed_at": null,
+      "layout_width": null,
+      "layout_mode": "two-column",
+      "requested_layout_width": "two-column",
+      "panels": {},
+      "placement_after": null,
+      "progress": 0,
+      "progress_message": "",
+      "job_token": null,
+      "job_revision": 0,
+      "job_started_at": null
     }
   },
   "tables": {
     "T1": {
       "status": "approved",
-      "revision": 1,
-      "approved_at": 1786899752,
-      "last_message": "Verified result table",
-      "latex": "\\begin{table*}[t]\n\\centering\\small\n\\begin{tabular}{lrrrr}\\toprule\nMethod & Clean accuracy $\\uparrow$ & Mean noisy accuracy $\\uparrow$ & Worst-operator accuracy $\\uparrow$ & Augmented examples $\\downarrow$ \\\\\\midrule\nClean only & 0.9133 & 0.7948 & 0.7889 & 0 \\\\\nRandom budget & 0.9090 & 0.8014 & 0.7918 & 1,250 \\\\\nMTA & \\textbf{0.9238} & 0.8182 & \\textbf{0.8017} & 1,250 \\\\\nFull mixture & 0.9131 & \\textbf{0.8217} & 0.7958 & 5,000 \\\\\n\\bottomrule\\end{tabular}\n\\caption{Primary CLINC150 50-intent method-by-metric comparison, averaged over eight seeds held out from exploration. MTA uses the same 1,250-example refit budget as random selection; the full mixture uses 5,000 examples. Best values are bold.}\n\\label{tab:main}\n\\end{table*}",
-      "placement_after": "E2",
+      "revision": 0,
+      "approved_at": 1787383793,
+      "last_message": "表格数字由 paper/metrics.json 确定性生成。",
+      "latex": "\\begin{table*}[t]\n  \\centering\n  \\small\n  \\setlength{\\tabcolsep}{3.5pt}\n  \\sbox0{\\begin{tabular}{lcccccccccccccc}\n    \\toprule\n    Method / condition & PS BLEU & PS ROUGE & PS NAT & PS RSN & PS FID & PS COV & PS RUD & CS BLEU & CS ROUGE & CS NAT & CS RSN & CS FID & CS COV & CS RUD \\\\\n    \\midrule\n    SFT & 46.55 & 61.42 & 0.77 & 1.2 & 1.13 & 1.43 & 0.46 & 36.97 & 54.55 & 0.78 & 1.18 & 1.21 & 1.36 & 0.52 \\\\\n    DPO & 43.35 & 58.34 & 1.16 & 1.37 & 1.15 & 1.49 & 0.75 & 35.31 & 53.19 & 0.97 & 1.29 & 1.17 & 1.42 & 0.77 \\\\\n    KTO & 43.99 & 60.17 & 1.04 & 1.38 & 1.12 & 1.47 & 0.71 & 36.64 & 55.24 & 0.94 & 1.25 & 1.22 & 1.41 & 0.73 \\\\\n    RLHF & 44.14 & 61.77 & 0.96 & 1.37 & 1.14 & 1.48 & 0.8 & 37.71 & 56.7 & 1.03 & 1.28 & 1.3 & 1.35 & 0.84 \\\\\n    CoT & 46.24 & 62.7 & 0.79 & 1.41 & 1.1 & 1.45 & 0.77 & 37.58 & 56.61 & 0.89 & 1.31 & 1.28 & 1.38 & 0.81 \\\\\n    C-DynaOpt & 46.77 & 62.83 & 1.22 & 1.44 & 1.21 & 1.52 & 0.84 & 37.62 & 56.59 & 1.14 & 1.27 & 1.32 & 1.36 & 0.85 \\\\\n    EMORL & 46.51 & 62.14 & 1.29 & 1.42 & 1.23 & 1.51 & 0.88 & 37.85 & 56.8 & 1.2 & 1.28 & 1.25 & 1.4 & 0.9 \\\\\n    MORE & 47.49 & 64.13 & 1.65 & 1.55 & 1.28 & 1.57 & 0.95 & 38.45 & 57.22 & 1.35 & 1.4 & 1.39 & 1.46 & 0.92 \\\\\n    \\bottomrule\n  \\end{tabular}}\n  \\ifdim\\wd0>\\linewidth\\resizebox{\\linewidth}{!}{\\usebox0}\\else\\usebox0\\fi\n  \\caption{ByteDance offline evaluation}\n  \\label{offline-private-table}\n\\end{table*}",
+      "generation_prompt": "数据源: paper/metrics.json\n列: Method / condition | PS BLEU | PS ROUGE | PS NAT | PS RSN | PS FID | PS COV | PS RUD | CS BLEU | CS ROUGE | CS NAT | CS RSN | CS FID | CS COV | CS RUD\n行: source\nCaption: ByteDance offline evaluation\n字号: small\n最优值: none",
+      "prompt_history": [],
+      "agent_prompt": "",
+      "agent_history": [],
+      "placement_after": "E-P2",
       "progress": 100,
       "progress_message": "已从论文源码恢复表格工作台。",
       "job_token": null,
-      "job_revision": 1,
-      "job_started_at": null,
-      "generation_prompt": "数据源: results/typo_margin/studio_metrics.json\n列: Clean accuracy | Mean noisy accuracy | Worst-operator accuracy | Augmented examples\n行: source\nCaption: Primary CLINC150 50-intent comparison across eight seeds held out from exploration.\n字号: small\n最优值: highest accuracy and lowest count",
-      "prompt_history": [],
-      "agent_prompt": "",
-      "agent_history": []
+      "job_revision": 0,
+      "job_started_at": null
     },
     "T2": {
       "status": "approved",
-      "revision": 1,
-      "approved_at": 1786899752,
-      "last_message": "Verified result table",
-      "latex": "\\begin{table}[tb]\n\\centering\\small\n\\setlength{\\tabcolsep}{3pt}\n\\begin{tabular}{lrrrr}\\toprule\nMethod & Swap & Delete & Insert & Keyboard \\\\\\midrule\nRandom budget & 0.8114 & 0.8053 & 0.7922 & 0.7968 \\\\\nMTA & 0.8327 & 0.8275 & \\textbf{0.8017} & 0.8107 \\\\\nFull mixture & \\textbf{0.8437} & \\textbf{0.8363} & 0.7958 & \\textbf{0.8113} \\\\\n\\bottomrule\\end{tabular}\n\\caption{Primary-setting method-by-operator accuracy. MTA improves over the matched random budget for every operator; best values are bold.}\n\\label{tab:operators}\n\\end{table}",
-      "placement_after": "E4",
+      "revision": 0,
+      "approved_at": 1787383794,
+      "last_message": "表格数字由 paper/metrics.json 确定性生成。",
+      "latex": "\\begin{table*}[t]\n  \\centering\n  \\small\n  \\setlength{\\tabcolsep}{3.5pt}\n  \\sbox0{\\begin{tabular}{lccccccc}\n    \\toprule\n    Method / condition & BLEU & Inform & Success & Combined & CBE & Unique unigrams & Unique trigrams \\\\\n    \\midrule\n    SimpleTOD & 15.0 & 84.4 & 70.1 & 92.3 & N/A & N/A & N/A \\\\\n    UBAR & 17.6 & 83.4 & 70.3 & 94.5 & 2.1 & 478 & 5238 \\\\\n    GALAXY & 19.6 & 85.4 & 75.7 & 100.2 & 1.75 & 295 & 2275 \\\\\n    Mars & 19.9 & 88.9 & 78.0 & 103.4 & 1.65 & 288 & 2264 \\\\\n    TOATOD & 17.0 & 90.0 & 79.8 & 101.9 & N/A & N/A & N/A \\\\\n    RewardNet & 17.6 & 87.6 & 81.5 & 102.2 & 1.99 & 423 & 3942 \\\\\n    SGP-TOD & 9.1 & 83.9 & 69.9 & 86.0 & N/A & N/A & N/A \\\\\n    AutoTOD & 9.3 & 87.2 & 82.8 & 94.3 & 2.62 & 1722 & 10188 \\\\\n    ProTOD & 8.9 & 91.7 & 83.3 & 96.4 & 3.26 & 1951 & 14345 \\\\\n    MORE & 18.7 & 92.5 & 84.8 & 107.35 & 2.96 & 3226 & 25834 \\\\\n    \\bottomrule\n  \\end{tabular}}\n  \\ifdim\\wd0>\\linewidth\\resizebox{\\linewidth}{!}{\\usebox0}\\else\\usebox0\\fi\n  \\caption{MultiWOZ 2.2 end-to-end evaluation}\n  \\label{multiwoz-table}\n\\end{table*}",
+      "generation_prompt": "数据源: paper/metrics.json\n列: Method / condition | BLEU | Inform | Success | Combined | CBE | Unique unigrams | Unique trigrams\n行: source\nCaption: MultiWOZ 2.2 end-to-end evaluation\n字号: small\n最优值: none",
+      "prompt_history": [],
+      "agent_prompt": "",
+      "agent_history": [],
+      "placement_after": "E-P3",
       "progress": 100,
       "progress_message": "已从论文源码恢复表格工作台。",
       "job_token": null,
-      "job_revision": 1,
-      "job_started_at": null,
-      "generation_prompt": "数据源: results/typo_margin/studio_metrics.json\n列: Swap | Delete | Insert | Keyboard\n行: source\nCaption: Primary-setting accuracy by held-out typo operator.\n字号: small\n最优值: highest accuracy",
+      "job_revision": 0,
+      "job_started_at": null
+    },
+    "T3": {
+      "status": "approved",
+      "revision": 0,
+      "approved_at": 1787383795,
+      "last_message": "表格数字由 paper/metrics.json 确定性生成。",
+      "latex": "\\begin{table*}[t]\n  \\centering\n  \\small\n  \\sbox0{\\begin{tabular}{lc}\n    \\toprule\n    Method / condition & Change \\\\\n    \\midrule\n    Proactive Sale · Overall conversion & 16.53 \\\\\n    Proactive Sale · Reached conversion & 30.09 \\\\\n    Proactive Sale · GSB & 61.34 \\\\\n    Customer Service · User satisfaction & 1.12 \\\\\n    Customer Service · Handoff rate & -1.83 \\\\\n    Customer Service · GSB & 57.0 \\\\\n    \\bottomrule\n  \\end{tabular}}\n  \\ifdim\\wd0>\\linewidth\\resizebox{\\linewidth}{!}{\\usebox0}\\else\\usebox0\\fi\n  \\caption{Fourteen-day ByteDance online A/B outcomes}\n  \\label{online-table}\n\\end{table*}",
+      "generation_prompt": "数据源: paper/metrics.json\n列: Method / condition | Change\n行: source\nCaption: Fourteen-day ByteDance online A/B outcomes\n字号: small\n最优值: none",
       "prompt_history": [],
       "agent_prompt": "",
-      "agent_history": []
+      "agent_history": [],
+      "placement_after": "E-P4",
+      "progress": 100,
+      "progress_message": "已从论文源码恢复表格工作台。",
+      "job_token": null,
+      "job_revision": 0,
+      "job_started_at": null
+    },
+    "T4": {
+      "status": "pending",
+      "revision": 0,
+      "approved_at": null,
+      "last_message": "",
+      "latex": "",
+      "generation_prompt": "数据源: paper/metrics.json\n列: Method / condition | BLEU | ROUGE | NAT | RSN | FID | COV\n行: source\nCaption: Proactive Sale component ablation\n字号: small\n最优值: none",
+      "prompt_history": [],
+      "agent_prompt": "",
+      "agent_history": [],
+      "placement_after": null,
+      "progress": 0,
+      "progress_message": "",
+      "job_token": null,
+      "job_revision": 0,
+      "job_started_at": null
     }
   },
   "compile": {
+    "status": "ok",
+    "message": "\nUnderfull \\vbox (badness 10000) has occurred while \\output is active\n[3.3{/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/libertine/lbtn_oexx6f.e\nnc}]) (./sections/experiments.tex\nUnderfull \\vbox (badness 10000) has occurred while \\output is active\n) (./sections/analysis.tex) (./sections/conclusion.tex)\n[4.4] [5.5 <./fig/f3.pdf>]\n(/usr/local/texlive/2025/texmf-dist/tex/generic/stringenc/se-pdfdoc.def)\n(/usr/local/texlive/2025/texmf-dist/tex/generic/stringenc/se-utf8.def) [6.6]\n(./sections/bibliography.tex) (./main.aux) )\n(see the transcript file for additional information)</usr/local/texlive/2025/te\nxmf-dist/fonts/type1/public/newtx/LibertineMathMI.pfb></usr/local/texlive/2025/\ntexmf-dist/fonts/type1/public/newtx/LibertineMathMI7.pfb></usr/local/texlive/20\n25/texmf-dist/fonts/type1/public/libertine/LinBiolinumT.pfb></usr/local/texlive\n/2025/texmf-dist/fonts/type1/public/libertine/LinBiolinumTB.pfb></usr/local/tex\nlive/2025/texmf-dist/fonts/type1/public/libertine/LinLibertineT.pfb></usr/local\n/texlive/2025/texmf-dist/fonts/type1/public/libertine/LinLibertineTB.pfb></usr/\nlocal/texlive/2025/texmf-dist/fonts/type1/public/libertine/LinLibertineTI.pfb><\n/usr/local/texlive/2025/texmf-dist/fonts/type1/public/newtx/txexs.pfb></usr/loc\nal/texlive/2025/texmf-dist/fonts/type1/public/newtx/txmiaX.pfb></usr/local/texl\nive/2025/texmf-dist/fonts/type1/public/newtx/txsym.pfb></usr/local/texlive/2025\n/texmf-dist/fonts/type1/public/newtx/txsys.pfb>\nOutput written on main.pdf (6 pages, 665288 bytes).\nSyncTeX written on main.synctex.gz.\nTranscript written on main.log.\nLatexmk: Getting log file 'main.log'\nLatexmk: Examining 'main.fls'\nLatexmk: Examining 'main.log'\nLatexmk: Log file says output to 'main.pdf'\nLatexmk: All targets (main.pdf) are up-to-date",
+    "updated_at": 1787385475
+  },
+  "section_draft_job": {
+    "token": null,
     "status": "completed",
-    "message": "Compiled positive-result manuscript",
-    "revision": 1
+    "server_instance": "cb7ce5a9fc70412b89fb2726df090912",
+    "server_pid": 72312,
+    "started_at": 1787383411,
+    "finished_at": 1787383450,
+    "total": 5,
+    "completed": 5,
+    "progress": 100,
+    "scope": "section",
+    "section": "experiments",
+    "current_section": "experiments",
+    "current_paragraph": "E-P5",
+    "progress_message": "Experiments 的正文与绑定图表均已完成，并已写入 LaTeX 和 PDF。",
+    "pending_artifacts": [],
+    "artifact_ids": [
+      "T1",
+      "T2",
+      "T3"
+    ]
   }
 }

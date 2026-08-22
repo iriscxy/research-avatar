@@ -41,24 +41,24 @@ from research_avatar.paper_studio.server import (
     figure_public_state,
     generate_data_figure_agent_worker,
     generate_table_latex,
+    has_uncited_named_attribution,
     needs_citation_resolution,
     next_unaccepted_index,
     manuscript_title_display,
     manuscript_title_tex,
     manuscript_entrypoint_errors,
+    normalize_reference_excerpt,
     latex_prose_issues,
     normalize_latex_ready_text,
     normalize_mechanism_text_boxes,
     public_state,
     replace_manuscript_title_source,
     require_substantive_table_revision,
-    reference_excerpt,
     render_section_source,
     response_source_urls,
     sync_verified_bibliography,
     save_manuscript_title,
     table_numeric_cells,
-    table_reference_context,
     validate_data_figure_layout,
     validate_mechanism_shape_spec,
 )
@@ -238,11 +238,31 @@ class PaperStudioTests(unittest.TestCase):
             "conclusion": [{"id": "C1", "purpose": "Conclusion.", "reference_lines": [70, 72], "artifacts": []}],
             "appendix": [{"id": "AP1", "purpose": "Appendix setup.", "reference_lines": [80, 82], "artifacts": []}, {"id": "AP2", "purpose": "Layerwise appendix.", "reference_lines": [83, 86], "artifacts": ["F6"]}],
         }
-        plan = {"reference_file": str(reference), "sections": plan_sections}
+        for paragraphs in plan_sections.values():
+            for index, paragraph in enumerate(paragraphs):
+                paragraph.setdefault("rhetorical_role", "approved test role")
+                paragraph.setdefault("relation_to_previous", "opening" if index == 0 else "continues prior paragraph")
+                paragraph.setdefault("relation_to_next", "closing" if index == len(paragraphs) - 1 else "prepares next paragraph")
+        for section in section_specs:
+            section["paragraphs"] = plan_sections[section["id"]]
         config_file = paper / "paper_studio.json"
-        plan_file = paper / "paragraph_plan.json"
+        reference_context_file = paper / "reference_context.json"
         config_file.write_text(json.dumps(config), encoding="utf-8")
-        plan_file.write_text(json.dumps(plan), encoding="utf-8")
+        reference_context_file.write_text(
+            json.dumps(
+                {
+                    "sections": {
+                        item["id"]: {
+                            "source_heading": item["title"],
+                            "logic_summary_zh": f"用于测试 {item['title']} 的节级参考上下文。",
+                            "excerpts": [{"text": f"Reference context for {item['title']}."}],
+                        }
+                        for item in section_specs
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
         inputs = []
         for section in section_specs:
             path = paper / "sections" / section["file"]
@@ -258,7 +278,8 @@ class PaperStudioTests(unittest.TestCase):
         )
         cls.originals = {
             "PAPER": studio.PAPER, "STATE_DIR": studio.STATE_DIR, "STATE_FILE": studio.STATE_FILE,
-            "PARAGRAPH_PLAN_FILE": studio.PARAGRAPH_PLAN_FILE, "PROJECT_CONFIG_FILE": studio.PROJECT_CONFIG_FILE,
+            "PROJECT_CONFIG_FILE": studio.PROJECT_CONFIG_FILE,
+            "REFERENCE_CONTEXT_FILE": studio.REFERENCE_CONTEXT_FILE,
             "FIGURE_DIR": studio.FIGURE_DIR, "FIGURE_SOURCE_DIR": studio.FIGURE_SOURCE_DIR,
             "DATA_FIGURE_AGENT_DIR": studio.DATA_FIGURE_AGENT_DIR, "TABLE_PREVIEW_DIR": studio.TABLE_PREVIEW_DIR,
             "PAPER_PAGE_DIR": studio.PAPER_PAGE_DIR, "METRICS_FILE": studio.METRICS_FILE,
@@ -267,8 +288,8 @@ class PaperStudioTests(unittest.TestCase):
         studio.PAPER = paper
         studio.STATE_DIR = paper / ".paper_studio"
         studio.STATE_FILE = studio.STATE_DIR / "state.json"
-        studio.PARAGRAPH_PLAN_FILE = plan_file
         studio.PROJECT_CONFIG_FILE = config_file
+        studio.REFERENCE_CONTEXT_FILE = reference_context_file
         studio.FIGURE_DIR = paper / "fig"
         studio.FIGURE_SOURCE_DIR = paper / "figsrc"
         studio.DATA_FIGURE_AGENT_DIR = studio.FIGURE_SOURCE_DIR / "data_agents"
@@ -299,16 +320,16 @@ class PaperStudioTests(unittest.TestCase):
         with patch.dict(studio.os.environ, {}, clear=True):
             missing = public_state(_default_state())
             with self.assertRaisesRegex(StudioError, "启动 Paper Studio 的本机终端"):
-                studio.post_openai({"model": "gpt-5-nano", "input": "test"})
+                studio.post_openai({"model": "deepseek-v4-flash", "input": "test"})
         self.assertFalse(missing["api_key_configured"])
         self.assertEqual(
-            missing["api_key_setup"]["environment_variable"], "OPENAI_API_KEY"
+            missing["api_key_setup"]["environment_variable"], "DEEPSEEK_API_KEY"
         )
-        self.assertIn("export OPENAI_API_KEY", missing["api_key_setup"]["setup_command"])
+        self.assertIn("export DEEPSEEK_API_KEY", missing["api_key_setup"]["setup_command"])
         self.assertIn("python3 -m research_avatar.paper_studio.server", missing["api_key_setup"]["restart_command"])
 
         secret = "must-never-reach-public-state"
-        with patch.dict(studio.os.environ, {"OPENAI_API_KEY": secret}):
+        with patch.dict(studio.os.environ, {"DEEPSEEK_API_KEY": secret}):
             configured = public_state(_default_state())
         self.assertTrue(configured["api_key_configured"])
         self.assertNotIn(secret, json.dumps(configured, ensure_ascii=False))
@@ -325,7 +346,7 @@ class PaperStudioTests(unittest.TestCase):
         )
         self.assertEqual(
             [item["id"] for item in configured["llm_model_options"]],
-            ["gpt-5", "gpt-5-mini", "gpt-5-nano"],
+            ["deepseek-v4-pro", "deepseek-v4-flash"],
         )
         self.assertIn('$("api-key-setup").hidden = apiKeyReady', source)
 
@@ -359,12 +380,16 @@ class PaperStudioTests(unittest.TestCase):
         sent = json.loads(request.data.decode("utf-8"))
         self.assertTrue(request.full_url.endswith("/chat/completions"))
         self.assertEqual(sent["messages"][0]["role"], "system")
+        self.assertEqual(sent["thinking"], {"type": "disabled"})
+        self.assertEqual(sent["max_tokens"], studio.DEEPSEEK_PAPER_MAX_OUTPUT_TOKENS)
         self.assertEqual(extract_output_text(body), "Draft paragraph.")
         self.assertEqual(visible["api_key_setup"]["environment_variable"], "DEEPSEEK_API_KEY")
         self.assertNotIn(secret, json.dumps(visible, ensure_ascii=False))
 
     def test_provider_selection_is_limited_to_openai_and_deepseek(self):
         state = _default_state()
+        state["llm_provider"] = "openai"
+        state["model"] = studio.PROVIDER_DEFAULT_MODELS["openai"]
         state["title_editor"]["previous_response_id"] = "title-old"
         first_section = next(iter(state["sections"].values()))
         first_section["previous_response_id"] = "section-old"
@@ -443,15 +468,15 @@ class PaperStudioTests(unittest.TestCase):
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         browser_matrix = (
-            studio.ROOT / ".agents" / "skills" / "paperstudio" / "scripts" / "browser_matrix.py"
+            studio.ROOT / "research_avatar" / "paper_studio" / "browser_matrix.py"
         ).read_text(encoding="utf-8")
         parser = InteractionParser()
         parser.feed(html)
         expected_controls = {
-            "model", "model-apply", "reset", "reset-generated", "writing-view", "figures-view",
+            "model", "model-apply", "reset-generated", "writing-view", "figures-view",
             "tables-view", "compile", "paper-title", "title-gpt-prompt",
             "title-generate", "title-save", "candidate", "comment", "generate",
-            "accept", "pdf-navigation-toggle", "table-agent-prompt", "table-agent-edit",
+            "accept", "section-draft-start", "pdf-navigation-toggle", "table-agent-prompt", "table-agent-edit",
             "figure-cancel", "draw-prompt", "prompt-instruction", "figure-prompt",
             "figure-draw", "figure-build", "single-data-prompt", "single-data-generate",
             "data-layout-prompt", "data-compose", "mechanism-preview-toggle",
@@ -492,12 +517,13 @@ class PaperStudioTests(unittest.TestCase):
                 "/api/accept",
                 "/api/compile", "/api/figure/approve", "/api/figure/build",
                 "/api/full-draft/start", "/api/full-draft/cancel",
+                "/api/section-draft/start",
                 "/api/figure/cancel", "/api/figure/caption",
                 "/api/figure/caption/generate", "/api/figure/compose",
                 "/api/figure/draw", "/api/figure/panel/generate",
                 "/api/figure/placement", "/api/figure/prompt", "/api/generate",
                 "/api/llm-model",
-                "/api/pdf/locate", "/api/reset-conversation",
+                "/api/pdf/locate",
                 "/api/runtime-key",
                 "/api/reset-generated-paper", "/api/select-paragraph", "/api/state",
                 "/api/table/agent-edit", "/api/table/approve", "/api/table/generate",
@@ -508,9 +534,10 @@ class PaperStudioTests(unittest.TestCase):
         for api_path in browser_api_paths:
             self.assertIn(api_path, browser_matrix, api_path)
 
-    def test_default_gpt_model_is_nano(self):
+    def test_default_writing_provider_is_low_cost_deepseek_flash(self):
         self.assertEqual(studio.DEFAULT_MODEL, "gpt-5-nano")
-        self.assertEqual(_default_state()["model"], "gpt-5-nano")
+        self.assertEqual(studio.DEFAULT_PROVIDER, "deepseek")
+        self.assertEqual(_default_state()["model"], "deepseek-v4-flash")
 
     def test_latex_prose_preflight_flags_raw_specials_and_unicode_math(self):
         issues = latex_prose_issues(
@@ -621,6 +648,28 @@ class PaperStudioTests(unittest.TestCase):
             "\\[\nx=y\n\\]",
         )
 
+    def test_latex_normalization_keeps_synthetic_marker_out_of_math_mode(self):
+        self.assertEqual(
+            normalize_latex_ready_text(r"Values are \[SYNTHETIC\] only."),
+            "Values are [SYNTHETIC] only.",
+        )
+        self.assertEqual(
+            normalize_latex_ready_text("The value is 0.73[SYNTHETIC]and bounded."),
+            "The value is 0.73 [SYNTHETIC] and bounded.",
+        )
+
+    def test_latex_normalization_uses_breakable_path_for_repository_files(self):
+        self.assertEqual(
+            normalize_latex_ready_text(
+                r"Stored in \texttt{results/steering\_commutator/metrics.json}."
+            ),
+            r"Stored in \path{results/steering_commutator/metrics.json}.",
+        )
+        self.assertEqual(
+            normalize_latex_ready_text(r"Use \texttt{prompt_id} as the key."),
+            r"Use \texttt{prompt\_id} as the key.",
+        )
+
     def test_latex_normalization_escapes_prose_specials_but_preserves_math_and_keys(self):
         self.assertEqual(
             normalize_latex_ready_text(
@@ -631,8 +680,8 @@ class PaperStudioTests(unittest.TestCase):
 
     def test_table_cell_escape_converts_direction_arrows_to_latex_math(self):
         self.assertEqual(
-            studio.latex_escape_cell("Accuracy ↑ / Drop ↓"),
-            r"Accuracy $\uparrow$ / Drop $\downarrow$",
+            studio.latex_escape_cell("Accuracy ↑ / Spearman ρ / Drop ↓ / ✓ / ≤"),
+            r"Accuracy $\uparrow$ / Spearman $\rho$ / Drop $\downarrow$ / Yes / $\leq$",
         )
 
     def test_newer_accepted_section_survives_an_unrelated_stale_save(self):
@@ -790,18 +839,13 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('id="empty-project"', html)
         self.assertIn("python3 -m research_avatar.paper_studio.server --empty", html)
 
-    def test_removed_project_files_fall_back_to_empty_shell(self):
+    def test_missing_project_config_falls_back_to_empty_shell(self):
         with (
             patch.object(studio, "EMPTY_PROJECT_MODE", False),
             patch.object(
                 studio,
                 "PROJECT_CONFIG_FILE",
                 studio.ROOT / "paper" / "missing-paper-studio-for-test.json",
-            ),
-            patch.object(
-                studio,
-                "PARAGRAPH_PLAN_FILE",
-                studio.ROOT / "paper" / "missing-paragraph-plan-for-test.json",
             ),
         ):
             visible = public_state(_default_state())
@@ -1041,6 +1085,29 @@ class PaperStudioTests(unittest.TestCase):
         self.assertEqual(candidate["source"], "manual_edit")
         self.assertIs(paragraph["candidate"], candidate)
 
+    def test_unaccepted_paragraph_can_be_drafted_directly(self):
+        paragraph = {
+            "id": "P1",
+            "purpose": "Draft prose.",
+            "accepted_text": "",
+            "candidate": None,
+        }
+        candidate, text = candidate_for_accept(
+            paragraph,
+            candidate_id="",
+            submitted_text="Researcher-authored first draft.",
+            base_text="",
+        )
+        self.assertEqual(text, "Researcher-authored first draft.")
+        self.assertEqual(candidate["source"], "manual_draft")
+        self.assertIs(paragraph["candidate"], candidate)
+
+    def test_browser_preserves_manual_text_against_automatic_generation(self):
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn('|| $("candidate").dataset.dirty === "true"', source)
+        self.assertIn('automatic && $("candidate").dataset.dirty === "true"', source)
+        self.assertIn("已保留你正在编辑的正文", source)
+
     def test_direct_edit_rejects_a_stale_accepted_base(self):
         paragraph = {
             "id": "P1",
@@ -1108,6 +1175,84 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('$("title-editor").hidden = activeSection !== "abstract"', source)
         self.assertIn('if (activeSection === "abstract") renderTitleEditor()', source)
         self.assertLess(html.index('id="title-generate"'), html.index('id="title-save"'))
+
+    def test_fresh_studio_navigation_starts_in_abstract_writing_view(self):
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        index = (studio.STATIC / "index.html").read_text(encoding="utf-8")
+        self.assertIn(
+            'if (["writing", "figures", "tables"].includes(requested)) return requested;',
+            source,
+        )
+        self.assertIn('return "writing";', source)
+        self.assertIn('if (requested) return requested;', source)
+        self.assertIn('return "abstract";', source)
+        self.assertNotIn("paper-studio.active-section", source)
+        self.assertNotIn("paper-studio.active-view", source)
+        self.assertIn("static/app.js?v=20260821.3-abstracted-reference", index)
+
+    def test_full_draft_click_queues_behind_an_inflight_paragraph_generation(self):
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn("let queuedFullDraftStart = false", source)
+        self.assertIn("if (proseRequestBusy) {\n    queuedFullDraftStart = true;", source)
+        self.assertIn("当前段落生成完成后将自动启动全文初稿任务", source)
+        self.assertIn(
+            "if (queuedFullDraftStart) {\n      queuedFullDraftStart = false;\n"
+            "      void startFullDraftFromBrowser();",
+            source,
+        )
+        self.assertIn(
+            'fullDraftRequestBusy\n          || queuedFullDraftStart\n'
+            '          || (job && job.status === "running")',
+            source,
+        )
+
+    def test_full_draft_api_uses_persisted_provider_model_when_body_omits_model(self):
+        handler = object.__new__(Handler)
+        handler.send_json = MagicMock()
+        persisted = {"model": "deepseek-v4-flash"}
+        started = {"model": "deepseek-v4-flash"}
+        with (
+            patch.object(studio, "load_state", return_value=persisted),
+            patch.object(
+                studio,
+                "start_full_draft_job",
+                return_value=("job-token", started),
+            ) as start,
+            patch.object(studio.threading, "Thread") as thread,
+            patch.object(studio, "public_state", return_value={}),
+        ):
+            handler.handle_full_draft_start({})
+
+        start.assert_called_once_with("deepseek-v4-flash")
+        thread.assert_called_once()
+
+    def test_section_draft_api_passes_the_selected_section_to_the_batch_writer(self):
+        handler = object.__new__(Handler)
+        handler.send_json = MagicMock()
+        section = studio.batch_writing_order()[0]
+        persisted = {"model": "deepseek-v4-flash"}
+        started = {"model": "deepseek-v4-flash"}
+        with (
+            patch.object(studio, "load_state", return_value=persisted),
+            patch.object(
+                studio,
+                "start_section_draft_job",
+                return_value=("job-token", started),
+            ) as start,
+            patch.object(studio.threading, "Thread") as thread,
+            patch.object(studio, "public_state", return_value={}),
+        ):
+            handler.handle_section_draft_start({"section": section})
+
+        start.assert_called_once_with("deepseek-v4-flash", section)
+        thread.assert_called_once()
+
+    def test_full_draft_uses_the_same_outline_approval_rule_as_public_state(self):
+        source = Path(studio.__file__).read_text(encoding="utf-8")
+        offset = source.index("def start_full_draft_job")
+        start = source[offset : source.index("\ndef ", offset + 5)]
+        self.assertIn("if not outline_is_confirmed():", start)
+        self.assertNotIn('if not (PAPER / ".outline-approved").exists():', start)
 
     def test_accept_renders_compiled_pdf_before_waiting_for_next_gpt_candidate(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
@@ -1183,7 +1328,6 @@ class PaperStudioTests(unittest.TestCase):
             main = paper / "main.tex"
             original = "\\title{Original Title}\n"
             main.write_text(original, encoding="utf-8")
-            (paper / "outline.txt").write_text("Approved framing", encoding="utf-8")
             (paper / "working_abstract.txt").write_text("Supported claims", encoding="utf-8")
             response = {"id": "resp_title", "output_text": "Candidate Title"}
             with patch.object(studio, "PAPER", paper), patch.object(
@@ -1206,7 +1350,10 @@ class PaperStudioTests(unittest.TestCase):
             captured.update(payload)
             return {"id": "resp_title_2", "output_text": "Shorter Title"}
 
-        with patch.object(studio, "post_openai", side_effect=fake_post):
+        with (
+            patch.object(studio, "active_llm_provider", return_value="openai"),
+            patch.object(studio, "post_openai", side_effect=fake_post),
+        ):
             studio.call_openai_for_title(
                 model="gpt-5-nano",
                 prompt="Shorter",
@@ -1251,6 +1398,53 @@ class PaperStudioTests(unittest.TestCase):
         )
         studio.validate_project_workspace()
 
+    def test_reference_excerpt_removes_pdf_line_wraps_but_keeps_paragraphs(self):
+        self.assertEqual(
+            normalize_reference_excerpt(
+                [
+                    "First visual line of the abstract",
+                    "continues on the next PDF line.",
+                    "",
+                    "A real second paragraph remains separate.",
+                ]
+            ),
+            "First visual line of the abstract continues on the next PDF line.\n\n"
+            "A real second paragraph remains separate.",
+        )
+
+    def test_project_workspace_accepts_abstracted_reference_constraints_without_source_text(self):
+        contexts = {
+            section: {
+                "mode": "abstracted",
+                "source_heading": "Abstracted structure",
+                "logic_summary_zh": "Only approved writing constraints are available.",
+                "writing_constraints": [
+                    {"id": paragraphs[0]["id"], "purpose": paragraphs[0]["purpose"]}
+                ],
+                "excerpts": [],
+            }
+            for section, paragraphs in studio.paragraph_plan()["sections"].items()
+        }
+        with patch.object(studio, "reference_contexts", return_value=contexts):
+            studio.validate_project_workspace()
+
+    def test_project_workspace_rejects_source_text_in_abstracted_reference_mode(self):
+        contexts = {
+            section: {
+                "mode": "abstracted",
+                "source_heading": "Abstracted structure",
+                "logic_summary_zh": "Only approved writing constraints are available.",
+                "writing_constraints": [
+                    {"id": paragraphs[0]["id"], "purpose": paragraphs[0]["purpose"]}
+                ],
+                "excerpts": [{"text": "Source prose must not be present."}],
+            }
+            for section, paragraphs in studio.paragraph_plan()["sections"].items()
+        }
+        with patch.object(studio, "reference_contexts", return_value=contexts):
+            with self.assertRaisesRegex(StudioError, "禁止携带原文片段"):
+                studio.validate_project_workspace()
+
     def test_project_workspace_rejects_an_artifact_without_any_paragraph_binding(self):
         plan = studio.paragraph_plan()
         for paragraphs in plan["sections"].values():
@@ -1258,12 +1452,12 @@ class PaperStudioTests(unittest.TestCase):
                 paragraph["artifacts"] = [
                     item for item in paragraph.get("artifacts", []) if item != "F1"
                 ]
-        with TemporaryDirectory() as directory:
-            plan_path = Path(directory) / "paragraph_plan.json"
-            plan_path.write_text(json.dumps(plan), encoding="utf-8")
-            with patch.object(studio, "PARAGRAPH_PLAN_FILE", plan_path):
-                with self.assertRaisesRegex(StudioError, "当前未绑定：F1"):
-                    studio.validate_project_workspace()
+        section_specs = json.loads(json.dumps(studio.SECTION_SPECS))
+        for section in section_specs:
+            section["paragraphs"] = plan["sections"][section["id"]]
+        with patch.object(studio, "SECTION_SPECS", section_specs):
+            with self.assertRaisesRegex(StudioError, "当前未绑定：F1"):
+                studio.validate_project_workspace()
 
     def test_fixed_web_application_contains_no_fixture_identity(self):
         production_files = [
@@ -1308,6 +1502,7 @@ class PaperStudioTests(unittest.TestCase):
             with self.assertRaisesRegex(studio.ProjectConfigError, "inside the workspace"):
                 studio.load_project_config(path, root=root)
 
+    @unittest.skip("reference paths are no longer part of Paper Studio")
     def test_project_config_requires_main_and_reference_paths(self):
         config = json.loads(
             (studio.PAPER / "paper_studio.json").read_text(encoding="utf-8")
@@ -1357,16 +1552,6 @@ class PaperStudioTests(unittest.TestCase):
             with self.assertRaisesRegex(studio.ProjectConfigError, "metrics must be a non-empty list"):
                 studio.load_project_config(path, root=root)
 
-    def test_project_workspace_rejects_invalid_reference_lines(self):
-        plan = studio.paragraph_plan()
-        plan["sections"]["abstract"][0]["reference_lines"] = [33, 6]
-        with TemporaryDirectory() as directory:
-            plan_path = Path(directory) / "paragraph_plan.json"
-            plan_path.write_text(json.dumps(plan), encoding="utf-8")
-            with patch.object(studio, "PARAGRAPH_PLAN_FILE", plan_path):
-                with self.assertRaisesRegex(StudioError, "reference_lines"):
-                    studio.validate_project_workspace()
-
     def test_project_id_change_starts_fresh_runtime_state(self):
         state = _default_state()
         state["project_id"] = "old-project"
@@ -1386,6 +1571,7 @@ class PaperStudioTests(unittest.TestCase):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('"agent_generating"', source)
         self.assertIn('"/api/figure/panel/generate"', source)
+        self.assertIn("autoDataPanelAttempted.delete(attemptKey)", source)
         self.assertIn('"/api/figure/compose"', source)
         self.assertIn("renderDataPanels", source)
         self.assertNotIn("绘图代码", source)
@@ -1434,7 +1620,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260817.10"', html)
+        self.assertIn('src="static/app.js?v=20260821.3-abstracted-reference"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1442,7 +1628,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('id="compile" class="secondary" disabled', html)
         self.assertIn('id="load-error" class="empty-project" hidden', html)
         self.assertIn('id="load-error-message"', html)
-        self.assertIn('id="project-eyebrow"', html)
+        self.assertNotIn('id="project-eyebrow"', html)
         self.assertIn('id="studio-title"', html)
         self.assertIn('const project = state.project || {}', source)
         self.assertIn('project.name ? `${project.name} · Paper Studio`', source)
@@ -1476,7 +1662,8 @@ class PaperStudioTests(unittest.TestCase):
             html.index('id="figure-preview-pdf"'),
             html.index('id="data-approve-after-placement"'),
         )
-        self.assertIn('captionDirty ? "更新 Caption → PDF" : "重新插入"', source)
+        self.assertIn('? "补生成 Caption → PDF"', source)
+        self.assertIn(': "重新插入"', source)
         self.assertIn('pdf.onload = () =>', source)
         self.assertIn('id="figure-caption-box"', html)
         self.assertIn('id="figure-caption"', html)
@@ -1497,10 +1684,18 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('Caption 已修改，尚未更新到正文与 PDF', source)
         self.assertIn('function approveFigureOrSaveCaption()', source)
         self.assertIn('$("data-approve").onclick = approveFigureOrSaveCaption', source)
-        self.assertIn('(figure.status === "approved" && !captionDirty)', source)
+        self.assertIn(
+            '(figure.status === "approved" && !captionDirty && !captionNeedsBackfill)',
+            source,
+        )
+        self.assertIn('"补生成 Caption → PDF"', source)
         self.assertIn('const captionDrafts = new Map()', source)
         self.assertIn('function rememberCaptionDraft(figureId, caption)', source)
         self.assertIn('function forgetCaptionDraft(figureId)', source)
+        self.assertIn('const automaticCaptionChanged = Boolean(', source)
+        self.assertIn('String(captionDraftRecord.generatedAt || "") !== generatedAt', source)
+        self.assertIn('forgetCaptionDraft(figure.id)', source)
+        self.assertIn('captionInput.dataset.captionGeneratedAt = generatedAt', source)
         self.assertIn('const figureEditorDrafts = new Map()', source)
         self.assertIn('function renderFigureEditorInput(', source)
         self.assertIn('const proseDrafts = new Map()', source)
@@ -1519,7 +1714,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('let proseRequestBusy = false', source)
         self.assertIn('let paragraphRequestBusy = false', source)
         self.assertIn('let compileRequestBusy = false', source)
-        self.assertIn('let conversationResetBusy = false', source)
+        self.assertIn('let modelApplyBusy = false', source)
         self.assertIn('let figureRequestBusy = false', source)
         self.assertIn('if (figureRequestBusy) return null', source)
         self.assertIn('if (acceptRequestBusy) return', source)
@@ -1558,14 +1753,21 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260817.10"', html)
+        self.assertIn('src="static/app.js?v=20260821.3-abstracted-reference"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
         self.assertIn('id="pdf-page-indicator"', html)
         self.assertIn("function updatePdfPageIndicator()", source)
         self.assertIn("pages.onscroll = updatePdfPageIndicator", source)
-        self.assertIn('href="static/style.css?v=20260817.10"', html)
+        self.assertIn('href="static/style.css?v=20260820.5-terminal-help"', html)
+        self.assertLess(
+            html.index('id="compile"'),
+            html.index('id="reset-generated"'),
+        )
+        self.assertIn('id="reference-context-card" class="reference-context-card" open hidden', html)
+        self.assertIn('id="reference-excerpts-toggle" class="reference-excerpts-toggle"', html)
+        self.assertNotIn('<details class="structure-card">', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)
         self.assertIn('id="reset-project-copy"', html)
@@ -1785,7 +1987,16 @@ First accepted paragraph.
             figure_latex("F6", state["figures"]["F6"]),
         )
 
-    def test_completed_section_keeps_last_paragraph_and_reference_visible(self):
+    def test_caption_latex_escaping_preserves_inline_scientific_notation(self):
+        caption = r"Gap \(9.47\times10^{-7}\) at 90% depth & later tokens."
+        escaped = studio.latex_escape_caption(caption)
+        self.assertEqual(
+            escaped,
+            r"Gap \(9.47\times10^{-7}\) at 90\% depth \& later tokens.",
+        )
+        self.assertNotIn("textasciicircum", escaped)
+
+    def test_completed_section_keeps_last_paragraph_and_architecture_visible(self):
         state = _default_state()
         conclusion = state["sections"]["conclusion"]
         conclusion["paragraphs"][0]["accepted_text"] = "Accepted conclusion."
@@ -1799,8 +2010,8 @@ First accepted paragraph.
         self.assertEqual(loaded["sections"]["conclusion"]["current_index"], 0)
         paragraph = public["sections"]["conclusion"]["current_paragraph"]
         self.assertEqual(paragraph["id"], "C1")
-        self.assertTrue(paragraph["reference_text"].startswith("Conclusion and Future Work"))
-        self.assertNotIn("Comparison with attacker-model", paragraph["reference_text"])
+        self.assertEqual(paragraph["architecture"]["rhetorical_role"], "approved test role")
+        self.assertNotIn("reference_text", paragraph)
         self.assertTrue(public["sections"]["conclusion"]["complete"])
 
     def test_custom_figure_caption_is_sent_to_bound_paragraph_gpt(self):
@@ -1836,7 +2047,7 @@ First accepted paragraph.
 
         def fake_post(payload):
             captured.update(payload)
-            return {"output_text": "Layer-wise probe trends for direct and stylized inputs."}
+            return {"output_text": "Figure 6: Layer-wise probe trends for direct and stylized inputs."}
 
         with patch.object(studio, "post_openai", side_effect=fake_post):
             caption = studio.generate_figure_caption(
@@ -1847,10 +2058,219 @@ First accepted paragraph.
             )
 
         self.assertTrue(caption.startswith("[SYNTHETIC]"))
+        self.assertNotIn("Figure 6:", caption)
         self.assertIn("Shorten it and define the comparison.", captured["input"])
         self.assertIn('"traceable_results"', captured["input"])
         self.assertIn('"synthetic": true', captured["input"])
-        self.assertIn("do not invent measurements", captured["instructions"])
+        self.assertIn("do not invent measurements", captured["instructions"].lower())
+        self.assertIn("Do not use em dashes", captured["instructions"])
+        self.assertIn("exactly one", captured["instructions"])
+        self.assertIn("no more than 40 words", captured["instructions"])
+        self.assertIn("no minimum length", captured["instructions"])
+
+    def test_oversized_gpt_caption_is_automatically_compressed_once(self):
+        state = _default_state()
+        payloads = []
+
+        def fake_post(payload):
+            payloads.append(payload)
+            if len(payloads) == 1:
+                return {"output_text": " ".join(["detail"] * 180)}
+            return {
+                "output_text": "Compact caption describing the compared panels and metric."
+            }
+
+        with patch.object(studio, "post_openai", side_effect=fake_post):
+            caption = studio.generate_figure_caption(
+                "F2", state, FIGURES["F2"]["caption"], ""
+            )
+
+        self.assertEqual(
+            caption, "Compact caption describing the compared panels and metric."
+        )
+        self.assertEqual(len(payloads), 2)
+        self.assertIn("Compress and polish", payloads[1]["instructions"])
+        self.assertIn("at most 40 words", payloads[1]["instructions"])
+
+    def test_multi_sentence_gpt_caption_is_repaired_to_one_sentence(self):
+        state = _default_state()
+        payloads = []
+
+        def fake_post(payload):
+            payloads.append(payload)
+            if len(payloads) == 1:
+                return {"output_text": "The upper panel shows the null. The lower panel shows transport."}
+            return {"output_text": "The upper and lower panels contrast the additive null with nonlinear transport."}
+
+        with patch.object(studio, "post_openai", side_effect=fake_post):
+            caption = studio.generate_figure_caption(
+                "F2", state, FIGURES["F2"]["caption"], "Use one sentence."
+            )
+
+        self.assertEqual(
+            caption,
+            "The upper and lower panels contrast the additive null with nonlinear transport.",
+        )
+        self.assertEqual(len(payloads), 2)
+        self.assertIn("exactly one sentence", payloads[1]["instructions"])
+
+    def test_caption_has_deterministic_bound_after_failed_api_compression(self):
+        state = _default_state()
+        long_two_sentence = (
+            "The upper panel shows the exact additive null for two constant vectors. "
+            + "The lower panel shows nonlinear transport across layers with matched positions "
+            + "and fixed token paths while highlighting state evolution and token history "
+            + "as the only remaining sources of observed order sensitivity."
+        )
+        with patch.object(
+            studio,
+            "post_openai",
+            side_effect=[
+                {"output_text": long_two_sentence},
+                {"output_text": long_two_sentence},
+            ],
+        ):
+            caption = studio.generate_figure_caption(
+                "F2", state, FIGURES["F2"]["caption"], "Use one sentence."
+            )
+        self.assertFalse(studio.figure_caption_issues(caption))
+        self.assertIn(";", caption)
+
+    def test_unicode_scientific_notation_caption_is_repaired_for_pdflatex(self):
+        state = _default_state()
+        payloads = []
+
+        def fake_post(payload):
+            payloads.append(payload)
+            if len(payloads) == 1:
+                return {"output_text": "The gap declines to 9.47×10⁻⁷ at 90% depth."}
+            return {
+                "output_text": r"The gap declines to \(9.47 \times 10^{-7}\) at 90\% depth."
+            }
+
+        with patch.object(studio, "post_openai", side_effect=fake_post):
+            caption = studio.generate_figure_caption(
+                "F3", state, FIGURES["F3"]["caption"], ""
+            )
+
+        self.assertEqual(
+            caption,
+            r"The gap declines to \(9.47 \times 10^{-7}\) at 90\% depth.",
+        )
+        self.assertEqual(studio.figure_caption_issues(caption), [])
+        self.assertIn("pdflatex-safe", payloads[1]["instructions"])
+
+    def test_caption_normalization_removes_forbidden_dash_punctuation(self):
+        normalized = studio.normalize_figure_caption_text(
+            "Figure 4: Predicted–observed gaps — lower is better."
+        )
+        self.assertEqual(
+            normalized,
+            "Predicted to observed gaps; lower is better.",
+        )
+        self.assertNotIn("dash punctuation", " ".join(studio.figure_caption_issues(normalized)))
+
+    def test_accepting_a_figure_bound_paragraph_generates_its_caption(self):
+        state = _default_state()
+        paragraph = {
+            "id": "I2",
+            "artifacts": ["F1"],
+        }
+        with patch.object(
+            studio,
+            "generate_figure_caption",
+            return_value="Automatically grounded caption.",
+        ) as generate:
+            generated = studio.auto_generate_bound_figure_captions(
+                state,
+                "introduction",
+                paragraph,
+                r"Figure~\ref{fig:overview} motivates the method.",
+            )
+
+        self.assertEqual(generated, ["F1"])
+        self.assertEqual(state["figures"]["F1"]["caption"], "Automatically grounded caption.")
+        self.assertEqual(state["figures"]["F1"]["caption_source"], "paragraph_accept")
+        self.assertEqual(
+            state["figures"]["F1"]["caption_generated_from_paragraph"], "I2"
+        )
+        self.assertEqual(generate.call_args.kwargs["trigger_paragraph"]["section"], "introduction")
+
+    def test_bound_paragraph_is_rejected_when_automatic_caption_fails(self):
+        state = _default_state()
+        paragraph = {"id": "I-P3", "artifacts": ["F1"]}
+        with (
+            patch.object(
+                studio,
+                "generate_figure_caption",
+                side_effect=studio.StudioError("still exceeds one sentence"),
+            ),
+            self.assertRaisesRegex(
+                studio.StudioError,
+                r"I-P3.*F1 Caption 自动生成失败.*本段未接受",
+            ),
+        ):
+            studio.auto_generate_bound_figure_captions(
+                state,
+                "introduction",
+                paragraph,
+                r"Figure~\ref{fig:overview} establishes the null.",
+            )
+
+        self.assertEqual(state["figures"]["F1"]["caption_source"], "configured")
+        self.assertIn("one sentence", state["figures"]["F1"]["caption_last_error"])
+
+    def test_figure_approval_backfills_caption_from_accepted_binding(self):
+        state = _default_state()
+        paragraph = {
+            "id": "I-P3",
+            "artifacts": ["F1"],
+            "accepted_text": r"Figure~\ref{fig:overview} establishes the null.",
+        }
+        with (
+            patch.object(studio, "first_artifact_binding", return_value=("introduction", "I-P3")),
+            patch.object(studio, "paragraph_by_id", return_value=(paragraph, 2)),
+            patch.object(
+                studio,
+                "generate_figure_caption",
+                return_value="The figure contrasts the additive null with transported state effects.",
+            ),
+        ):
+            studio.ensure_figure_caption_before_approval(state, "F1")
+
+        self.assertEqual(state["figures"]["F1"]["caption_source"], "paragraph_accept")
+        self.assertEqual(
+            state["figures"]["F1"]["caption"],
+            "The figure contrasts the additive null with transported state effects.",
+        )
+
+    def test_figure_approval_preserves_researcher_caption(self):
+        state = _default_state()
+        state["figures"]["F1"].update(
+            caption="Researcher caption.", caption_source="researcher"
+        )
+        with patch.object(studio, "auto_generate_bound_figure_captions") as generate:
+            studio.ensure_figure_caption_before_approval(state, "F1")
+        generate.assert_not_called()
+        self.assertEqual(state["figures"]["F1"]["caption"], "Researcher caption.")
+
+    def test_automatic_caption_never_overwrites_researcher_caption(self):
+        state = _default_state()
+        state["figures"]["F1"].update(
+            caption="Researcher caption.", caption_source="researcher"
+        )
+        paragraph = {
+            "id": "I2",
+            "artifacts": [{"id": "F1", "kind": "figure"}],
+        }
+        with patch.object(studio, "generate_figure_caption") as generate:
+            generated = studio.auto_generate_bound_figure_captions(
+                state, "introduction", paragraph, "Revised accepted prose."
+            )
+
+        self.assertEqual(generated, [])
+        self.assertEqual(state["figures"]["F1"]["caption"], "Researcher caption.")
+        generate.assert_not_called()
 
     def test_last_data_panel_waits_for_manual_composition(self):
         state = _default_state()
@@ -2032,9 +2452,9 @@ First accepted paragraph.
                 }
 
             final_paths = {
-                "pdf": root / "combined.pdf",
-                "pptx": root / "combined.pptx",
-                "preview": root / "combined.png",
+                "pdf": root / "nested" / "combined.pdf",
+                "pptx": root / "nested" / "combined.pptx",
+                "preview": root / "nested" / "combined.png",
                 "layout_source": root / "layout.json",
                 "layout_prompt": root / "layout.txt",
             }
@@ -2122,6 +2542,15 @@ args = parser.parse_args()
         source = r"Prior work \\citep{alpha,beta} and \\citet[Sec. 2]{gamma}."
         self.assertEqual(citation_keys(source), {"alpha", "beta", "gamma"})
 
+    def test_citation_key_counts_detects_repeated_section_uses(self):
+        source = (
+            r"First \\cite{alpha,beta}. Second \\citep{alpha}. "
+            r"Third \\cite{alpha}."
+        )
+        self.assertEqual(
+            studio.citation_key_counts(source), {"alpha": 3, "beta": 1}
+        )
+
     def test_extract_response_text(self):
         response = {
             "output": [
@@ -2135,12 +2564,323 @@ args = parser.parse_args()
 
     def test_missing_or_unknown_citation_triggers_resolution(self):
         self.assertTrue(needs_citation_resolution("Claim. [CITATION NEEDED]"))
+        self.assertTrue(needs_citation_resolution(r"Claim \\cite{}."))
         self.assertTrue(needs_citation_resolution(r"Claim \\cite{definitelyUnknownKey}."))
         self.assertTrue(
             needs_citation_resolution(
                 r"Claim \\cite{[REFUSAL_DIRECTION_CITATION]}."
             )
         )
+
+    def test_uncited_named_attribution_triggers_targeted_audit(self):
+        self.assertTrue(has_uncited_named_attribution("Zhu et al. (2020) propose it."))
+        self.assertFalse(
+            has_uncited_named_attribution(
+                r"Zhu et al. (2020) propose it \cite{zhu-etal-2020-multitask}."
+            )
+        )
+        self.assertFalse(has_uncited_named_attribution("Our method uses four operators."))
+
+    def test_citation_audit_covers_external_claims_even_without_placeholders(self):
+        self.assertTrue(
+            studio.paragraph_requires_citation_audit(
+                "introduction", "Motivate the problem.", "Typos impair deployed systems."
+            )
+        )
+        self.assertTrue(
+            studio.paragraph_requires_citation_audit(
+                "experiments", "Describe data.", "We evaluate on the CLINC150 benchmark."
+            )
+        )
+        self.assertFalse(
+            studio.paragraph_requires_citation_audit(
+                "experiments", "Report our result.", "MTA improves the measured pilot mean."
+            )
+        )
+
+    def test_display_alias_intro_always_receives_citation_audit(self):
+        with patch.object(
+            studio,
+            "SECTION_MAP",
+            {"i": {"title": "Introduction", "render": "section"}},
+        ):
+            self.assertTrue(
+                studio.paragraph_requires_citation_audit(
+                    "i", "Introduce the setting.", "Activation steering is efficient."
+                )
+            )
+        self.assertFalse(
+            studio.paragraph_requires_citation_audit(
+                "abstract", "Summarize.", "We evaluate on CLINC150."
+            )
+        )
+
+    def test_real_fixture_rejects_pending_result_language(self):
+        with patch.object(
+            studio,
+            "metrics_bundle",
+            return_value={"fixture": {"synthetic": False, "pilot_scale": True}},
+        ):
+            self.assertIn(
+                "pending execution",
+                studio.real_result_status_issues("All values are pending execution."),
+            )
+            self.assertEqual(
+                studio.real_result_status_issues(
+                    "The reduced-sample pilot measured a 0.01 effect."
+                ),
+                [],
+            )
+
+    def test_synthetic_fixture_does_not_apply_real_result_status_gate(self):
+        with patch.object(
+            studio,
+            "metrics_bundle",
+            return_value={"fixture": {"synthetic": True}},
+        ):
+            self.assertEqual(
+                studio.real_result_status_issues("All values are pending execution."),
+                [],
+            )
+
+    def test_local_accept_gate_rejects_empty_and_non_survey_citations(self):
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", False),
+            patch.object(studio, "survey_bibliography_keys", return_value={"surveyKey"}),
+        ):
+            with self.assertRaisesRegex(StudioError, r"未解决的 \\cite\{\}"):
+                studio.validate_citations_for_accept(r"Prior work \cite{}.")
+            with self.assertRaisesRegex(StudioError, "notInSurvey"):
+                studio.validate_citations_for_accept(r"Prior work \cite{notInSurvey}.")
+            studio.validate_citations_for_accept(r"Prior work \cite{surveyKey}.")
+
+    def test_online_accept_gate_allows_only_empty_citation_markers(self):
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(studio, "bibliography_keys", return_value=set()),
+        ):
+            studio.validate_citations_for_accept(r"Prior work \cite{}.")
+            with self.assertRaisesRegex(StudioError, "known2020"):
+                studio.validate_citations_for_accept(r"Prior work \cite{known2020}.")
+
+    def test_empty_citation_repair_uses_only_a_verified_local_key(self):
+        captured = {}
+
+        def fake_post(payload):
+            captured.update(payload)
+            return {
+                "id": "resp-citation-repair",
+                "output_text": r"ORBIT studies sequence asymmetry \cite{orbit2026}.",
+            }
+
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", False),
+            patch.object(studio, "survey_bibliography_keys", return_value={"orbit2026"}),
+            patch.object(
+                studio,
+                "writing_bibliography_catalog",
+                return_value="key=orbit2026 | title=ORBIT",
+            ),
+            patch.object(studio, "post_openai", side_effect=fake_post),
+        ):
+            response_id, repaired = studio.repair_empty_citation_placeholders(
+                model="deepseek-v4-flash",
+                previous_response_id="resp-audit",
+                section="related_work",
+                purpose="Contrast with ORBIT.",
+                paragraph=r"ORBIT studies sequence asymmetry \cite{}.",
+            )
+
+        self.assertEqual(response_id, "resp-citation-repair")
+        self.assertEqual(repaired, r"ORBIT studies sequence asymmetry \cite{orbit2026}.")
+        self.assertIn("zero citations is valid", captured["instructions"].lower())
+        self.assertIn("key=orbit2026", captured["input"])
+
+    def test_empty_citation_repair_can_remove_an_unsupported_attribution(self):
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", False),
+            patch.object(studio, "survey_bibliography_keys", return_value={"known2024"}),
+            patch.object(
+                studio,
+                "writing_bibliography_catalog",
+                return_value="key=known2024 | title=Unrelated Work",
+            ),
+            patch.object(
+                studio,
+                "post_openai",
+                return_value={
+                    "id": "resp-narrowed",
+                    "output_text": "We instead isolate order effects with matched controls.",
+                },
+            ),
+        ):
+            _, repaired = studio.repair_empty_citation_placeholders(
+                model="deepseek-v4-flash",
+                previous_response_id="resp-audit",
+                section="related_work",
+                purpose="State the contribution boundary.",
+                paragraph=r"An unsupported named method proves this claim \cite{}.",
+            )
+
+        self.assertEqual(
+            repaired,
+            "We instead isolate order effects with matched controls.",
+        )
+        self.assertFalse(studio.has_empty_citation_placeholder(repaired))
+
+    def test_citation_obligations_become_empty_latex_placeholders(self):
+        with patch.object(studio, "bibliography_keys", return_value={"known2020"}):
+            text = studio.citation_placeholders(
+                r"Missing [CITATION NEEDED]. Unknown \cite{invented2025}. "
+                r"Approved \cite{known2020}."
+            )
+        self.assertEqual(text.count(r"\cite{}"), 2)
+        self.assertIn(r"\cite{known2020}", text)
+        self.assertNotIn("invented2025", text)
+
+    def test_online_citation_markers_remove_every_key(self):
+        text = studio.online_citation_markers(
+            r"Known \cite{known2020}; unknown [CITATION NEEDED]."
+        )
+        self.assertEqual(text, r"Known \cite{}; unknown \cite{}.")
+
+    def test_online_empty_citation_repair_preserves_marker_without_api(self):
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(studio, "post_openai") as post_openai,
+        ):
+            response_id, text = studio.repair_empty_citation_placeholders(
+                model="deepseek-v4-flash",
+                previous_response_id="resp-audit",
+                section="introduction",
+                purpose="Locate prior-work obligations.",
+                paragraph=r"Prior work establishes this result \cite{}.",
+            )
+        self.assertEqual(response_id, "resp-audit")
+        self.assertEqual(text, r"Prior work establishes this result \cite{}.")
+        post_openai.assert_not_called()
+
+    def test_online_citation_audit_marks_obligations_without_bibliography(self):
+        captured = {}
+
+        def fake_post(payload):
+            captured.update(payload)
+            return {
+                "id": "resp-online-audit",
+                "output_text": r"CLINC150 is the evaluation benchmark \cite{larson2019}.",
+            }
+
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(studio, "post_openai", side_effect=fake_post),
+        ):
+            response_id, text = studio.resolve_citations_from_online_bibliography(
+                model="deepseek-v4-flash",
+                previous_response_id="resp-draft",
+                section="experiments",
+                purpose="Describe the dataset.",
+                paragraph=r"CLINC150 is the evaluation benchmark \cite{}.",
+            )
+
+        self.assertEqual(response_id, "resp-online-audit")
+        self.assertEqual(text, r"CLINC150 is the evaluation benchmark \cite{}.")
+        self.assertNotIn("<verified_catalog>", captured["input"])
+        self.assertIn("has no\nbibliography", captured["instructions"])
+        self.assertIn(r"literal marker \cite{}", captured["instructions"])
+        self.assertNotIn("tools", captured)
+
+    def test_online_prompt_marks_citation_obligations_without_keys(self):
+        payloads = []
+
+        def fake_post(payload):
+            payloads.append(payload)
+            if len(payloads) == 1:
+                return {"id": "resp-draft", "output_text": "Background claim."}
+            return {"id": "resp-audit", "output_text": r"Background claim \cite{}."}
+
+        with (
+            patch.object(studio, "post_openai", side_effect=fake_post),
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(studio, "bibliography_keys", return_value=set()),
+        ):
+            response_id, text, added = call_openai(
+                section="method",
+                model="gpt-5",
+                previous_response_id=None,
+                purpose="Establish the externally grounded problem.",
+                required_heading=None,
+                comment="",
+                current_text="",
+            )
+
+        self.assertEqual((response_id, text, added), ("resp-audit", r"Background claim \cite{}.", []))
+        writer = payloads[0]
+        self.assertIn("a paragraph may legitimately contain zero citations", writer["instructions"])
+        self.assertIn("generic motivation, common knowledge", writer["instructions"])
+        self.assertIn("hosted workflow has no bibliography", writer["instructions"])
+        self.assertIn(r"literal marker \cite{}", writer["instructions"])
+        self.assertIn("<bibliography_catalog></bibliography_catalog>", writer["input"])
+        self.assertIn("Never search the web", writer["instructions"])
+        self.assertNotIn("tools", writer)
+        self.assertEqual(len(payloads), 2)
+
+    def test_local_prompt_decides_citations_and_uses_only_survey_verified_keys(self):
+        captured = {}
+
+        def fake_post(payload):
+            captured.update(payload)
+            return {"id": "resp-draft", "output_text": r"CLINC150 is an intent benchmark \cite{larson2019clinc}."}
+
+        with (
+            patch.object(studio, "post_openai", side_effect=fake_post),
+            patch.object(studio, "survey_bibliography_keys", return_value={"larson2019clinc"}),
+        ):
+            response_id, text, added = call_openai(
+                section="experiments",
+                model="gpt-5",
+                previous_response_id=None,
+                purpose="Describe the evaluation benchmark.",
+                required_heading=None,
+                comment="",
+                current_text="",
+            )
+
+        self.assertEqual(response_id, "resp-draft")
+        self.assertEqual(text, r"CLINC150 is an intent benchmark \cite{larson2019clinc}.")
+        self.assertEqual(added, [])
+        self.assertIn("a paragraph may legitimately contain zero citations", captured["instructions"])
+        self.assertIn("smallest directly supporting set", captured["instructions"])
+        self.assertIn("reports/01_LIT_SURVEY.html", captured["instructions"])
+        self.assertNotIn("tools", captured)
+
+    def test_abstract_prompt_and_postprocessing_remove_citations(self):
+        captured = {}
+
+        def fake_post(payload):
+            captured.update(payload)
+            return {
+                "id": "resp-abstract",
+                "output_text": r"We study a fixed-budget selector \cite{sengupta2021robustness} and report supported results.",
+            }
+
+        with (
+            patch.object(studio, "post_openai", side_effect=fake_post),
+            patch.object(studio, "survey_bibliography_keys", return_value={"sengupta2021robustness"}),
+        ):
+            response_id, text, added = call_openai(
+                section="abstract",
+                model="gpt-5",
+                previous_response_id=None,
+                purpose="Summarize the paper.",
+                required_heading=None,
+                comment="",
+                current_text="",
+            )
+
+        self.assertEqual(response_id, "resp-abstract")
+        self.assertEqual(text, "We study a fixed-budget selector and report supported results.")
+        self.assertEqual(added, [])
+        self.assertIn("Abstract must contain no citation commands", captured["instructions"])
 
     def test_web_search_sources_are_collected(self):
         response = {
@@ -2294,17 +3034,30 @@ args = parser.parse_args()
         paragraph = current_paragraph(section)
         self.assertEqual(paragraph["id"], "A1")
         self.assertTrue(paragraph["purpose"])
-        self.assertTrue(reference_excerpt(paragraph["reference_lines"]))
+        self.assertTrue(paragraph["rhetorical_role"])
 
-    def test_public_state_exposes_reference_but_not_full_plan(self):
+    def test_public_state_exposes_target_architecture_but_not_mutable_plan(self):
         state = public_state(_default_state())
         section = state["sections"]["introduction"]
         self.assertNotIn("paragraphs", section)
         self.assertEqual(section["current_paragraph"]["id"], "I1")
-        self.assertTrue(section["current_paragraph"]["reference_text"])
+        self.assertTrue(section["current_paragraph"]["architecture"]["relation_to_next"])
+        self.assertEqual(len(section["structure_blueprint"]), 6)
+        self.assertNotIn("reference_text", section["current_paragraph"])
         self.assertIsNone(section["current_paragraph"]["candidate"])
         self.assertEqual(len(section["paragraph_navigation"]), 6)
         self.assertTrue(section["paragraph_navigation"][0]["selected"])
+
+    def test_structure_blueprint_does_not_render_internal_relation_hints(self):
+        app_js = (
+            Path(__file__).resolve().parents[1]
+            / "research_avatar/paper_studio/static/app.js"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("RHETORICAL_ROLE_LABELS", app_js)
+        self.assertNotIn("architectureRelationLabel", app_js)
+        self.assertNotIn("段落作用：", app_js)
+        self.assertNotIn("与前文：", app_js)
+        self.assertNotIn("下一步：", app_js)
 
     def test_related_work_heading_is_explicit_plan_metadata(self):
         state = _default_state()
@@ -2328,6 +3081,78 @@ args = parser.parse_args()
         )
         self.assertEqual(enforce_required_heading("", heading), "")
 
+    def test_section_name_leadins_are_removed_before_planned_headings(self):
+        self.assertEqual(
+            studio.strip_redundant_section_name_leadin(
+                "Related Work. Body prose.", "Related Work"
+            ),
+            "Body prose.",
+        )
+        self.assertEqual(
+            studio.strip_redundant_section_name_leadin(
+                "Abstract: Body prose.", "Abstract"
+            ),
+            "Body prose.",
+        )
+        self.assertEqual(
+            studio.strip_redundant_section_name_leadin(
+                "Abstrct. Body prose.", "Abstract"
+            ),
+            "Body prose.",
+        )
+        self.assertEqual(
+            studio.strip_redundant_section_name_leadin(
+                "Related work establishes a useful baseline.", "Related Work"
+            ),
+            "Related work establishes a useful baseline.",
+        )
+
+    def test_redundant_section_leadin_migration_rewrites_canonical_source(self):
+        with TemporaryDirectory() as directory:
+            paper = Path(directory)
+            sections = paper / "sections"
+            sections.mkdir()
+            state = studio._default_state()
+            related = state["sections"]["related_work"]
+            for index, paragraph in enumerate(related["paragraphs"], 1):
+                paragraph["accepted_text"] = f"Body paragraph {index}."
+            source = "\\section{Related Work}\n\n\\label{sec:related-work}\n\n" + "\n\n".join(
+                f"% PAPER_STUDIO_PARAGRAPH:{paragraph['id']}\n\n"
+                f"Related Work. {paragraph['accepted_text']}"
+                for paragraph in related["paragraphs"]
+            )
+            target = sections / studio.SECTION_MAP["related_work"]["file"]
+            target.write_text(source, encoding="utf-8")
+            with patch.object(studio, "PAPER", paper):
+                self.assertTrue(
+                    studio.repair_redundant_section_leadins_in_manuscript(state)
+                )
+            repaired = target.read_text(encoding="utf-8")
+            self.assertNotIn("Related Work. Body", repaired)
+            self.assertIn("Body paragraph 1.", repaired)
+
+    def test_online_placeholder_reference_migration_adds_missing_bound_reference(self):
+        state = studio._default_state()
+        section, paragraph_id = studio.first_artifact_binding("T1")
+        paragraph, _index = studio.paragraph_by_id(state, section, paragraph_id)
+        paragraph["accepted_text"] = "The planned comparison will test the hypothesis."
+        paragraph["artifacts"] = ["T1"]
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(studio, "PAPER", Path(directory)),
+            patch.dict(studio.TABLES["T1"], {"online_placeholder": True}),
+        ):
+            sections = Path(directory) / "sections"
+            sections.mkdir()
+            self.assertTrue(
+                studio.repair_online_placeholder_references_in_manuscript(state)
+            )
+            self.assertIn(
+                f"Table~\\ref{{{studio.TABLES['T1']['label']}}}",
+                paragraph["accepted_text"],
+            )
+
     def test_heading_styles_support_textbf_and_subsection_groups(self):
         self.assertEqual(
             enforce_required_heading("Body prose.", "Related topic.", "textbf"),
@@ -2347,11 +3172,11 @@ args = parser.parse_args()
         self.assertEqual(experiment[1]["heading"], "Main Results")
         self.assertIsNone(experiment[2].get("heading"))
 
-    def test_prose_api_receives_reference_and_explicit_heading(self):
-        captured = {}
+    def test_prose_api_receives_target_architecture_and_explicit_heading(self):
+        payloads = []
 
         def fake_post(payload):
-            captured.update(payload)
+            payloads.append(payload)
             return {"id": "resp-r1", "output_text": "Body prose."}
 
         with patch.object(studio, "post_openai", side_effect=fake_post):
@@ -2362,16 +3187,23 @@ args = parser.parse_args()
                 purpose="Position prior safety-alignment work.",
                 required_heading="Safety alignment and refusal behavior.",
                 required_heading_style="textbf",
-                reference_paragraph="Reference-paper paragraph with an inline heading.",
+                architecture={
+                    "purpose": "Position prior work.",
+                    "rhetorical_role": "literature synthesis",
+                    "relation_to_previous": "opening",
+                    "relation_to_next": "narrows the gap",
+                },
                 comment="",
                 current_text="",
             )
 
         self.assertEqual(response_id, "resp-r1")
+        captured = payloads[0]
         self.assertIn(
-            "<reference_paragraph>Reference-paper paragraph with an inline heading.",
+            "<paragraph_architecture>",
             captured["input"],
         )
+        self.assertNotIn("Reference-paper paragraph", captured["input"])
         self.assertIn(
             "<required_heading>Safety alignment and refusal behavior.",
             captured["input"],
@@ -2381,9 +3213,60 @@ args = parser.parse_args()
             captured["input"],
         )
         self.assertIn("<writing_style>", captured["input"])
+        self.assertIn("Do not use em dashes", captured["instructions"])
+        self.assertIn("LaTeX double/triple hyphens", captured["instructions"])
+        self.assertIn(
+            "content-adversarial, structure-only material",
+            captured["instructions"],
+        )
+        self.assertIn(
+            'Never begin the prose with the section name',
+            captured["instructions"],
+        )
+        self.assertIn(
+            "The target project evidence is the sole content authority",
+            captured["input"].replace("\n", " "),
+        )
         self.assertTrue(
             text.startswith(r"\textbf{Safety alignment and refusal behavior.}")
         )
+
+    def test_latex_prose_rejects_dash_punctuation_but_allows_compound_hyphens(self):
+        self.assertIn("em dash", " ".join(studio.latex_prose_issues("Claim—detail.")))
+        self.assertIn("en dash", " ".join(studio.latex_prose_issues("Claim–detail.")))
+        self.assertIn(
+            "double/triple-hyphen",
+            " ".join(studio.latex_prose_issues("Claim---detail.")),
+        )
+        self.assertEqual(
+            studio.latex_prose_issues(r"Inference-time control uses \(-1\)."),
+            [],
+        )
+
+    def test_from_scratch_revision_breaks_the_old_response_chain(self):
+        captured = {}
+
+        def fake_post(payload):
+            captured.update(payload)
+            return {"id": "resp-fresh", "output_text": "Fresh evidence-only prose."}
+
+        with patch.object(studio, "post_openai", side_effect=fake_post):
+            response_id, text, _ = call_openai(
+                section="related_work",
+                model="gpt-5-nano",
+                previous_response_id="resp-contaminated-history",
+                purpose="Interpret only the verified selector evidence.",
+                required_heading=None,
+                required_heading_style=None,
+                reference_paragraph="Unrelated reference-paper subject matter.",
+                comment="Rewrite this paragraph from scratch using only current evidence.",
+                current_text="OLD-CONTAMINATED-CANDIDATE",
+            )
+
+        self.assertEqual(response_id, "resp-fresh")
+        self.assertEqual(text, "Fresh evidence-only prose.")
+        self.assertNotIn("previous_response_id", captured)
+        self.assertIn("<current_candidate></current_candidate>", captured["input"])
 
     def test_html_profile_writing_style_is_extracted(self):
         style = studio.writing_style_context()
@@ -2417,6 +3300,40 @@ args = parser.parse_args()
             else:
                 bibliography.write_text(previous, encoding="utf-8")
 
+    def test_paragraph_prompt_has_a_hard_cost_budget(self):
+        captured = {}
+
+        def fake_post(payload):
+            captured.update(payload)
+            return {"id": "resp-budgeted", "output_text": "Budgeted prose."}
+
+        huge = "context " * 20_000
+        with (
+            patch.object(studio, "post_openai", side_effect=fake_post),
+            patch.object(studio, "approved_outline_context", return_value=huge),
+            patch.object(studio, "writing_style_context", return_value=huge),
+            patch.object(studio, "section_evidence", return_value=huge),
+            patch.object(studio, "writing_bibliography_catalog", return_value=huge),
+            patch.object(studio, "artifact_writing_context", return_value=[]),
+        ):
+            call_openai(
+                section="introduction",
+                model="deepseek-v4-flash",
+                previous_response_id=None,
+                purpose=huge,
+                required_heading=None,
+                comment=huge,
+                current_text=huge,
+                architecture={"context": huge},
+                reference_context={"context": huge},
+            )
+
+        self.assertLessEqual(
+            len(captured["instructions"]) + len(captured["input"]),
+            studio.PAPER_TEXT_PROMPT_MAX_CHARS,
+        )
+        self.assertIn("truncated to control API input cost", captured["input"])
+
     def test_prompt_bibliography_prefers_records_relevant_to_the_section(self):
         bibliography = studio.PAPER / "references.bib"
         previous = bibliography.read_text(encoding="utf-8") if bibliography.exists() else None
@@ -2447,13 +3364,13 @@ args = parser.parse_args()
             else:
                 bibliography.write_text(previous, encoding="utf-8")
 
-    def test_reference_excerpt_rejects_whole_paper_sized_selection(self):
+    @unittest.skip("reference excerpts are no longer part of Paper Studio")
+    def test_reference_excerpt_does_not_override_agent_selected_length(self):
         reference = Path(studio.paragraph_plan()["reference_file"])
         original = reference.read_text(encoding="utf-8")
         try:
             reference.write_text("\n".join(["x" * 1000] * 8), encoding="utf-8")
-            with self.assertRaisesRegex(StudioError, "过长"):
-                reference_excerpt([1, 8])
+            self.assertEqual(len(reference_excerpt([1, 8])), 8007)
         finally:
             reference.write_text(original, encoding="utf-8")
 
@@ -2464,7 +3381,10 @@ args = parser.parse_args()
             captured.update(payload)
             return {"id": "resp-next", "output_text": "Revised prose."}
 
-        with patch.object(studio, "post_openai", side_effect=fake_post):
+        with (
+            patch.object(studio, "active_llm_provider", return_value="openai"),
+            patch.object(studio, "post_openai", side_effect=fake_post),
+        ):
             call_openai(
                 section="introduction",
                 model="gpt-5.6",
@@ -2483,11 +3403,11 @@ args = parser.parse_args()
         self.assertNotIn("<section_evidence>", captured["input"])
 
     def test_researcher_prompt_is_the_primary_editing_objective(self):
-        captured = {}
+        payloads = []
         comment = "Remove all numbers and use exactly two sentences."
 
         def fake_post(payload):
-            captured.update(payload)
+            payloads.append(payload)
             return {"id": "resp-revised", "output_text": "Revised prose. Second sentence."}
 
         with patch.object(studio, "post_openai", side_effect=fake_post):
@@ -2502,6 +3422,7 @@ args = parser.parse_args()
                 current_text="Current prose contains 42 results.",
             )
 
+        captured = payloads[0]
         self.assertIn("primary editing objective", captured["instructions"])
         self.assertIn("Do not weaken, reinterpret, or silently omit", captured["instructions"])
         self.assertIn(
@@ -2567,6 +3488,7 @@ args = parser.parse_args()
                 side_effect=[
                     {"id": "resp-noop", "output_text": "Current prose."},
                     {"id": "resp-still-noop", "output_text": "Current prose."},
+                    {"id": "resp-audit", "output_text": "Current prose."},
                 ],
             ),
             self.assertRaisesRegex(StudioError, "连续两次返回与当前版本相同"),
@@ -2582,24 +3504,25 @@ args = parser.parse_args()
                 current_text="Current prose.",
             )
 
-    def test_unresolved_citation_is_narrowed_once_before_candidate_returns(self):
-        payloads = []
-
-        def fake_post(payload):
-            payloads.append(payload)
-            if len(payloads) == 1:
-                return {"id": "resp-draft", "output_text": "Broad claim [CITATION NEEDED]."}
-            return {"id": "resp-narrow", "output_text": "Narrow supported framing."}
-
+    def test_unresolved_citation_is_narrowed_without_an_api_search(self):
         with (
-            patch.object(studio, "post_openai", side_effect=fake_post),
+            patch.object(
+                studio,
+                "post_openai",
+                side_effect=[
+                    {"id": "resp-draft", "output_text": "Broad claim [CITATION NEEDED]."},
+                    {"id": "resp-repair", "output_text": "Supported framing."},
+                ],
+            ) as post,
             patch.object(
                 studio,
                 "resolve_citations",
-                return_value=("resp-resolver", "Broad claim [CITATION NEEDED].", []),
-            ) as resolver,
+                side_effect=AssertionError("citation search must not run"),
+            ),
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(studio, "bibliography_keys", return_value=set()),
         ):
-            response_id, text, _ = call_openai(
+            response_id, text, added = call_openai(
                 section="introduction",
                 model="gpt-5.6",
                 previous_response_id=None,
@@ -2610,38 +3533,22 @@ args = parser.parse_args()
                 current_text="",
             )
 
-        resolver.assert_called_once()
-        self.assertEqual((response_id, text), ("resp-narrow", "Narrow supported framing."))
-        self.assertIn("Narrow or remove every unsupported clause", payloads[1]["instructions"])
+        self.assertEqual((response_id, text, added), ("resp-repair", "Supported framing.", []))
+        self.assertEqual(post.call_count, 2)
 
-    def test_non_openai_provider_narrows_unverified_citations_instead_of_crashing(self):
-        # Regression: resolve_citations needs OpenAI's web_search tool, and
-        # post_openai refuses to send `tools` to any other provider. Before
-        # this fix, a DeepSeek-drafted paragraph that cited a key not yet in
-        # the bibliography (no literal [CITATION NEEDED] marker -- just an
-        # invented \cite{} key) hit that guard and 400'd the whole generate
-        # request, discarding an otherwise-usable draft. It must instead
-        # fall back to the same narrow-or-drop path already used when
-        # OpenAI's own search comes back empty.
-        payloads = []
-
-        def fake_post(payload):
-            payloads.append(payload)
-            if len(payloads) == 1:
-                return {
-                    "id": "resp-draft",
-                    "output_text": r"Broad claim \cite{invented2024}.",
-                }
-            return {"id": "resp-narrow", "output_text": "Narrow supported framing."}
-
+    def test_non_openai_provider_also_converts_an_invented_key_to_a_placeholder(self):
         with (
-            patch.object(studio, "post_openai", side_effect=fake_post),
-            patch.object(studio, "active_llm_provider", return_value="deepseek"),
             patch.object(
                 studio,
-                "resolve_citations",
-                side_effect=AssertionError("resolve_citations must not be called"),
-            ),
+                "post_openai",
+                side_effect=[
+                    {"id": "resp-draft", "output_text": r"Broad claim \cite{invented2024}."},
+                    {"id": "resp-repair", "output_text": "Supported positioning."},
+                ],
+            ) as post,
+            patch.object(studio, "active_llm_provider", return_value="deepseek"),
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(studio, "bibliography_keys", return_value=set()),
         ):
             response_id, text, _ = call_openai(
                 section="related_work",
@@ -2654,10 +3561,9 @@ args = parser.parse_args()
                 current_text="",
             )
 
-        self.assertEqual((response_id, text), ("resp-narrow", "Narrow supported framing."))
+        self.assertEqual((response_id, text), ("resp-repair", "Supported positioning."))
         self.assertNotIn("invented2024", text)
-        self.assertIn("Narrow or remove every unsupported clause", payloads[1]["instructions"])
-        self.assertNotIn("tools", payloads[1])
+        self.assertTrue(all("tools" not in call.args[0] for call in post.call_args_list))
 
     def test_unresolved_sentence_is_dropped_after_narrowing_still_leaves_marker(self):
         self.assertEqual(
@@ -2753,75 +3659,16 @@ args = parser.parse_args()
         self.assertIn("<verified_bibliography>", captured["input"])
         self.assertEqual(text, r"Claim \\cite{knownKey}.")
 
-    def test_accept_invokes_citation_research_for_an_old_candidate(self):
-        state = _default_state()
-        section = state["sections"]["related_work"]
-        paragraph = section["paragraphs"][0]
-        section["previous_response_id"] = "resp-old"
-        paragraph["candidate"] = {
-            "id": "candidate-old",
-            "text": r"Claim \\cite{[MISSING_PAPER]}.",
-            "citations_added": [],
-        }
-        handler = object.__new__(Handler)
-        handler.require_section = lambda body: "related_work"
-
-        with (
-            patch.object(studio, "load_state", return_value=state),
-            patch.object(studio, "save_state") as save,
-            patch.object(
-                studio,
-                "resolve_citations",
-                return_value=(
-                    "resp-resolved",
-                    "Claim [CITATION NEEDED].",
-                    [],
-                ),
-            ) as resolve,
-            patch.object(studio, "bibliography_fingerprint", return_value="bib-v2"),
-        ):
-            with self.assertRaisesRegex(StudioError, "没有找到可验证"):
-                handler.handle_accept(
-                    {
-                        "section": "related_work",
-                        "candidate_id": "candidate-old",
-                    }
-                )
-
-        resolve.assert_called_once()
-        save.assert_called_once_with(state)
-        self.assertEqual(section["previous_response_id"], "resp-resolved")
-        self.assertEqual(section["bibliography_fingerprint"], "bib-v2")
-        self.assertIn("[CITATION NEEDED]", paragraph["candidate"]["text"])
-
-    def test_accept_repairs_citations_even_when_section_conversation_is_missing(self):
-        state = _default_state()
-        section = state["sections"]["introduction"]
-        section["current_index"] = 1
-        paragraph = section["paragraphs"][1]
-        paragraph["candidate"] = {
-            "id": "candidate-stranded",
-            "text": "Claim [CITATION NEEDED].",
-            "citations_added": [],
-        }
-        handler = object.__new__(Handler)
-        handler.require_section = lambda body: "introduction"
-        with (
-            patch.object(studio, "load_state", return_value=state),
-            patch.object(studio, "save_state"),
-            patch.object(
-                studio,
-                "resolve_citations",
-                return_value=("resp-new-chain", "Claim [CITATION NEEDED].", []),
-            ) as resolve,
-            patch.object(studio, "bibliography_fingerprint", return_value="bib-current"),
-        ):
-            with self.assertRaisesRegex(StudioError, "没有找到可验证"):
-                handler.handle_accept(
-                    {"section": "introduction", "candidate_id": "candidate-stranded"}
-                )
-        self.assertIsNone(resolve.call_args.kwargs["previous_response_id"])
-        self.assertEqual(section["previous_response_id"], "resp-new-chain")
+    def test_accept_branches_between_online_placeholders_and_local_survey_keys(self):
+        source = Path(studio.__file__).read_text(encoding="utf-8")
+        accept_source = source.split("    def handle_accept(", 1)[1].split(
+            "\n    def ", 1
+        )[0]
+        self.assertIn("online_citation_markers(text)", accept_source)
+        self.assertIn("local_survey_citations(text)", accept_source)
+        self.assertIn("validate_citations_for_accept(text", accept_source)
+        self.assertNotIn("resolve_citations(", accept_source)
+        self.assertNotIn("web_search", accept_source)
 
     def test_citation_resolver_starts_a_new_chain_when_previous_id_is_absent(self):
         captured = {}
@@ -2845,33 +3692,6 @@ args = parser.parse_args()
             )
         self.assertNotIn("previous_response_id", captured)
         self.assertEqual((response_id, paragraph, added), ("resp-new-resolver", "Supported claim.", []))
-
-    def test_reset_persists_selected_model_and_clears_section_context(self):
-        state = _default_state()
-        section = state["sections"]["method"]
-        section["previous_response_id"] = "resp-method"
-        section["bibliography_fingerprint"] = "bib-v1"
-        handler = object.__new__(Handler)
-        handler.require_section = lambda body: "method"
-        response = {}
-        handler.send_json = lambda payload: response.update(payload)
-
-        with (
-            patch.object(studio, "load_state", return_value=state),
-            patch.object(studio, "save_state") as save,
-            patch.object(
-                studio,
-                "public_state",
-                side_effect=lambda current: {"model": current["model"]},
-            ),
-        ):
-            handler.handle_reset({"section": "method", "model": "gpt-5.4-mini"})
-
-        save.assert_called_once_with(state)
-        self.assertEqual(state["model"], "gpt-5.4-mini")
-        self.assertIsNone(section["previous_response_id"])
-        self.assertIsNone(section["bibliography_fingerprint"])
-        self.assertEqual(response["state"]["model"], "gpt-5.4-mini")
 
     def test_generated_paper_reset_requires_exact_project_id(self):
         handler = object.__new__(Handler)
@@ -2911,9 +3731,6 @@ args = parser.parse_args()
             (figure_source_dir / "iterations" / "method").mkdir(parents=True)
             state_dir.mkdir(parents=True)
             (paper / "main.tex").write_text(r"\title{Old Title}", encoding="utf-8")
-            (paper / "paragraph_plan.json").write_text(
-                json.dumps(studio.paragraph_plan()), encoding="utf-8"
-            )
             (paper / "paper_studio.json").write_text("{}", encoding="utf-8")
             (paper / "main.pdf").write_bytes(b"old pdf")
             (paper / "main.log").write_text("old log", encoding="utf-8")
@@ -2942,7 +3759,6 @@ args = parser.parse_args()
                     TABLE_PREVIEW_DIR=state_dir / "table_previews",
                     PAPER_PAGE_DIR=state_dir / "paper_pages",
                     PROJECT_CONFIG_FILE=paper / "paper_studio.json",
-                    PARAGRAPH_PLAN_FILE=paper / "paragraph_plan.json",
                     FIGURES=figures,
                 ),
                 patch.object(
@@ -3141,7 +3957,7 @@ args = parser.parse_args()
             "introduction", section, state["figures"]
         )
 
-        self.assertLess(source.index("Paragraph 4."), source.index(r"\begin{figure}[t]"))
+        self.assertLess(source.index("Paragraph 4."), source.index(r"\begin{figure}[htbp]"))
         self.assertLess(source.index(r"\end{figure}"), source.index("Paragraph 5."))
         self.assertIn(r"\includegraphics[width=\columnwidth]{fig/overview_gpt.pdf}", source)
         self.assertIn(r"\label{fig:overview}", source)
@@ -3175,7 +3991,7 @@ args = parser.parse_args()
             "introduction", section, state["figures"]
         )
 
-        self.assertLess(source.index("Paragraph 2."), source.index(r"\begin{figure}[t]"))
+        self.assertLess(source.index("Paragraph 2."), source.index(r"\begin{figure}[htbp]"))
         self.assertLess(source.index(r"\end{figure}"), source.index("Paragraph 3."))
 
     def test_generated_table_is_editable_latex_with_fixed_label(self):
@@ -3199,6 +4015,119 @@ args = parser.parse_args()
         self.assertIn(r"\begin{table*}[t]", latex)
         self.assertIn(r"\label{tab:main}", latex)
         self.assertIn("Method A & 12.0 & 3.0 & 9.0 & 2.0", latex)
+
+    def test_many_column_wide_table_wraps_repeated_condition_headers(self):
+        definition = studio.TABLES["T2"]
+        previous_width = definition["width"]
+        previous_grid = definition["data_grid"]
+        labels = ["Behavior"] + [
+            f"{condition} {setting}"
+            for condition in ("None", "Positive", "Negative")
+            for setting in ("-1", "0", "+1")
+        ]
+        definition["width"] = "two-column"
+        definition["data_grid"] = {
+            "type": "records",
+            "path": "rows",
+            "columns": [
+                {"key": f"c{index}", "label": label}
+                for index, label in enumerate(labels)
+            ],
+        }
+        try:
+            latex = generate_table_latex(
+                "T2",
+                {"rows": [{f"c{index}": index for index in range(len(labels))}]},
+                "行: source\nCaption: Wide table.\n字号: small\n最优值: none",
+            )
+        finally:
+            definition["width"] = previous_width
+            definition["data_grid"] = previous_grid
+        self.assertIn(r"\setlength{\tabcolsep}{3.5pt}", latex)
+        self.assertIn(r"\shortstack{Positive\\+1}", latex)
+        self.assertIn(r"\shortstack{Negative\\-1}", latex)
+
+    def test_renderer_strips_model_emitted_top_level_section_heading(self):
+        state = _default_state()
+        section_id = next(
+            key
+            for key, value in studio.SECTION_MAP.items()
+            if value.get("render") != "abstract"
+        )
+        section = state["sections"][section_id]
+        section["paragraphs"][0]["accepted_text"] = (
+            rf"\section{{{studio.SECTION_LATEX_TITLES[section_id]}}} Body text."
+        )
+        source, _accepted = studio.render_section_source(
+            section_id, section, state["figures"], state["tables"]
+        )
+        self.assertEqual(source.count(r"\section{"), 1)
+        self.assertIn("Body text.", source)
+
+    def test_placeholder_table_is_not_preserved_as_an_approved_result(self):
+        placeholder = studio.table_placeholder_latex("T1")
+        self.assertTrue(studio.table_latex_is_placeholder(placeholder))
+        stored = {"status": "approved", "latex": placeholder}
+        latex, _prompt, preserved = studio.direct_full_draft_table_source(
+            "T1", stored, studio.metrics_bundle()
+        )
+        self.assertIn(r"\begin{tabular}", latex)
+        self.assertFalse(preserved)
+
+    def test_numeric_comparison_gate_rejects_inverted_values(self):
+        issues = studio.numeric_comparison_issues(
+            r"Prompt-all exceeds last-prompt (\(5.48\times10^{-6}\) versus "
+            r"\(5.61\times10^{-6}\))."
+        )
+        self.assertTrue(issues)
+        self.assertFalse(
+            studio.numeric_comparison_issues(
+                r"Last-prompt exceeds prompt-all (\(5.61\times10^{-6}\) versus "
+                r"\(5.48\times10^{-6}\))."
+            )
+        )
+        self.assertFalse(
+            studio.numeric_comparison_issues(
+                r"The error is lower than the tolerance (\(10^{-10}\) versus \(10^{-8}\))."
+            )
+        )
+        self.assertFalse(
+            studio.numeric_comparison_issues(
+                "The score fell below 5.34, reaching 4.42 after steering."
+            )
+        )
+        self.assertTrue(
+            studio.numeric_comparison_issues("The score 5.34 is below 4.42.")
+        )
+
+    def test_appendix_gate_rejects_roadmap_but_accepts_content(self):
+        appendix = next(
+            key
+            for key, value in studio.SECTION_MAP.items()
+            if "append" in value.get("title", "").lower()
+        )
+        self.assertTrue(
+            studio.appendix_content_issues(
+                appendix, "Appendix A supplies the proof and notation table."
+            )
+        )
+        self.assertFalse(
+            studio.appendix_content_issues(
+                appendix,
+                r"For constant vectors, \(h+v_a+v_b=h+v_b+v_a\); therefore the states coincide.",
+            )
+        )
+
+    def test_agent_table_metrics_are_normalized_to_three_decimal_places(self):
+        latex = (
+            r"\begin{table}\begin{tabular}{lc}A & 0.9133333333333333 \\ "
+            r"B & -0.0035833333333333134 \\\end{tabular}"
+            r"\caption{Result.}\label{tab:x}\end{table}"
+        )
+        normalized = studio.normalize_table_numeric_precision(latex)
+        self.assertIn("0.913", normalized)
+        self.assertIn("-0.004", normalized)
+        self.assertNotIn("333333333333", normalized)
 
     def test_table_prompt_locally_reorders_and_styles_without_an_api_call(self):
         metrics = {
@@ -3235,6 +4164,36 @@ args = parser.parse_args()
         self.assertIn(r"\caption{Prompt-authored local table.}", latex)
         self.assertLess(latex.index(r"B & \textbf{15.0}"), latex.index("A & 9.0"))
         self.assertNotIn("StrongREJECT", latex)
+
+    def test_pipe_delimited_table_prompt_preserves_commas_inside_column_labels(self):
+        metrics = {
+            "defenses": {
+                "rows": [
+                    {"defense": "Baseline", "residual_asr": 31.4, "benign_utility": 78.6},
+                    {"defense": "Boundary-aware", "residual_asr": 22.1, "benign_utility": 77.9},
+                ]
+            }
+        }
+        prompt = "\n".join(
+            [
+                "数据源: results/",
+                "列: Defense | Residual ASR | Benign utility",
+                "行: source",
+                "Caption: Safety comparison, lower ASR is better.",
+                "字号: small",
+                "最优值: none",
+            ]
+        )
+        with patch.dict(
+            studio.TABLES["T2"]["data_grid"]["columns"][1],
+            {"label": "Residual ASR (%, lower is better)"},
+        ):
+            prompt = prompt.replace(
+                "Residual ASR", "Residual ASR (%, lower is better)", 1
+            )
+            latex = generate_table_latex("T2", metrics, prompt)
+        self.assertIn("31.4", latex)
+        self.assertIn("22.1", latex)
 
     def test_table_prompt_accepts_natural_language_best_values_phrasing(self):
         # Regression: the demo project's own default table briefs describe
@@ -3359,6 +4318,36 @@ args = parser.parse_args()
             ):
                 studio.compile_paper()
             self.assertIn("-g", captured["command"])
+
+    def test_compile_discards_stale_empty_bbl_when_first_citation_returns(self):
+        # Clearing the only cited section can leave an empty generated .bbl.
+        # When the next accepted paragraph adds citations, pdflatex must not
+        # read that cache before latexmk has rerun BibTeX.
+        with TemporaryDirectory() as directory:
+            paper = Path(directory)
+            (paper / "sections").mkdir()
+            (paper / "main.tex").write_text("paper", encoding="utf-8")
+            (paper / "sections" / "body.tex").write_text(
+                r"Supported claim \cite{smith2020}.", encoding="utf-8"
+            )
+            (paper / "main.bbl").write_text(
+                "\\begin{thebibliography}{0}\n\\end{thebibliography}\n",
+                encoding="utf-8",
+            )
+
+            def fake_run(command, **kwargs):
+                self.assertFalse((paper / "main.bbl").exists())
+                return CompletedProcess(command, 0, "ok", "")
+
+            with (
+                patch.object(studio, "PAPER", paper),
+                patch.object(studio, "manuscript_entrypoint_errors", return_value=[]),
+                patch.object(studio, "shutil_which", return_value="/usr/bin/latexmk"),
+                patch.object(studio.subprocess, "run", side_effect=fake_run),
+            ):
+                result = studio.compile_paper()
+
+            self.assertTrue(result.ok)
 
     def test_concurrent_compiles_are_serialized_not_interleaved(self):
         # Regression: the HTTP server is threaded, and multiple callers can
@@ -3528,7 +4517,7 @@ args = parser.parse_args()
             [item["heading_style"] for item in groups], ["textbf", "textbf"]
         )
         for item in groups:
-            self.assertTrue(studio.reference_excerpt(item["reference_lines"]))
+            self.assertTrue(item["rhetorical_role"])
 
     def test_removed_plan_group_is_pruned_and_last_retained_group_is_selected(self):
         state = _default_state()
@@ -3573,6 +4562,7 @@ args = parser.parse_args()
             r"\begin{table}[tb]\caption{X}\label{tab:defense}\end{table}",
         )
 
+    @unittest.skip("table editing no longer reads reference-paper results")
     def test_reference_context_contains_the_full_case_table(self):
         path, source = table_reference_context()
         self.assertEqual(path, studio.PROJECT_CONFIG["paths"]["reference"])
@@ -3600,6 +4590,7 @@ args = parser.parse_args()
                 "PDF 里的实验结果不止这么多，还有更多数字",
             )
 
+    @unittest.skip("table editing no longer reads reference-paper results")
     def test_more_numbers_prompt_accepts_added_reference_cells(self):
         current = (
             r"\begin{tabular}{lc}" "\n"
@@ -3638,6 +4629,8 @@ args = parser.parse_args()
                 "placement_after": "E2",
                 "latex": (
                     "\\begin{table*}[t]\n"
+                    "\\begin{tabular}{l}A \\\\\n"
+                    "\\end{tabular}\n"
                     "\\caption{Main comparison.}\n"
                     "\\label{tab:main}\n"
                     "\\end{table*}"
@@ -3678,9 +4671,14 @@ args = parser.parse_args()
         model = studio.mechanism_source("F3", state)
         self.assertIn('"placement": "single-column figure"', intro)
         self.assertIn('"image_size": "1024x1024"', intro)
-        self.assertIn("compact ACL-style introduction/motivation schematic", intro)
-        self.assertIn("2–3 aligned regions", intro)
+        self.assertIn('"role": "Introduction or motivation figure"', intro)
+        self.assertIn("two or three aligned visual groups", intro)
         self.assertIn("pure white background", intro)
+        self.assertIn("<bound_paragraph_evidence>", intro)
+        self.assertIn("not a results figure", intro)
+        self.assertIn("Do not request bar charts", intro)
+        self.assertIn("maximum four words each", intro)
+        self.assertIn("at most eight text labels", intro)
         self.assertIn('"placement": "two-column figure*"', model)
         self.assertIn('"image_size": "1536x1024"', model)
         self.assertIn("page-width ACL-style method schematic", model)
@@ -3696,8 +4694,8 @@ args = parser.parse_args()
                 "source": root / "figure_source.txt",
                 "draft": root / "figure.bg.png",
                 "preview": root / "figure.png",
-                "pdf": root / "figure.pdf",
-                "pptx": root / "figure.pptx",
+                "pdf": root / "nested" / "figure.pdf",
+                "pptx": root / "nested" / "figure.pptx",
                 "agent_source": root / "agent.py",
                 "layout_source": root / "layout.json",
                 "layout_prompt": root / "layout_prompt.txt",
@@ -3716,6 +4714,8 @@ args = parser.parse_args()
                 patch.object(studio, "validate_editable_shape_deliverables") as validate,
             ):
                 message = studio.build_mechanism_figure("F1")
+                self.assertTrue(paths["pdf"].parent.is_dir())
+                self.assertTrue(paths["pptx"].parent.is_dir())
         commands = [call.args[0] for call in run.call_args_list]
         self.assertEqual(commands[0][2], "buildshapes")
         self.assertNotIn("--img", commands[0])
@@ -3808,12 +4808,53 @@ args = parser.parse_args()
         self.assertGreater(pdf_path.stat().st_size, 0)
         save.assert_called_once_with(state)
 
+    def test_online_data_figure_infers_records_grid_from_package_result_keys(self):
+        # Evidence-package projects use result_keys for their local Agent
+        # plots and do not necessarily carry the lightweight uploader's
+        # explicit data_grid.  Online Python rendering must still work.
+        figure_definition = dict(studio.FIGURES["F5"])
+        figure_definition.pop("data_grid", None)
+        figure_definition["result_keys"] = ["artifacts.F5.rows"]
+        metrics = {
+            "artifacts": {
+                "F5": {
+                    "rows": [
+                        {"setting": "base", "random": "0.81", "ours": "0.84"},
+                        {"setting": "hard", "random": "0.72", "ours": "0.79"},
+                    ]
+                }
+            }
+        }
+        with patch.dict(studio.FIGURES, {"F5": figure_definition}):
+            headers, rows = studio.figure_records_grid("F5", metrics)
+        self.assertEqual(headers, ["Setting", "Random", "Ours"])
+        self.assertEqual(rows[1], ["hard", "0.72", "0.79"])
+
+    def test_data_figure_axis_label_never_uses_last_series_name(self):
+        definition = {
+            "visible_dimensions": [
+                "Behavior",
+                "No finetuning",
+                "Positive finetuning",
+                "Negative finetuning",
+            ]
+        }
+        self.assertEqual(
+            studio.data_figure_axis_labels(definition),
+            ("Behavior", "Value"),
+        )
+        definition["y_axis_label"] = "Target-answer probability"
+        self.assertEqual(
+            studio.data_figure_axis_labels(definition),
+            ("Behavior", "Target-answer probability"),
+        )
+
     def test_data_layout_width_controls_paper_float(self):
         wide = figure_latex("F4", {"layout_width": "two-column"})
         narrow = figure_latex("F4", {"layout_width": "single-column"})
         self.assertIn(r"\begin{figure*}[t]", wide)
         self.assertIn(r"\includegraphics[width=\textwidth]", wide)
-        self.assertIn(r"\begin{figure}[t]", narrow)
+        self.assertIn(r"\begin{figure}[htbp]", narrow)
         self.assertIn(r"\includegraphics[width=\columnwidth]", narrow)
 
     def test_wrapfigure_mode_uses_right_side_column_wrap(self):
@@ -3890,6 +4931,31 @@ args = parser.parse_args()
         )
         self.assertNotIn(r"\includegraphics", source)
 
+    def test_online_non_data_placeholder_does_not_claim_a_job_is_running(self):
+        state = _default_state()
+        introduction = state["sections"]["introduction"]
+        introduction["paragraphs"][0]["accepted_text"] = (
+            r"Figure~\ref{fig:overview} motivates the problem."
+        )
+        with patch.object(studio, "ONLINE_PROJECT_MODE", True):
+            source, _ = render_section_source(
+                "introduction", introduction, state["figures"], state["tables"]
+            )
+        self.assertIn("complete the final artwork after project export", source)
+        self.assertNotIn("generation is in progress", source)
+        self.assertIn(r"\begin{figure}[t]", source)
+        self.assertNotIn(r"\begin{figure*}[t]", source)
+
+    def test_section_rerender_preserves_configured_start_label(self):
+        state = _default_state()
+        section = state["sections"]["experiments"]
+        metadata = dict(studio.SECTION_MAP["experiments"])
+        metadata["start_label"] = "sec:experiments"
+        with patch.dict(studio.SECTION_MAP, {"experiments": metadata}):
+            source, _ = render_section_source("experiments", section)
+        self.assertIn(r"\section{Experiments}", source)
+        self.assertIn(r"\label{sec:experiments}", source)
+
     def test_first_table_reference_renders_placeholder_with_real_caption_and_label(self):
         # Regression: only figures had a placeholder mechanism, so a batch
         # -written paragraph citing a not-yet-approved table's \ref{} left a
@@ -3910,6 +4976,24 @@ args = parser.parse_args()
         self.assertIn(r"\begin{table*}[t]", source)
         self.assertNotIn(r"\begin{tabular}", source)
 
+    def test_online_planned_table_reference_renders_export_placeholder(self):
+        state = _default_state()
+        experiments = state["sections"]["experiments"]
+        experiments["paragraphs"][1]["accepted_text"] = (
+            r"Table~\ref{tab:main} reports the planned comparison."
+        )
+        definition = {**studio.TABLES["T1"], "online_placeholder": True}
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.dict(studio.TABLES, {"T1": definition}),
+        ):
+            source, _ = render_section_source(
+                "experiments", experiments, state["figures"], state["tables"]
+            )
+        self.assertIn("complete the final table after project export", source)
+        self.assertIn(r"\label{tab:main}", source)
+        self.assertNotIn("table generation is in progress", source)
+
     def test_figure_and_table_captions_escape_raw_percent_signs(self):
         # Regression: a real batch-writing run crashed pdflatex with
         # "Runaway argument?" / "Missing $ inserted." because a figure
@@ -3927,9 +5011,18 @@ args = parser.parse_args()
         self.assertIn(rf"\caption{{{escaped_caption}}}", placeholder)
         self.assertNotIn(raw_caption, placeholder)
 
+        recovered_placeholder = studio.figure_placeholder_latex(
+            "F1", {"caption": escaped_caption}
+        )
+        self.assertEqual(recovered_placeholder, placeholder)
+
         approved = figure_latex("F1", {"caption": raw_caption})
         self.assertIn(rf"\caption{{{escaped_caption}}}", approved)
         self.assertNotIn(raw_caption, approved)
+        self.assertEqual(
+            figure_latex("F1", {"caption": escaped_caption}),
+            approved,
+        )
 
         table_placeholder = studio.table_placeholder_latex("T1", {"caption": raw_caption})
         self.assertIn(rf"\caption{{{escaped_caption}}}", table_placeholder)
@@ -4009,6 +5102,14 @@ args = parser.parse_args()
         self.assertIn('"显示可编辑 PPT/PDF 完整版"', source)
         self.assertIn('id="mechanism-preview-note"', html)
 
+    def test_approved_figure_preview_is_locked_to_inserted_paper_pdf(self):
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn('figure.status === "approved"', source)
+        self.assertIn("paperVersionInserted", source)
+        self.assertIn("? figure.paper_preview_url", source)
+        self.assertIn('figure.status === "approved"\n    || !figure.gpt_preview_url', source)
+        self.assertIn("当前预览与正文 PDF 使用同一个图文件。", source)
+
     def test_mechanism_prompt_editor_has_two_columns_and_adjacent_draw_flow(self):
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
@@ -4051,6 +5152,28 @@ args = parser.parse_args()
                 figure = figure_public_state(state)[0]
         self.assertEqual(figure["preview_type"], "pdf")
         self.assertIn("/pdf?", figure["preview_url"])
+
+    def test_approved_mechanism_exposes_only_the_pdf_inserted_in_the_paper(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = {
+                "draft": root / "figure.bg.png",
+                "preview": root / "figure.png",
+                "pdf": root / "figure.pdf",
+                "pptx": root / "figure.pptx",
+            }
+            paths["draft"].write_bytes(b"draft")
+            paths["pdf"].write_bytes(b"%PDF final")
+            state = _default_state()
+            state["figures"]["F1"]["status"] = "approved"
+            with (
+                patch.object(studio, "figure_paths", return_value=paths),
+                patch.object(studio, "mechanism_draft_path", return_value=paths["draft"]),
+            ):
+                figure = figure_public_state(state)[0]
+        self.assertIsNone(figure["gpt_preview_url"])
+        self.assertEqual(figure["preview_url"], figure["paper_preview_url"])
+        self.assertEqual(figure["preview_type"], "pdf")
 
     def test_archived_gpt_iteration_restores_mechanism_preview_toggle(self):
         with TemporaryDirectory() as directory:
@@ -4170,6 +5293,338 @@ args = parser.parse_args()
         )
         self.assertTrue(captured["synthetic"])
 
+    def test_experiment_setup_context_is_compact_and_includes_baseline_implementations(self):
+        contract = {
+            "dataset_citations": [{"name": "Bench", "url": "https://example.test"}],
+            "baseline_contract": {
+                "selected": [
+                    {"name": "Clean only", "scientific_role": "floor"},
+                    {"name": "Random", "scientific_role": "matched control"},
+                ]
+            },
+            "implementation_contract": [
+                {"method": "Clean only", "implementation_summary": "shared local path"},
+                {"method": "Random", "implementation_summary": "matched local sampler"},
+                {"method": "Ours", "implementation_summary": "rank then refit"},
+            ],
+            "metric_contract": [{"name": "Noisy accuracy"}],
+        }
+        with TemporaryDirectory() as directory:
+            report = Path(directory) / "03_EXPERIMENT_PLAN.html"
+            report.write_text(
+                '<script id="experiment-plan-contract" type="application/json">'
+                + json.dumps(contract)
+                + "</script>",
+                encoding="utf-8",
+            )
+            with patch.object(studio, "EXPERIMENT_PLAN_FILE", report):
+                setup = studio.experiment_setup_context()
+
+        self.assertEqual(setup["baseline_count"], 2)
+        self.assertEqual(setup["baselines"][1]["implementation"], "matched local sampler")
+        self.assertEqual(setup["proposed_methods"], [{"name": "Ours", "implementation": "rank then refit"}])
+
+    def test_experiment_evidence_is_scoped_to_the_current_paragraph_artifact(self):
+        metrics = {
+            "result_source": "reports/05_EXP_RESULT.html",
+            "evidence_grade": "smoke-only",
+            "artifacts": {
+                "T1": {"rows": [{"score": "0.1"}]},
+                "T2": {"rows": [{"score": "0.2"}]},
+            },
+        }
+        tables = {
+            "T1": {"source_sections": ["e"], "data_grid": {"path": "artifacts.T1.rows"}},
+            "T2": {"source_sections": ["e"], "data_grid": {"path": "artifacts.T2.rows"}},
+        }
+        with (
+            patch.object(studio, "SECTION_MAP", {"e": {"title": "Experiments", "render": "section"}}),
+            patch.object(studio, "RESULT_KEYS", {"e": ["artifacts.T1.rows", "artifacts.T2.rows"]}),
+            patch.object(studio, "FIGURES", {}),
+            patch.object(studio, "TABLES", tables),
+            patch.object(studio, "metrics_bundle", return_value=metrics),
+            patch.object(studio, "experiment_setup_context", return_value={"baseline_count": 2}),
+        ):
+            evidence = json.loads(studio.section_evidence("e", ["T1"]))
+
+        self.assertEqual(evidence["result_source"], "reports/05_EXP_RESULT.html")
+        self.assertEqual(evidence["experiment_setup_contract"]["baseline_count"], 2)
+        self.assertIn("artifacts.T1.rows", evidence)
+        self.assertNotIn("artifacts.T2.rows", evidence)
+
+    def test_method_evidence_includes_the_approved_model_design(self):
+        design = {
+            "data_flow": "input -> policy -> reward -> update",
+            "adaptive_rule": "rank gradient norms",
+            "unknowns": ["group size"],
+        }
+        with (
+            patch.object(studio, "SECTION_MAP", {
+                "m": {"title": "Method", "render": "section"},
+                "i": {"title": "Introduction", "render": "section"},
+            }),
+            patch.object(studio, "RESULT_KEYS", {"m": [], "i": []}),
+            patch.object(studio, "FIGURES", {}),
+            patch.object(studio, "TABLES", {}),
+            patch.object(studio, "metrics_bundle", return_value={"model_design": design}),
+        ):
+            method = json.loads(studio.section_evidence("m", []))
+            introduction = json.loads(studio.section_evidence("i", []))
+
+        self.assertEqual(method["approved_model_design"], design)
+        self.assertNotIn("approved_model_design", introduction)
+
+    def test_setup_without_declared_external_items_does_not_require_three_citations(self):
+        with (
+            patch.object(
+                studio,
+                "SECTION_MAP",
+                {"setup": {"title": "Experimental Setup", "render": "section"}},
+            ),
+            patch.object(studio, "experiment_setup_context", return_value={}),
+            patch.object(studio, "metrics_bundle", return_value={"evaluation_protocol": {}}),
+        ):
+            issues = studio.experimental_setup_issues(
+                "setup",
+                "State the experimental setup and dataset protocol.",
+                "We evaluate the configured model on the executed protocol.",
+            )
+
+        self.assertNotIn(
+            "published datasets and baselines lack introducing citations", issues
+        )
+
+    def test_setup_citation_requirement_scales_with_declared_external_items(self):
+        setup = {
+            "datasets": [{"name": "Dataset A"}],
+            "baselines": [{"name": "Method B"}],
+        }
+        with (
+            patch.object(
+                studio,
+                "SECTION_MAP",
+                {"setup": {"title": "Experimental Setup", "render": "section"}},
+            ),
+            patch.object(studio, "experiment_setup_context", return_value=setup),
+            patch.object(studio, "metrics_bundle", return_value={"evaluation_protocol": {}}),
+        ):
+            one_citation = studio.experimental_setup_issues(
+                "setup",
+                "State the experimental setup, dataset, and baseline selection.",
+                "Dataset A and Method B are used \\cite{sourceA}.",
+            )
+            two_citations = studio.experimental_setup_issues(
+                "setup",
+                "State the experimental setup, dataset, and baseline selection.",
+                "Dataset A is used \\cite{sourceA}; Method B is used \\cite{sourceB}.",
+            )
+
+        self.assertIn(
+            "published datasets and baselines lack introducing citations", one_citation
+        )
+        self.assertNotIn(
+            "published datasets and baselines lack introducing citations", two_citations
+        )
+
+    def test_split_setup_paragraph_checks_only_its_planned_models(self):
+        protocol = {
+            "models": ["Model Chat 7B", "Model Chat 13B", "Model Base 7B"]
+        }
+        with (
+            patch.object(
+                studio,
+                "SECTION_MAP",
+                {"setup": {"title": "Experimental Setup", "render": "section"}},
+            ),
+            patch.object(studio, "experiment_setup_context", return_value={}),
+            patch.object(
+                studio,
+                "metrics_bundle",
+                return_value={"evaluation_protocol": protocol},
+            ),
+        ):
+            issues = studio.experimental_setup_issues(
+                "setup",
+                "State Model Chat 7B and Model Chat 13B with the dataset sizes.",
+                "We evaluate Model Chat 7B and Model Chat 13B on the held-out sets.",
+            )
+
+        self.assertFalse(
+            any("Model Base 7B" in issue for issue in issues),
+            issues,
+        )
+
+    def test_abstract_receives_compact_executed_result_tables(self):
+        metrics = {
+            "result_source": "reports/05_EXP_RESULT.html",
+            "artifacts": {"T1": {"rows": [{"score": "0.1"}]}},
+        }
+        tables = {
+            "T1": {"source_sections": ["e"], "data_grid": {"path": "artifacts.T1.rows"}},
+        }
+        with (
+            patch.object(studio, "SECTION_MAP", {"a": {"title": "Abstract", "render": "abstract"}}),
+            patch.object(studio, "RESULT_KEYS", {"a": []}),
+            patch.object(studio, "FIGURES", {}),
+            patch.object(studio, "TABLES", tables),
+            patch.object(studio, "metrics_bundle", return_value=metrics),
+        ):
+            evidence = json.loads(studio.section_evidence("a", []))
+
+        self.assertEqual(evidence["artifacts.T1.rows"], [{"score": "0.1"}])
+
+    def test_completed_abstract_numeric_placeholders_are_detected(self):
+        self.assertEqual(
+            studio.numerical_placeholder_issues(
+                "Across [X] pairs, [X\\% of cases] passed; sample size was [N]."
+            ),
+            ["[X]", "[X\\% of cases]", "[N]"],
+        )
+        self.assertEqual(studio.numerical_placeholder_issues("Accuracy was 0.944."), [])
+
+    def test_bound_artifact_row_gate_rejects_values_from_another_named_row(self):
+        evidence = json.dumps({
+            "artifacts.T2.rows": [
+                {"behavior": "Corrigibility", "positive_0": ".79", "positive_plus_1": ".93"},
+                {"behavior": "Refusal", "positive_0": ".95", "positive_plus_1": ".92"},
+            ]
+        })
+
+        issues = studio.bound_artifact_row_value_issues(
+            "Refusal rises from \\(0.79\\) to \\(0.93\\).", evidence
+        )
+
+        self.assertEqual(len(issues), 2)
+        self.assertTrue(all("Refusal" in issue for issue in issues))
+
+    def test_bound_artifact_row_gate_allows_exact_cells_and_direct_differences(self):
+        evidence = json.dumps({
+            "artifacts.T6.rows": [{
+                "category": "Average",
+                "positive": ".57",
+                "negative": ".62",
+                "none": ".60",
+            }]
+        })
+
+        issues = studio.bound_artifact_row_value_issues(
+            "For Average, positive steering is \\(0.57\\), no steering is "
+            "\\(0.60\\), and their differences are \\(0.03\\) and \\(-0.03\\).",
+            evidence,
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_latex_numeric_values_preserves_leading_decimal_scale(self):
+        self.assertEqual(
+            studio._latex_numeric_values(
+                "Scores are \\(.63\\), \\(.00\\), and \\(1.00\\)."
+            ),
+            [0.63, 0.0, 1.0],
+        )
+
+    def test_writing_ui_does_not_display_raw_experiment_result_panel(self):
+        root = Path(__file__).resolve().parents[1]
+        index_source = (
+            root / "research_avatar/paper_studio/static/index.html"
+        ).read_text(encoding="utf-8")
+        app_source = (
+            root / "research_avatar/paper_studio/static/app.js"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn('id="result-evidence-card"', index_source)
+        self.assertNotIn("renderResultEvidence", app_source)
+
+    def test_reference_original_is_filtered_to_the_selected_paragraph_mapping(self):
+        context = {
+            "source_heading": "Introduction",
+            "logic_summary_zh": "Section-level logic summary.",
+            "excerpts": [
+                {"id": "REF-I-P1", "text": "First source paragraph."},
+                {"id": "REF-I-P2", "text": "Second source paragraph."},
+            ],
+        }
+        paragraph = {"id": "I-P2", "reference_paragraph_ids": ["REF-I-P2"]}
+        with patch.object(studio, "section_reference_context", return_value=context):
+            filtered = studio.paragraph_reference_context("introduction", paragraph)
+
+        self.assertEqual(
+            [item["id"] for item in filtered["excerpts"]],
+            ["REF-I-P2"],
+        )
+
+    def test_abstracted_reference_constraints_are_filtered_to_current_paragraph(self):
+        context = {
+            "mode": "abstracted",
+            "source_heading": "Abstracted structure",
+            "logic_summary_zh": "No source prose.",
+            "writing_constraints": [
+                {"id": "I-P1", "purpose": "Frame the problem."},
+                {"id": "I-P2", "purpose": "State the gap."},
+            ],
+            "excerpts": [],
+        }
+        paragraph = {"id": "I-P2", "reference_paragraph_ids": []}
+        with patch.object(studio, "section_reference_context", return_value=context):
+            filtered = studio.paragraph_reference_context("introduction", paragraph)
+
+        self.assertEqual(filtered["excerpts"], [])
+        self.assertEqual(
+            filtered["writing_constraints"],
+            [{"id": "I-P2", "purpose": "State the gap."}],
+        )
+
+    def test_reference_original_fails_closed_without_a_paragraph_mapping(self):
+        context = {
+            "source_heading": "Introduction",
+            "logic_summary_zh": "Section-level logic summary.",
+            "excerpts": [{"id": "REF-I-P1", "text": "Do not leak this excerpt."}],
+        }
+        with (
+            patch.object(studio, "section_reference_context", return_value=context),
+            patch.object(studio, "_approved_contract", return_value={}),
+        ):
+            filtered = studio.paragraph_reference_context(
+                "introduction", {"id": "I-P1"}
+            )
+
+        self.assertEqual(filtered["excerpts"], [])
+
+    def test_reference_mapping_survives_a_display_section_alias(self):
+        contract = {
+            "paper_outline": [
+                {
+                    "section_id": "discussion_limitations",
+                    "paragraphs": [
+                        {
+                            "id": "D-P1",
+                            "reference_mapping": [
+                                {"source_paragraph_id": "REF-D-P1"}
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+        with patch.object(studio, "_approved_contract", return_value=contract):
+            ids = studio.paragraph_reference_ids(
+                "discussion_and_limitations", {"id": "D-P1"}
+            )
+
+        self.assertEqual(ids, ["REF-D-P1"])
+
+    def test_llm_generation_uses_paragraph_scoped_reference_context(self):
+        source = Path(studio.__file__).read_text(encoding="utf-8")
+        self.assertEqual(
+            source.count(
+                "reference_context=paragraph_reference_context(section, paragraph)"
+            ),
+            2,
+        )
+        self.assertNotIn(
+            "reference_context=section_reference_context(section)",
+            source,
+        )
+
     def test_public_figure_order_matches_workflow(self):
         figures = figure_public_state(_default_state())
         self.assertEqual(
@@ -4178,6 +5633,17 @@ args = parser.parse_args()
         )
         self.assertEqual(figures[0]["phase"], 1)
         self.assertEqual(figures[2]["phase"], 2)
+
+    def test_artifact_card_labels_data_figures_by_kind_not_phase(self):
+        app = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn(
+            'figure.kind === "mechanism" ? "机制图 · 先完成" : "数据图 · results/ 驱动"',
+            app,
+        )
+        self.assertNotIn(
+            'figure.phase === 1 ? "机制图 · 先完成" : "数据图 · results/ 驱动"',
+            app,
+        )
 
     def test_every_figure_is_bound_to_its_first_prose_section(self):
         self.assertEqual(FIGURES["F1"]["source_sections"], ["introduction"])
@@ -4222,8 +5688,12 @@ args = parser.parse_args()
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('id="project-reference-paper"', html)
+        self.assertIn("网页未提供的功能或其他需求，请在本地终端运行 Code Agent。", html)
+        self.assertNotIn('id="project-subtitle"', html)
+        self.assertNotIn("逐段对话、确认后写入 LaTeX", html + source)
         self.assertIn('$("project-reference-paper")', source)
         self.assertIn("project.reference_paper", source)
+        self.assertNotIn("referencePaper.authors", source)
         # A project with no reference_paper.title (e.g. the lightweight
         # onboarding path with no single structural reference) must hide
         # the line rather than show an empty "参考论文：".
@@ -4249,10 +5719,66 @@ args = parser.parse_args()
             '$("runtime-key-open").hidden = Boolean(state.online_project);', source,
         )
 
+    def test_online_mechanism_figures_are_placeholder_only(self):
+        state = _default_state()
+        with patch.object(studio, "ONLINE_PROJECT_MODE", True):
+            visible = public_state(state)
+        mechanism = next(item for item in visible["figures"] if item["kind"] == "mechanism")
+        data = next(item for item in visible["figures"] if item["kind"] == "data")
+        self.assertTrue(mechanism["placeholder_only"])
+        self.assertEqual(
+            mechanism["placeholder_message"],
+            studio.ONLINE_PLACEHOLDER_FIGURE_MESSAGE,
+        )
+        self.assertFalse(data["placeholder_only"])
+
+        handler = object.__new__(studio.Handler)
+        with patch.object(studio, "ONLINE_PROJECT_MODE", True):
+            with self.assertRaisesRegex(StudioError, "网页版保留图位"):
+                handler.reject_online_placeholder_figure(mechanism["id"])
+            handler.reject_online_placeholder_figure(data["id"])
+
+        html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn('id="online-figure-placeholder"', html)
+        self.assertIn("figure.placeholder_only", source)
+        self.assertIn('"PHASE PLACEHOLDER"', source)
+        self.assertIn('$("figure-placement-row").hidden = placeholderOnly;', source)
+        self.assertIn('isTable && !state.online_project', source)
+
+    def test_online_verified_source_figure_is_not_a_placeholder(self):
+        state = _default_state()
+        figure_id = studio.FIGURE_ORDER[0]
+        definition = {**studio.FIGURES[figure_id], "kind": "source"}
+        with (
+            patch.dict(studio.FIGURES, {figure_id: definition}),
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+        ):
+            visible = figure_public_state(state)
+
+        source_figure = next(item for item in visible if item["id"] == figure_id)
+        self.assertFalse(source_figure["placeholder_only"])
+
+    def test_online_planned_result_table_is_placeholder_only(self):
+        state = _default_state()
+        table_id = studio.TABLE_ORDER[0]
+        definition = {**studio.TABLES[table_id], "online_placeholder": True}
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.dict(studio.TABLES, {table_id: definition}),
+            patch.object(studio, "TABLE_ORDER", [table_id]),
+        ):
+            table = studio.table_public_state(state)[0]
+        self.assertTrue(table["placeholder_only"])
+        self.assertEqual(
+            table["placeholder_message"],
+            studio.ONLINE_PLACEHOLDER_FIGURE_MESSAGE,
+        )
+
     def test_read_only_demo_control_list_covers_every_mutating_action(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         for control_id in (
-            "generate", "accept", "comment", "reset", "reset-generated",
+            "generate", "accept", "comment", "reset-generated",
             "title-generate", "title-save", "figure-approve", "table-generate",
             "table-approve",
         ):
@@ -4262,6 +5788,12 @@ args = parser.parse_args()
             'document.querySelectorAll(".figure-card, .figure-actions button, .paragraph-nav button")',
             source,
         )
+        self.assertIn(
+            'document.querySelectorAll("input, textarea, select, [contenteditable=\'true\']")',
+            source,
+        )
+        for control_id in ("compile", "model", "model-apply", "runtime-key-open"):
+            self.assertIn(f'"{control_id}"', source)
 
     def test_demo_mode_is_public_but_never_exposes_a_key(self):
         with patch.object(studio, "DEMO_MODE", True):
@@ -4308,7 +5840,7 @@ args = parser.parse_args()
                 patch.object(
                     studio,
                     "generate_mechanism_prompt",
-                    return_value=("resp-figure-1", "Generated BioRender prompt."),
+                    return_value=("resp-figure-1", "Generated drawing prompt."),
                 ),
             ):
                 studio.save_state(state)
@@ -4322,7 +5854,7 @@ args = parser.parse_args()
 
             self.assertEqual(finished["status"], "prompt_ready")
             self.assertEqual(finished["previous_response_id"], "resp-figure-1")
-            self.assertEqual(finished["draw_prompt"], "Generated BioRender prompt.")
+            self.assertEqual(finished["draw_prompt"], "Generated drawing prompt.")
             self.assertEqual(
                 finished["prompt_instruction"],
                 "Simplify to a single-column figure.",
@@ -4339,6 +5871,8 @@ args = parser.parse_args()
         with TemporaryDirectory() as directory:
             source_dir = Path(directory)
             state = _default_state()
+            state["llm_provider"] = "openai"
+            state["model"] = "gpt-5-nano"
             state["figures"]["F1"]["previous_response_id"] = "resp-f1-previous"
             state["figures"]["F3"]["previous_response_id"] = "resp-f3-unrelated"
             captured = {}
@@ -4347,12 +5881,13 @@ args = parser.parse_args()
                 captured.update(payload)
                 return {
                     "id": "resp-f1-next",
-                    "output_text": "A simpler single-column BioRender prompt.",
+                    "output_text": "A simpler single-column drawing prompt with at most eight text labels.",
                 }
 
             with (
                 patch.dict(os.environ, {"OPENAI_API_KEY": "unit-test-placeholder"}),
                 patch.object(studio, "FIGURE_SOURCE_DIR", source_dir),
+                patch.object(studio, "active_llm_provider", return_value="openai"),
                 patch.object(studio, "post_openai", side_effect=fake_post),
             ):
                 response_id, prompt = studio.generate_mechanism_prompt(
@@ -4369,7 +5904,29 @@ args = parser.parse_args()
             self.assertIn("Previous dense prompt.", captured["input"])
             self.assertNotIn("Approved outline:", captured["input"])
             self.assertEqual(response_id, "resp-f1-next")
-            self.assertEqual(prompt, "A simpler single-column BioRender prompt.")
+            self.assertTrue(
+                prompt.startswith(
+                    "A simpler single-column drawing prompt with at most eight text labels."
+                )
+            )
+            self.assertIn("use no more than eight text labels total", prompt)
+
+    def test_mechanism_prompt_contract_rejects_results_captions_and_analysis_leaks(self):
+        invalid = (
+            "Draw a bar chart with an inline caption and make one bar appear higher. "
+            "</analysis>"
+        )
+        issues = studio.mechanism_prompt_contract_issues("F1", invalid)
+        self.assertIn("contains analysis markup", issues)
+        self.assertIn("requests explanatory captions inside the figure", issues)
+        self.assertIn("encodes empirical results in a mechanism figure", issues)
+        self.assertIn("does not explicitly enforce the configured text-label limit", issues)
+
+        valid = (
+            "Show input tokens, the selection mechanism, and a refit-ready pool; "
+            "no empirical results or inline captions. Use no more than 8 text labels."
+        )
+        self.assertEqual(studio.mechanism_prompt_contract_issues("F1", valid), [])
 
     def test_full_draft_worker_fills_only_pending_paragraph_and_finishes(self):
         with TemporaryDirectory() as directory:
@@ -4414,9 +5971,15 @@ args = parser.parse_args()
                 ),
                 patch.object(
                     studio,
-                    "materialize_direct_full_draft_artifacts",
+                    "materialize_batch_artifacts",
                     return_value=False,
                 ) as materialize,
+                patch.object(
+                    studio,
+                    "pending_batch_artifacts",
+                    return_value=[],
+                ),
+                patch.object(studio, "completed_manuscript_issues", return_value=[]),
             ):
                 studio.save_state(state)
                 studio.full_draft_worker(token, "gpt-5-nano")
@@ -4430,6 +5993,300 @@ args = parser.parse_args()
             self.assertEqual(accepted["accepted_text"], "Batch draft.")
             self.assertEqual(generate.call_count, 1)
             materialize.assert_called_once()
+
+    def test_section_draft_targets_only_the_selected_section(self):
+        state = _default_state()
+        selected = studio.batch_writing_order()[0]
+        other = studio.batch_writing_order()[1]
+        for section in state["sections"].values():
+            for paragraph in section["paragraphs"]:
+                paragraph["accepted_text"] = "Already accepted."
+        state["sections"][selected]["paragraphs"][0]["accepted_text"] = ""
+        state["sections"][other]["paragraphs"][0]["accepted_text"] = ""
+
+        targets = studio.full_draft_targets(state, selected)
+
+        self.assertEqual(targets, [(selected, state["sections"][selected]["paragraphs"][0]["id"])])
+
+    def test_section_draft_worker_materializes_only_selected_section_artifacts(self):
+        with TemporaryDirectory() as directory:
+            state_dir = Path(directory)
+            state_file = state_dir / "state.json"
+            state = _default_state()
+            for section in state["sections"].values():
+                for paragraph in section["paragraphs"]:
+                    paragraph["accepted_text"] = "Already accepted."
+            selected = next(
+                section
+                for section in studio.batch_writing_order()
+                if any(
+                    paragraph.get("artifacts")
+                    for paragraph in state["sections"][section]["paragraphs"]
+                )
+            )
+            other = next(
+                section for section in studio.batch_writing_order() if section != selected
+            )
+            selected_paragraph = next(
+                paragraph
+                for paragraph in state["sections"][selected]["paragraphs"]
+                if paragraph.get("artifacts")
+            )
+            other_paragraph = state["sections"][other]["paragraphs"][0]
+            selected_paragraph["accepted_text"] = ""
+            other_paragraph["accepted_text"] = ""
+            token = "section-draft-test"
+            state["section_draft_job"] = {
+                "token": token,
+                "status": "running",
+                "server_instance": studio.SERVER_INSTANCE_TOKEN,
+                "section": selected,
+                "artifact_ids": studio.section_artifact_ids(state, selected),
+                "total": 1,
+                "completed": 0,
+                "progress": 0,
+            }
+
+            def fake_accept(current_state, section, paragraph, text):
+                paragraph["accepted_text"] = text
+                paragraph["candidate"] = None
+                current_state["sections"][section]["accepted_text"] = text
+                current_state["compile"] = {"status": "ok", "message": "compiled"}
+                return studio.CompileResult(True, "compiled")
+
+            with (
+                patch.object(studio, "STATE_DIR", state_dir),
+                patch.object(studio, "STATE_FILE", state_file),
+                patch.object(studio, "call_openai", return_value=("resp", "Section draft.", [])) as generate,
+                patch.object(studio, "accept_full_draft_paragraph", side_effect=fake_accept),
+                patch.object(studio, "materialize_batch_artifacts") as materialize,
+                patch.object(studio, "pending_batch_artifacts", return_value=[]),
+                patch.object(studio, "synchronize_paragraph_editors_from_manuscript"),
+                patch.object(studio, "synchronize_artifact_workbenches_from_manuscript"),
+            ):
+                studio.save_state(state)
+                studio.section_draft_worker(token, "gpt-5-nano", selected)
+                finished = studio.load_state()
+
+            self.assertEqual(finished["section_draft_job"]["status"], "completed")
+            self.assertIsNone(finished["full_draft_job"])
+            self.assertEqual(finished["sections"][selected]["paragraphs"][0]["accepted_text"], "Section draft.")
+            self.assertEqual(finished["sections"][other]["paragraphs"][0]["accepted_text"], "")
+            self.assertEqual(generate.call_count, 1)
+            self.assertEqual(materialize.call_count, 1)
+            self.assertEqual(
+                materialize.call_args.args[1],
+                studio.section_artifact_ids(state, selected),
+            )
+
+    def test_section_draft_ui_shows_real_paragraph_progress_while_running(self):
+        html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        style = (studio.STATIC / "style.css").read_text(encoding="utf-8")
+        self.assertIn('id="section-draft-progress-row"', html)
+        self.assertIn('id="section-draft-progress"', html)
+        self.assertIn('id="section-draft-progress-text" aria-live="polite"', html)
+        self.assertIn('["running", "artifacts_pending"].includes(sectionDraftJob.status)', source)
+        self.assertIn('sectionDraftJob.completed || 0', source)
+        self.assertIn('sectionDraftJob.total || sectionPending', source)
+        self.assertIn('sectionDraftJob.progress_message', source)
+        self.assertIn('.section-draft-progress progress', style)
+
+    def test_section_artifact_status_ignores_other_sections_and_blocks_completion(self):
+        state = _default_state()
+        for section in state["sections"].values():
+            for paragraph in section["paragraphs"]:
+                paragraph["accepted_text"] = "Accepted prose."
+        selected = next(
+            section
+            for section in studio.batch_writing_order()
+            if studio.section_artifact_ids(state, section)
+        )
+        scoped = studio.section_artifact_ids(state, selected)
+        selected_artifact = scoped[0]
+        other_artifact = next(
+            artifact_id
+            for artifact_id in [*studio.FIGURE_ORDER, *studio.TABLE_ORDER]
+            if artifact_id not in scoped
+        )
+        for figure_id in studio.FIGURE_ORDER:
+            state["figures"][figure_id]["status"] = "approved"
+        for table_id in studio.TABLE_ORDER:
+            state["tables"][table_id]["status"] = "approved"
+        selected_collection = "figures" if selected_artifact in studio.FIGURES else "tables"
+        other_collection = "figures" if other_artifact in studio.FIGURES else "tables"
+        state[selected_collection][selected_artifact]["status"] = "pending"
+        state[other_collection][other_artifact]["status"] = "pending"
+        state["section_draft_job"] = {
+            "status": "artifacts_pending",
+            "section": selected,
+            "artifact_ids": scoped,
+        }
+
+        studio.refresh_full_draft_artifact_status(state)
+
+        self.assertEqual(
+            state["section_draft_job"]["pending_artifacts"], [selected_artifact]
+        )
+        self.assertEqual(state["section_draft_job"]["status"], "artifacts_pending")
+        state[selected_collection][selected_artifact]["status"] = "approved"
+        studio.refresh_full_draft_artifact_status(state)
+        self.assertEqual(state["section_draft_job"]["status"], "completed")
+        self.assertEqual(state["section_draft_job"]["pending_artifacts"], [])
+        self.assertIsNone(state["full_draft_job"])
+        state[selected_collection][selected_artifact]["status"] = "pending"
+        studio.refresh_full_draft_artifact_status(state)
+        self.assertEqual(
+            state["section_draft_job"]["pending_artifacts"], [selected_artifact]
+        )
+
+    def test_slow_single_paragraph_generation_cannot_erase_new_full_draft_job(self):
+        with TemporaryDirectory() as directory:
+            state_dir = Path(directory)
+            state_file = state_dir / "state.json"
+            state = _default_state()
+            section = studio.batch_writing_order()[0]
+            paragraph = studio.current_paragraph(state["sections"][section])
+            self.assertIsNotNone(paragraph)
+            token = "newer-batch-job"
+
+            def model_returns_after_batch_started(**_kwargs):
+                latest = studio.load_state()
+                latest["full_draft_job"] = {
+                    "token": token,
+                    "status": "running",
+                    "server_instance": studio.SERVER_INSTANCE_TOKEN,
+                    "total": 1,
+                    "completed": 0,
+                }
+                studio.save_state(latest)
+                return "stale-response", "Stale single paragraph.", []
+
+            handler = object.__new__(Handler)
+            handler.send_json = MagicMock()
+            with (
+                patch.object(studio, "STATE_DIR", state_dir),
+                patch.object(studio, "STATE_FILE", state_file),
+                patch.object(studio, "call_openai", side_effect=model_returns_after_batch_started),
+                patch.object(studio, "bibliography_fingerprint", return_value="bib"),
+                patch.object(studio, "section_source_fingerprint", return_value="source"),
+            ):
+                studio.save_state(state)
+                with self.assertRaisesRegex(StudioError, "过时候选"):
+                    handler.handle_generate({
+                        "section": section,
+                        "paragraph_id": paragraph["id"],
+                        "model": "test-model",
+                        "current_text": "",
+                        "comment": "",
+                    })
+                finished = studio.load_state()
+
+            self.assertEqual(finished["full_draft_job"]["token"], token)
+            self.assertEqual(finished["full_draft_job"]["status"], "running")
+            current = studio.current_paragraph(finished["sections"][section])
+            self.assertIsNone(current.get("candidate"))
+
+    def test_full_draft_reports_bound_artifacts_instead_of_false_completion(self):
+        state = _default_state()
+        for section in state["sections"].values():
+            for paragraph in section["paragraphs"]:
+                paragraph["accepted_text"] = "Accepted prose."
+        for figure_id in studio.FIGURE_ORDER:
+            state["figures"][figure_id]["status"] = "approved"
+        state["figures"]["F1"]["status"] = "pending"
+        for table_id in ("T1", "T2"):
+            state["tables"][table_id]["status"] = "approved"
+
+        self.assertEqual(studio.pending_batch_artifacts(state), ["F1"])
+        state["full_draft_job"] = {"status": "artifacts_pending"}
+        studio.refresh_full_draft_artifact_status(state)
+        self.assertEqual(state["full_draft_job"]["pending_artifacts"], ["F1"])
+        state["figures"]["F1"]["status"] = "approved"
+        studio.refresh_full_draft_artifact_status(state)
+        self.assertEqual(state["full_draft_job"]["status"], "completed")
+        self.assertEqual(state["full_draft_job"]["pending_artifacts"], [])
+
+    def test_full_draft_can_resume_artifact_only_failure(self):
+        state = _default_state()
+        for section in state["sections"].values():
+            for paragraph in section["paragraphs"]:
+                paragraph["accepted_text"] = "Accepted prose."
+        first_table = studio.TABLE_ORDER[0]
+        state["tables"][first_table]["status"] = "pending"
+        with (
+            patch.object(studio, "load_state", return_value=state),
+            patch.object(studio, "save_state"),
+            patch.object(studio, "outline_is_confirmed", return_value=True),
+            patch.object(studio, "active_llm_provider", return_value="deepseek"),
+            patch.object(
+                studio,
+                "api_setup_for_provider",
+                return_value={"configured": True},
+            ),
+            patch.object(studio, "PAPER") as paper,
+        ):
+            paper.__truediv__.return_value.exists.return_value = True
+            _token, started = studio.start_full_draft_job("deepseek-v4-flash")
+        self.assertEqual(started["full_draft_job"]["total"], 0)
+        self.assertEqual(started["full_draft_job"]["status"], "running")
+
+    def test_online_full_draft_treats_non_data_placeholder_as_complete(self):
+        state = _default_state()
+        for section in state["sections"].values():
+            for paragraph in section["paragraphs"]:
+                paragraph["accepted_text"] = "Accepted prose."
+        for figure_id in studio.FIGURE_ORDER:
+            state["figures"][figure_id]["status"] = "approved"
+        state["figures"]["F1"]["status"] = "pending"
+        for table_id in studio.TABLE_ORDER:
+            state["tables"][table_id]["status"] = "approved"
+
+        with patch.object(studio, "ONLINE_PROJECT_MODE", True):
+            self.assertEqual(studio.pending_batch_artifacts(state), [])
+
+    def test_online_full_draft_treats_explicit_data_and_table_placeholders_as_complete(self):
+        state = _default_state()
+        for section in state["sections"].values():
+            for paragraph in section["paragraphs"]:
+                paragraph["accepted_text"] = "Accepted prose."
+        figure_id = studio.FIGURE_ORDER[0]
+        table_id = studio.TABLE_ORDER[0]
+        state["figures"][figure_id]["status"] = "pending"
+        state["tables"][table_id]["status"] = "pending"
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.dict(studio.FIGURES[figure_id], {"online_placeholder": True}),
+            patch.dict(studio.TABLES[table_id], {"online_placeholder": True}),
+        ):
+            self.assertNotIn(
+                figure_id,
+                studio.pending_batch_artifacts(state, [figure_id, table_id]),
+            )
+            self.assertNotIn(
+                table_id,
+                studio.pending_batch_artifacts(state, [figure_id, table_id]),
+            )
+
+    def test_full_draft_preserves_researcher_approved_table_latex(self):
+        custom = studio.generate_table_latex("T1", studio.metrics_bundle()).replace(
+            "Main safety comparison across both benchmarks.",
+            "Researcher-approved caption, preserving a manual clarification.",
+        )
+        stored = {
+            "status": "approved",
+            "latex": custom,
+            "generation_prompt": "Researcher-approved prompt",
+        }
+        with patch.object(
+            studio, "generate_table_latex", side_effect=AssertionError("overwritten")
+        ):
+            latex, prompt, preserved = studio.direct_full_draft_table_source(
+                "T1", stored, studio.metrics_bundle()
+            )
+        self.assertTrue(preserved)
+        self.assertEqual(latex, custom)
+        self.assertEqual(prompt, "Researcher-approved prompt")
 
     def test_stuck_running_job_from_a_dead_process_self_heals_on_next_load(self):
         # Regression: a real production batch job hung mid-generation
@@ -4490,6 +6347,10 @@ args = parser.parse_args()
 
             def fake_worker(token, _model):
                 current = studio.load_state()
+                for figure in current["figures"].values():
+                    figure["status"] = "approved"
+                for table in current["tables"].values():
+                    table["status"] = "approved"
                 current["full_draft_job"].update(
                     status="completed",
                     token=None,
@@ -4504,7 +6365,6 @@ args = parser.parse_args()
                 patch.object(studio, "STATE_DIR", state_dir),
                 patch.object(studio, "STATE_FILE", state_file),
                 patch.object(studio, "full_draft_worker", side_effect=fake_worker) as worker,
-                patch.object(studio.webbrowser, "open") as browser_open,
                 patch.dict(studio.os.environ, {studio.API_KEY_ENVIRONMENT_VARIABLE: "secret"}),
                 patch("builtins.print"),
             ):
@@ -4512,7 +6372,6 @@ args = parser.parse_args()
                 studio.run_direct_full_draft("gpt-5-nano")
 
             worker.assert_called_once()
-            browser_open.assert_not_called()
 
     def test_project_config_rejects_incomplete_batch_writing_order(self):
         config = json.loads(studio.PROJECT_CONFIG_FILE.read_text(encoding="utf-8"))
@@ -4522,6 +6381,54 @@ args = parser.parse_args()
             path.write_text(json.dumps(config), encoding="utf-8")
             with self.assertRaisesRegex(studio.ProjectConfigError, "batch_writing_order"):
                 studio.load_project_config(path, root=studio.ROOT)
+
+    def test_unexecuted_experiment_tense_guard_rejects_result_like_present_tense(self):
+        with patch.dict(
+            studio.SECTION_MAP,
+            {"e": {"title": "Proposed Experiments"}},
+            clear=True,
+        ):
+            issues = studio.unexecuted_experiment_tense_issues(
+                "e",
+                "Table~\\ref{tab:main} compares the methods, and we report AUROC.",
+            )
+        self.assertIn("first-person present-tense experiment claim", issues)
+        self.assertIn("present-tense artifact result claim", issues)
+
+    def test_unexecuted_experiment_tense_guard_accepts_future_protocol(self):
+        with patch.dict(
+            studio.SECTION_MAP,
+            {"e": {"title": "Proposed Experiments"}},
+            clear=True,
+        ):
+            issues = studio.unexecuted_experiment_tense_issues(
+                "e",
+                "Table~\\ref{tab:main} will compare the methods, and we will report AUROC.",
+            )
+        self.assertEqual(issues, [])
+
+    def test_no_result_guard_rejects_completed_conclusion_and_threshold(self):
+        issues = studio.unexecuted_result_claim_issues(
+            "The results support the method under conditions tested at \\(10^{-6}\\)."
+        )
+        self.assertIn("result-support claim", issues)
+        self.assertIn("claimed tested condition", issues)
+        self.assertIn("concrete unavailable numerical threshold", issues)
+
+    def test_latex_guard_requires_long_display_equation_to_be_split(self):
+        source = (
+            r"\[ C(v_1,v_2;h)=\|J_{l_1\to l^*}(h)v_1+J_{l_2\to l^*}(h)v_2"
+            r"-(J_{l_2\to l^*}(h)v_2+J_{l_1\to l^*}(h)v_1)\| \]"
+        )
+        self.assertTrue(
+            any("too long" in item for item in studio.latex_prose_issues(source))
+        )
+
+    def test_normalizer_removes_standalone_latex_fences(self):
+        self.assertEqual(
+            studio.normalize_latex_ready_text("```latex\nA paragraph.\n```"),
+            "A paragraph.",
+        )
 
 
 if __name__ == "__main__":

@@ -37,11 +37,30 @@ class ReportStructureTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "bad.html"
             path.write_text(
-                '<section data-report-section="theme-map"><h2>2. Theme Map</h2></section>'
-                '<section data-report-section="scope-taxonomy"><h2>1. Scope and Taxonomy</h2></section>',
+                '<section data-report-section="approaches"><h2>2. Approaches</h2></section>'
+                '<section data-report-section="problem"><h2>1. Problem</h2></section>',
                 encoding="utf-8",
             )
             self.assertTrue(validate("literature", path))
+
+    def test_validator_accepts_translated_literature_titles(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "literature-zh.html"
+            translated = [
+                ("problem", "1. 问题"),
+                ("approaches", "2. 方法"),
+                ("evaluation", "3. 评估"),
+                ("gaps", "4. 差距"),
+            ]
+            path.write_text(
+                "".join(
+                    f'<section data-report-section="{section_id}"><h2>{title}</h2>'
+                    f"<p>这是包含充分内容的固定报告章节，用于验证翻译后结构。</p></section>"
+                    for section_id, title in translated
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(validate("literature", path), [])
 
     def test_validator_rejects_title_only_sections(self):
         with TemporaryDirectory() as directory:
@@ -55,6 +74,26 @@ class ReportStructureTests(unittest.TestCase):
             )
             errors = validate("ideas", path)
             self.assertTrue(any("no substantive content" in error for error in errors))
+
+    def test_runplan_validator_rejects_a_figure_without_its_evidence_table(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "runplan.html"
+            sections = []
+            for section_id, title in REPORT_STRUCTURES["runplan"]["sections"]:
+                body = "Substantive execution content for this report section."
+                if section_id == "parts-and-goals":
+                    body += (
+                        '<section class="figure-card" data-artifact-id="F2">'
+                        "<h3>F2</h3><svg></svg></section>"
+                    )
+                sections.append(
+                    f'<section data-report-section="{section_id}"><h2>{title}</h2>'
+                    f"<p>{body}</p></section>"
+                )
+            path.write_text("".join(sections), encoding="utf-8")
+            self.assertTrue(
+                any("lacks an adjacent source/evidence table" in error for error in validate("runplan", path))
+            )
 
     def test_every_html_skill_names_the_shared_validator(self):
         expected = {
@@ -85,7 +124,9 @@ class ReportStructureTests(unittest.TestCase):
         structures = json.loads(
             (ROOT / "research_avatar/web/demo/report-structures.json").read_text(encoding="utf-8")
         )
-        self.assertIn("内容预览", source)
+        self.assertIn("<span>内容总结</span>", source)
+        self.assertNotIn("HTML 内容总结", source)
+        self.assertNotIn("功能展示", source)
         demo_keys = {
             "profile": "profile",
             "literature": "literature",

@@ -39,6 +39,5 @@ class FetchFulltextPrivacyTests(unittest.TestCase):
             self.assertIsNone(fetch_fulltext.unpaywall_pdf("10.1000/example"))
         request.assert_not_called()
 
-
 if __name__ == "__main__":
     unittest.main()
