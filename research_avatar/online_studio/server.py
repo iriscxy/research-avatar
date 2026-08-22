@@ -898,42 +898,44 @@ def _extract_document_text(name: str, content: bytes) -> str:
     raise OnlineStudioError(f"不支持的文档格式：{name}。")
 
 
-def _response_output_text(body: dict[str, Any]) -> str:
-    """Return the visible text from an OpenAI Responses API payload."""
-    direct = str(body.get("output_text") or "").strip()
-    if direct:
-        return direct
-    chunks: list[str] = []
-    for item in body.get("output") or []:
-        if not isinstance(item, dict) or item.get("type") != "message":
-            continue
-        for part in item.get("content") or []:
-            if isinstance(part, dict) and part.get("type") == "output_text":
-                text = str(part.get("text") or "").strip()
-                if text:
-                    chunks.append(text)
-    return "\n".join(chunks).strip()
-
-
 def _extract_pdf_text_with_llm(name: str, content: bytes) -> str:
-    """Transcribe a PDF by giving the original file directly to the LLM.
-
-    This deliberately does not run pdftotext or OCR first.  Research papers
-    are commonly two-column documents, so a coordinate-based intermediate
-    transcript can interleave the abstract with the introduction before the
-    model ever sees it.  The PDF-capable model receives both the page text and
-    rendered pages and is asked to recover semantic reading order itself.
-    """
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    """Extract PDF layout locally, then restore semantic order with DeepSeek."""
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
     if not api_key:
         raise OnlineStudioError(
-            "服务端缺少 OPENAI_API_KEY，无法用 LLM 直接读取 PDF。"
+            "服务端缺少 DEEPSEEK_API_KEY，无法整理 PDF 文本。"
         )
-    model = os.environ.get("OPENAI_PDF_EXTRACTION_MODEL", "gpt-5-mini").strip()
-    if not model:
-        model = "gpt-5-mini"
-    encoded = base64.b64encode(content).decode("ascii")
-    prompt = """Transcribe the supplied research-paper PDF into semantic reading order.
+    pdftotext = shutil.which("pdftotext")
+    if not pdftotext:
+        raise OnlineStudioError("服务器缺少 PDF 文本提取工具 pdftotext。")
+    with tempfile.NamedTemporaryFile(suffix=".pdf") as handle:
+        handle.write(content)
+        handle.flush()
+        try:
+            completed = subprocess.run(
+                [pdftotext, "-layout", handle.name, "-"],
+                capture_output=True,
+                timeout=120,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise OnlineStudioError(f"提取 {name} 的页面文本时超时。") from exc
+    if completed.returncode:
+        detail = completed.stderr.decode("utf-8", errors="replace").strip()
+        raise OnlineStudioError(
+            f"无法从 {name} 提取页面文本：{detail[-300:] or 'pdftotext failed'}"
+        )
+    layout_text = completed.stdout.decode("utf-8", errors="replace").strip()
+    if len(layout_text) < 200:
+        raise OnlineStudioError(f"{name} 没有足够的可提取文本；当前不支持纯扫描 PDF。")
+    if len(layout_text) > MAX_STRUCTURE_REFERENCE_CHARS:
+        raise OnlineStudioError(
+            f"{name} 提取后超过 {MAX_STRUCTURE_REFERENCE_CHARS} 字符，请上传较短的参考论文。"
+        )
+    model = os.environ.get(
+        "DEEPSEEK_PDF_EXTRACTION_MODEL", PROVIDERS["deepseek"][1]
+    ).strip() or PROVIDERS["deepseek"][1]
+    prompt = """Restore the supplied layout-preserving PDF text into semantic reading order.
 Return only the transcript, with no commentary and no Markdown code fence.
 
 Requirements:
@@ -947,25 +949,23 @@ Requirements:
 5. Omit page headers, page footers, line numbers, and standalone page numbers.
 6. Include title, abstract, all main-paper sections, captions, appendices, and references.
 7. Put each heading and each natural paragraph in its own block separated by one blank line.
-"""
+8. Treat form-feed characters as page boundaries. Never invent text absent from the input.
+
+<layout_preserving_pdf_text>
+""" + layout_text + "\n</layout_preserving_pdf_text>"
     payload = {
         "model": model,
-        "input": [{
-            "role": "user",
-            "content": [
-                {
-                    "type": "input_file",
-                    "filename": name,
-                    "file_data": f"data:application/pdf;base64,{encoded}",
-                },
-                {"type": "input_text", "text": prompt},
-            ],
-        }],
-        "max_output_tokens": 50000,
+        "messages": [
+            {"role": "system", "content": "Preserve only supplied text and reading order."},
+            {"role": "user", "content": prompt},
+        ],
+        "thinking": {"type": "disabled"},
+        "temperature": 0.0,
+        "max_tokens": 16000,
     }
     request = urllib.request.Request(
-        os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
-        + "/responses",
+        os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
+        + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {api_key}",
@@ -986,12 +986,14 @@ Requirements:
         raise OnlineStudioError(f"LLM 读取 {name} 时 API 连接失败：{reason}") from exc
     except json.JSONDecodeError as exc:
         raise OnlineStudioError(f"LLM 读取 {name} 时返回了无效 JSON。") from exc
-    transcript = _response_output_text(body)
+    choices = body.get("choices") or []
+    transcript = (
+        str((choices[0].get("message") or {}).get("content") or "").strip()
+        if choices else ""
+    )
     if len(transcript) < 200:
-        status = str(body.get("status") or "unknown")
-        incomplete = body.get("incomplete_details") or {}
         raise OnlineStudioError(
-            f"LLM 未能完整读取 {name}（status={status}, details={incomplete}）。"
+            f"DeepSeek 未能完整整理 {name} 的文本。"
         )
     return transcript
 
@@ -3957,7 +3959,7 @@ def create_session(
             if progress is not None:
                 progress(
                     "reference_pdf",
-                    "正在由 LLM 直接读取结构参考论文 PDF…",
+                    "正在提取并由 DeepSeek 整理结构参考论文 PDF…",
                     8,
                 )
             reference_paper_files = _decode_document_files(

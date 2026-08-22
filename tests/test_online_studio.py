@@ -1857,45 +1857,40 @@ class OnlineStudioTests(unittest.TestCase):
             online._extract_document_text("brief.docx", stream.getvalue()),
         )
 
-    def test_pdf_is_sent_directly_to_llm_api_for_semantic_transcription(self):
+    def test_pdf_layout_text_is_semantically_ordered_by_deepseek(self):
         transcript = (
             "Paper title\n\nAbstract\n\nAbstract paragraph.\n\n"
             "1 Introduction\n\nFirst paragraph.\n\nSecond paragraph. " * 8
         )
+        layout_text = ("Left column text                 Right column text\n" * 12).encode()
+        extracted = MagicMock(returncode=0, stdout=layout_text, stderr=b"")
         response = MagicMock()
         response.read.return_value = json.dumps({
-            "status": "completed",
-            "output": [{
-                "type": "message",
-                "content": [{"type": "output_text", "text": transcript}],
-            }],
+            "choices": [{"message": {"content": transcript}}],
         }).encode()
         response.__enter__.return_value = response
         with patch.dict(
             os.environ,
-            {"OPENAI_API_KEY": "test-key", "OPENAI_PDF_EXTRACTION_MODEL": "gpt-5-mini"},
+            {"DEEPSEEK_API_KEY": "test-key", "DEEPSEEK_PDF_EXTRACTION_MODEL": "deepseek-test"},
         ), patch.object(online.urllib.request, "urlopen", return_value=response) as call, patch.object(
-            online.subprocess, "run"
-        ) as local_extract:
+            online.subprocess, "run", return_value=extracted
+        ) as local_extract, patch.object(online.shutil, "which", return_value="/usr/bin/pdftotext"):
             text = online._extract_document_text("reference.pdf", b"%PDF-test")
 
-        local_extract.assert_not_called()
+        command = local_extract.call_args.args[0]
+        self.assertEqual(command[:2], ["/usr/bin/pdftotext", "-layout"])
+        self.assertEqual(command[-1], "-")
         request = call.call_args.args[0]
-        self.assertEqual(request.full_url, "https://api.openai.com/v1/responses")
+        self.assertEqual(request.full_url, "https://api.deepseek.com/chat/completions")
         payload = json.loads(request.data)
-        self.assertEqual(payload["model"], "gpt-5-mini")
-        file_part = payload["input"][0]["content"][0]
-        self.assertEqual(file_part["type"], "input_file")
-        self.assertEqual(file_part["filename"], "reference.pdf")
-        self.assertEqual(
-            base64.b64decode(file_part["file_data"].split(",", 1)[1]),
-            b"%PDF-test",
-        )
+        self.assertEqual(payload["model"], "deepseek-test")
+        self.assertIn(layout_text.decode().strip(), payload["messages"][1]["content"])
+        self.assertNotIn("input_file", json.dumps(payload))
         self.assertEqual(text, transcript.strip())
 
-    def test_pdf_llm_extraction_requires_server_openai_key(self):
+    def test_pdf_llm_extraction_requires_server_deepseek_key(self):
         with patch.dict(os.environ, {}, clear=True), self.assertRaisesRegex(
-            online.OnlineStudioError, "OPENAI_API_KEY"
+            online.OnlineStudioError, "DEEPSEEK_API_KEY"
         ):
             online._extract_document_text("reference.pdf", b"%PDF-test")
 
@@ -2237,17 +2232,17 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
-        self.assertIn('"class_name": "OnlineStudioContainerV48"', wrangler)
-        self.assertIn("export class OnlineStudioContainerV48", worker)
+        self.assertIn('"class_name": "OnlineStudioContainerV49"', wrangler)
+        self.assertIn("export class OnlineStudioContainerV49", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
 
-    def test_cloudflare_worker_forwards_both_llm_secrets_to_container(self):
+    def test_cloudflare_worker_forwards_only_deepseek_secret_to_container(self):
         worker = (
             Path(__file__).resolve().parents[1] / "deploy/cloudflare/index.ts"
         ).read_text(encoding="utf-8")
-        for name in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY"):
-            self.assertIn(f"if (env.{name})", worker)
-            self.assertIn(f"{name}: env.{name}", worker)
+        self.assertIn("if (env.DEEPSEEK_API_KEY)", worker)
+        self.assertIn("DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY", worker)
+        self.assertNotIn("env.OPENAI_API_KEY", worker)
 
     def test_cloudflare_release_copies_shared_runtime_modules(self):
         """The incremental release image must contain every newly imported module."""

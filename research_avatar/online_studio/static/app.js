@@ -184,7 +184,7 @@ async function startSession(payload) {
       if (!poll.ok || !result.ok) throw new Error(result.error || '初始化失败。');
       const elapsed = Math.max(1, Math.round((Date.now() - startedAt) / 1000));
       const progressMessage = result.message || '正在初始化…';
-      const estimate = progressMessage.includes('LLM 直接读取结构参考论文 PDF')
+      const estimate = progressMessage.includes('DeepSeek 整理结构参考论文 PDF')
         ? '（预计 2–3 min）'
         : '';
       message.textContent = `${progressMessage} · ${Number(result.progress || 0)}% · 已等待 ${elapsed} 秒${estimate}`;

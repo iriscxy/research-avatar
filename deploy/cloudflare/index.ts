@@ -16,10 +16,9 @@ interface Env {
   };
   GOOGLE_OAUTH_CLIENT_ID?: string;
   GOOGLE_OAUTH_CLIENT_SECRET?: string;
-  // Set with `wrangler secret put`; never add secret values to the plain
+  // Set with `wrangler secret put`; never add the secret value to the plain
   // envVars literal below, which is baked into the deployed Worker bundle.
   DEEPSEEK_API_KEY?: string;
-  OPENAI_API_KEY?: string;
 }
 
 interface User {
@@ -42,13 +41,10 @@ export class OnlineStudioContainer extends Container<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    // Inject encrypted Worker secrets only at container construction time.
-    // DeepSeek powers writing; OpenAI's Responses API reads the uploaded PDF.
+    // Inject the encrypted Worker secret only at container construction time.
+    // DeepSeek powers both PDF text ordering and manuscript writing.
     if (env.DEEPSEEK_API_KEY) {
       this.envVars = { ...this.envVars, DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY };
-    }
-    if (env.OPENAI_API_KEY) {
-      this.envVars = { ...this.envVars, OPENAI_API_KEY: env.OPENAI_API_KEY };
     }
   }
 }
@@ -156,9 +152,13 @@ export class OnlineStudioContainerV46 extends OnlineStudioContainer {}
 // application's stuck image rollout and starts only the verified image.
 export class OnlineStudioContainerV47 extends OnlineStudioContainer {}
 
-// PDF-extraction-secret release: earlier Workers forwarded only the DeepSeek
-// writing key, leaving direct PDF transcription without OPENAI_API_KEY.
+// DeepSeek-only PDF extraction release: the hosted service intentionally has
+// no OpenAI secret; layout extraction plus semantic ordering uses DeepSeek.
 export class OnlineStudioContainerV48 extends OnlineStudioContainer {}
+
+// DeepSeek PDF pipeline image release: rotate again so the container runs the
+// image containing layout extraction and no longer checks for an OpenAI key.
+export class OnlineStudioContainerV49 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
