@@ -16,10 +16,10 @@ interface Env {
   };
   GOOGLE_OAUTH_CLIENT_ID?: string;
   GOOGLE_OAUTH_CLIENT_SECRET?: string;
-  // Set with `wrangler secret put DEEPSEEK_API_KEY` -- never as a plain
-  // envVars literal below, which is baked into the deployed Worker script
-  // and would leak the key to anyone who can read the bundle.
+  // Set with `wrangler secret put`; never add secret values to the plain
+  // envVars literal below, which is baked into the deployed Worker bundle.
   DEEPSEEK_API_KEY?: string;
+  OPENAI_API_KEY?: string;
 }
 
 interface User {
@@ -42,11 +42,13 @@ export class OnlineStudioContainer extends Container<Env> {
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
-    // Merge the Wrangler secret into the container's process environment
-    // at construction time -- this is the only place DEEPSEEK_API_KEY's
-    // real value ever exists outside Cloudflare's encrypted secret store.
+    // Inject encrypted Worker secrets only at container construction time.
+    // DeepSeek powers writing; OpenAI's Responses API reads the uploaded PDF.
     if (env.DEEPSEEK_API_KEY) {
       this.envVars = { ...this.envVars, DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY };
+    }
+    if (env.OPENAI_API_KEY) {
+      this.envVars = { ...this.envVars, OPENAI_API_KEY: env.OPENAI_API_KEY };
     }
   }
 }
@@ -153,6 +155,10 @@ export class OnlineStudioContainerV46 extends OnlineStudioContainer {}
 // before binding its port. A fresh class avoids routing through that failed
 // application's stuck image rollout and starts only the verified image.
 export class OnlineStudioContainerV47 extends OnlineStudioContainer {}
+
+// PDF-extraction-secret release: earlier Workers forwarded only the DeepSeek
+// writing key, leaving direct PDF transcription without OPENAI_API_KEY.
+export class OnlineStudioContainerV48 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({

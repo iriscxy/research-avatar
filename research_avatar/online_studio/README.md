@@ -159,6 +159,13 @@ Then store its credentials without committing them and redeploy (run from
     npx wrangler secret put GOOGLE_OAUTH_CLIENT_SECRET
     npm run deploy
 
+The hosted writing flow also needs two encrypted LLM secrets: DeepSeek for
+drafting and OpenAI for direct PDF transcription. Store both through Wrangler;
+do not place either value in `wrangler.jsonc` or a tracked environment file:
+
+    npx wrangler secret put DEEPSEEK_API_KEY
+    npx wrangler secret put OPENAI_API_KEY
+
 The Worker keeps OAuth state and nonce records in D1, exchanges the authorization
 code server-side, verifies the returned Google ID token and its audience, and
 requires a verified email before creating the account.

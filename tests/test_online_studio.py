@@ -2237,9 +2237,17 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
-        self.assertIn('"class_name": "OnlineStudioContainerV47"', wrangler)
-        self.assertIn("export class OnlineStudioContainerV47", worker)
+        self.assertIn('"class_name": "OnlineStudioContainerV48"', wrangler)
+        self.assertIn("export class OnlineStudioContainerV48", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
+
+    def test_cloudflare_worker_forwards_both_llm_secrets_to_container(self):
+        worker = (
+            Path(__file__).resolve().parents[1] / "deploy/cloudflare/index.ts"
+        ).read_text(encoding="utf-8")
+        for name in ("DEEPSEEK_API_KEY", "OPENAI_API_KEY"):
+            self.assertIn(f"if (env.{name})", worker)
+            self.assertIn(f"{name}: env.{name}", worker)
 
     def test_cloudflare_release_copies_shared_runtime_modules(self):
         """The incremental release image must contain every newly imported module."""
