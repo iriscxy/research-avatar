@@ -76,10 +76,15 @@ class PaperStructureTests(unittest.TestCase):
         self.assertNotIn("reference_paragraph_ids", context)
 
     def test_prompt_makes_logic_similarity_and_no_mapping_explicit(self):
+        self.contract["target_project_brief"] = (
+            "Test answer invariance under semantics-preserving option permutations."
+        )
         prompt = structure_prompt(self.contract, self.source, reference={"publication_key": "owned"})
         self.assertIn("section-level context", prompt)
         self.assertIn("complete_line_numbered_structure_reference", prompt)
         self.assertIn("Enumerate the Abstract", prompt)
+        self.assertIn("answer invariance", prompt)
+        self.assertIn("authoritative source for the TARGET topic", prompt)
 
     def test_online_prompt_maps_each_target_paragraph_to_one_reference_paragraph(self):
         self.contract["writing_boundary"] = {
@@ -99,7 +104,8 @@ class PaperStructureTests(unittest.TestCase):
         self.assertIn("minified JSON", prompt)
         self.assertIn("at most 12 English words", prompt)
         self.assertIn("at most 30 English words", prompt)
-        self.assertIn("write the literal xx", prompt)
+        self.assertIn("Use the literal xx only for result measurements", prompt)
+        self.assertIn("preserve exact experimental-design constants", prompt)
         self.assertIn("reference Abstract is mandatory", prompt)
         payload = copy.deepcopy(self.payload)
         target = payload["paper_outline"][0]["paragraphs"][0]
@@ -156,13 +162,15 @@ class PaperStructureTests(unittest.TestCase):
         with self.assertRaises(PaperStructureError):
             parse_structure_response('{"paper_outline": [missing]}')
 
-    def test_missing_neighbor_relation_fails(self):
+    def test_missing_neighbor_relation_does_not_block_generated_structure(self):
         self.payload["paper_outline"][0]["paragraphs"][0]["relation_to_next"] = ""
-        with self.assertRaises(PaperStructureError):
-            design_structure_with_agent(
-                self.contract, self.source, reference={"publication_key": "owned"},
-                invoke=lambda _prompt: __import__("json").dumps(self.payload),
-            )
+        result = design_structure_with_agent(
+            self.contract, self.source, reference={"publication_key": "owned"},
+            invoke=lambda _prompt: __import__("json").dumps(self.payload),
+        )
+        self.assertEqual(
+            result["paper_outline"][0]["paragraphs"][0]["relation_to_next"], ""
+        )
 
     def test_normalizes_relative_shares_without_changing_section_order(self):
         payload = copy.deepcopy(self.payload)

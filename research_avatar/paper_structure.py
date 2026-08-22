@@ -61,6 +61,14 @@ def _scientific_requirements(contract: dict[str, Any]) -> dict[str, Any]:
             })
     return {
         "target": contract.get("target", {}),
+        # Raw two-file onboarding briefs do not have an Experiment Plan's
+        # claims and content obligations yet. Without the brief, the structure
+        # call sees only generic paragraph roles plus a complete reference
+        # paper and inevitably turns the reference topic into the target topic.
+        "target_project_brief": str(
+            contract.get("target_project_brief") or ""
+        ).strip(),
+        "target_project_analysis": contract.get("target_project_analysis", {}),
         "writing_boundary": contract.get("writing_boundary", {}),
         "working_title": (
             contract.get("paper_title")
@@ -145,6 +153,12 @@ its topic, claims, methods, numbers, datasets, citations, or wording into the
 target paper. The target venue rule and the target project's scientific needs
 override the reference whenever they conflict.
 
+The `target_project_brief` inside target_scientific_requirements is the
+authoritative source for the TARGET topic, research question, method, data,
+experiment, and claims. Every target title and target paragraph purpose must be
+about that brief. If the brief and reference discuss different topics, that is
+intentional: transfer only rhetorical organization from the reference.
+
 <structure_reference_metadata>
 {json.dumps(reference, ensure_ascii=False, indent=2)}
 </structure_reference_metadata>
@@ -190,7 +204,7 @@ Every input content obligation must appear in exactly one target paragraph's
 across additional paragraphs, but may not drop or scientifically change them.
 Every artifact must appear exactly once in ``artifact_refs`` at the paragraph
 that introduces or interprets it. Preserve every claim/evidence/artifact
-contract. Use stable target IDs, one exact grammatical sentence in
+contract. Use stable target IDs, a concise concrete writing instruction in
 ``plan_sentence``, and section shares that sum to 1. Method paragraphs must
 carry forward the applicable method metadata. A four-page short paper must be
 genuinely compact rather than imitating an eight-page reference's paragraph
@@ -211,10 +225,12 @@ unavailable, still plan and draft every section. From Experiments/Evaluation
 onward, plan proposed experiment prose in future tense: specify the datasets,
 baselines, metrics, main comparisons, ablations, robustness checks, and analyses
 that the project idea requires. Do not state or imply any observed outcome.
-When writing_boundary.numeric_policy is replace_quantitative_values_with_xx,
-write the literal xx for every quantitative slot in target plan sentences. Never
-copy a concrete count, percentage, year, threshold, score, or measurement from
-the project brief or structural reference.
+When target_scientific_requirements.writing_boundary says results are unavailable,
+preserve exact experimental-design constants explicitly supplied by the target
+project brief, including sample counts, permutation counts, seeds, decoding settings,
+and API-call budgets. Use the literal xx only for result measurements that have not
+been observed. Never replace a supplied design constant with xx, expand a sampled
+procedure into an exhaustive one, or copy any number from the structural reference.
 
 Return JSON only, once, with this shape:
 {{
@@ -735,10 +751,10 @@ def validate_structure_design(
         if not isinstance(section, dict):
             errors.append("目标 paper_outline section 必须是 object。")
             continue
-        for field in (
-            "section_id", "title", "section_role", "relation_to_previous",
-            "relation_to_next",
-        ):
+        # Only fields consumed as program coordinates are required here.
+        # Rhetorical roles and transitions are generated writing guidance, not
+        # user input to approve or content that application code should judge.
+        for field in ("section_id", "title"):
             if not str(section.get(field) or "").strip():
                 errors.append(f"目标 section 缺少 {field}。")
         reference_context = section.get("reference_context")
@@ -798,14 +814,9 @@ def validate_structure_design(
             if not paragraph_id or paragraph_id in seen_paragraphs:
                 errors.append(f"目标 paragraph ID 无效或重复：{paragraph_id or '[empty]'}。")
             seen_paragraphs.add(paragraph_id)
-            for field in (
-                "plan_sentence", "rhetorical_role", "relation_to_previous",
-                "relation_to_next",
-            ):
+            for field in ("plan_sentence",):
                 if not str(paragraph.get(field) or "").strip():
                     errors.append(f"目标 paragraph {paragraph_id} 缺少 {field}。")
-            if len(re.findall(r"[.!?](?:\s|$)", str(paragraph.get("plan_sentence") or ""))) != 1:
-                errors.append(f"目标 paragraph {paragraph_id} 的 plan_sentence 必须恰好一句。")
             covers = paragraph.get("covers")
             artifacts = paragraph.get("artifact_refs", [])
             supports = paragraph.get("supports", [])

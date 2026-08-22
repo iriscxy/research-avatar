@@ -1291,6 +1291,27 @@ def section_figure_placeholder_anchors(
     return anchors
 
 
+def is_hosted_placeholder_artifact(artifact_id: str) -> bool:
+    """Return whether the hosted draft intentionally leaves this artifact editable.
+
+    This decision comes only from the generated project contract. It must not be
+    inferred from prose, captions, titles, or keywords: manuscript recovery,
+    preview/materialization, and completion gates all share this one contract.
+    """
+    if not ONLINE_PROJECT_MODE:
+        return False
+    if artifact_id in TABLES:
+        return bool(TABLES[artifact_id].get("online_placeholder"))
+    definition = FIGURES.get(artifact_id)
+    return bool(
+        definition
+        and (
+            definition.get("online_placeholder")
+            or definition.get("kind") == "mechanism"
+        )
+    )
+
+
 def figure_placeholder_latex(
     figure_id: str, figure_state: dict[str, Any] | None = None
 ) -> str:
@@ -1309,17 +1330,14 @@ def figure_placeholder_latex(
     # placeholders can otherwise be emitted partly above the page crop box.
     # Keep the requested span in project metadata; the real local figure still
     # renders at that span after export.
-    if ONLINE_PROJECT_MODE and (
-        definition.get("kind") == "mechanism" or definition.get("online_placeholder")
-    ):
+    if is_hosted_placeholder_artifact(figure_id):
         wide = False
     environment = "figure*" if wide else "figure"
     box_width = r"0.92\linewidth"
     placeholder = latex_escape_title(
         (
             f"{figure_id} placeholder: complete the final artwork after project export"
-            if ONLINE_PROJECT_MODE
-            and (definition.get("kind") == "mechanism" or definition.get("online_placeholder"))
+            if is_hosted_placeholder_artifact(figure_id)
             else f"{figure_id} placeholder -- figure generation is in progress"
         )
     )
@@ -1400,7 +1418,7 @@ def table_placeholder_latex(
     placeholder = latex_escape_title(
         (
             f"{table_id} placeholder: complete the final table after project export"
-            if ONLINE_PROJECT_MODE and definition.get("online_placeholder")
+            if is_hosted_placeholder_artifact(table_id)
             else f"{table_id} placeholder -- table generation is in progress"
         )
     )
@@ -2766,12 +2784,10 @@ def figure_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "id": figure_id,
                 **definition,
-                "placeholder_only": bool(
-                    ONLINE_PROJECT_MODE and definition.get("kind") == "mechanism"
-                ),
+                "placeholder_only": is_hosted_placeholder_artifact(figure_id),
                 "placeholder_message": (
                     ONLINE_PLACEHOLDER_FIGURE_MESSAGE
-                    if ONLINE_PROJECT_MODE and definition.get("kind") == "mechanism"
+                    if is_hosted_placeholder_artifact(figure_id)
                     else ""
                 ),
                 "caption": stored.get("caption") or definition["caption"],
@@ -2887,7 +2903,7 @@ def table_gate(
     table_id: str, state: dict[str, Any], metrics: dict[str, Any] | None = None
 ) -> tuple[bool, str]:
     definition = TABLES[table_id]
-    if ONLINE_PROJECT_MODE and definition.get("online_placeholder"):
+    if is_hosted_placeholder_artifact(table_id):
         return False, ONLINE_PLACEHOLDER_FIGURE_MESSAGE
     metrics = metrics if metrics is not None else metrics_bundle()
     missing_results = [
@@ -3775,14 +3791,7 @@ def repair_online_placeholder_references_in_manuscript(
             placeholder_ids = [
                 artifact_id
                 for artifact_id in paragraph.get("artifacts", [])
-                if (
-                    artifact_id in FIGURES
-                    and FIGURES[artifact_id].get("online_placeholder")
-                )
-                or (
-                    artifact_id in TABLES
-                    and TABLES[artifact_id].get("online_placeholder")
-                )
+                if is_hosted_placeholder_artifact(artifact_id)
             ]
             missing = artifact_reference_issues(
                 text, artifact_writing_context(placeholder_ids, state.get("figures"))
@@ -3869,6 +3878,12 @@ def synchronize_artifact_workbenches_from_manuscript(
         if allowed is not None and figure_id not in allowed:
             continue
         definition = FIGURES[figure_id]
+        # In the hosted two-file flow, an explicit placeholder is itself the
+        # intended deliverable until real experiment data is uploaded locally.
+        # Keep its labelled float in the manuscript; never pass its deliberately
+        # unresolved data_grid to the deterministic renderer.
+        if is_hosted_placeholder_artifact(figure_id):
+            continue
         stored = state["figures"][figure_id]
         recovered: tuple[str, int, int, str, Path] | None = None
         for section in definition.get("source_sections", []):
@@ -3937,6 +3952,8 @@ def synchronize_artifact_workbenches_from_manuscript(
         if allowed is not None and table_id not in allowed:
             continue
         definition = TABLES[table_id]
+        if is_hosted_placeholder_artifact(table_id):
+            continue
         stored = state["tables"][table_id]
         recovered = None
         for section in definition.get("source_sections", []):
@@ -4043,6 +4060,8 @@ def materialize_batch_artifacts(
         if allowed is not None and figure_id not in allowed:
             continue
         definition = FIGURES[figure_id]
+        if is_hosted_placeholder_artifact(figure_id):
+            continue
         stored = state["figures"][figure_id]
         binding = first_artifact_binding(figure_id)
         if not binding:
@@ -4096,6 +4115,8 @@ def materialize_batch_artifacts(
         if allowed is not None and table_id not in allowed:
             continue
         definition = TABLES[table_id]
+        if is_hosted_placeholder_artifact(table_id):
+            continue
         stored = state["tables"][table_id]
         binding = first_artifact_binding(table_id)
         if not binding:
@@ -4184,17 +4205,7 @@ def pending_batch_artifacts(
         # while the exported project carries the actual table/figure completion to
         # the local workflow. Counting that unreachable approval as pending strands
         # an otherwise finished online draft forever.
-        if (
-            ONLINE_PROJECT_MODE
-            and (
-                (artifact_id in FIGURES and FIGURES[artifact_id].get("online_placeholder"))
-                or (artifact_id in TABLES and TABLES[artifact_id].get("online_placeholder"))
-                or (
-                    artifact_id in FIGURES
-                    and FIGURES[artifact_id].get("kind") == "mechanism"
-                )
-            )
-        ):
+        if is_hosted_placeholder_artifact(artifact_id):
             continue
         binding = first_artifact_binding(artifact_id)
         if not binding:
@@ -4344,7 +4355,7 @@ def completed_manuscript_issues(state: dict[str, Any]) -> list[str]:
             if label not in actual_labels:
                 issues.append(f"{section}: unresolved internal reference {label}")
     for table_id, stored in state.get("tables", {}).items():
-        if ONLINE_PROJECT_MODE and TABLES.get(table_id, {}).get("online_placeholder"):
+        if is_hosted_placeholder_artifact(table_id):
             continue
         if stored.get("status") != "approved" or table_latex_is_placeholder(
             str(stored.get("latex") or "")
@@ -4774,12 +4785,10 @@ def table_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
             {
                 "id": table_id,
                 **definition,
-                "placeholder_only": bool(
-                    ONLINE_PROJECT_MODE and definition.get("online_placeholder")
-                ),
+                "placeholder_only": is_hosted_placeholder_artifact(table_id),
                 "placeholder_message": (
                     ONLINE_PLACEHOLDER_FIGURE_MESSAGE
-                    if ONLINE_PROJECT_MODE and definition.get("online_placeholder")
+                    if is_hosted_placeholder_artifact(table_id)
                     else ""
                 ),
                 "status": stored.get("status", "pending"),
@@ -5125,6 +5134,15 @@ def section_evidence(
         selected["evidence_grade"] = metrics["evidence_grade"]
     if isinstance(metrics.get("fixture"), dict):
         selected["fixture"] = metrics["fixture"]
+    lightweight = metrics.get("lightweight_project")
+    if isinstance(lightweight, dict) and str(
+        lightweight.get("project_evidence") or ""
+    ).strip():
+        # The uploaded target brief is authoritative for design constants in
+        # every section. Keeping it at the top level makes it impossible for a
+        # paragraph writer to mistake the structural reference for evidence or
+        # silently replace a sampled protocol with a different one.
+        selected["target_project_brief"] = lightweight["project_evidence"]
     if _is_method_section(section) and isinstance(metrics.get("model_design"), dict):
         selected["approved_model_design"] = metrics["model_design"]
     if _is_experiment_section(section):
@@ -7177,11 +7195,14 @@ def call_openai(
         )
     )
     measurement_marker_rule = (
-        "No experiment results are available. Replace every quantitative value in "
-        "manuscript prose with the literal xx, including counts, percentages, years, "
-        "thresholds, scores, dimensions, model counts, dataset sizes, and measurements. "
+        "No experiment results are available. Preserve every experimental-design "
+        "constant explicitly supplied in target_project_brief, including sample counts, "
+        "permutation counts, seeds, decoding settings, and API-call budgets. Use the "
+        "literal xx only for unavailable result measurements such as observed scores, "
+        "percentages, effects, confidence intervals, and measured outcomes. "
         "Do not alter LaTeX command names, citation keys, labels, or section commands. "
-        "Never infer or copy a concrete number from the structural reference. In the "
+        "Never infer a design value, turn sampled random permutations into exhaustive "
+        "enumeration, or copy a concrete number from the structural reference. In the "
         "Experiments section, write the proposed setup and required experiments in "
         "future tense and never claim that an outcome was observed. Keep each "
         "plan-only experiment paragraph at or below 75 words."
@@ -12163,7 +12184,7 @@ class Handler(BaseHTTPRequestHandler):
         return figure_id
 
     def reject_online_placeholder_figure(self, figure_id: str) -> None:
-        if ONLINE_PROJECT_MODE and FIGURES[figure_id].get("kind") == "mechanism":
+        if is_hosted_placeholder_artifact(figure_id):
             raise StudioError(ONLINE_PLACEHOLDER_FIGURE_MESSAGE)
 
     def require_panel(self, figure_id: str, body: dict[str, Any]) -> str:
@@ -13107,9 +13128,7 @@ class Handler(BaseHTTPRequestHandler):
         figure_state["caption_last_error"] = ""
         figure_state["last_message"] = "Caption 已保存。"
 
-        online_placeholder = (
-            ONLINE_PROJECT_MODE and FIGURES[figure_id].get("kind") == "mechanism"
-        )
+        online_placeholder = is_hosted_placeholder_artifact(figure_id)
         if figure_state.get("status") == "approved" or online_placeholder:
             section = FIGURES[figure_id]["source_sections"][0]
             section_path = PAPER / "sections" / SECTION_MAP[section]["file"]

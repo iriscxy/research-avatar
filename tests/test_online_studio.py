@@ -310,6 +310,16 @@ def lightweight_structure_fixture(_root, contract, _source, _reference, **_kwarg
     return {"structure_reference_analysis": {}, "paper_outline": outline}
 
 
+def lightweight_target_analysis_fixture(*_args, **_kwargs):
+    return {
+        "target_title": "Target Project Analysis for a Short Research Paper",
+        "research_question": "What does the supplied target project test?",
+        "contribution_type": "evaluation_study",
+        "proposes_model_architecture": False,
+        "model_figure_rationale": "The target evaluates an existing system.",
+    }
+
+
 def project_archive():
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
@@ -362,8 +372,15 @@ class OnlineStudioTests(unittest.TestCase):
             side_effect=lightweight_structure_fixture,
         )
         self.structure_patcher.start()
+        self.target_analysis_patcher = patch.object(
+            online,
+            "_analyze_target_project_online",
+            side_effect=lightweight_target_analysis_fixture,
+        )
+        self.target_analysis_patcher.start()
 
     def tearDown(self):
+        self.target_analysis_patcher.stop()
         self.structure_patcher.stop()
         with online.SESSIONS_LOCK:
             sessions = list(online.SESSIONS.values())
@@ -1511,6 +1528,12 @@ class OnlineStudioTests(unittest.TestCase):
                     api_key="test-key",
                     model="test-model",
                 )
+            design_contract = online._design_lightweight_structure_online.call_args.args[1]
+            self.assertIn(
+                "Typo robustness in intent classification",
+                design_contract["target_project_brief"],
+            )
+            self.assertNotIn("Uploaded Model Reference", design_contract["target_project_brief"])
             environment = {**os.environ, "RESEARCH_AVATAR_ROOT": str(root)}
             result = subprocess.run(
                 [
@@ -1650,6 +1673,16 @@ class OnlineStudioTests(unittest.TestCase):
                 online,
                 "_write_lightweight_researcher_profile",
                 side_effect=lightweight_profile_fixture,
+            ), patch.object(
+                online,
+                "_analyze_target_project_online",
+                return_value={
+                    "target_title": "A Gated Residual Encoder for Robust Classification",
+                    "research_question": "Does the proposed encoder improve robustness?",
+                    "contribution_type": "model_architecture",
+                    "proposes_model_architecture": True,
+                    "model_figure_rationale": "The target introduces a learned encoder module.",
+                },
             ):
                 online._write_lightweight_workspace(
                     root,
@@ -2374,8 +2407,8 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
-        self.assertIn('"class_name": "OnlineStudioContainerV49"', wrangler)
-        self.assertIn("export class OnlineStudioContainerV49", worker)
+        self.assertIn('"class_name": "OnlineStudioContainerV50"', wrangler)
+        self.assertIn("export class OnlineStudioContainerV50", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
 
     def test_cloudflare_worker_forwards_only_deepseek_secret_to_container(self):

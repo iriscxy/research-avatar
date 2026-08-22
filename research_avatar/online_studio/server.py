@@ -48,7 +48,6 @@ from research_avatar.paper_structure import (
     normalize_structure_design,
     parse_structure_response,
     structure_prompt,
-    validate_structure_design,
 )
 from research_avatar.survey_bibliography import verified_survey_bibliography
 
@@ -948,7 +947,10 @@ Requirements:
    "under<soft-hyphen>standing" must become "understanding"), while preserving
    genuine lexical hyphens.
 5. Omit page headers, page footers, line numbers, and standalone page numbers.
-6. Include title, abstract, all main-paper sections, captions, appendices, and references.
+6. Start the transcript with the paper's actual scholarly title, even when a copyright,
+   permission, publisher, or repository notice appears earlier in the PDF layout. Omit
+   those legal/distribution notices from the transcript. Then include the abstract, all
+   main-paper sections, captions, appendices, and references.
 7. Put each heading and each natural paragraph in its own block separated by one blank line.
 8. Treat form-feed characters as page boundaries. Never invent text absent from the input.
 
@@ -2420,6 +2422,118 @@ FULL PAPERS:
     }
 
 
+def _analyze_target_project_online(
+    root: Path,
+    project_text: str,
+    *,
+    venue: str,
+    api_key: str,
+    model: str,
+) -> dict[str, Any]:
+    """Classify target-paper needs from the target brief alone."""
+    if not api_key:
+        raise OnlineStudioError("缺少线上写作模型凭证，不能分析目标项目。")
+    requested_model = os.environ.get("DEEPSEEK_ALIGNMENT_MODEL", model).strip() or model
+    prompt = f"""Read only the TARGET PROJECT BRIEF below. Do not use any reference
+paper or outside source. Return one JSON object with exactly these fields:
+{{
+  "target_title": "6--18 word English paper title",
+  "research_question": "one concise sentence",
+  "contribution_type": "evaluation_study | model_architecture | method_non_architecture | dataset | analysis | other",
+  "proposes_model_architecture": false,
+  "model_figure_rationale": "one concise sentence"
+}}
+
+Set proposes_model_architecture=true only when the target work itself introduces
+or modifies a model architecture or learned model component whose information
+flow should be diagrammed. Evaluating, prompting, perturbing, comparing, or
+calling an existing language model is not a proposed model architecture.
+The title, research question, and classification must describe the target brief,
+not a possible reference paper. Target venue: {venue}.
+
+<target_project_brief>
+{project_text}
+</target_project_brief>
+"""
+    payload = {
+        "model": requested_model,
+        "messages": [
+            {
+                "role": "system",
+                "content": "Analyze only the supplied target brief and return only JSON.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "thinking": {"type": "disabled"},
+        "temperature": 0.0,
+        "max_tokens": 1200,
+        "response_format": {"type": "json_object"},
+    }
+    request = urllib.request.Request(
+        os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
+        + "/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=240) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise OnlineStudioError(
+            f"分析目标项目时模型 API 返回 HTTP {exc.code}：{detail[:500]}"
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise OnlineStudioError(f"分析目标项目时模型 API 连接失败：{exc.reason}") from exc
+    choices = body.get("choices") or []
+    content = (
+        str((choices[0].get("message") or {}).get("content") or "").strip()
+        if choices else ""
+    )
+    try:
+        analysis = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise OnlineStudioError("目标项目分析没有返回有效 JSON，请重试。") from exc
+    allowed_types = {
+        "evaluation_study", "model_architecture", "method_non_architecture",
+        "dataset", "analysis", "other",
+    }
+    if not isinstance(analysis, dict):
+        raise OnlineStudioError("目标项目分析必须是 JSON object。")
+    if analysis.get("contribution_type") not in allowed_types:
+        raise OnlineStudioError("目标项目分析返回了未知的 contribution_type。")
+    if not isinstance(analysis.get("proposes_model_architecture"), bool):
+        raise OnlineStudioError("目标项目分析缺少模型架构布尔判断。")
+    for field in ("target_title", "research_question", "model_figure_rationale"):
+        if not str(analysis.get(field) or "").strip():
+            raise OnlineStudioError(f"目标项目分析缺少 {field}。")
+    normalized = {
+        "id": body.get("id"),
+        "model": body.get("model") or requested_model,
+        "usage": body.get("usage") or {},
+        "output": [
+            {"type": "message", "content": [{"type": "output_text", "text": content}]}
+        ],
+    }
+    append_usage(
+        root / "paper/.paper_studio/api_usage.jsonl",
+        usage_record(
+            normalized,
+            provider="deepseek",
+            requested_model=requested_model,
+            operation="target_project_analysis",
+        ),
+    )
+    return {
+        "target_title": str(analysis["target_title"]).strip(),
+        "research_question": str(analysis["research_question"]).strip(),
+        "contribution_type": str(analysis["contribution_type"]),
+        "proposes_model_architecture": analysis["proposes_model_architecture"],
+        "model_figure_rationale": str(analysis["model_figure_rationale"]).strip(),
+    }
+
+
 def _design_lightweight_structure_online(
     root: Path,
     contract: dict[str, Any],
@@ -2440,15 +2554,6 @@ def _design_lightweight_structure_online(
         paragraph_mapping=True,
         selected_reference_inventory=True,
     )
-    prompt += """
-
-Also return one top-level string field named `target_paper_title`. Generate a
-concise, specific English research-paper title from the TARGET scientific
-requirements only. It must describe the target problem and proposed idea, use
-6--18 words, contain no citation, no placeholder, and no wording copied from
-the structure-reference paper. Do not merely repeat a generic uploaded file
-heading or a working title from the input.
-"""
     payload = {
         "model": requested_model,
         "messages": [
@@ -2483,12 +2588,9 @@ heading or a working title from the input.
         result = parse_structure_response(content)
         normalize_reference_line_ranges(reference_source, result)
         normalize_structure_design(contract, result, paragraph_mapping=True)
-        validate_structure_design(
-            contract, reference_source, result, require_paragraph_mapping=True
-        )
         materialize_reference_contexts(reference_source, result)
     except PaperStructureError as exc:
-        raise OnlineStudioError("系统生成的目标论文结构未通过校验：" + str(exc)) from exc
+        raise OnlineStudioError("写作结构服务返回了无法读取的数据，请重试。") from exc
     normalized = {
         "id": body.get("id"), "model": body.get("model") or requested_model,
         "usage": body.get("usage") or {},
@@ -2942,13 +3044,26 @@ def _write_lightweight_workspace(
         raise OnlineStudioError("请上传一篇完整的结构参考论文。")
     project_text = _plain_source_text(project_brief_files, "PROJECT BRIEF")
     approved_contract = _approved_contract_from_project_text(project_text)
+    title_was_explicit = bool(title.strip())
     title = _lightweight_paper_title(
         title,
         project_text,
         approved_contract,
         project_brief_files[0][0],
     )
-    project_name_was_explicit = bool(project_name.strip())
+    report("target_analysis", "正在分析目标项目的研究类型与图表需求…", 18)
+    target_analysis = _analyze_target_project_online(
+        root,
+        project_text,
+        venue=venue,
+        api_key=api_key,
+        model=model,
+    )
+    if not title_was_explicit:
+        title = _generated_structure_title(
+            {"target_paper_title": target_analysis["target_title"]},
+            title,
+        )
     project_name = project_name.strip() or title
     main_reference: dict[str, Any] | None = None
     reference_name = ""
@@ -3117,14 +3232,7 @@ def _write_lightweight_workspace(
     tables: dict[str, Any] = {}
     figure_order: list[str] = []
     table_order: list[str] = []
-    has_model_improvement = bool(
-        re.search(
-            r"\b(?:model|architecture|encoder|classifier|network|module|attention|"
-            r"gating|adapter|residual|fusion)\b|模型|架构|网络|模块|门控|注意力|改进",
-            project_text,
-            re.IGNORECASE,
-        )
-    )
+    has_model_improvement = target_analysis["proposes_model_architecture"]
     # A motivation figure is part of the default Introduction contract even
     # for a text-first hosted session.  The hosted UI preserves its float,
     # caption and prose binding; the exported project carries the actual
@@ -3362,6 +3470,12 @@ def _write_lightweight_workspace(
             if results_files else "draft_proposed_experiment_design_without_results"
         ),
     }
+    # For an exported Experiment Plan, claims/obligations already identify the
+    # target. For a raw TXT brief they do not; the brief must therefore travel
+    # in the same target-only contract sent to the structure designer. It is
+    # never appended to the structure-reference source.
+    structure_contract["target_project_brief"] = project_text
+    structure_contract["target_project_analysis"] = target_analysis
     report(
         "reference_analysis",
         "正在分析 ref paper，并为目标论文逐段匹配写作结构…",
@@ -3372,12 +3486,6 @@ def _write_lightweight_workspace(
         {key: main_reference.get(key) for key in ("title", "authors", "venue", "year", "url", "bibtex_key")},
         api_key=api_key, model=model,
     )
-    generated_title = _generated_structure_title(structure_design, title)
-    if generated_title != title:
-        title = generated_title
-        structure_contract["paper_title"] = title
-        if not project_name_was_explicit:
-            project_name = title
     report("workspace", "逐段映射已完成，正在生成 Paper Studio 项目…", 82)
     if approved_contract is not None:
         designed_sections = []

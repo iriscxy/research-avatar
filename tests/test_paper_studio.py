@@ -5733,6 +5733,18 @@ args = parser.parse_args()
         self.assertFalse(data["placeholder_only"])
 
         handler = object.__new__(studio.Handler)
+        with patch.object(studio, "ONLINE_PROJECT_MODE", True), patch.dict(
+            studio.FIGURES[data["id"]], {"online_placeholder": True}
+        ):
+            hosted_data = next(
+                item
+                for item in public_state(_default_state())["figures"]
+                if item["id"] == data["id"]
+            )
+            self.assertTrue(hosted_data["placeholder_only"])
+            with self.assertRaisesRegex(StudioError, "网页版保留图位"):
+                handler.reject_online_placeholder_figure(data["id"])
+
         with patch.object(studio, "ONLINE_PROJECT_MODE", True):
             with self.assertRaisesRegex(StudioError, "网页版保留图位"):
                 handler.reject_online_placeholder_figure(mechanism["id"])
