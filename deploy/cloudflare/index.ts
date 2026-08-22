@@ -160,6 +160,7 @@ export class OnlineStudioContainerV48 extends OnlineStudioContainer {}
 // image containing layout extraction and no longer checks for an OpenAI key.
 export class OnlineStudioContainerV49 extends OnlineStudioContainer {}
 export class OnlineStudioContainerV50 extends OnlineStudioContainer {}
+export class OnlineStudioContainerV51 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
