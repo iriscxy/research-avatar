@@ -159,6 +159,7 @@ export class OnlineStudioContainerV48 extends OnlineStudioContainer {}
 // DeepSeek PDF pipeline image release: rotate again so the container runs the
 // image containing layout extraction and no longer checks for an OpenAI key.
 export class OnlineStudioContainerV49 extends OnlineStudioContainer {}
+export class OnlineStudioContainerV50 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
