@@ -269,6 +269,16 @@ class PaperStructureTests(unittest.TestCase):
         self.assertEqual(paragraph["start_line"], 3)
         self.assertEqual(paragraph["end_line"], len(self.source.splitlines()))
 
+    def test_reference_paragraph_does_not_require_english_terminal_punctuation(self):
+        payload = copy.deepcopy(self.payload)
+        source = "Title\nAbstract\nA valid extracted paragraph ending in citation [12]"
+        validate_structure_design(self.contract, source, payload)
+
+    def test_reference_paragraph_may_end_in_cjk_punctuation(self):
+        payload = copy.deepcopy(self.payload)
+        source = "标题\n摘要\n这是从参考论文中提取的完整自然段。"
+        validate_structure_design(self.contract, source, payload)
+
     def test_drops_wholly_outside_reference_paragraph_and_rebinds_context(self):
         payload = copy.deepcopy(self.payload)
         valid = copy.deepcopy(

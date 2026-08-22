@@ -1142,6 +1142,107 @@ class OnlineStudioTests(unittest.TestCase):
                 process.terminate()
                 process.wait(timeout=5)
 
+    def test_reset_session_deletes_the_current_project(self):
+        process = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "project"
+            root.mkdir()
+            (root / "content.txt").write_text("temporary manuscript")
+            session = online.Session(
+                "reset-me", "user-1", root, "deepseek", "deepseek-v4-flash",
+                process, 0,
+            )
+            try:
+                with online.SESSIONS_LOCK:
+                    online.SESSIONS[session.session_id] = session
+                self.assertTrue(online.reset_session(
+                    f"{online.COOKIE_NAME}=reset-me", user_id="user-1"
+                ))
+                process.wait(timeout=5)
+                self.assertFalse(root.exists())
+                with online.SESSIONS_LOCK:
+                    self.assertNotIn(session.session_id, online.SESSIONS)
+            finally:
+                with online.SESSIONS_LOCK:
+                    online.SESSIONS.pop(session.session_id, None)
+                if process.poll() is None:
+                    process.terminate()
+                    process.wait(timeout=5)
+
+    def test_four_hour_idle_expiry_deletes_content_and_cannot_recover(self):
+        process = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"]
+        )
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            online, "DATA_ROOT", Path(directory)
+        ):
+            session_id = "idle-project"
+            root = online.user_project_root("user-1") / hashlib.sha256(
+                session_id.encode("utf-8")
+            ).hexdigest()
+            (root / "paper").mkdir(parents=True)
+            (root / "paper/paper_studio.json").write_text("{}")
+            session = online.Session(
+                session_id, "user-1", root, "deepseek", "deepseek-v4-flash",
+                process, 0, last_access=100.0,
+            )
+            try:
+                with online.SESSIONS_LOCK:
+                    online.SESSIONS[session_id] = session
+                self.assertEqual(
+                    online._reap_expired_sessions(
+                        now=100.0 + online.SESSION_IDLE_SECONDS + 1
+                    ),
+                    1,
+                )
+                process.wait(timeout=5)
+                self.assertFalse(root.exists())
+                self.assertIsNone(online._session_from_cookie(
+                    f"{online.COOKIE_NAME}={session_id}", user_id="user-1"
+                ))
+            finally:
+                with online.SESSIONS_LOCK:
+                    online.SESSIONS.pop(session_id, None)
+                if process.poll() is None:
+                    process.terminate()
+                    process.wait(timeout=5)
+
+    def test_gateway_restart_discards_a_persisted_project_idle_over_four_hours(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            online, "DATA_ROOT", Path(directory)
+        ):
+            session_id = "stale-durable-session"
+            root = online.user_project_root("user-1") / hashlib.sha256(
+                session_id.encode("utf-8")
+            ).hexdigest()
+            (root / "paper").mkdir(parents=True)
+            config = root / "paper/paper_studio.json"
+            config.write_text("{}")
+            stale = time.time() - online.SESSION_IDLE_SECONDS - 10
+            os.utime(config, (stale, stale))
+            with patch.object(online, "_start_worker") as start:
+                recovered = online._session_from_cookie(
+                    f"{online.COOKIE_NAME}={session_id}", user_id="user-1"
+                )
+            self.assertIsNone(recovered)
+            self.assertFalse(root.exists())
+            start.assert_not_called()
+
+    def test_reaper_deletes_stale_project_left_after_logout(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(
+            online, "DATA_ROOT", Path(directory)
+        ):
+            root = online.user_project_root("user-1") / "logged-out-project"
+            (root / "paper").mkdir(parents=True)
+            marker = root / online.SESSION_ACTIVITY_FILE
+            marker.write_text("")
+            stale = time.time() - online.SESSION_IDLE_SECONDS - 10
+            os.utime(marker, (stale, stale))
+            self.assertEqual(online._reap_expired_projects(), 1)
+            self.assertFalse(root.exists())
+
     def test_gateway_logout_handler_closes_writer_before_revoking_auth(self):
         source = Path(online.__file__).read_text(encoding="utf-8")
         branch = source[source.index('elif path == "/api/auth/logout":') :]
@@ -1173,6 +1274,33 @@ class OnlineStudioTests(unittest.TestCase):
         finally:
             with online.SESSIONS_LOCK:
                 online.SESSIONS.pop("recover-me", None)
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=5)
+
+    def test_session_status_check_does_not_extend_idle_deadline(self):
+        process = subprocess.Popen(
+            [sys.executable, "-c", "import time; time.sleep(30)"]
+        )
+        try:
+            last_access = time.time() - 60
+            session = online.Session(
+                "status-check", "user-1", Path("/tmp/unused-status-check"),
+                "deepseek", "deepseek-v4-flash", process, 0,
+                last_access=last_access,
+            )
+            with online.SESSIONS_LOCK:
+                online.SESSIONS[session.session_id] = session
+            found = online._session_from_cookie(
+                f"{online.COOKIE_NAME}={session.session_id}",
+                user_id="user-1",
+                record_access=False,
+            )
+            self.assertIs(found, session)
+            self.assertEqual(session.last_access, last_access)
+        finally:
+            with online.SESSIONS_LOCK:
+                online.SESSIONS.pop("status-check", None)
             if process.poll() is None:
                 process.terminate()
                 process.wait(timeout=5)
@@ -2176,6 +2304,20 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("sessionActions.classList.remove('hidden')", script)
         self.assertIn("studioFrame.src = '/studio'", script)
         self.assertNotIn("window.location.assign(result.redirect)", script)
+        authenticated = script[script.index("async function showAuthenticated"):
+                               script.index("async function initializeAuth")]
+        self.assertNotIn("showStudioInUseTab()", authenticated)
+        self.assertIn("showSessionChoice()", authenticated)
+
+    def test_paper_studio_has_a_destructive_reset_back_to_upload(self):
+        html = (online.STATIC / "index.html").read_text(encoding="utf-8")
+        script = (online.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn('id="reset-studio"', html)
+        self.assertIn("清空当前内容并重新上传", html)
+        self.assertIn("/api/online/session/reset", script)
+        self.assertIn("showUploadView()", script)
+        self.assertIn("连续 4 小时未使用", script)
+        self.assertIn("window.setInterval", script)
 
     def test_free_paperwrite_uses_the_shared_section_draft_surface(self):
         """The hosted writer must not lag behind the reusable Paper Studio UI."""

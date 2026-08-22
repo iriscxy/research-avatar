@@ -10,11 +10,39 @@ const studioFrame = document.querySelector('#studio-frame');
 const useOnboarding = document.querySelector('#use-onboarding');
 const sessionActions = document.querySelector('#session-actions');
 let activeStudioSession = false;
+let studioIsOpen = false;
+let sessionMonitor = null;
+
+function showSessionChoice() {
+  if (!activeStudioSession) return;
+  studioIsOpen = false;
+  useOnboarding.classList.add('hidden');
+  studioFrame.classList.add('hidden');
+  studioFrame.src = 'about:blank';
+  document.querySelector('#use-panel').classList.remove('studio-active');
+  sessionActions.classList.remove('hidden');
+  document.querySelector('#resume-studio').classList.remove('hidden');
+}
+
+function showUploadView() {
+  activeStudioSession = false;
+  studioIsOpen = false;
+  document.querySelector('#use-panel').classList.remove('studio-active');
+  studioFrame.classList.add('hidden');
+  studioFrame.src = 'about:blank';
+  sessionActions.classList.add('hidden');
+  document.querySelector('#resume-studio').classList.remove('hidden');
+  useOnboarding.classList.remove('hidden');
+  form.reset();
+  submit.disabled = false;
+}
 
 function showStudioInUseTab() {
   if (!activeStudioSession) return;
+  studioIsOpen = true;
   useOnboarding.classList.add('hidden');
-  sessionActions.classList.add('hidden');
+  sessionActions.classList.remove('hidden');
+  document.querySelector('#resume-studio').classList.add('hidden');
   document.querySelector('#use-panel').classList.add('studio-active');
   studioFrame.classList.remove('hidden');
   if (studioFrame.getAttribute('src') !== '/studio') studioFrame.src = '/studio';
@@ -47,7 +75,9 @@ function selectProductPanel(panelId) {
     tab.classList.toggle('active', active);
     tab.setAttribute('aria-selected', String(active));
   });
-  if (panelId === 'use-panel') showStudioInUseTab();
+  if (panelId === 'use-panel' && activeStudioSession && !studioIsOpen) {
+    showSessionChoice();
+  }
 }
 
 document.querySelectorAll('.product-tab').forEach((tab) => {
@@ -80,13 +110,28 @@ async function showAuthenticated(user) {
     const state = await response.json();
     activeStudioSession = Boolean(state.active);
     if (activeStudioSession) {
-      sessionActions.classList.remove('hidden');
       if (!document.querySelector('#use-panel').classList.contains('hidden')) {
-        showStudioInUseTab();
+        showSessionChoice();
       }
     }
   } catch (_) {
     // Leave the resume link hidden if the check fails.
+  }
+  if (sessionMonitor === null) {
+    sessionMonitor = window.setInterval(async () => {
+      if (!activeStudioSession) return;
+      try {
+        const response = await fetch('/api/online/session', { cache: 'no-store' });
+        const state = await response.json();
+        if (response.ok && !state.active) {
+          showUploadView();
+          sessionNotice.textContent = '当前写作会话已连续 4 小时未使用，临时内容已自动清空。请重新上传材料。';
+          sessionNotice.classList.remove('hidden');
+        }
+      } catch (_) {
+        // A transient network error must not discard the browser view.
+      }
+    }, 30000);
   }
 }
 
@@ -199,6 +244,29 @@ async function startSession(payload) {
 document.querySelector('#resume-studio').addEventListener('click', () => {
   activeStudioSession = true;
   showStudioInUseTab();
+});
+
+document.querySelector('#reset-studio').addEventListener('click', async (event) => {
+  const button = event.currentTarget;
+  const resetMessage = document.querySelector('#reset-message');
+  button.disabled = true;
+  resetMessage.textContent = '正在清空…';
+  try {
+    const response = await fetch('/api/online/session/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || '清空失败。');
+    showUploadView();
+    message.className = '';
+    message.textContent = '当前写作内容已清空，请重新上传材料。';
+  } catch (error) {
+    resetMessage.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
 });
 
 form.addEventListener('submit', async (event) => {

@@ -79,6 +79,7 @@ MAX_SOURCE_TEXT_CHARS = 60_000
 MAX_STRUCTURE_REFERENCE_CHARS = 120_000
 MAX_ACTIVE_SESSIONS = int(os.environ.get("ONLINE_STUDIO_MAX_SESSIONS", "16"))
 SESSION_IDLE_SECONDS = int(os.environ.get("ONLINE_STUDIO_IDLE_SECONDS", "14400"))
+SESSION_ACTIVITY_FILE = ".last-online-use"
 AUTH_SESSION_SECONDS = int(os.environ.get("ONLINE_STUDIO_AUTH_SECONDS", "2592000"))
 KEY_ENVIRONMENTS = ("OPENAI_API_KEY", "DEEPSEEK_API_KEY", "LLM_API_KEY")
 PROVIDERS = {
@@ -2487,7 +2488,7 @@ heading or a working title from the input.
         )
         materialize_reference_contexts(reference_source, result)
     except PaperStructureError as exc:
-        raise OnlineStudioError("作者参考论文的目标结构设计未通过校验：" + str(exc)) from exc
+        raise OnlineStudioError("系统生成的目标论文结构未通过校验：" + str(exc)) from exc
     normalized = {
         "id": body.get("id"), "model": body.get("model") or requested_model,
         "usage": body.get("usage") or {},
@@ -4001,6 +4002,7 @@ def create_session(
             shutil.rmtree(root)
         raise
     session = Session(session_id, user_id, root, provider, model, process, port, api_key)
+    _record_session_access(session)
     with SESSIONS_LOCK:
         SESSIONS[session_id] = session
     return session
@@ -4164,7 +4166,56 @@ def _ensure_session_alive(session: Session) -> bool:
     return True
 
 
-def _session_from_cookie(header: str | None, *, user_id: str) -> Session | None:
+def _record_session_access(session: Session, now: float | None = None) -> None:
+    """Record user-visible activity in memory and beside the durable project."""
+    timestamp = time.time() if now is None else now
+    session.last_access = timestamp
+    if session.kind != "user":
+        return
+    marker = session.root / SESSION_ACTIVITY_FILE
+    try:
+        marker.parent.mkdir(parents=True, exist_ok=True)
+        marker.touch(exist_ok=True)
+        os.utime(marker, (timestamp, timestamp))
+    except OSError:
+        # In-memory expiry remains authoritative while this gateway is alive.
+        pass
+
+
+def _project_last_access(root: Path) -> float | None:
+    """Read persisted activity, with a migration fallback for older projects."""
+    candidates = (root / SESSION_ACTIVITY_FILE, root / "paper/paper_studio.json")
+    for candidate in candidates:
+        try:
+            return candidate.stat().st_mtime
+        except OSError:
+            continue
+    return None
+
+
+def _terminate_session(session: Session, *, delete_content: bool) -> None:
+    if session.process.poll() is None:
+        session.process.terminate()
+    if delete_content and session.kind == "user":
+        shutil.rmtree(session.root, ignore_errors=True)
+
+
+def _expire_session(session: Session, *, now: float | None = None) -> bool:
+    """Delete an idle user's whole temporary project, never merely its worker."""
+    timestamp = time.time() if now is None else now
+    if session.kind != "user" or timestamp - session.last_access <= SESSION_IDLE_SECONDS:
+        return False
+    with SESSIONS_LOCK:
+        current = SESSIONS.get(session.session_id)
+        if current is session:
+            SESSIONS.pop(session.session_id, None)
+    _terminate_session(session, delete_content=True)
+    return True
+
+
+def _session_from_cookie(
+    header: str | None, *, user_id: str, record_access: bool = True
+) -> Session | None:
     session_id = _cookie_value(header, COOKIE_NAME)
     with SESSIONS_LOCK:
         session = SESSIONS.get(session_id) if session_id is not None else None
@@ -4187,6 +4238,8 @@ def _session_from_cookie(header: str | None, *, user_id: str) -> Session | None:
                 reverse=True,
             )
             session = owned[0] if owned else None
+    if session is not None and _expire_session(session):
+        return None
     if session is None and session_id:
         # The gateway itself may restart while the durable Paper Studio project
         # remains intact. The session cookie is high entropy and its project
@@ -4196,6 +4249,13 @@ def _session_from_cookie(header: str | None, *, user_id: str) -> Session | None:
             session_id.encode("utf-8")
         ).hexdigest()
         if (root / "paper/paper_studio.json").is_file():
+            persisted_access = _project_last_access(root)
+            if (
+                persisted_access is None
+                or time.time() - persisted_access > SESSION_IDLE_SECONDS
+            ):
+                shutil.rmtree(root, ignore_errors=True)
+                return None
             try:
                 api_key = shared_deepseek_api_key()
                 process, port = _start_worker(
@@ -4212,6 +4272,7 @@ def _session_from_cookie(header: str | None, *, user_id: str) -> Session | None:
                 process,
                 port,
                 api_key,
+                last_access=persisted_access,
             )
             with SESSIONS_LOCK:
                 existing = SESSIONS.setdefault(session_id, recovered)
@@ -4224,7 +4285,8 @@ def _session_from_cookie(header: str | None, *, user_id: str) -> Session | None:
         with SESSIONS_LOCK:
             SESSIONS.pop(session.session_id, None)
         return None
-    session.last_access = time.time()
+    if record_access:
+        _record_session_access(session)
     return session
 
 
@@ -4256,21 +4318,88 @@ def close_session(header: str | None, *, user_id: str) -> bool:
         if session is None:
             return False
         SESSIONS.pop(session.session_id)
-        if session.process.poll() is None:
-            session.process.terminate()
+    _terminate_session(session, delete_content=False)
+    return True
+
+
+def reset_session(header: str | None, *, user_id: str) -> bool:
+    """Destroy the caller's current temporary project and its writer process."""
+    session_id = _cookie_value(header, COOKIE_NAME)
+    session: Session | None = None
+    with SESSIONS_LOCK:
+        if session_id is not None:
+            candidate = SESSIONS.get(session_id)
+            if candidate is not None and candidate.user_id != user_id:
+                return False
+            session = candidate
+        if session is None:
+            owned = sorted(
+                (
+                    candidate
+                    for candidate in SESSIONS.values()
+                    if candidate.user_id == user_id and candidate.kind == "user"
+                ),
+                key=lambda candidate: candidate.last_access,
+                reverse=True,
+            )
+            session = owned[0] if owned else None
+        if session is not None:
+            SESSIONS.pop(session.session_id, None)
+    if session is not None:
+        _terminate_session(session, delete_content=True)
         return True
+    if session_id:
+        root = user_project_root(user_id) / hashlib.sha256(
+            session_id.encode("utf-8")
+        ).hexdigest()
+        existed = root.exists()
+        shutil.rmtree(root, ignore_errors=True)
+        return existed
+    return False
+
+
+def _reap_expired_sessions(*, now: float | None = None) -> int:
+    """Apply idle expiry immediately; split out so the policy is testable."""
+    timestamp = time.time() if now is None else now
+    with SESSIONS_LOCK:
+        candidates = list(SESSIONS.values())
+    return sum(_expire_session(session, now=timestamp) for session in candidates)
+
+
+def _reap_expired_projects(*, now: float | None = None) -> int:
+    """Delete stale user projects even when logout/restart removed memory state."""
+    timestamp = time.time() if now is None else now
+    with SESSIONS_LOCK:
+        active_roots = {
+            session.root.resolve()
+            for session in SESSIONS.values()
+            if session.kind == "user"
+        }
+    projects_root = DATA_ROOT / "projects"
+    removed = 0
+    if not projects_root.is_dir():
+        return removed
+    for owner_root in projects_root.iterdir():
+        if not owner_root.is_dir():
+            continue
+        for project_root in owner_root.iterdir():
+            if not project_root.is_dir() or project_root.resolve() in active_roots:
+                continue
+            last_access = _project_last_access(project_root)
+            if (
+                last_access is not None
+                and timestamp - last_access > SESSION_IDLE_SECONDS
+            ):
+                shutil.rmtree(project_root, ignore_errors=True)
+                removed += 1
+    return removed
 
 
 def _reap_sessions() -> None:
     while True:
         time.sleep(60)
-        cutoff = time.time() - SESSION_IDLE_SECONDS
-        with SESSIONS_LOCK:
-            expired = [sid for sid, session in SESSIONS.items() if session.last_access < cutoff]
-            for sid in expired:
-                session = SESSIONS.pop(sid)
-                if session.process.poll() is None:
-                    session.process.terminate()
+        _reap_expired_sessions()
+        _reap_expired_projects()
         job_cutoff = time.time() - 1800
         with ONBOARDING_JOBS_LOCK:
             for job_id in [
@@ -4560,7 +4689,9 @@ class Handler(BaseHTTPRequestHandler):
             user = self._require_user()
             if user:
                 session = _session_from_cookie(
-                    self.headers.get("Cookie"), user_id=user["id"]
+                    self.headers.get("Cookie"),
+                    user_id=user["id"],
+                    record_access=False,
                 )
                 self._json(
                     {
@@ -4568,7 +4699,12 @@ class Handler(BaseHTTPRequestHandler):
                         "active": session is not None,
                         "provider": session.provider if session else None,
                         "model": session.model if session else None,
-                    }
+                    },
+                    cookies=(
+                        [self._clear_paper_session_cookie()]
+                        if session is None
+                        else None
+                    ),
                 )
         elif path == "/api/online/export":
             user = self._require_user()
@@ -4640,6 +4776,14 @@ class Handler(BaseHTTPRequestHandler):
             if user:
                 close_session(self.headers.get("Cookie"), user_id=user["id"])
             self._json({"ok": True})
+        elif path == "/api/online/session/reset":
+            user = self._require_user()
+            if user:
+                reset_session(self.headers.get("Cookie"), user_id=user["id"])
+                self._json(
+                    {"ok": True},
+                    cookies=[self._clear_paper_session_cookie()],
+                )
         elif path == "/api/online/session":
             user = self._require_user()
             if not user:

@@ -695,13 +695,19 @@ def validate_structure_design(
         ):
             errors.append(f"结构参考 paragraph {paragraph_id} 行号无效。")
         else:
+            # Paragraph boundaries come from the structure-analysis agent, not
+            # from English punctuation. A real reference paragraph may end in
+            # a citation, equation, list item, caption marker, CJK punctuation,
+            # or no terminal punctuation after PDF extraction. Rejecting those
+            # forms blamed a valid uploaded paper for a brittle coordinate
+            # heuristic and prevented the writer from opening. Line validity
+            # is the protocol boundary here; rhetorical suitability remains
+            # the structure agent's responsibility.
             excerpt = " ".join(
                 line.strip() for line in source_lines[start - 1:end] if line.strip()
             )
-            if not re.search(r"[.!?][\"')\]]?\s*$", excerpt):
-                errors.append(
-                    f"结构参考 paragraph {paragraph_id} 不是完整自然段，可能只是标题或公式。"
-                )
+            if not excerpt:
+                errors.append(f"结构参考 paragraph {paragraph_id} 没有定位到文字内容。")
 
     outline = payload.get("paper_outline")
     if not isinstance(outline, list) or not outline:

@@ -190,7 +190,7 @@ deployment database if recovery is required.
 The Python service defaults to 16 active writing sessions and four idle hours.
 The Cloudflare container overrides these values to 10 active writing sessions and
 90 idle minutes (`ONLINE_STUDIO_MAX_SESSIONS=10`,
-`ONLINE_STUDIO_IDLE_SECONDS=5400`). The current Worker routes one immutable
+`ONLINE_STUDIO_IDLE_SECONDS=14400`). The current Worker routes one immutable
 version-scoped public container name, so `max_instances: 6` is a platform ceiling,
 not `6 × 10` user capacity. Login records persist in D1, but Container writing
 workspaces are ephemeral. Download the project ZIP from inside an active Paper

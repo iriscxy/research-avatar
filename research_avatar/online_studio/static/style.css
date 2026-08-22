@@ -49,7 +49,8 @@ small, .security { color: #68736d; font-weight: 400; line-height: 1.5; }
 .check { display: flex; align-items: flex-start; gap: 10px; font-weight: 600; }
 .check input { width: auto; margin-top: 3px; }
 button, .resume { display: inline-block; border: 0; border-radius: 999px; background: #173f2d; color: white; padding: 13px 22px; font-weight: 800; text-decoration: none; cursor: pointer; }
-.session-actions { display: flex; align-items: center; gap: 18px; margin-top: 8px; }
+.session-actions { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+#reset-message { color: #68736d; font-size: 13px; }
 .export { color: #1d6845; font-weight: 800; }
 button:disabled { opacity: .55; cursor: wait; }
 #message { min-height: 1.5em; color: #286345; }
@@ -62,4 +63,4 @@ button:disabled { opacity: .55; cursor: wait; }
 /* Authenticated workspace: fixed product controls and exactly one content scroller. */
 body.workspace-authenticated{height:100dvh;min-height:0;overflow:hidden}.workspace-authenticated .shell{height:100dvh;padding:10px 0;overflow:hidden}.workspace-authenticated #workspace-shell:not(.hidden){height:100%;min-height:0;display:flex;flex-direction:column}.workspace-authenticated .account-bar{flex:0 0 auto;min-height:24px;margin:0 4px 6px}.workspace-authenticated .product-tabs{position:sticky;top:0;z-index:3;flex:0 0 auto;align-self:flex-start;margin:0 0 8px}.workspace-authenticated .product-panel:not(.hidden){flex:1;min-height:0}.workspace-authenticated #demo-panel{overflow:hidden}.workspace-authenticated #use-panel{overflow-y:auto;scrollbar-gutter:stable;padding:2px 4px 30px}.workspace-authenticated .demo-frame{height:100%;min-height:0;border-radius:15px}.workspace-authenticated .session-actions{margin:4px 0 10px}
 @media(max-width:680px){.workspace-authenticated .shell{width:calc(100% - 16px);padding:7px 0}.workspace-authenticated .account-bar{margin-bottom:4px}.workspace-authenticated .product-tabs{margin-bottom:6px}.workspace-authenticated .demo-frame{border-radius:12px}}
-.workspace-authenticated #use-panel.studio-active{overflow:hidden;padding:0}.studio-frame{display:block;width:100%;height:100%;min-height:0;border:1px solid #cdd4ce;border-radius:15px;background:#fff}.studio-frame.hidden{display:none}
+.workspace-authenticated #use-panel.studio-active{display:flex;flex-direction:column;overflow:hidden;padding:0}.workspace-authenticated #use-panel.studio-active .session-actions{flex:0 0 auto;justify-content:flex-end;margin:0 4px 6px}.workspace-authenticated #use-panel.studio-active .studio-frame{flex:1}.studio-frame{display:block;width:100%;height:100%;min-height:0;border:1px solid #cdd4ce;border-radius:15px;background:#fff}.studio-frame.hidden{display:none}
