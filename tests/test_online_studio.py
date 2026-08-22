@@ -2237,8 +2237,8 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
-        self.assertIn('"class_name": "OnlineStudioContainerV45"', wrangler)
-        self.assertIn("export class OnlineStudioContainerV45", worker)
+        self.assertIn('"class_name": "OnlineStudioContainerV46"', wrangler)
+        self.assertIn("export class OnlineStudioContainerV46", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
 
     def test_deployment_access_token_field_and_protocol_are_removed(self):

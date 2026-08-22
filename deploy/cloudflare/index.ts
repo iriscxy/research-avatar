@@ -144,6 +144,11 @@ export class OnlineStudioContainerV43 extends OnlineStudioContainer {}
 export class OnlineStudioContainerV44 extends OnlineStudioContainer {}
 export class OnlineStudioContainerV45 extends OnlineStudioContainer {}
 
+// Unified-workflow release: rotating the class is required because updating
+// an image tag does not restart a live Container instance. Without this, the
+// Worker reports a successful deploy while continuing to serve stale assets.
+export class OnlineStudioContainerV46 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
