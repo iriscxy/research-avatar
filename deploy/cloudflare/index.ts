@@ -149,6 +149,11 @@ export class OnlineStudioContainerV45 extends OnlineStudioContainer {}
 // Worker reports a successful deploy while continuing to serve stale assets.
 export class OnlineStudioContainerV46 extends OnlineStudioContainer {}
 
+// Runtime-module recovery: V46 was provisioned from an image that exited
+// before binding its port. A fresh class avoids routing through that failed
+// application's stuck image rollout and starts only the verified image.
+export class OnlineStudioContainerV47 extends OnlineStudioContainer {}
+
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
     "content-type": "application/json; charset=utf-8",
