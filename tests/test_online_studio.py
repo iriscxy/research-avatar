@@ -2241,6 +2241,19 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("export class OnlineStudioContainerV46", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
 
+    def test_cloudflare_release_copies_shared_runtime_modules(self):
+        """The incremental release image must contain every newly imported module."""
+        dockerfile = (
+            Path(__file__).resolve().parents[1]
+            / "deploy/cloudflare/Dockerfile.release"
+        ).read_text(encoding="utf-8")
+        for module in ("paper_structure.py", "survey_bibliography.py"):
+            self.assertIn(f"COPY research_avatar/{module} ", dockerfile)
+            self.assertIn(
+                f"/usr/local/lib/python3.12/site-packages/research_avatar/{module}",
+                dockerfile,
+            )
+
     def test_deployment_access_token_field_and_protocol_are_removed(self):
         root = Path(__file__).resolve().parents[1]
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")

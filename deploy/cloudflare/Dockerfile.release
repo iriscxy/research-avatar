@@ -17,6 +17,10 @@ COPY research_avatar/paper_studio/ /opt/research-avatar/research_avatar/paper_st
 COPY research_avatar/paper_studio/ /usr/local/lib/python3.12/site-packages/research_avatar/paper_studio/
 COPY research_avatar/web/demo/ /opt/research-avatar/research_avatar/web/demo/
 COPY research_avatar/web/demo/ /usr/local/lib/python3.12/site-packages/research_avatar/web/demo/
+COPY research_avatar/paper_structure.py /opt/research-avatar/research_avatar/paper_structure.py
+COPY research_avatar/paper_structure.py /usr/local/lib/python3.12/site-packages/research_avatar/paper_structure.py
+COPY research_avatar/survey_bibliography.py /opt/research-avatar/research_avatar/survey_bibliography.py
+COPY research_avatar/survey_bibliography.py /usr/local/lib/python3.12/site-packages/research_avatar/survey_bibliography.py
 COPY research_avatar/tools/plan_conformance.py /opt/research-avatar/research_avatar/tools/plan_conformance.py
 COPY research_avatar/tools/plan_conformance.py /usr/local/lib/python3.12/site-packages/research_avatar/tools/plan_conformance.py
 COPY research_avatar/tools/validate_experiment_plan.py /opt/research-avatar/research_avatar/tools/validate_experiment_plan.py
@@ -25,11 +29,15 @@ RUN chown -R studio:studio \
     /opt/research-avatar/research_avatar/online_studio \
     /opt/research-avatar/research_avatar/paper_studio \
     /opt/research-avatar/research_avatar/web/demo \
+    /opt/research-avatar/research_avatar/paper_structure.py \
+    /opt/research-avatar/research_avatar/survey_bibliography.py \
     /opt/research-avatar/research_avatar/tools/plan_conformance.py \
     /opt/research-avatar/research_avatar/tools/validate_experiment_plan.py \
     /usr/local/lib/python3.12/site-packages/research_avatar/online_studio \
     /usr/local/lib/python3.12/site-packages/research_avatar/paper_studio \
     /usr/local/lib/python3.12/site-packages/research_avatar/web/demo \
+    /usr/local/lib/python3.12/site-packages/research_avatar/paper_structure.py \
+    /usr/local/lib/python3.12/site-packages/research_avatar/survey_bibliography.py \
     /usr/local/lib/python3.12/site-packages/research_avatar/tools/plan_conformance.py \
     /usr/local/lib/python3.12/site-packages/research_avatar/tools/validate_experiment_plan.py
 USER studio
