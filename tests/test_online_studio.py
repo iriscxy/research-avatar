@@ -2822,7 +2822,10 @@ class OnlineStudioTests(unittest.TestCase):
         # known: that produced a visible 401 console error on every fresh
         # login page. showAuthenticated() assigns the real URL afterward.
         self.assertIn('id="demo-frame" class="demo-frame" src="about:blank"', source)
-        self.assertIn("demoFrame.src = `/demo/?lang=${uiLanguage}&authenticated=", app)
+        self.assertIn(
+            "demoFrame.src = `/demo/?lang=${uiLanguage}&embedded=1&authenticated=",
+            app,
+        )
         self.assertNotIn("先看看一篇论文是怎样完成的。", source)
         self.assertNotIn("这是完整 Research Avatar 流程的可交互示例。", source)
         self.assertNotIn("上传完整项目，开始自己的论文。", source)
@@ -2918,7 +2921,7 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("grid-template-columns:minmax(0,1fr) auto", style)
         self.assertIn('<div class="demo-top-row">', html)
         self.assertIn(".stage-content{min-height:calc(100dvh - 117px);max-height:none;overflow:visible", style)
-        self.assertIn("style.css?v=20260823.4-csp-safe-copy", html)
+        self.assertIn("style.css?v=20260823.5-single-language-control", html)
 
     def test_lightweight_structure_requests_english_planning_fields(self):
         source = Path(online.__file__).read_text(encoding="utf-8")

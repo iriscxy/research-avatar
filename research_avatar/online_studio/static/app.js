@@ -78,7 +78,7 @@ function setInterfaceLanguage(language) {
   window.localStorage.setItem('research-avatar-language', uiLanguage);
   applyInterfaceLanguage();
   const demoFrame = document.querySelector('#demo-frame');
-  if (demoFrame.src !== 'about:blank') demoFrame.src = `/demo/?lang=${uiLanguage}&authenticated=${Date.now()}`;
+  if (demoFrame.src !== 'about:blank') demoFrame.src = `/demo/?lang=${uiLanguage}&embedded=1&authenticated=${Date.now()}`;
   if (studioIsOpen) studioFrame.src = `/studio?lang=${uiLanguage}`;
 }
 
@@ -200,7 +200,7 @@ async function showAuthenticated(user) {
     : 'demo-panel';
   selectProductPanel(requestedPanel);
   const demoFrame = document.querySelector('#demo-frame');
-  demoFrame.src = `/demo/?lang=${uiLanguage}&authenticated=${Date.now()}`;
+  demoFrame.src = `/demo/?lang=${uiLanguage}&embedded=1&authenticated=${Date.now()}`;
   applyInterfaceLanguage();
   sessionActions.classList.add('hidden');
   try {

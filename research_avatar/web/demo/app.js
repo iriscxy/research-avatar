@@ -1,8 +1,10 @@
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 const requestedLanguage = new URLSearchParams(window.location.search).get("lang");
+const embeddedDemo = new URLSearchParams(window.location.search).get("embedded") === "1";
 const uiLanguage = requestedLanguage === "en" ? "en" : "zh";
 const t = (zh, en) => uiLanguage === "en" ? en : zh;
 document.documentElement.lang = uiLanguage === "en" ? "en" : "zh-CN";
+document.body.classList.toggle("embedded-demo", embeddedDemo);
 if (requestedLanguage) localStorage.setItem("research-avatar-language", uiLanguage);
 document.querySelector("#demo-label").textContent = t("产品演示", "Product demo");
 document.querySelector("#demo-language-label").textContent = t("界面语言", "Interface language");

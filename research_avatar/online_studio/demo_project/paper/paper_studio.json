@@ -39,9 +39,7 @@
           "relation_to_previous": "None",
           "relation_to_next": "None",
           "artifacts": [],
-          "reference_paragraph_ids": [
-            "REF-ABS-P1"
-          ]
+          "reference_paragraph_ids": []
         }
       ]
     },
@@ -67,7 +65,8 @@
             "F1"
           ],
           "reference_paragraph_ids": [
-            "REF-I-P1"
+            "SRC-P007",
+            "SRC-P008"
           ]
         },
         {
@@ -78,7 +77,7 @@
           "relation_to_next": "Proposes approach.",
           "artifacts": [],
           "reference_paragraph_ids": [
-            "REF-I-P2"
+            "SRC-P009"
           ]
         },
         {
@@ -89,7 +88,7 @@
           "relation_to_next": "Defines evaluation question.",
           "artifacts": [],
           "reference_paragraph_ids": [
-            "REF-I-P3"
+            "SRC-P010"
           ]
         },
         {
@@ -100,7 +99,7 @@
           "relation_to_next": "None",
           "artifacts": [],
           "reference_paragraph_ids": [
-            "REF-I-P4"
+            "SRC-P013"
           ]
         }
       ]
@@ -124,9 +123,7 @@
           "relation_to_previous": "None",
           "relation_to_next": "Covers evaluation thread.",
           "artifacts": [],
-          "reference_paragraph_ids": [
-            "REF-RW-P1"
-          ]
+          "reference_paragraph_ids": []
         },
         {
           "id": "R-P2",
@@ -135,9 +132,7 @@
           "relation_to_previous": "Covers methods.",
           "relation_to_next": "Synthesizes position.",
           "artifacts": [],
-          "reference_paragraph_ids": [
-            "REF-RW-P2"
-          ]
+          "reference_paragraph_ids": []
         },
         {
           "id": "R-P3",
@@ -146,9 +141,7 @@
           "relation_to_previous": "Covers evaluation.",
           "relation_to_next": "None",
           "artifacts": [],
-          "reference_paragraph_ids": [
-            "REF-RW-P3"
-          ]
+          "reference_paragraph_ids": []
         }
       ]
     },
@@ -166,47 +159,55 @@
       "paragraphs": [
         {
           "id": "M-P1",
-          "purpose": "Give an overview of the proposed experimental approach and connect it to the research problem.",
+          "purpose": "Give a method overview that states the semantic-invariance problem, the transformation, inverse answer mapping, and comparison pipeline without datasets, sample counts, API budgets, or decoding settings.",
           "rhetorical_role": "Overview",
           "relation_to_previous": "None",
-          "relation_to_next": "Defines core procedure.",
+          "relation_to_next": "Defines the semantics-preserving transformation.",
+          "heading": "Overview",
+          "heading_style": "subsection",
           "artifacts": [],
           "reference_paragraph_ids": [
-            "REF-PR-P1"
+            "SRC-P027",
+            "SRC-P035"
           ]
         },
         {
           "id": "M-P2",
-          "purpose": "Define the core procedure, notation, and design choices precisely enough to reproduce it.",
-          "rhetorical_role": "Procedure definition",
+          "purpose": "Formally define semantics-preserving option permutations and the inverse map that converts a returned position label back to the original semantic option; explain the invariance target without experimental parameter values.",
+          "rhetorical_role": "Transformation definition",
           "relation_to_previous": "Overview.",
-          "relation_to_next": "Describes execution details.",
+          "relation_to_next": "Defines answer recovery and decision rules.",
+          "heading": "Semantics-Preserving Option Permutations",
+          "heading_style": "subsection",
           "artifacts": [],
           "reference_paragraph_ids": [
-            "REF-PR-P2"
+            "SRC-P037"
           ]
         },
         {
           "id": "M-P3",
-          "purpose": "Describe execution details and distinguish fixed choices from tested variables.",
-          "rhetorical_role": "Execution details",
-          "relation_to_previous": "Defines procedure.",
-          "relation_to_next": "Explains expected mechanism.",
+          "purpose": "Define label-first parsing, content-first semantic matching, and permutation majority vote as black-box decision rules, including invalid-output handling and deterministic tie resolution; do not include dataset sizes, call counts, or runtime settings.",
+          "rhetorical_role": "Decision rules",
+          "relation_to_previous": "Defines the transformation and inverse map.",
+          "relation_to_next": "Defines invariance and error measures.",
+          "heading": "Answer Recovery and Decision Rules",
+          "heading_style": "subsection",
           "artifacts": [],
           "reference_paragraph_ids": [
-            "REF-PR-P3"
+            "SRC-P041",
+            "SRC-P050"
           ]
         },
         {
           "id": "M-P4",
-          "purpose": "Explain the expected mechanism of permutation sensitivity while marking it as a hypothesis.",
-          "rhetorical_role": "Hypothesis",
-          "relation_to_previous": "Describes execution.",
+          "purpose": "Define exact semantic invariance, directional flips, residual position preference, and permutation-vote aggregation from inverse-mapped answers; distinguish these observable black-box measures from unsupported claims about model internals.",
+          "rhetorical_role": "Evaluation measures",
+          "relation_to_previous": "Defines answer recovery and decision rules.",
           "relation_to_next": "None",
+          "heading": "Invariance Measures",
+          "heading_style": "subsection",
           "artifacts": [],
-          "reference_paragraph_ids": [
-            "REF-PR-P4"
-          ]
+          "reference_paragraph_ids": []
         }
       ]
     },
@@ -228,9 +229,12 @@
           "rhetorical_role": "Setup",
           "relation_to_previous": "None",
           "relation_to_next": "Introduces main comparison.",
+          "heading": "Experimental Setup",
+          "heading_style": "subsection",
           "artifacts": [],
           "reference_paragraph_ids": [
-            "REF-V-P6"
+            "SRC-P025",
+            "SRC-P027"
           ]
         },
         {
@@ -239,12 +243,15 @@
           "rhetorical_role": "Main comparison",
           "relation_to_previous": "Describes setup.",
           "relation_to_next": "Analyzes supported pattern.",
+          "heading": "Main Results",
+          "heading_style": "subsection",
           "artifacts": [
             "T1",
             "F2"
           ],
           "reference_paragraph_ids": [
-            "REF-V-P7"
+            "SRC-P033",
+            "SRC-P035"
           ]
         },
         {
@@ -255,7 +262,8 @@
           "relation_to_next": "Closes with robustness.",
           "artifacts": [],
           "reference_paragraph_ids": [
-            "REF-V-P8"
+            "SRC-P063",
+            "SRC-P065"
           ]
         },
         {
@@ -264,9 +272,12 @@
           "rhetorical_role": "Robustness",
           "relation_to_previous": "Analyzes results.",
           "relation_to_next": "None",
+          "heading": "Robustness Checks",
+          "heading_style": "subsection",
           "artifacts": [],
           "reference_paragraph_ids": [
-            "REF-V-P9"
+            "SRC-P068",
+            "SRC-P069"
           ]
         }
       ]
@@ -289,12 +300,14 @@
           "rhetorical_role": "Interpretation",
           "relation_to_previous": "None",
           "relation_to_next": "Discusses limitations.",
+          "heading": "Implications for Multiple-Choice Evaluation",
+          "heading_style": "subsection",
           "artifacts": [
             "T1",
             "F2"
           ],
           "reference_paragraph_ids": [
-            "REF-P-P1"
+            "SRC-P066"
           ]
         },
         {
@@ -303,9 +316,11 @@
           "rhetorical_role": "Limitations",
           "relation_to_previous": "Interprets findings.",
           "relation_to_next": "None",
+          "heading": "Limitations and Threats to Validity",
+          "heading_style": "subsection",
           "artifacts": [],
           "reference_paragraph_ids": [
-            "REF-P-P2"
+            "SRC-P085"
           ]
         }
       ]
@@ -330,7 +345,7 @@
           "relation_to_next": "None",
           "artifacts": [],
           "reference_paragraph_ids": [
-            "REF-CON-P1"
+            "SRC-P094"
           ]
         }
       ]
@@ -356,11 +371,12 @@
       "kind": "mechanism",
       "phase": 1,
       "width": "single-column",
+      "include_scale": 0.78,
       "source_sections": [
         "introduction"
       ],
       "description": "A concrete visual motivation that shows the real problem setting, the unresolved failure or comparison, and the paper's evaluation question.",
-      "caption": "Motivation and evaluation question of the study; the hosted Studio reserves this location for artwork completed after project export.",
+      "caption": "The same multiple-choice content under two option orders motivates testing semantic permutation invariance.",
       "result_keys": [],
       "depends_on_paragraphs": {
         "introduction": [
@@ -381,49 +397,68 @@
       }
     },
     "F2": {
-      "title": "Planned primary result analysis",
+      "title": "Permutation consistency by tested option count",
       "label": "fig:planned-results",
       "kind": "data",
       "phase": 1,
       "width": "single-column",
       "source_sections": [
-        "discussion"
+        "experiments"
       ],
-      "description": "Placeholder for the planned primary numerical comparison; no measurements are available in the hosted project yet.",
-      "caption": "Planned primary result analysis; values and curves will be filled after the experiment evidence is supplied.",
-      "result_keys": [],
+      "description": "Measured cumulative exact semantic invariance across one to four tested option permutations for ARC-Challenge and MMLU.",
+      "caption": "Cumulative exact semantic invariance as additional option permutations are tested. Every point is computed from the saved ARC-Challenge and MMLU API responses.",
+      "result_keys": [
+        "f2_rows"
+      ],
       "depends_on_paragraphs": {
-        "discussion": [
-          "D-P1"
+        "experiments": [
+          "E-P2"
         ]
       },
       "panels": [
         {
           "id": "a",
-          "title": "Planned primary result analysis",
-          "goal": "Show the planned numerical trend or comparison without inventing measurements.",
-          "result_keys": []
+          "title": "Permutation consistency curve",
+          "goal": "Plot the four measured consistency curves from the saved response records.",
+          "result_keys": [
+            "f2_rows"
+          ]
         }
       ],
       "data_grid": {
         "type": "records",
-        "path": "lightweight_results.rows",
+        "path": "f2_rows",
         "columns": [
           {
-            "key": "condition",
-            "label": "Condition"
+            "key": "permutation_count",
+            "label": "Tested permutations"
           },
           {
-            "key": "main_result",
-            "label": "Main result"
+            "key": "arc_label_first",
+            "label": "ARC label-first"
+          },
+          {
+            "key": "arc_content_first",
+            "label": "ARC content-first"
+          },
+          {
+            "key": "mmlu_label_first",
+            "label": "MMLU label-first"
+          },
+          {
+            "key": "mmlu_content_first",
+            "label": "MMLU content-first"
           }
         ]
       },
-      "deliverable_stem": "planned_results",
-      "online_placeholder": true,
+      "chart_type": "line",
+      "x_axis_label": "Number of tested permutations",
+      "y_axis_label": "Cumulative exact semantic invariance",
+      "deliverable_stem": "permutation_consistency",
+      "online_placeholder": false,
       "related_paragraphs": {
-        "discussion": [
-          "D-P1"
+        "experiments": [
+          "E-P2"
         ]
       }
     }
@@ -433,39 +468,53 @@
   ],
   "tables": {
     "T1": {
-      "title": "Planned main experimental comparison",
+      "title": "Measured main experimental comparison",
       "label": "tab:main-results",
       "kind": "table",
       "phase": 1,
       "width": "single-column",
       "source_sections": [
-        "discussion"
+        "experiments"
       ],
-      "description": "Placeholder for the planned main experimental comparison.",
-      "caption": "Planned main experimental comparison across methods and evaluation criteria.",
-      "result_keys": [],
+      "description": "Measured accuracy and exact semantic invariance for the three evaluated decision rules on ARC-Challenge and MMLU.",
+      "caption": "Measured accuracy and exact semantic invariance across datasets and decision rules.",
+      "result_keys": [
+        "t1_rows"
+      ],
       "related_paragraphs": {
-        "discussion": [
-          "D-P1"
+        "experiments": [
+          "E-P2"
         ]
       },
-      "online_placeholder": true,
+      "online_placeholder": false,
       "data_grid": {
         "type": "records",
-        "path": "lightweight_results.rows",
+        "path": "t1_rows",
         "columns": [
           {
             "key": "method",
             "label": "Method"
           },
           {
-            "key": "main_result",
-            "label": "Main result"
+            "key": "arc_accuracy",
+            "label": "ARC accuracy"
+          },
+          {
+            "key": "arc_invariance",
+            "label": "ARC invariance"
+          },
+          {
+            "key": "mmlu_accuracy",
+            "label": "MMLU accuracy"
+          },
+          {
+            "key": "mmlu_invariance",
+            "label": "MMLU invariance"
           }
         ]
       },
       "prompt": {
-        "columns": "Method | Main result",
+        "columns": "Method | ARC accuracy | ARC invariance | MMLU accuracy | MMLU invariance",
         "rows": "source",
         "font_size": "small",
         "best_values": "none"

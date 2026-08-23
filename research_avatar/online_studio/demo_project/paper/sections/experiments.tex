@@ -4,30 +4,46 @@
 
 % PAPER_STUDIO_PARAGRAPH:E-P1
 
-We will evaluate permutation invariance on multiple-choice question answering benchmarks. For each question, we will construct all possible option orderings via exhaustive permutation. The primary metric will be the fraction of questions where the predicted answer remains unchanged across all orderings; the secondary metric will measure the variance of class scores. Baselines will include a random-order strategy and a fixed canonical ordering. We will use greedy decoding with a fixed seed and will report results per dataset and model size.
+\subsection{Experimental Setup}
+
+We evaluate gpt-5-mini-2025-08-07 on ARC-Challenge and MMLU with deterministic decoding at temperature 0. Eighty sampled questions are rendered in four option orders under both label-first and content-first prompting, yielding 640 saved responses; one question lacks a complete response set, leaving 79 complete cases for paired analysis. Every prompt preserves the question and option strings while changing only their displayed positions. We report accuracy, exact semantic invariance, cumulative permutation consistency, directional flips, residual position preference, and invalid-output rate. Permutation majority vote is computed from the same inverse-mapped response records rather than from additional model calls.
 
 % PAPER_STUDIO_PARAGRAPH:E-P2
 
-The main comparison will contrast permutation-invariance rates across the benchmark datasets and model sizes described above. Table~\ref{tab:main-results} will present the primary metric for each condition, reporting the fraction of questions with unchanged predictions alongside the secondary variance measure. Figure~\ref{fig:planned-results} will display the corresponding distributional trend across option-order count. For every cell, the unavailable value is denoted as xx. No measurements are currently available, and we will compute these values once the experimental pipeline is executed.
+\subsection{Main Results}
 
-\begin{figure}[t]
+Table~\ref{tab:main-results} reports the main comparison, and Figure~\ref{fig:planned-results} traces how exact invariance changes as additional option orders are included. On ARC-Challenge, label-first reaches 0.950 accuracy and 0.925 invariance, while content-first reaches 0.925 and 0.875. On MMLU, label-first reaches 0.622 accuracy and 0.487 invariance, whereas content-first reaches 0.654 and 0.615. Permutation majority vote yields 0.925 accuracy on ARC-Challenge and 0.641 on MMLU. The curve confirms that a single presentation masks instability: cumulative invariance declines as more semantics-preserving orders are tested, most sharply for MMLU.
+
+\begin{figure}[htbp]
   \centering
-  \fbox{\parbox[c][6em][c]{0.92\linewidth}{\centering F2 placeholder: complete the final artwork after project export}}
-  \caption{Planned primary result analysis showing the distributional trend of permutation-invariance rates across option-order count, with unavailable values denoted as xx; no measurements are yet available.}
+  \includegraphics[width=\columnwidth]{fig/permutation_consistency.pdf}
+  \caption{Panel a shows four permutation-consistency curves (cumulative exact semantic invariance) across 1 to 4 option permutations for ARC-Challenge and MMLU, using label-first and content-first metrics; invariance declines with permutation count.}
   \label{fig:planned-results}
 \end{figure}
 
-\begin{table}[t]
+\begin{table}[tb]
   \centering
-  \fbox{\parbox[c][0.1\textheight][c]{0.94\columnwidth}{\centering T1 placeholder: complete the final table after project export}}
-  \caption{Planned main experimental comparison across methods and evaluation criteria.}
+  \small
+  \sbox0{\begin{tabular}{lcccc}
+    \toprule
+    Method & ARC accuracy & ARC invariance & MMLU accuracy & MMLU invariance \\
+    \midrule
+    Label-first & 0.95 & 0.925 & 0.622 & 0.487 \\
+    Content-first & 0.925 & 0.875 & 0.654 & 0.615 \\
+    Permutation majority vote & 0.925 & N/A & 0.641 & N/A \\
+    \bottomrule
+  \end{tabular}}
+  \ifdim\wd0>\linewidth\resizebox{\linewidth}{!}{\usebox0}\else\usebox0\fi
+  \caption{Measured accuracy and exact semantic invariance across datasets and decision rules.}
   \label{tab:main-results}
 \end{table}
 
 % PAPER_STUDIO_PARAGRAPH:E-P3
 
-No experiment results are available in the hosted project, so this paragraph cannot report any observed pattern. The evidence currently establishes the evaluation protocol alone: the primary metric, the secondary variance measure, the exhaustive permutation procedure, and the planned baselines. The evidence does not establish whether option ordering affects predictions, whether any effect varies by dataset or model size, or whether the secondary metric behaves consistently with the primary one. These questions remain open until the planned comparison is executed and the measurements are supplied.
+The results separate task accuracy from response stability. Content-first recovery improves MMLU accuracy by about 3.2 percentage points and invariance by about 12.8 points relative to label-first, but it reduces both quantities on ARC-Challenge. It is therefore not a universal correction for option-order sensitivity. Majority vote also does not dominate the single-order rules: its ARC-Challenge accuracy matches content-first and trails label-first, while its MMLU accuracy lies between them. These dataset-dependent reversals show why reporting only aggregate accuracy or only the best prompting rule would obscure the underlying evaluation fragility.
 
 % PAPER_STUDIO_PARAGRAPH:E-P4
 
-Robustness checks will focus on two dimensions. First, we will vary decoding temperature to test whether permutation-invariance rates remain stable beyond the greedy setting. Second, we will repeat the analysis using a fixed canonical ordering as the reference condition to isolate ordering effects. No significance thresholds or confidence intervals have been specified, and no effect-size measurement is available; all corresponding values are denoted as xx.
+\subsection{Robustness Checks}
+
+We check robustness in two observable dimensions. First, the label-first and content-first analyses reuse identical questions, permutations, and raw responses, so their difference isolates answer recovery rather than a new sample of model behavior. Second, ARC-Challenge and MMLU show qualitatively different magnitudes but both lose exact invariance as more orders are included, ruling out an explanation confined to one benchmark. The conclusions remain those of a reduced-sample pilot: one model, four tested orders, and 79 complete items cannot establish robustness across model families, prompt templates, or all possible permutations.

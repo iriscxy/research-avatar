@@ -1,0 +1,88 @@
+Figure task: Problem motivation and evaluation question
+
+Required content: A concrete visual motivation that shows the real problem setting, the unresolved failure or comparison, and the paper's evaluation question.
+
+Rhetorical type: motivation_contrast
+
+<acl_figure_type_profile>
+
+{
+  "role": "Introduction or motivation figure",
+  "message_pattern": "one concrete setup, two visibly comparable cases, one bounded takeaway",
+  "visual_signature": "semantic example cards and large comparison paths, not an internal model diagram",
+  "composition": "two spacious matched cases with one concrete semantic anchor; comparison before mechanism detail",
+  "object_grammar": [
+    "a concrete prompt, behavior-control card, response bubble, or task object",
+    "matched branches that preserve common context",
+    "one highlighted structural difference per branch",
+    "short outcome or diagnostic symbols without result numbers",
+    "equivalent alternatives drawn in parallel and converging on one shared outcome"
+  ],
+  "reading_order": "shared setup, contrasted cases, takeaway",
+  "avoid": [
+    "full model stack",
+    "dense implementation detail",
+    "Jacobians, layer stacks, tensor grids, or repeated internal model blocks",
+    "more than six labels unless the manuscript example requires literal text",
+    "decorative metaphor",
+    "generic problem versus solution title cards",
+    "a causal arrow between two cases that are claimed to be equal alternatives"
+  ]
+}
+
+</acl_figure_type_profile>
+
+<paper_figure_format>
+
+{
+  "placement": "single-column figure",
+  "canvas_in": [
+    3.32,
+    3.32
+  ],
+  "image_size": "1024x1024",
+  "composition": "compact single-column introduction or motivation figure with two or three aligned visual groups; follow the type-specific object grammar and reading order; pure white background and readable at one-column width",
+  "final_output": "Design a restrained final-quality ACL paper figure whose modules, tokens, paths, glyphs, and labels can be faithfully reconstructed as editable PowerPoint elements; avoid both sparse placeholder flowcharts and decorative poster illustration."
+}
+
+</paper_figure_format>
+
+<figure_content_contract>
+
+{
+  "title": "Problem motivation and evaluation question",
+  "caption_intent": "Motivation and evaluation question of the study; the hosted Studio reserves this location for artwork completed after project export.",
+  "required_dimensions": [],
+  "prohibited_empirical_inputs": []
+}
+
+</figure_content_contract>
+
+<cross_figure_distinction>
+
+[]
+
+</cross_figure_distinction>
+
+<bound_paragraph_evidence>
+
+[
+  {
+    "section": "introduction",
+    "paragraph_id": "I-P1",
+    "purpose": "Establish the concrete problem of option-order sensitivity and why it matters.",
+    "accepted_text": "Option-order sensitivity in multiple-choice questions constitutes a precise problem for language-model evaluation. If shuffling answer options while preserving semantics can alter the model’s final choice, benchmark stability and cross-study comparability are compromised and conclusions about reasoning capacity may reflect artefacts rather than genuine understanding. The gap is that current work has not established whether state-of-the-art models exhibit permutation invariance for standard MC tasks. We propose to study permutation invariance as a core property by presenting questions in distinct random orders and comparing the resulting final answers. The central evaluation question asks whether the final option remains identical under random reordering, thereby delimiting the invariance boundary; this is illustrated in Figure~\\ref{fig:motivation}."
+  }
+]
+
+</bound_paragraph_evidence>
+
+<mechanism_figure_semantic_contract>
+
+This is a mechanism or motivation schematic, not a results figure. Do not request bar charts, curves, score rankings, higher/lower result marks, numeric outcomes, or visual claims of empirical superiority. Those belong in data figures even when the prose later reports them.
+
+The image must be self-explanatory at its configured paper width: show an explicit input, the paper's actual intervention/mechanism, and its non-empirical output or decision. Every arrow must name a real source and target; every branch must differ by structure or iconography as well as color. Remove any glyph that has no one-clause manuscript-grounded meaning.
+
+Do not put captions, explanatory sentences, or prose callouts inside the figure. Use short noun labels only (maximum four words each). For a single-column figure, request at most eight text labels and two core visual groups; for a two-column figure, at most sixteen labels and four groups.
+
+</mechanism_figure_semantic_contract>

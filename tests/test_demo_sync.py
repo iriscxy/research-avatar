@@ -13,6 +13,8 @@ class DemoSyncTests(unittest.TestCase):
         style = (ROOT / "research_avatar/web/demo/style.css").read_text(encoding="utf-8")
         self.assertIn('id="demo-language-select"', index)
         self.assertIn('id="demo-language-label"', index)
+        self.assertIn('document.body.classList.toggle("embedded-demo", embeddedDemo)', app)
+        self.assertIn(".embedded-demo .demo-language-control{display:none}", style)
         self.assertIn('url.searchParams.set("lang", language)', app)
         self.assertIn('localStorage.setItem("research-avatar-language", language)', app)
         self.assertIn('<div class="demo-top-row">', index)
@@ -60,11 +62,11 @@ class DemoSyncTests(unittest.TestCase):
         )
         self.assertEqual(
             [state["figures"][figure_id]["status"] for figure_id in config["figure_order"]],
-            ["pending", "pending"],
+            ["approved", "approved"],
         )
         self.assertEqual(
             [state["tables"][table_id]["status"] for table_id in config["table_order"]],
-            ["pending"],
+            ["approved"],
         )
         self.assertTrue((project / "paper/main.pdf").is_file())
         self.assertIn("Option Ordering", config["project"]["name"])

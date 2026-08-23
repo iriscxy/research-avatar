@@ -1,0 +1,31 @@
+{
+  "synthetic": false,
+  "result_source": "results/option_permutation/metrics.json",
+  "evidence_grade": "real reduced-sample pilot",
+  "execution_summary": {
+    "saved_response_count": 640,
+    "complete_case_question_count": 79,
+    "excluded_question_count": 1
+  },
+  "evaluation_protocol": {
+    "models": ["gpt-5-mini-2025-08-07"],
+    "temperature": 0,
+    "permutations_per_question": 4,
+    "datasets": ["ARC-Challenge", "MMLU"]
+  },
+  "f2_rows": [
+    {"permutation_count": 1, "arc_label_first": 1.0, "arc_content_first": 1.0, "mmlu_label_first": 1.0, "mmlu_content_first": 1.0},
+    {"permutation_count": 2, "arc_label_first": 0.95, "arc_content_first": 0.9, "mmlu_label_first": 0.6923076923, "mmlu_content_first": 0.6666666667},
+    {"permutation_count": 3, "arc_label_first": 0.925, "arc_content_first": 0.9, "mmlu_label_first": 0.5384615385, "mmlu_content_first": 0.6153846154},
+    {"permutation_count": 4, "arc_label_first": 0.925, "arc_content_first": 0.875, "mmlu_label_first": 0.4871794872, "mmlu_content_first": 0.6153846154}
+  ],
+  "t1_rows": [
+    {"method": "Label-first", "arc_accuracy": 0.95, "arc_invariance": 0.925, "mmlu_accuracy": 0.6217948718, "mmlu_invariance": 0.4871794872},
+    {"method": "Content-first", "arc_accuracy": 0.925, "arc_invariance": 0.875, "mmlu_accuracy": 0.6538461538, "mmlu_invariance": 0.6153846154},
+    {"method": "Permutation majority vote", "arc_accuracy": 0.925, "arc_invariance": "N/A", "mmlu_accuracy": 0.6410256410, "mmlu_invariance": "N/A"}
+  ],
+  "artifacts": {
+    "F2": {"source": "results/option_permutation/F2_plot_metrics.json", "rows": 4, "synthetic": false},
+    "T1": {"source": "results/option_permutation/metrics.json", "rows": 3, "synthetic": false}
+  }
+}
