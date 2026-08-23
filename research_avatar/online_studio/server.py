@@ -1931,6 +1931,7 @@ def _write_workspace(
         [
             str(venue_template["documentclass"]),
             *[str(line) for line in venue_template.get("preamble", [])],
+            r"\makeatletter\let\paperstudio@cite\cite\renewcommand{\cite}[1]{\if\relax\detokenize{#1}\relax\textbf{[CITATION NEEDED]}\else\paperstudio@cite{#1}\fi}\makeatother",
             f"\\title{{{_latex_escape(title)}}}",
             r"\author{Anonymous Author(s)}",
             r"\date{}",
@@ -2554,6 +2555,11 @@ def _design_lightweight_structure_online(
         paragraph_mapping=True,
         selected_reference_inventory=True,
     )
+    prompt += (
+        "\n\nWrite every generated JSON string value in English, including section "
+        "titles, paragraph plans, reference-move summaries, and mapping rationales. "
+        "Quoted reference excerpts must preserve the source paper verbatim."
+    )
     payload = {
         "model": requested_model,
         "messages": [
@@ -2805,7 +2811,7 @@ def _lightweight_paper_title(
     candidates.append(Path(project_brief_name).stem.replace("_", " ").replace("-", " ").strip())
     title = next((item for item in candidates if 1 <= len(item) <= 300), "Research Paper Draft")
     # ACL's pdfLaTeX template cannot typeset arbitrary CJK text.  Project
-    # plans may use a bilingual display title such as ``English：中文``; keep
+    # plans may use a bilingual display title such as ``English: Chinese``; keep
     # its English paper-title prefix instead of emitting an uncompilable
     # initial main.tex.  A wholly non-ASCII display name remains available as
     # project metadata, while the manuscript starts from a safe neutral title.
@@ -3071,14 +3077,24 @@ def _write_lightweight_workspace(
     reference_path: Path | None = None
     if reference_paper_files:
         reference_name, reference_source = reference_paper_files[0]
-        reference_title = next(
-            (
+        # The LLM-restored transcript starts with the scholarly title as one
+        # semantic block. PDF line wrapping can still split that title across
+        # two or more physical lines, so use the complete first block rather
+        # than truncating the displayed reference title at its first line.
+        source_lines = reference_source.strip().splitlines()
+        first_nonempty = next((line.strip() for line in source_lines if line.strip()), "")
+        if first_nonempty.startswith("#"):
+            # A Markdown heading is already an explicit title boundary. Do not
+            # concatenate the following author line or body paragraph.
+            reference_title = re.sub(r"^#+\s*", "", first_nonempty).strip()
+        else:
+            first_block = re.split(r"\n\s*\n", reference_source.strip(), maxsplit=1)[0]
+            reference_title = " ".join(
                 re.sub(r"^[#\s]+", "", line).strip()
-                for line in reference_source.splitlines()
+                for line in first_block.splitlines()
                 if re.sub(r"^[#\s]+", "", line).strip()
-            ),
-            Path(reference_name).stem,
-        )[:300]
+            )
+        reference_title = reference_title[:300] or Path(reference_name).stem
         reference_dir = root / "uploaded-evidence" / "reference"
         reference_dir.mkdir(parents=True, exist_ok=True)
         reference_path = reference_dir / "structural-reference.txt"
@@ -3646,6 +3662,7 @@ def _write_lightweight_workspace(
         [
             str(venue_template["documentclass"]),
             *[str(line) for line in venue_template.get("preamble", [])],
+            r"\makeatletter\let\paperstudio@cite\cite\renewcommand{\cite}[1]{\if\relax\detokenize{#1}\relax\textbf{[CITATION NEEDED]}\else\paperstudio@cite{#1}\fi}\makeatother",
             f"\\title{{{_latex_escape(title)}}}",
             r"\author{Anonymous Author(s)}",
             r"\date{}",
@@ -3951,7 +3968,7 @@ def _start_worker(
         # Keep startup diagnostics long enough to report configuration and
         # dependency failures to the onboarding surface.  Discarding stderr
         # here used to turn every actionable preflight error into the same
-        # opaque "写作进程启动失败" message and made a generated workspace
+        # opaque "writer startup failed" message and made a generated workspace
         # impossible to debug.  Paper Studio is intentionally quiet on
         # stderr after startup, so the bounded pipe is safe for the worker's
         # lifetime.
@@ -4241,13 +4258,14 @@ def _ensure_session_alive(session: Session) -> bool:
     A live batch full-draft job runs almost entirely in a background thread
     with no inbound HTTP request in flight; a container platform hiccup or
     an unexpected child-process death otherwise strands the researcher with
-    a permanent "会话不存在或已过期" even though every accepted paragraph
+    a permanent "session missing or expired" error even though every accepted paragraph
     was already durably written to paper/sections/*.tex and
     paper/.paper_studio/state.json. research_avatar.paper_studio.server
     already has dedicated recovery logic for exactly this — a fresh process
     pointed at the same root detects a stale full_draft_job from a
     different SERVER_INSTANCE_TOKEN at startup and turns it into a clean
-    "服务已重启...可从未完成段落继续" state — but only if something actually
+    recoverable "service restarted; continue unfinished paragraphs" state, but
+    only if something actually
     restarts the child. This is that something.
     """
     if session.process.poll() is None:

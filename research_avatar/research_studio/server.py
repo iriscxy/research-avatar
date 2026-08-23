@@ -40,6 +40,7 @@ STATIC = Path(__file__).resolve().parent / "static"
 DEMO = PACKAGE_ROOT / "web" / "demo"
 PAPER_STUDIO_URL = "http://127.0.0.1:8765"
 PAPER_STUDIO_ROUTE = "/paper-studio"
+PAPER_STUDIO_EMBED_URL = f"{PAPER_STUDIO_ROUTE}/?lang=en&embedded=research-studio"
 PAPER_STUDIO_PROXY_TOKEN = hashlib.sha256(
     f"research-studio-paper-proxy:{ROOT}".encode("utf-8")
 ).hexdigest()
@@ -326,7 +327,7 @@ def record_idea_selection(path: Path, idea_id: str, reason: str = "") -> dict[st
     )
     source = re.sub(
         r"(<section\b[^>]*\bclass=[\"'][^\"']*\bgate\b[^\"']*[\"'][^>]*>.*?<h2\b[^>]*>).*?(</h2>)",
-        rf"\g<1>已选择 {idea_id}\g<2>",
+        rf"\g<1>Selected {idea_id}\g<2>",
         source,
         count=1,
         flags=re.IGNORECASE | re.DOTALL,
@@ -368,8 +369,8 @@ def render_ledger_html(path: Path) -> str:
             cells.append(f'<td class="{cell_class.strip()}">{displayed}</td>')
         body_rows.append("<tr>" + "".join(cells) + "</tr>")
     empty_note = "" if rows else (
-        '<div class="empty-ledger"><strong>目前没有实验结果</strong>'
-        '<span>表头已经建立；每个 Goal 完成并核验后，结果才会写入这里。</span></div>'
+        '<div class="empty-ledger"><strong>No experiment results yet</strong>'
+        '<span>The ledger header exists; results are added only after each Goal is completed and verified.</span></div>'
     )
     return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Results Ledger</title><style>
@@ -429,7 +430,7 @@ body{{margin:0;background:var(--wash);color:var(--ink);font:13px/1.55 Inter,-app
 .controls{{position:sticky;top:0;z-index:3;display:grid;grid-template-columns:1fr 130px;gap:8px;padding:12px 24px;border-bottom:1px solid var(--line);background:#ffffffed;backdrop-filter:blur(8px)}}input,select{{width:100%;padding:10px 12px;border:1px solid #c9d9d5;border-radius:8px;background:#fff;color:var(--ink);font:inherit}}input:focus,select:focus{{outline:2px solid #77bcb1;outline-offset:1px}}
 main{{padding:15px 24px 50px}}.result-count{{margin:0 0 9px;color:var(--muted);font-size:10px}}.paper{{display:grid;grid-template-columns:45px 1fr 70px;gap:13px;padding:16px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;margin-bottom:8px;box-shadow:0 3px 12px #16394708}}.paper[hidden]{{display:none}}.year{{color:var(--teal);font-weight:900}}h2{{margin:0;font:700 16px/1.35 Georgia,serif}}h2 a{{color:var(--navy);text-decoration:none}}h2 a:hover{{color:var(--teal);text-decoration:underline}}.authors,.venue{{margin:5px 0 0}}.authors{{color:#4f636b}}.venue{{color:var(--muted);font-size:11px}}.paper-meta{{text-align:right}}.paper-meta span,.paper-meta strong,.paper-meta small{{display:block}}.paper-meta span{{color:var(--teal);font-size:8px;text-transform:uppercase}}.paper-meta strong{{margin-top:7px;font:700 17px Georgia,serif}}.paper-meta small{{color:var(--muted);font-size:8px}}details{{margin-top:8px;color:var(--muted);font-size:10px}}details summary{{cursor:pointer;color:var(--teal);font-weight:800}}details p{{margin:5px 0 0}}.none{{display:none;padding:60px 20px;text-align:center;color:var(--muted)}}
 @media(max-width:600px){{header{{padding:25px 18px}}.controls{{grid-template-columns:1fr;padding:10px 14px}}.controls select{{display:none}}main{{padding:12px 14px}}.paper{{grid-template-columns:37px 1fr}}.paper-meta{{display:none}}}}
-</style></head><body><header><span>CANONICAL PUBLICATION RECORD</span><h1>{html.escape(researcher)}</h1><p>从 publications.json 实时渲染；筛选不会修改原始数据。</p><div class="stats"><div class="stat"><strong>{len(publications)}</strong><span>PUBLICATIONS</span></div><div class="stat"><strong>{total_citations:,}</strong><span>TOTAL CITATIONS</span></div><div class="stat"><strong>{fulltext_count}</strong><span>FULL TEXT READY</span></div></div></header><div class="controls"><input id="search" type="search" placeholder="搜索标题、作者、venue 或研究方向…"><select id="year"><option value="">全部年份</option>{year_options}</select></div><main><p class="result-count"><span id="visible-count">{len(publications)}</span> / {len(publications)} papers</p>{''.join(cards)}<div id="none" class="none">没有匹配的论文</div></main><script>
+</style></head><body><header><span>CANONICAL PUBLICATION RECORD</span><h1>{html.escape(researcher)}</h1><p>Rendered live from publications.json; filtering never modifies the source data.</p><div class="stats"><div class="stat"><strong>{len(publications)}</strong><span>PUBLICATIONS</span></div><div class="stat"><strong>{total_citations:,}</strong><span>TOTAL CITATIONS</span></div><div class="stat"><strong>{fulltext_count}</strong><span>FULL TEXT READY</span></div></div></header><div class="controls"><input id="search" type="search" placeholder="Search title, author, venue, or research area…"><select id="year"><option value="">All years</option>{year_options}</select></div><main><p class="result-count"><span id="visible-count">{len(publications)}</span> / {len(publications)} papers</p>{''.join(cards)}<div id="none" class="none">No matching publications</div></main><script>
 const search=document.querySelector('#search'),year=document.querySelector('#year'),papers=[...document.querySelectorAll('.paper')],count=document.querySelector('#visible-count'),none=document.querySelector('#none');function filter(){{const q=search.value.trim().toLowerCase(),y=year.value;let visible=0;papers.forEach(p=>{{const show=(!q||p.dataset.search.includes(q))&&(!y||p.dataset.year===y);p.hidden=!show;if(show)visible++}});count.textContent=visible;none.style.display=visible?'none':'block'}}search.addEventListener('input',filter);year.addEventListener('change',filter);
 </script></body></html>"""
 
@@ -475,6 +476,13 @@ def record_expplan_approval(path: Path) -> dict[str, Any]:
     source = re.sub(
         r'<div class="approval-box">.*?</div>',
         '<div class="approval-box">' + approval_copy + '</div>',
+        source,
+        count=1,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    source = re.sub(
+        r'<div class="approval">.*?</div>',
+        '<div class="approval">' + approval_copy + '</div>',
         source,
         count=1,
         flags=re.IGNORECASE | re.DOTALL,
@@ -584,18 +592,18 @@ def profile_stage(root: Path) -> dict[str, Any]:
         title = html_title(profile)
         name = re.sub(r"^Researcher Profile\s*[—–-]?\s*", "", title).strip()
     artifact = file_record(root, "profile")
-    artifact["title"] = "研究画像"
+    artifact["title"] = "Research Profile"
     return {
         "id": "profile",
-        "title": "研究画像",
+        "title": "Research Profile",
         "status": status_for(profile.exists()),
-        "command": "上传完整的 Google Scholar HTML",
+        "command": "Upload a complete Google Scholar HTML export",
         "metrics": [
             {"label": "Researcher", "value": name or "Pending"},
             {"label": "Publications", "value": str(count) if count else "—"},
         ],
         "artifacts": [artifact],
-        "message": "画像是后续选题、实验习惯和写作风格的唯一通用来源。",
+        "message": "The profile is the shared source for topic selection, experiment habits, and writing style.",
     }
 
 
@@ -603,14 +611,14 @@ def literature_stage(root: Path) -> dict[str, Any]:
     literature = file_record(root, "literature")
     return {
         "id": "literature",
-        "title": "文献 Survey",
+        "title": "Literature Survey",
         "status": status_for(literature["exists"]),
-        "command": "等待文献 Survey 生成",
+        "command": "Waiting for the literature survey",
         "metrics": [
             {"label": "Survey", "value": "Ready" if literature["exists"] else "Pending"},
         ],
         "artifacts": [literature],
-        "message": "先独立建立可核验的文献地图，再进入 Idea 生成与选择。",
+        "message": "Build a verifiable literature map before generating and selecting ideas.",
     }
 
 
@@ -619,15 +627,15 @@ def ideas_stage(root: Path) -> dict[str, Any]:
     idea_selection = idea_report_state(root / ARTIFACTS["ideas"][0])
     return {
         "id": "ideas",
-        "title": "Idea 选择",
+        "title": "Idea Selection",
         "status": status_for(ideas["exists"], approved=bool(idea_selection["selected_id"]) if ideas["exists"] else None),
-        "command": "等待 Idea 报告生成并选择",
+        "command": "Waiting for the idea report and researcher selection",
         "metrics": [
             {"label": "Idea report", "value": "Ready" if ideas["exists"] else "Pending"},
             {"label": "Human pick", "value": idea_selection["selected_id"] or "Pending"},
         ],
         "artifacts": [ideas],
-        "message": "推荐 idea 必须通过最近工作核对与新颖性资格门槛。",
+        "message": "Recommended ideas must pass recent-work verification and the novelty qualification gate.",
         "idea_selection": idea_selection,
     }
 
@@ -640,9 +648,9 @@ def expplan_stage(root: Path) -> dict[str, Any]:
     baselines = contract.get("baseline_contract", {}).get("selected", [])
     return {
         "id": "expplan",
-        "title": "实验设计",
+        "title": "Experiment Plan",
         "status": status_for(artifact["exists"], approved=approved),
-        "command": "等待实验设计生成并确认",
+        "command": "Waiting for the experiment plan and approval",
         "metrics": [
             {"label": "Approval", "value": contract.get("approval_status", "Pending")},
             {"label": "Venue", "value": target.get("venue", "—")},
@@ -650,7 +658,7 @@ def expplan_stage(root: Path) -> dict[str, Any]:
             {"label": "Selected baselines", "value": str(len(baselines))},
         ],
         "artifacts": [artifact],
-        "message": contract.get("selected_idea", "等待从 Projected Paper 反推证据空位。"),
+        "message": contract.get("selected_idea", "Waiting to derive evidence slots from the projected paper."),
         "approval": {
             "status": contract.get("approval_status", "pending"),
             "approved_at": contract.get("approved_at", ""),
@@ -667,16 +675,13 @@ def runplan_stage(root: Path) -> dict[str, Any]:
     completed = [goal for goal in goals if goal.get("status") == "completed"]
     proposed_id = plan.get("proposed_goal_id")
     proposed = next((goal for goal in goals if goal.get("id") == proposed_id), {})
-    visible_artifacts = [item for item in (results_artifact, artifact) if item["exists"]]
-    if not visible_artifacts:
-        visible_artifacts = [artifact]
     return {
         "id": "runplan",
-        "title": "实验执行",
+        "title": "Experiment Execution",
         "status": "in_progress" if artifact["exists"] and len(completed) < len(goals) else status_for(artifact["exists"]),
         "command": (
-            f"执行 {proposed_id}: {proposed.get('title', '')}"
-            if proposed_id else "等待实验执行计划"
+            f"Execute {proposed_id}: {proposed.get('title', '')}"
+            if proposed_id else "Waiting for the run plan"
         ),
         "metrics": [
             {"label": "Goals", "value": f"{len(completed)} / {len(goals)}"},
@@ -687,15 +692,13 @@ def runplan_stage(root: Path) -> dict[str, Any]:
                 "value": str(plan.get("state") or plan.get("status") or "Pending"),
             },
         ],
-        # Once results exist, make the evidence-bearing result report the
-        # default execution view. Keep the run plan beside it so the acquisition
-        # hierarchy and the values it produced remain independently inspectable.
-        "artifacts": visible_artifacts,
-        "default_artifact_key": (
-            "results" if results_artifact["exists"] else "runplan"
-        ),
+        # Run Plan is the single user-facing experiment-execution document.
+        # It embeds the current validated artifact snapshots under their owning
+        # Goals; 05 remains the provenance backend reached by clicking a value.
+        "artifacts": [artifact],
+        "default_artifact_key": "runplan",
         "results_backend": results_artifact,
-        "message": proposed.get("instructions", plan.get("exact_next_authorized_action", "等待实验计划批准。")),
+        "message": proposed.get("instructions", plan.get("exact_next_authorized_action", "Waiting for experiment-plan approval.")),
         "goals": [
             {
                 "id": goal.get("id"),
@@ -805,20 +808,20 @@ def paper_stage(root: Path) -> dict[str, Any]:
         "exists": bool(config),
         "size": config_path.stat().st_size if config_path.exists() else 0,
         "modified_ns": config_path.stat().st_mtime_ns if config_path.exists() else 0,
-        "url": f"{PAPER_STUDIO_ROUTE}/" if config else "",
-        "title": "Paper Studio · 可交互论文写作",
+        "url": PAPER_STUDIO_EMBED_URL if config else "",
+        "title": "Paper Studio · Interactive Writing",
         "interactive": True,
     }
     return {
         "id": "paper",
-        "title": "论文写作",
+        "title": "Paper Writing",
         "status": "complete" if project_complete else ("in_progress" if config else "not_started"),
         "command": (
-            "Paper Studio 已就绪"
+            "Paper Studio is ready"
             if config else (
                 "python3 -m research_avatar.tools.init_paper_studio_from_pipeline "
                 "--from-run-plan --open"
-                if experiment_ready else "等待实验执行完成并生成 05_EXP_RESULT.html"
+                if experiment_ready else "Waiting for experiment execution and 05_EXP_RESULT.html"
             )
         ),
         "metrics": [
@@ -831,10 +834,10 @@ def paper_stage(root: Path) -> dict[str, Any]:
         # available inside Paper Studio's live-output pane; using it as the
         # stage artifact silently replaces the editing workflow with a viewer.
         "artifacts": [studio_artifact],
-        "message": "Paper Studio 逐段确认后写入 LaTeX，并保持图表与结果绑定。",
+        "message": "Paper Studio writes accepted paragraphs to LaTeX while keeping figures and tables bound to validated results.",
         "paper_studio": {
             "configured": bool(config),
-            "url": f"{PAPER_STUDIO_ROUTE}/" if config else "",
+            "url": PAPER_STUDIO_EMBED_URL if config else "",
             "experiment_ready": experiment_ready,
         },
     }
@@ -945,7 +948,7 @@ def start_paper_studio() -> dict[str, Any]:
     paper_root = paper_workspace_root()
     with PAPER_STUDIO_LOCK:
         if not paper_project_configured():
-            return {"ok": False, "error": "当前项目没有 Paper Studio 配置。"}
+            return {"ok": False, "error": "The current project has no Paper Studio configuration."}
         initial = paper_studio_status()
         if initial["running"] and not initial["same_workspace"]:
             return {
@@ -1116,7 +1119,7 @@ class Handler(BaseHTTPRequestHandler):
         started = start_paper_studio()
         if not started.get("ok"):
             self.send_json(
-                {"ok": False, "error": started.get("error", "论文编辑器启动失败。")},
+                {"ok": False, "error": started.get("error", "The paper editor failed to start.")},
                 HTTPStatus.BAD_GATEWAY,
             )
             return
@@ -1150,7 +1153,7 @@ class Handler(BaseHTTPRequestHandler):
         except urllib.error.HTTPError as error:
             response = error
         except (urllib.error.URLError, OSError) as error:
-            self.send_json({"ok": False, "error": f"论文编辑器连接失败：{error}"}, 502)
+            self.send_json({"ok": False, "error": f"The paper editor connection failed: {error}"}, 502)
             return
         with response:
             payload = response.read()
@@ -1317,7 +1320,7 @@ def main() -> None:
         print(f"Research Studio ready: {result['research_studio']['url']}")
         print(
             "Paper editor ready inside Research Studio: "
-            f"{result['research_studio']['url']} (论文写作 Tab)"
+            f"{result['research_studio']['url']} (Paper Writing tab)"
         )
         return
     if args.ensure:

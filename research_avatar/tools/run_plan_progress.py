@@ -62,7 +62,13 @@ GOAL_RESULT_PROVENANCE_STYLE = (
     'border-radius:8px;background:#102e3b;color:#f2fbf9;text-align:left;white-space:pre-line;'
     'box-shadow:0 12px 28px #102e3b3d;font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;'
     'transform:translateX(-50%)}.goal-results .result-value:hover::after,'
-    '.goal-results .result-value:focus-visible::after{display:block}</style>'
+    '.goal-results .result-value:focus-visible::after{display:block}'
+    '.goal-results .result-panel .panel-pair{display:grid;grid-template-columns:minmax(0,1fr) '
+    'minmax(0,1fr);gap:16px;align-items:start}.goal-results .result-panel .figure-source-data,'
+    '.goal-results .result-panel figure{min-width:0;margin:0}.goal-results .result-panel img{'
+    'display:block;width:100%;max-width:100%;height:auto}.goal-results .result-panel table{width:100%}'
+    '@media(max-width:760px){.goal-results .result-panel .panel-pair{grid-template-columns:1fr}}'
+    '</style>'
     '<script>(()=>{const rewrite=()=>{if(location.protocol!=="file:")return;document.querySelectorAll('
     '".goal-results a[data-local-result-href]").forEach(link=>link.setAttribute("href",'
     'link.dataset.localResultHref))};if(document.readyState==="loading")addEventListener('
@@ -96,10 +102,10 @@ GOAL_COPY_ASSETS = (
     'document.getElementById(button.getAttribute("aria-describedby"));if(!source)return;const '
     'original=button.textContent;const value=source.textContent;try{if(navigator.clipboard&&'
     'window.isSecureContext)await navigator.clipboard.writeText(value);else fallback(value);'
-    'button.textContent="已复制 ✓";if(status)status.textContent="完整 /goal 命令已复制"}'
-    'catch(error){try{await bridge(value);button.textContent="已复制 ✓";if(status)status.textContent='
-    '"完整 /goal 命令已复制"}catch(bridgeError){button.textContent="复制未完成";if(status)'
-    'status.textContent="请在新窗口打开报告后重试"}}'
+    'button.textContent="Copied ✓";if(status)status.textContent="Complete /goal command copied"}'
+    'catch(error){try{await bridge(value);button.textContent="Copied ✓";if(status)status.textContent='
+    '"Complete /goal command copied"}catch(bridgeError){button.textContent="Copy failed";if(status)'
+    'status.textContent="Open the report in a new window and try again"}}'
     'window.setTimeout(()=>{button.textContent=original;if(status)status.textContent=""},2200)'
     '})})();</script>'
 )
@@ -136,19 +142,19 @@ def current_goal_html(goal: dict, *, active_goal: str | None) -> str:
     status_id = f"goal-copy-status-{safe_goal_id}"
     running = active_goal == goal_id or goal.get("status") == "running"
     label = "▶ running" if running else "→ unlocked"
-    outputs = "、".join(str(value) for value in goal.get("outputs", [])) or "按 embedded state 保存目标输出"
-    budget = str(goal.get("budget", "按批准预算执行"))
-    completion = str(goal.get("completion_check", "完成 embedded state 中的机械检查"))
+    outputs = ", ".join(str(value) for value in goal.get("outputs", [])) or "Save the outputs required by the embedded state"
+    budget = str(goal.get("budget", "Use the approved budget"))
+    completion = str(goal.get("completion_check", "Pass the mechanical checks in the embedded state"))
     return (
         f'<div class="current-goal" data-current-goal-id="{html.escape(goal_id)}">'
         f'<h4>Current Goal · {html.escape(goal_id)}</h4>'
         f'<p><span class="pill">{label}</span> '
-        f'{html.escape(str(goal.get("title", goal_id)))}；只执行这一项，不启动后继 Goal。</p>'
+        f'{html.escape(str(goal.get("title", goal_id)))}; execute only this Goal and do not start its successor.</p>'
         '<div class="goal-command-copy">'
         f'<pre class="copybox" id="{html.escape(command_id)}">{html.escape(goal_command(goal))}</pre>'
         '<div class="goal-copy-actions">'
         f'<button type="button" class="copy-goal-button" data-copy-goal-target="{html.escape(command_id)}" '
-        f'aria-describedby="{html.escape(status_id)}">复制 /goal</button>'
+        f'aria-describedby="{html.escape(status_id)}">Copy /goal</button>'
         f'<span class="goal-copy-status" id="{html.escape(status_id)}" aria-live="polite"></span>'
         '</div></div>'
         f'<p><strong>Outputs:</strong> {html.escape(outputs)}</p>'
@@ -176,17 +182,17 @@ def render_parts_and_goals(state: dict, completed_artifacts: dict[str, list[str]
         if current_id:
             raise ValueError("awaiting_goal_confirmation must not expose a current goal")
         mode_text = (
-            "Goal 确认：请先查看完整计划，然后选择“一次确认全部 Goals，由系统自动依次执行”"
-            "或“逐个查看并确认”。确认前不会开始实验。"
+            "Goal confirmation: review the complete plan, then choose automatic sequential execution "
+            "or one-Goal-at-a-time review. No experiment starts before confirmation."
         )
     elif execution_mode == "sequential_all_goals":
         mode_text = (
-            "Goal 确认：已一次确认全部 Goals；系统自动依次执行全部 Goal。"
-            "每个 Goal 仍单独保存、校验和更新网页；"
-            "任一检查失败会停止队列，不会跳过失败继续运行。"
+            "Goal confirmation: all Goals were confirmed once and executed sequentially. "
+            "Each Goal still saves evidence, validates it, and refreshes the report independently; "
+            "any failed check stops the queue."
         )
     else:
-        mode_text = "Goal 确认：逐个查看并确认；每次只运行当前解锁项。"
+        mode_text = "Goal confirmation: review one Goal at a time and execute only the currently unlocked item."
     chunks = [
         '<section data-report-section="parts-and-goals"><h2>4. Parts and Goals</h2>'
         f'<p class="execution-mode" data-execution-mode="{execution_mode}">'
@@ -202,9 +208,7 @@ def render_parts_and_goals(state: dict, completed_artifacts: dict[str, list[str]
         for goal_id in part.get("goals", []):
             item = goals_by_id[str(goal_id)]
             artifact_ids = [str(value) for value in item.get("artifact_ids", [])]
-            mapping = "、".join(artifact_ids) if artifact_ids else "无直接图表（基础设施或配置冻结）"
-            if str(goal_id) == "G1.1":
-                mapping += "；F1 为非实验图，仅计数，后续在论文写作阶段绘制"
+            mapping = ", ".join(artifact_ids) if artifact_ids else "No direct paper artifact (infrastructure or configuration freeze)"
             mark = STATUS_MARK.get(str(item.get("status", "locked")), "○")
             chunks.append(
                 f'<article class="goal" data-goal-id="{html.escape(str(goal_id))}" '
@@ -212,9 +216,9 @@ def render_parts_and_goals(state: dict, completed_artifacts: dict[str, list[str]
                 f'<h3>{mark} {html.escape(str(goal_id))} — {html.escape(str(item.get("title", "")))}</h3>'
                 f'<p>{html.escape(str(item.get("decision_question", "")))}</p>'
                 f'<p>{html.escape(str(item.get("visible_work", "")))}</p>'
-                f'<p>{html.escape(str(item.get("visible_evidence", "")))} 完成检查：'
+                f'<p>{html.escape(str(item.get("visible_evidence", "")))} Completion check: '
                 f'{html.escape(str(item.get("completion_check", "")))}</p>'
-                f'<p class="mapping">对应图表：{html.escape(mapping)}</p>'
+                f'<p class="mapping">Corresponding artifacts: {html.escape(mapping)}</p>'
             )
             if str(goal_id) == current_id:
                 chunks.append(current_goal_html(item, active_goal=active))
@@ -222,8 +226,8 @@ def render_parts_and_goals(state: dict, completed_artifacts: dict[str, list[str]
             snapshots = completed_artifacts.get(str(goal_id), [])
             if item.get("status") == "completed" and snapshots:
                 chunks.append(
-                    '<div class="goal-results"><h4>已完成 Goal 的图表</h4>'
-                    '<p>本 Goal 已验证的真实表格或“源数据表＋图”显示如下；悬停或聚焦数字可预览生成过程，点击可在 05 查看完整 provenance。</p>'
+                    '<div class="goal-results"><h4>Completed Goal Evidence</h4>'
+                    '<p>The validated table or figure with its source-data table appears below. Hover or focus a value for a compact provenance preview; click it to open the complete record in the result backend.</p>'
                     + GOAL_RESULT_PROVENANCE_STYLE
                     + "".join(snapshots)
                     + '</div>'
@@ -310,6 +314,11 @@ def completed_artifact_snapshots(state: dict, results_path: Path) -> dict[str, l
         for artifact_id in goal.get("artifact_ids", []):
             artifact_owner.setdefault(str(artifact_id), goal_id)
     scoped: dict[str, dict[str, list[str]]] = {}
+    data_figure_artifacts = {
+        str(contract.get("artifact_id") or "")
+        for contract in state.get("acquisition_contracts", [])
+        if contract.get("figure_source_cell") is True
+    }
     for contract in state.get("acquisition_contracts", []):
         producing_goal = str(contract.get("producing_goal") or "")
         artifact_id = str(contract.get("artifact_id") or "")
@@ -331,34 +340,12 @@ def completed_artifact_snapshots(state: dict, results_path: Path) -> dict[str, l
                 raise ValueError(
                     f"completed artifact owner {goal_id} has unlinked/unverified targets in {artifact_id}: {missing[:5]}"
                 )
-            snapshots.setdefault(goal_id, []).append(snapshot)
-
-    # Every completed figure remains auditable in the execution view.  Numeric
-    # figures carry their exact source-data table; qualitative figures carry a
-    # structured evidence-input table rather than invented numeric cells.
-    for goal in goals:
-        goal_id = str(goal.get("id") or "")
-        if goal_id not in completed:
-            continue
-        already_present = {
-            match.group(1)
-            for snapshot in snapshots.get(goal_id, [])
-            if (match := re.search(r'data-artifact-id=["\']([^"\']+)', snapshot))
-        }
-        for artifact_id in map(str, goal.get("artifact_ids", [])):
-            if artifact_id in already_present:
-                continue
-            try:
-                snapshot = _artifact_snapshot(report, artifact_id)
-            except ValueError:
-                continue
-            if not artifact_id.upper().startswith("F"):
-                continue
-            if "<table" not in snapshot:
+            if artifact_id in data_figure_artifacts and "<table" not in snapshot:
                 raise ValueError(
-                    f"completed figure {artifact_id} under {goal_id} lacks its adjacent source/evidence table"
+                    f"completed data-bearing figure {artifact_id} under {goal_id} lacks its adjacent source-data table"
                 )
             snapshots.setdefault(goal_id, []).append(snapshot)
+
     return snapshots
 
 

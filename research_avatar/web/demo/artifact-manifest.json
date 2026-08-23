@@ -1,27 +1,27 @@
 {
   "profile": {
     "url": "artifacts/profile.html",
-    "source": "researcher-profile/PROFILE.html",
-    "sha256": "f7382fee0291902be8ac72cffa3fb1eb52e6c7e9a40f7b53859f2ea0bcfc1c38"
+    "source": "research_avatar/online_studio/demo_project/researcher-profile/PROFILE.html",
+    "sha256": "be10adc99d020daef7ec8b0662bcad9b28266da93a289405f42869e93c7589ea"
   },
   "literature": {
     "url": "artifacts/literature.html",
-    "source": "reports/01_LIT_SURVEY.html",
-    "sha256": "27baf11a135d61237e0d1ec7433d6ff4b89a5ce9763622801b6e9dd8a009ff98"
+    "source": "research_avatar/online_studio/demo_project/reports/01_LIT_SURVEY.html",
+    "sha256": "e60a8d81b5c859faee241d16e2e0de8c28f8c36a8c203c4ef24e7f6d0c79fd6d"
   },
   "ideas": {
     "url": "artifacts/ideas.html",
-    "source": "reports/02_IDEA_REPORT.html",
-    "sha256": "23b49c01c7d47ae84a40562e166727848585e7268dd941b822cc9553bb76e05e"
+    "source": "research_avatar/online_studio/demo_project/reports/02_IDEA_REPORT.html",
+    "sha256": "d8a9eaee4aea5478de00f7a7721b29566174e343e6a03c5df5bd6852c0a304af"
   },
   "expplan": {
     "url": "artifacts/expplan.html",
-    "source": "reports/03_EXPERIMENT_PLAN.html",
-    "sha256": "a2a132583508bc38d950bd745889da18d8f313859e17d482698dac04d766a98c"
+    "source": "research_avatar/online_studio/demo_project/reports/03_EXPERIMENT_PLAN.html",
+    "sha256": "da3aaaa1b03417e1f591757f1c63fdd57a5a85f644fd3f80c383359f682fde50"
   },
   "runplan": {
     "url": "artifacts/runplan.html",
-    "source": "reports/04_RUN_PLAN.html",
-    "sha256": "6d2560544bef6bf13e5f1371cde294b83e3fba53cd69cd44dee952d01c3f4d97"
+    "source": "research_avatar/online_studio/demo_project/reports/04_RUN_PLAN.html",
+    "sha256": "215b73160dfd589bb796b5eda2854336bafdd14312ce633c73bd1973a4e30125"
   }
 }

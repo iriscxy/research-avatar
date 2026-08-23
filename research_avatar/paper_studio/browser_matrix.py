@@ -69,6 +69,7 @@ class Matrix:
             "full-draft-cancel", "runtime-key-open",
         )
         assert all(page.locator("#" + item).is_disabled() for item in controls)
+        assert page.locator("#studio-language-select").input_value() in {"zh", "en"}
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()
         expected_banner = not bool(self.state.get("api_key_configured"))
@@ -185,7 +186,7 @@ class Matrix:
         assert page.locator("#runtime-key-dialog").is_hidden()
         page.locator("#runtime-key-open").click()
         page.locator("#runtime-key-provider").select_option("deepseek")
-        page.locator("#runtime-key-input").fill("sk-matrix-runtime-key-000000")
+        page.locator("#runtime-key-input").fill("browser-matrix-placeholder-key")
         page.locator("#runtime-key-submit").click()
         page.wait_for_timeout(100)
         assert any(item.endswith("/api/runtime-key") for item in posts), posts

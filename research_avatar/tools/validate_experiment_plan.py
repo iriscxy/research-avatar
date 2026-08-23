@@ -586,18 +586,25 @@ def validate(plan: Path) -> list[str]:
         budget_text = visible_text(budget.group(1))
         reference_figures = float_budget.get("reference_body_figures")
         reference_tables = float_budget.get("reference_body_tables")
-        for token in (
-            f"本计划 {body_figures + body_tables}（{body_figures} 图，{body_tables} 表）",
-            f"参考论文 {reference_figures + reference_tables}（{reference_figures} 图，{reference_tables} 表）",
-        ):
-            if token not in budget_text:
-                errors.append(f"whole-paper float budget lacks: {token}")
+        count_pairs = (
+            (
+                f"本计划 {body_figures + body_tables}（{body_figures} 图，{body_tables} 表）",
+                f"this plan {body_figures + body_tables} ({body_figures} figures, {body_tables} tables)",
+            ),
+            (
+                f"参考论文 {reference_figures + reference_tables}（{reference_figures} 图，{reference_tables} 表）",
+                f"reference paper {reference_figures + reference_tables} ({reference_figures} figures, {reference_tables} tables)",
+            ),
+        )
+        for chinese, english in count_pairs:
+            if chinese not in budget_text and english not in budget_text:
+                errors.append(f"whole-paper float budget lacks: {chinese} / {english}")
         for forbidden in ("Experiments", "正文", "因此", "回指", "出现位置", "content floats"):
             if forbidden in budget_text:
                 errors.append(f"whole-paper float budget must ignore artifact placement: {forbidden}")
-        if "<a " in budget.group(1) or "reference" in budget_text.lower():
+        if "<a " in budget.group(1) or "reference label" in budget_text.lower():
             errors.append("whole-paper float budget must end after the two numeric entries without a reference label/link")
-        if "图表数量：" not in budget_text:
+        if "图表数量：" not in budget_text and "Figure/table count:" not in budget_text:
             errors.append("whole-paper float budget needs an explicit visible figure/table count label")
         for css_token in (".float-budget{", "font-size:18px", "border:2px solid"):
             if css_token not in page:

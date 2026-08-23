@@ -173,6 +173,11 @@ def validate_figure_sources(report: str, acquisitions: dict[str, dict[str, objec
             errors.append(f"report lacks figure-result section for {artifact_id}")
             continue
         block = match.group(0)
+        if not all(token in report for token in (
+            ".result-panel .panel-pair{display:grid",
+            "grid-template-columns:minmax(0,1fr) minmax(0,1fr)",
+        )):
+            errors.append(f"{artifact_id}: source table and plot must use the desktop left/right layout")
         target_ids = set().union(*panels.values())
         declared = re.search(r'data-source-target-ids="([^"]*)"', block)
         declared_ids = set(declared.group(1).split()) if declared else set()
@@ -324,6 +329,21 @@ def validate_clickable_provenance(
             for field in local_fields:
                 if str(record.get(field, "")) != row.get(field, ""):
                     errors.append(f"{label}: provenance field {field} differs from ledger")
+            complete_execution_fields = (
+                "working_directory", "executable_entrypoint", "input_files",
+                "run_manifest_path", "stdout_log_path", "stderr_log_path",
+                "exit_status", "started_at", "ended_at", "produced_raw_files",
+            )
+            for field in complete_execution_fields:
+                value = record.get(field)
+                if value in (None, "", []):
+                    errors.append(f"{label}: complete local execution provenance lacks {field}")
+            for field in ("run_manifest_path", "stdout_log_path", "stderr_log_path"):
+                value = str(record.get(field, ""))
+                if value and not Path(value).is_file():
+                    errors.append(f"{label}: provenance {field} path is missing: {value}")
+            if record.get("exit_status") != 0:
+                errors.append(f"{label}: provenance exit_status is not zero")
         elif row.get("source_type") == "REUSE_REPORTED":
             for field in reported_fields:
                 if str(record.get(field, "")) != row.get(field, ""):
@@ -397,6 +417,13 @@ def validate_completed_goal_evidence(
             errors.append(f"artifact owner {goal_id} lacks the Completed Goal Evidence block for {artifact_id}")
             continue
         block = card.group(0)
+        if any(contract.get("figure_source_cell") is True for contract in contracts) and not all(
+            token in block for token in (
+                ".goal-results .result-panel .panel-pair{display:grid",
+                "grid-template-columns:minmax(0,1fr) minmax(0,1fr)",
+            )
+        ):
+            errors.append(f"artifact owner {goal_id} must show the figure source table left and plot right")
         if plan.count(f'data-artifact-id="{artifact_id}"') != 1:
             errors.append(f"artifact {artifact_id} must appear exactly once under earliest owner {goal_id}")
         if ".result-value:hover" not in block or ".result-value:focus-visible" not in block:
@@ -437,6 +464,66 @@ def validate_completed_goal_evidence(
                 errors.append(
                     f"artifact owner {goal_id} target {target_id} lacks hover provenance"
                 )
+    return errors
+
+
+def validate_results_format(
+    report: str,
+    experiment_contract: dict[str, object],
+    state: dict[str, object],
+) -> list[str]:
+    """Enforce the complete runplan result-page presentation contract."""
+    errors: list[str] = []
+    paper_marker = re.search(r'<section\b[^>]*data-report-section="paper-artifacts"[^>]*>', report)
+    process_marker = re.search(r'<section\b[^>]*data-report-section="generation-process"[^>]*>', report)
+    if not paper_marker or not process_marker or process_marker.start() <= paper_marker.start():
+        return ["report cannot resolve the Paper Tables and Figures artifact region"]
+    paper_region = report[paper_marker.end():process_marker.start()]
+    execution_artifact_ids = {
+        str(item.get("artifact_id", ""))
+        for item in experiment_contract.get("result_requirements", [])
+        if isinstance(item, dict) and item.get("artifact_id")
+    }
+    approved = [
+        item for item in experiment_contract.get("paper_artifacts", [])
+        if isinstance(item, dict) and str(item.get("id", "")) in execution_artifact_ids
+    ]
+    expected_ids = [str(item.get("id", "")) for item in approved]
+    actual_ids = re.findall(r'<section\b[^>]*data-artifact-id="([^"]+)"', paper_region)
+    if actual_ids != expected_ids:
+        errors.append(f"paper artifact order/coverage differs from approved plan: {actual_ids} != {expected_ids}")
+    if report.count('class="completion-card"') != len(expected_ids):
+        errors.append("Artifact Completion must show exactly one status card per approved artifact")
+    for artifact in approved:
+        artifact_id = str(artifact.get("id", ""))
+        block_match = re.search(
+            rf'<section\b(?=[^>]*data-artifact-id="{re.escape(artifact_id)}")[^>]*>.*?</section>',
+            paper_region,
+            re.S,
+        )
+        if not block_match:
+            continue
+        block = block_match.group(0)
+        if f'data-span="{artifact.get("span", "")}"' not in block:
+            errors.append(f"{artifact_id}: rendered span differs from approved paper geometry")
+        if artifact.get("kind") == "figure":
+            if "<table" not in block:
+                errors.append(f"{artifact_id}: qualitative/data figure lacks its adjacent evidence table")
+            if not re.search(r'<(?:svg|img|figure)\b|\brole="img"', block):
+                errors.append(f"{artifact_id}: filled figure lacks an actual visual or traceable qualitative visual")
+        if artifact.get("kind") == "table":
+            visible = html.unescape(re.sub(r'<[^>]+>', ' ', block))
+            shell = artifact.get("shell", {}) if isinstance(artifact.get("shell"), dict) else {}
+            for label in [*shell.get("row_labels", []), *shell.get("column_labels", [])]:
+                if str(label) not in visible:
+                    errors.append(f"{artifact_id}: approved row/column label is missing: {label}")
+            if 'data-status="FILLED"' in block and "95% CI" not in visible:
+                errors.append(f"{artifact_id}: filled result table does not display approved uncertainty")
+    if not re.search(r'<details\b[^>]*id="result-provenance-index"', report):
+        errors.append("generation process must be one collapsible result-provenance index")
+    expected_goals = len([goal for goal in state.get("goals", []) if isinstance(goal, dict)])
+    if report.count('class="goal-audit"') != expected_goals:
+        errors.append("generation process must include one Goal execution record per Run Plan Goal")
     return errors
 
 
@@ -504,6 +591,7 @@ def validate(args: argparse.Namespace) -> list[str]:
         return [f"cannot load embedded run-plan state: {exc}"]
     source_plan_value = str(state.get("source_plan", "")).strip()
     source_plan = Path(source_plan_value)
+    experiment_contract: dict[str, object] = {}
     has_source_contract = bool(
         source_plan_value
         or state.get("source_plan_approval")
@@ -543,13 +631,21 @@ def validate(args: argparse.Namespace) -> list[str]:
             )
             if source_approval.get("contract_version") != expected_version:
                 errors.append("run-plan source contract version differs from the approved expplan")
-            expected_artifacts = [item.get("id") for item in experiment_contract.get("paper_artifacts", [])]
+            required_artifact_ids = {
+                str(item.get("artifact_id", ""))
+                for item in experiment_contract.get("result_requirements", [])
+                if isinstance(item, dict) and item.get("artifact_id")
+            }
+            expected_artifacts = [
+                item.get("id") for item in experiment_contract.get("paper_artifacts", [])
+                if item.get("id") in required_artifact_ids
+            ]
             approved_artifacts = state.get("approved_artifact_ids", [])
             coverage = state.get("artifact_coverage", {})
             if approved_artifacts != expected_artifacts:
-                errors.append("run-plan approved_artifact_ids do not preserve the approved 03 artifact order")
+                errors.append("run-plan approved_artifact_ids do not preserve the data-bearing 03 artifact order")
             if set(coverage) != set(expected_artifacts):
-                errors.append("run-plan artifact coverage does not exactly cover every approved figure/table")
+                errors.append("run-plan artifact coverage does not exactly cover every data-bearing figure/table")
             goal_ids = {str(item.get("id", "")) for item in state.get("goals", [])}
             for artifact_id in expected_artifacts:
                 owners = coverage.get(artifact_id, {}).get("goals", []) if isinstance(coverage, dict) else []
@@ -566,8 +662,11 @@ def validate(args: argparse.Namespace) -> list[str]:
                 goal_id = str(item.get("id", ""))
                 if visible_goal_artifacts.get(goal_id) != set(item.get("artifact_ids", [])):
                     errors.append(f"{goal_id}: visible corresponding-artifact mapping disagrees with embedded state")
-            coverage_label = f"图表覆盖：{len(expected_artifacts)}/{len(expected_artifacts)}"
-            if coverage_label not in args.plan.read_text(encoding="utf-8"):
+            coverage_labels = (
+                f"Artifact coverage: {len(expected_artifacts)}/{len(expected_artifacts)}",
+                f"图表覆盖：{len(expected_artifacts)}/{len(expected_artifacts)}",
+            )
+            if not any(label in args.plan.read_text(encoding="utf-8") for label in coverage_labels):
                 errors.append("visible run plan lacks the complete figure/table coverage count")
             approved_implementation = experiment_contract.get("implementation_contract", [])
             if state.get("implementation_contract") != approved_implementation:
@@ -756,6 +855,8 @@ def validate(args: argparse.Namespace) -> list[str]:
     if args.strict_report and report_text:
         errors.extend(validate_figure_sources(report_text, acquisitions))
         errors.extend(validate_clickable_provenance(report_text, rows, acquisitions))
+        if experiment_contract:
+            errors.extend(validate_results_format(report_text, experiment_contract, state))
     if args.plan:
         errors.extend(
             validate_completed_goal_evidence(

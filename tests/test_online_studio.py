@@ -2335,7 +2335,7 @@ class OnlineStudioTests(unittest.TestCase):
         )
         self.assertIn("activeStudioSession = Boolean(state.active)", script)
         self.assertIn("sessionActions.classList.remove('hidden')", script)
-        self.assertIn("studioFrame.src = '/studio'", script)
+        self.assertIn("const studioUrl = `/studio?lang=${uiLanguage}`", script)
         self.assertNotIn("window.location.assign(result.redirect)", script)
         authenticated = script[script.index("async function showAuthenticated"):
                                script.index("async function initializeAuth")]
@@ -2667,7 +2667,7 @@ class OnlineStudioTests(unittest.TestCase):
                 self.assertEqual(archive.namelist(), ["paper/main.tex"])
 
     def test_live_worker_hides_root_and_never_persists_api_key(self):
-        key = "sk-online-test-never-write-this"
+        key = "online-test-placeholder-key"
         encoded_files = [
             {"name": name, "data": base64.b64encode(source.encode()).decode()}
             for name, source in pipeline_files()
@@ -2822,7 +2822,7 @@ class OnlineStudioTests(unittest.TestCase):
         # known: that produced a visible 401 console error on every fresh
         # login page. showAuthenticated() assigns the real URL afterward.
         self.assertIn('id="demo-frame" class="demo-frame" src="about:blank"', source)
-        self.assertIn("demoFrame.src = '/demo/?authenticated='", app)
+        self.assertIn("demoFrame.src = `/demo/?lang=${uiLanguage}&authenticated=", app)
         self.assertNotIn("先看看一篇论文是怎样完成的。", source)
         self.assertNotIn("这是完整 Research Avatar 流程的可交互示例。", source)
         self.assertNotIn("上传完整项目，开始自己的论文。", source)
@@ -2914,9 +2914,42 @@ class OnlineStudioTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         style = (root / "research_avatar/web/demo/style.css").read_text(encoding="utf-8")
         html = (root / "research_avatar/web/demo/index.html").read_text(encoding="utf-8")
-        self.assertIn(".journey-nav{position:sticky;top:0", style)
+        self.assertIn(".demo-top-row{position:sticky;top:0", style)
+        self.assertIn("grid-template-columns:minmax(0,1fr) auto", style)
+        self.assertIn('<div class="demo-top-row">', html)
         self.assertIn(".stage-content{min-height:calc(100dvh - 117px);max-height:none;overflow:visible", style)
-        self.assertIn("style.css?v=20260822-generic-workflow", html)
+        self.assertIn("style.css?v=20260823.4-csp-safe-copy", html)
+
+    def test_lightweight_structure_requests_english_planning_fields(self):
+        source = Path(online.__file__).read_text(encoding="utf-8")
+        self.assertIn(
+            'Write every generated JSON string value in English',
+            source,
+        )
+        self.assertIn(
+            'Quoted reference excerpts must preserve the source paper verbatim',
+            source,
+        )
+
+    def test_authenticated_shell_has_one_visible_language_control(self):
+        root = Path(__file__).resolve().parents[1]
+        html = (root / "research_avatar/online_studio/static/index.html").read_text(encoding="utf-8")
+        style = (root / "research_avatar/online_studio/static/style.css").read_text(encoding="utf-8")
+        app = (root / "research_avatar/online_studio/static/app.js").read_text(encoding="utf-8")
+        self.assertIn('id="account-bar" class="account-bar hidden"', html)
+        self.assertIn('class="top-toolbar"', html)
+        self.assertIn("document.querySelector('#account-bar').classList.remove('hidden')", app)
+        self.assertIn(".workspace-authenticated .top-toolbar .language-control{display:flex}", style)
+        self.assertNotIn(".language-control{position:fixed", style)
+
+    def test_runtime_upload_errors_have_english_templates(self):
+        root = Path(__file__).resolve().parents[1]
+        app = (root / "research_avatar/online_studio/static/app.js").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("The structural reference paper", app)
+        self.assertIn("must be a uniquely named DOC, DOCX, TXT, PDF", app)
+        self.assertIn("Unsupported document format", app)
 
 
 if __name__ == "__main__":

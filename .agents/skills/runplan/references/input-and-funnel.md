@@ -105,16 +105,17 @@ work. Do not render long field tables, nested bullet contracts, or one visible
 row per result target.
 
 Every visible goal must end with one short `对应图表` line naming the exact
-approved figure/table IDs it supports (`F1`, `T1`, etc.). If it supports no
+data-bearing figure/table IDs it supports (`F2`, `T1`, etc.). If it supports no
 paper artifact directly, say `无直接图表` and state its infrastructure role.
 Immediately below the execution estimate, show `图表覆盖：N/N` followed by the
-complete approved artifact-ID set. Count-only non-experimental figures must
-still be mapped to the goal that establishes their specification, visibly
-marked `非实验图，仅计数，后续在论文写作阶段绘制`; they receive no
-acquisition contract. Embed `approved_artifact_ids` and `artifact_coverage` in
-the run-plan state. Generation and validation must fail unless the coverage
-keys exactly equal `03.paper_artifacts`, every artifact has at least one owning
-goal, and every visible `对应图表` mapping agrees with the hidden state.
+complete data-bearing artifact-ID set derived from `03.result_requirements`.
+Figures without any result requirement are writing-stage artifacts: do not map
+them to a Goal, count them in RunPlan coverage, draw them in `04`, or copy them
+to `05`. Embed only data-bearing IDs in `approved_artifact_ids` and
+`artifact_coverage`. Generation and validation must fail unless those IDs
+exactly equal the ordered unique artifact IDs in `03.result_requirements`, each
+has at least one owning goal, and every visible `对应图表` mapping agrees with
+the hidden state.
 
 Copy `03.implementation_contract` byte-for-byte into the embedded run-plan
 state and render the same per-method implementation list before the hierarchy.
@@ -143,7 +144,7 @@ Goal panel moves downward to the newly proposed/unlocked goal. There must be
 exactly one nested Current Goal whenever `active_goal` or `proposed_goal_id` is
 set, and its `data-current-goal-id` must equal that state ID.
 
-For each paper-facing artifact, render exactly one `Completed Goal Evidence`
+For each data-bearing experiment artifact, render exactly one `Completed Goal Evidence`
 block under the earliest goal in run-plan order whose `artifact_ids` names that
 artifact. If later goals fill additional cells or panels of the same table or
 figure, regenerate and update that original block; never repeat the artifact

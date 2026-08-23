@@ -73,6 +73,9 @@ LOCALIZED_TITLE_ALIASES = {
         "evaluation": {"3. 评估"},
         "gaps": {"4. 差距"},
     },
+    "results": {
+        "generation-process": {"3. Acquisition Process"},
+    },
 }
 
 

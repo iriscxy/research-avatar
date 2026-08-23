@@ -1,4 +1,240 @@
 const $ = (id) => document.getElementById(id);
+const requestedUiLanguage = new URLSearchParams(window.location.search).get("lang");
+const embeddedInResearchStudio = new URLSearchParams(window.location.search).get("embedded") === "research-studio";
+const studioUiLanguage = requestedUiLanguage === "en"
+  ? "en"
+  : (requestedUiLanguage === "zh" ? "zh" : (localStorage.getItem("research-avatar-language") === "en" ? "en" : "zh"));
+const studioT = (zh, en) => studioUiLanguage === "en" ? en : zh;
+if (embeddedInResearchStudio) document.documentElement.classList.add("research-studio-embedded");
+const studioTranslations = new Map(Object.entries({
+  "界面语言":"Interface language", "写作模型":"Writing model", "应用":"Apply", "安全更换 API Key":"Update API key securely",
+  "请为当前选择的正文写作 API 在启动 Paper Studio 的本机终端配置；不要把真实 key 输入聊天、提交到仓库或保存在浏览器中。GPT Image 仍单独使用 OpenAI。":"Configure the selected prose-writing API in the local terminal that starts Paper Studio. Never paste a real key into chat, commit it, or store it in the browser. GPT Image still uses OpenAI separately.",
+  "网页未提供的功能或其他需求，请在本地终端运行 Code Agent。":"For features not available in the web interface, run Code Agent in your local terminal.",
+  "正文":"Prose", "图":"Figures", "表":"Tables", "编译 PDF":"Compile PDF", "清空生成内容":"Clear generated content", "下载项目 ZIP":"Download project ZIP",
+  "写论文需要 LLM API":"Paper writing requires an LLM API", "然后停止当前服务并重新运行":"Then stop the current service and run it again",
+  "Paper Studio 已启动，尚未载入论文":"Paper Studio is running with no paper loaded", "Paper Studio 状态加载失败":"Failed to load Paper Studio state",
+  "将项目配置、段落计划、LaTeX 与图表数据写入 paper/ 后，固定网页会自动读取这些内容。":"Once project configuration, paragraph plans, LaTeX, and artifact data are written to paper/, this interface loads them automatically.",
+  "直接生成全文初稿":"Generate full first draft", "复用已批准的段落结构、结果与逐段校验，只补齐尚未写入的段落。":"Use the approved paragraph structure, results, and paragraph checks to fill only unwritten paragraphs.",
+  "⏸ 停止":"⏸ Stop", "论文标题":"Paper title", "当前标题 / 可编辑候选标题":"Current title / editable candidate", "输入论文标题":"Enter a paper title",
+  "GPT 生成候选标题":"Generate title candidates", "确认写入 LaTeX":"Write to LaTeX", "选择当前编辑的自然段":"Select the paragraph to edit",
+  "例如：更突出 representation contraction，保持审慎，不增加未验证 claim。":"For example: emphasize representation contraction, remain cautious, and add no unverified claims.",
+  "一键生成当前 Section":"Generate current section", "参考论文中对应的写法":"Corresponding writing move in the reference paper",
+  "目标段落规划（写作约束）":"Target paragraph plan (writing constraints)", "查看参考原文":"View reference text", "当前候选段落":"Current candidate paragraph",
+  "给 GPT 的修改意见":"Revision instructions for GPT", "根据 comment 修改":"Revise from comment", "Accept → LaTeX":"Accept → LaTeX",
+  "系统正在结合已批准的段落结构、working abstract 和实验结果生成当前段落…":"The system is generating this paragraph from the approved structure, working abstract, and experiment results…",
+  "例如：motivation 太泛；把三个 confound 说清楚，缩短最后一句。":"For example: the motivation is too broad; clarify the three confounds and shorten the last sentence.",
+  "第 — / — 页":"Page — / —", "下载 PDF":"Download PDF", "显示导航栏":"Show navigation", "隐藏导航栏":"Hide navigation",
+  "还没有可预览的 PDF":"No PDF is available yet", "outline 确认并生成 LaTeX scaffold 后，这里会随每次 Accept 自动刷新。":"After the outline is approved and the LaTeX scaffold is generated, this preview refreshes after every Accept.",
+  "按论证依赖推进图表":"Build artifacts in argument order", "机制图单独设计；数据图和表格都从 results/ 生成，确认后插入对应自然段。":"Design mechanism figures separately; generate data figures and tables from results/, then insert them into the linked paragraph after approval.",
+  "选择一张图":"Select a figure", "修改命令":"Revision request", "调用本地 Agent":"Call local Agent", "⏸ 停止调用":"⏸ Stop request",
+  "绘图前置步骤":"Figure prerequisite", "画图 Prompt":"Figure prompt", "GPT Image 将按这里的完整描述绘制":"GPT Image renders the complete description entered here.",
+  "GPT 生成的画图 Prompt":"GPT-generated figure prompt", "修改 Prompt":"Revise prompt", "描述希望 GPT 怎样调整左侧 Prompt":"Describe how GPT should revise the prompt on the left.",
+  "给 GPT 的 Prompt 修改指令":"Prompt revision instructions", "GPT 生成画图 Prompt":"Generate figure prompt", "确认 Prompt 后绘图":"Approve prompt and draw",
+  "确认后依次完成 GPT Image 绘制和可编辑 PowerPoint 重建":"After approval, generate the GPT Image and rebuild it as an editable PowerPoint.",
+  "待生成":"Pending", "等待 Prompt":"Waiting for prompt", "可编辑 PPT/PDF":"Editable PPT/PDF", "随后自动重建":"Rebuilt automatically next",
+  "确认 Prompt → GPT Image":"Approve prompt → GPT Image", "重试可编辑 PPT/PDF 重建":"Retry editable PPT/PDF rebuild",
+  "这张图的修改 Prompt":"Revision prompt for this figure", "本地 Agent 生成这张图":"Generate this figure with local Agent", "合成设置":"Composition settings",
+  "论文组合 Prompt":"Paper composition prompt", "合成图":"Compose figure", "Agent 解析的布局计划":"Agent-parsed layout plan", "显示 GPT 原图":"Show original GPT image",
+  "图片 Caption":"Figure caption", "给 GPT 的 Caption 修改 Prompt":"Caption revision prompt", "GPT 生成 Caption candidate":"Generate caption candidate",
+  "描述这张图所展示的内容和必要的实验条件。":"Describe what the figure shows and any necessary experimental conditions.",
+  "当前正文将使用此 Caption":"The paper will use this caption", "保存 Caption":"Save caption", "插入正文位置":"Insertion point", "排版方式":"Layout", "单栏":"Single column", "双栏":"Two columns",
+  "确认并插入正文":"Approve and insert into paper", "高级：生成新的表格初稿":"Advanced: generate a new table draft",
+  "初始表格规格":"Initial table specification", "本地 Agent 生成初稿":"Generate draft with local Agent", "可编辑 Table LaTeX":"Editable table LaTeX",
+  "保存修改":"Save changes", "取消":"Cancel", "确认清空":"Confirm clearing", "复制 ID":"Copy ID", "当前项目 ID（可选择复制）":"Current project ID (copy if needed)",
+  "粘贴或输入项目 ID 以确认":"Paste or enter the project ID to confirm", "服务商":"Provider", "安全更新":"Update securely",
+  "这会删除当前项目的生成正文、候选、对话和图表产物，但保留配置、输入与实验结果。":"This deletes generated prose, candidates, conversations, and artifacts for the current project while preserving configuration, inputs, and experiment results.",
+  "密钥只写入当前 Paper Studio 进程内存，不进入聊天记录、浏览器存储或项目文件。":"The key is stored only in the current Paper Studio process memory, never in chat, browser storage, or project files."
+  ,"参考论文：":"Reference paper: ", "正文已全部写入 LaTeX；请在图表工作台完成并确认：":"All prose has been written to LaTeX; complete and approve these artifacts in the figure and table workspace: ",
+  "全文初稿已生成":"Full first draft generated", "已写入 PDF":"Written to PDF", "修改后需确认，才会写入 LaTeX。":"Approve revisions before writing them to LaTeX.",
+  "当前 Section 已完成":"Current section is complete", "参考摘要先提出假设，解释现象，再给出验证。":"The reference abstract introduces the hypothesis, explains the phenomenon, and then presents validation.",
+  "参考摘要先说明问题，再提出假设，最后总结验证。":"The reference abstract states the problem, introduces the hypothesis, and closes with the validation.",
+  "仅向当前目标段落提供 EXP PLAN 中已批准并嵌入的参考原文，用于模仿论证动作，不复制研究结论或措辞。":"Only the approved reference excerpt embedded in the experiment plan is provided for the current target paragraph. It guides the argumentative move, not the research claims or wording.",
+  "参考论文先说明问题重要性，再收窄到尚未解决的矛盾。":"The reference paper establishes the importance of the problem, then narrows to the unresolved tension.",
+  "参考论文先综述方法，再综述理论，最后定位自身。":"The reference paper reviews methods, then theory, and finally positions its own contribution.",
+  "参考论文先概述方法，再定义过程，最后说明细节。":"The reference paper gives an overview, defines the procedure, and then specifies implementation details.",
+  "参考论文先描述设置，再给出结果，最后分析。":"The reference paper describes the setup, presents results, and then analyzes them.",
+  "参考论文讨论可预测性，并指出不可预测的部分。":"The reference paper discusses predictability and identifies what remains unpredictable.",
+  "参考论文总结贡献，指出意义，并列出未来方向。":"The reference paper summarizes its contributions, implications, and future directions.",
+  "已接受版本（可继续修改）":"Accepted version (editable)", "已写入 LaTeX":"Written to LaTeX",
+  "机制图 · 先完成":"Mechanism figure · complete first", "画图 Prompt 任务已开始…":"Figure-prompt task started…", "生成中":"Generating",
+  "Caption 已在接受 I-P1 时自动生成":"The caption was generated automatically when I-P1 was accepted", "Wrapfigure（AAAI 禁用）":"Wrapfigure (disabled for AAAI)",
+  "结果表 · 可编辑 LaTeX":"Results table · editable LaTeX", "正在启动本地 Codex agent 生成表格初稿…":"Starting the local Codex agent to draft the table…",
+  "上方图片由当前 LaTeX 真实编译。初稿与实验结果相关修改均由本地 Agent 完成。":"The preview above is compiled from the current LaTeX. The local Agent creates the draft and applies result-grounded revisions.",
+  "本地 Agent 已启动，正在从可追溯结果生成 LaTeX 表格。":"The local Agent is generating a LaTeX table from traceable results.",
+  "正在自动生成 T1 表格初稿…":"Automatically generating the initial T1 table…"
+  ,"请先确认 outline；批量模式不会绕过论文结构确认。":"Confirm the outline first; batch drafting does not bypass structure approval."
+  ,"请先按页面顶部说明配置 LLM API Key。":"Configure the LLM API key using the instructions at the top of the page."
+  ,"继续补齐未完成正文":"Continue unfinished prose"
+  ,"尚未载入论文":"No paper loaded"
+  ,"完成":"Complete"
+  ,"未找到标题":"No title found"
+  ,"查看参考原文":"View reference text"
+  ,"显示导航栏":"Show navigation"
+  ,"隐藏导航栏":"Hide navigation"
+  ,"加载失败":"Loading failed"
+  ,"已写入 PDF":"Written to PDF"
+  ,"线上仅保留正文、可编辑表格与 Python 数据图；其他图以带 Caption 和 label 的 placeholder 写入论文。":"The online version supports prose, editable tables, and Python data plots. Other figures are inserted as placeholders with captions and labels."
+  ,"这是只读 Demo，无法生成或修改内容。":"This is a read-only demo; content cannot be generated or modified."
+  ,"等待 candidate":"Waiting for candidate"
+  ,"当前版本已写入 LaTeX；可直接修改正文，或填写 comment 让 GPT 生成新 candidate。":"The current version is in LaTeX. Edit it directly or add a comment for GPT to generate a new candidate."
+  ,"正在结合已批准的段落结构、working abstract 和实验结果生成当前段落…":"Generating the current paragraph from the approved structure, working abstract, and experiment results…"
+  ,"确认后更新 LaTeX 并重新编译 PDF。":"Update LaTeX and recompile the PDF after confirmation."
+  ,"当前标题已经写入 PDF。":"The current title is already in the PDF."
+  ,"GPT candidate 尚未保存；可编辑后确认。":"The GPT candidate is unsaved; edit it and confirm when ready."
+  ,"提炼后的参考结构":"Distilled reference structure"
+  ,"双击正文、图片或表格，返回对应编辑位置":"Double-click prose, a figure, or a table to return to its editor"
+  ,"正在定位 PDF 中的源内容…":"Locating the source content in the PDF…"
+  ,"已就绪":"Ready"
+  ,"绘制中":"Drawing"
+  ,"已归档":"Archived"
+  ,"自动重建中":"Rebuilding automatically"
+  ,"已完成":"Completed"
+  ,"Prompt 未变 → 显示原图":"Prompt unchanged → Show original"
+  ,"确认新 Prompt → 重新调用 GPT Image":"Approve new prompt → Call GPT Image again"
+  ,"重新解析 Prompt 并生成合成图":"Reparse prompt and regenerate composition"
+  ,"更新 Caption → PDF":"Update caption → PDF"
+  ,"补生成 Caption → PDF":"Generate missing caption → PDF"
+  ,"已插入正文":"Inserted into paper"
+  ,"重新插入":"Insert again"
+  ,"保存修改（需重新确认）":"Save changes (confirmation required)"
+  ,"更新表格 → PDF":"Update table → PDF"
+  ,"保存 Caption 并更新 PDF":"Save caption and update PDF"
+  ,"例如：缩短标题，把图例移到右上角；只调整这一张图，不改变数据。":"For example: shorten the title and move the legend to the upper right; adjust only this panel without changing the data."
+  ,"这张图的修改 Prompt":"Revision prompt for this figure"
+  ,"这张子图的修改 Prompt":"Revision prompt for this panel"
+  ,"尚未生成这张图":"This figure has not been generated"
+  ,"尚未生成这张独立子图":"This panel has not been generated"
+  ,"本地 Agent 正在处理这张图…":"The local Agent is processing this figure…"
+  ,"本地 Agent 正在处理这张子图…":"The local Agent is processing this panel…"
+  ,"本地 Agent 重新生成这张":"Regenerate with local Agent"
+  ,"这是一张独立单图：点击下方按钮后直接生成最终 PDF candidate，不添加子图角标。":"This is a standalone figure. The button below generates the final PDF candidate directly, without panel labels."
+  ,"请分别生成并检查每张 PDF candidate。全部满意后，再手动点击“合成图”生成 PPTX 与矢量 PDF candidate。":"Generate and review each PDF candidate separately. When all are satisfactory, click Compose figure to create the PPTX and vector PDF candidate."
+  ,"线上不提供画图表功能":"Figure and table drawing is unavailable online"
+  ,"来源图 · 参考论文证据":"Source figure · reference-paper evidence"
+  ,"数据图 · results/ 驱动":"Data figure · driven by results/"
+  ,"生成表格初稿":"Generate table draft"
+  ,"当前候选段落":"Current candidate paragraph"
+  ,"已接受并写入 LaTeX 的 section 内容":"Accepted section content written to LaTeX"
+  ,"未上传实验结果：本 section 只保留段落主旨和待执行实验，不生成正文。":"No experimental results were uploaded. This section keeps only paragraph purposes and planned experiments, without drafting prose."
+  ,"这是当前写入 LaTeX 的版本；填写 comment 后可继续修改。":"This is the version currently written to LaTeX; add a comment to revise it."
+  ,"等待生成当前段落…":"Waiting to generate the current paragraph…"
+  ,"这个 section 已完成。":"This section is complete."
+  ,"未上传实验结果：从 Experiments 开始仅展示每段主旨、写作任务和待执行实验，不调用 LLM 生成正文。":"No experimental results were uploaded. From Experiments onward, only paragraph purposes, writing tasks, and planned experiments are shown; the LLM does not draft prose."
+  ,"Outline 尚未确认。可以浏览界面，但在确认并建立 LaTeX scaffold 前不能 Accept → LaTeX。":"The outline is not confirmed. You may browse, but cannot accept content into LaTeX until the scaffold is created."
+  ,"当前段落完成后自动生成本 Section…":"Generate this section automatically after the current paragraph…"
+  ,"正在根据 comment 修改当前段落…":"Revising the current paragraph from the comment…"
+  ,"后台 candidate 已生成；已保留你正在编辑的正文，Accept 时将以编辑框内容为准。":"A background candidate is ready. Your current edits were preserved and will be used on Accept."
+  ,"当前段落已生成。你只需要写 comment 修改，或 Accept → LaTeX。":"The current paragraph is ready. Add a comment to revise it or accept it into LaTeX."
+  ,"已接受版本的手动修改（尚未写入）":"Manual edits to the accepted version (not yet written)"
+  ,"请先输入写作模型名称。":"Enter a writing model first."
+  ,"标题有未保存修改。":"The title has unsaved changes."
+  ,"请先填写 Title GPT Prompt。":"Enter the Title GPT Prompt first."
+  ,"正在生成标题候选；不会自动保存…":"Generating title candidates; they will not be saved automatically…"
+  ,"正在写入 LaTeX 并编译 PDF…":"Writing to LaTeX and compiling the PDF…"
+  ,"正在核对最新段落状态…":"Checking the latest paragraph state…"
+  ,"候选已在另一轮生成中更新；已自动载入最新版，请确认内容后再次 Accept。":"The candidate changed in another generation run. The latest version is loaded; review it before accepting again."
+  ,"当前段落没有可接受的正文。":"The current paragraph has no prose to accept."
+  ,"正在校验引用；缺失时会联网检索、更新 BibTeX，再写入 LaTeX 并编译…":"Validating citations; missing references will be retrieved, added to BibTeX, written to LaTeX, and compiled…"
+  ,"正在编译 LaTeX…":"Compiling LaTeX…"
+  ,"PDF 编译成功。":"PDF compiled successfully."
+  ,"项目 ID 不匹配；未删除任何生成内容。":"Project ID does not match; nothing was deleted."
+  ,"当前没有可清空的论文项目。":"There is no paper project to clear."
+  ,"项目 ID 已复制。":"Project ID copied."
+  ,"自动复制失败；ID 已选中，请按 Ctrl/Cmd+C。":"Automatic copy failed. The ID is selected; press Ctrl/Cmd+C."
+  ,"当前段落生成完成后将自动启动全文初稿任务…":"The full-draft task will start after the current paragraph finishes…"
+  ,"全文初稿任务已启动；可以切换页面查看进度，完成后仍可逐段修改。":"Full-draft generation has started. You may navigate elsewhere and edit paragraphs after it completes."
+  ,"全文初稿与全部图表已写入 LaTeX，并完成 PDF 编译。":"The full draft and all artifacts were written to LaTeX, and the PDF was compiled."
+  ,"全文初稿已写入 LaTeX 并完成 PDF 编译，计划图表已以 placeholder 保留。":"The full draft was written to LaTeX and compiled to PDF; planned figures and tables remain as placeholders."
+  ,"已请求停止；已完成段落保留，之后可继续补齐未完成正文。":"Stop requested. Completed paragraphs are preserved and unfinished prose can be resumed later."
+  ,"完成。":"Done."
+  ,"正在停止本次 GPT Image 调用…":"Stopping this GPT Image request…"
+  ,"GPT 正在生成 Caption…":"GPT is generating a caption…"
+  ,"正在生成 Caption candidate…":"Generating a caption candidate…"
+  ,"Caption 已保存。":"Caption saved."
+  ,"正在安全更新…":"Updating securely…"
+  ,"GPT candidate 尚未保存；可继续编辑，确认后再写入 LaTeX。":"The GPT candidate is unsaved; edit it and confirm before writing it to LaTeX."
+  ,"标题已确认写入 LaTeX，并完成 PDF 编译。":"The title was written to LaTeX and the PDF was compiled."
+  ,"网页版保留图位、图题和正文引用，但不直接绘制机制图；请下载项目 ZIP，并在本地终端运行 Code Agent 完成绘图。":"The web version preserves the figure location, caption, and prose reference but does not draw mechanism figures. Download the project ZIP and use Code Agent locally to complete the figure."
+  ,"线上版以带 Caption 和 label 的 placeholder 保留该图位，不提供正式绘图。完整功能请下载项目 ZIP 后在本地版使用。":"The online version preserves this figure as a placeholder with its caption and label; formal drawing is unavailable. Download the project ZIP and use the local version for the complete workflow."
+  ,"线上版以带 Caption 和 label 的 placeholder 保留该表位，不提供表格生成。完整功能请下载项目 ZIP 后在本地版使用。":"The online version preserves this table as a placeholder with its caption and label; table generation is unavailable. Download the project ZIP and use the local version for the complete workflow."
+}));
+
+function translateStudioText(value) {
+  const exact = studioTranslations.get(value);
+  if (exact) return exact;
+  const replacements = [
+    ["参考论文：", "Reference paper: "],
+    ["正文已全部写入 LaTeX；请在图表工作台完成并确认：", "All prose has been written to LaTeX; complete and approve these artifacts in the figure and table workspace: "],
+    ["第 ", "Page "],
+    [" 页", ""],
+    [" · 图", " · Figures"],
+    [" · 表", " · Tables"],
+    ["已等待 ", "waited "],
+    [" 秒", " seconds"],
+    [" 后", " after"],
+  ];
+  let translated = value;
+  replacements.forEach(([source, target]) => { translated = translated.split(source).join(target); });
+  translated = translated
+    .replace(/^正在生成 (.+)$/, "Generating $1")
+    .replace(/^已写入并编译 (.+)$/, "Written and compiled: $1")
+    .replace(/^(.+) 的正文已写入 LaTeX 和 PDF，计划图表已以 placeholder 保留。$/, "$1 prose was written to LaTeX and PDF; planned figures and tables remain as placeholders.")
+    .replace(/^(.+) 的新版本已替换写入 LaTeX，并完成 PDF 编译。$/, "The new version of $1 was written to LaTeX and the PDF was compiled.")
+    .replace(/^\u5168\u90e8 (\d+) \u4e2a\u6bb5\u843d\u5df2\u7ecf\u5199\u5165 LaTeX\uff0c\u53ef\u7ee7\u7eed\u9010\u6bb5\u4fee\u6539\u3002$/, "All $1 paragraphs have been written to LaTeX and remain editable.")
+    .replace(/^\u5c06\u6309\u9879\u76ee\u5199\u4f5c\u987a\u5e8f\u8865\u9f50 (\d+) \/ (\d+) \u4e2a\u672a\u5b8c\u6210\u6bb5\u843d\uff1b\u5df2\u63a5\u53d7\u5185\u5bb9\u4e0d\u4f1a\u88ab\u8986\u76d6\u3002$/, "Draft $1 of $2 unfinished paragraphs in project order; accepted content will not be overwritten.")
+    .replace(/^\u4e00\u952e\u751f\u6210\u5f53\u524d Section\uff08(\d+) \u6bb5\u5f85\u5b8c\u6210\uff09$/, "Generate current section ($1 paragraphs remaining)")
+    .replace(/^\u5df2\u4ece PDF \u8fd4\u56de (.+) \u7684\u6587\u5b57\u7f16\u8f91\u4f4d\u7f6e\u3002$/, "Returned from the PDF to the text editor for $1.")
+    .replace(/^\u5df2\u4ece PDF \u8fd4\u56de (.+) \u7684(\u8868\u683c|\u56fe\u7247)\u7f16\u8f91\u4f4d\u7f6e\u3002$/, (_, id, kind) => `Returned from the PDF to the ${kind === "\u8868\u683c" ? "table" : "figure"} editor for ${id}.`)
+    .replace(/^(.+) \u7684\u5f53\u524d\u6bb5\u843d\u5df2\u751f\u6210\u5e76\u4fdd\u5b58\u3002$/, "The current paragraph in $1 was generated and saved.")
+    .replace(/^(.+) \u5df2\u63a5\u53d7\u5e76\u5b8c\u6210 LaTeX \u7f16\u8bd1\uff1b\u5f53\u524d section \u5df2\u5b8c\u6210\u3002$/, "$1 was accepted and compiled; the current section is complete.")
+    .replace(/^(.+) \u5df2\u63a5\u53d7\u5e76\u5b8c\u6210 LaTeX \u7f16\u8bd1\uff1b\u6b63\u5728\u540e\u53f0\u51c6\u5907 (.+) \u5019\u9009\u3002$/, "$1 was accepted and compiled; the candidate for $2 is being prepared in the background.")
+    .replace(/^(.+) \u5df2\u63a5\u53d7\u5e76\u5b8c\u6210 LaTeX \u7f16\u8bd1\uff1b(.+) \u5019\u9009\u5df2\u5237\u65b0\u3002$/, "$1 was accepted and compiled; the candidate for $2 was refreshed.")
+    .replace(/^(.+) \u5df2\u63a5\u53d7\u5e76\u5b8c\u6210 LaTeX \u7f16\u8bd1\u3002$/, "$1 was accepted and compiled in LaTeX.")
+    .replace(/^(.+) \u5df2\u52a0\u5165\u961f\u5217\uff1b\u5f53\u524d\u6bb5\u843d\u751f\u6210\u5b8c\u6210\u540e\u4f1a\u81ea\u52a8\u5f00\u59cb\u6574\u8282\u751f\u6210\u3002$/, "$1 was queued and will start after the current paragraph finishes.")
+    .replace(/^(.+) \u7684\u6574\u8282\u751f\u6210\u4efb\u52a1\u5df2\u542f\u52a8\uff1b\u5c06\u6309\u6bb5\u843d\u987a\u5e8f\u81ea\u52a8\u5199\u5165 LaTeX \u5e76\u7f16\u8bd1\u3002$/, "Full-section drafting for $1 has started and will write paragraphs to LaTeX in order.")
+    .replace(/\uff08([^\uff09]+)\uff09/g, " ($1)");
+  return translated;
+}
+
+function translateStudioUi(root = document.body) {
+  document.documentElement.lang = studioUiLanguage === "en" ? "en" : "zh-CN";
+  const select = $("studio-language-select");
+  if (select) select.value = studioUiLanguage;
+  if (studioUiLanguage !== "en" || !root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node => {
+    if (node.parentElement?.closest("script,style,textarea,code")) return;
+    if (node.parentElement?.closest("pre") && !node.parentElement.closest("pre.message")) return;
+    const value = node.nodeValue.trim();
+    const translated = translateStudioText(value);
+    if (translated !== value) node.nodeValue = node.nodeValue.replace(value, translated);
+  });
+  root.querySelectorAll?.("[placeholder]").forEach(node => {
+    const translated = studioTranslations.get(node.placeholder);
+    if (translated) node.placeholder = translated;
+  });
+}
+
+translateStudioUi();
+$("studio-language-select")?.addEventListener("change", event => {
+  const language = event.target.value === "en" ? "en" : "zh";
+  localStorage.setItem("research-avatar-language", language);
+  if (window.parent !== window) {
+    window.parent.postMessage({type: "research-avatar-language", language}, window.location.origin);
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set("lang", language);
+  window.location.replace(url.toString());
+});
+new MutationObserver(records => records.forEach(record => {
+  if (record.type === "characterData") translateStudioUi(record.target.parentElement);
+  record.addedNodes.forEach(node => {
+    if (node.nodeType === Node.ELEMENT_NODE) translateStudioUi(node);
+    if (node.nodeType === Node.TEXT_NODE) translateStudioUi(node.parentElement);
+  });
+})).observe(document.body, {subtree:true, childList:true, characterData:true});
 const STUDIO_BASE_PATH = ["/demo-studio", "/paper-studio"].find(
   prefix => window.location.pathname === prefix
     || window.location.pathname.startsWith(prefix + "/"),
@@ -80,6 +316,7 @@ let figureRequestBusy = false;
 let generatedResetBusy = false;
 let fullDraftRequestBusy = false;
 let queuedFullDraftStart = false;
+let queuedSectionDraftStart = "";
 let pdfLocateRequestId = 0;
 let proseBaselineKey = "";
 let proseBaselineText = "";
@@ -719,9 +956,9 @@ function renderPdf() {
     download.hidden = false;
     download.href = studioPath(state.pdf.url || "/paper.pdf");
     download.download = `${String(state.project && state.project.id || "paper").replace(/[^A-Za-z0-9._-]+/g, "-")}.pdf`;
-    viewer.style.display = "flex";
+    viewer.hidden = false;
     viewer.classList.toggle("navigation-visible", pdfNavigationVisible);
-    empty.style.display = "none";
+    empty.hidden = true;
     const signature = `${state.pdf.version}:${state.pdf.page_count}`;
     if (pages.dataset.signature !== signature) {
       const previousPosition = capturePdfPosition(pages);
@@ -730,7 +967,6 @@ function renderPdf() {
         const page = document.createElement("div");
         page.className = "pdf-page";
         page.dataset.page = String(pageNumber);
-        page.style.aspectRatio = `${state.pdf.page_width_pt} / ${state.pdf.page_height_pt}`;
         page.title = "双击正文、图片或表格，返回对应编辑位置";
         const image = document.createElement("img");
         image.alt = `论文 PDF 第 ${pageNumber} 页`;
@@ -767,8 +1003,8 @@ function renderPdf() {
     requestAnimationFrame(updatePdfPageIndicator);
   } else {
     download.hidden = true;
-    viewer.style.display = "none";
-    empty.style.display = "flex";
+    viewer.hidden = true;
+    empty.hidden = false;
     updatePdfPageIndicator();
   }
   const compile = state.compile || {};
@@ -963,7 +1199,7 @@ function updateFigureButtonStates() {
   );
   const hasPlacement = (figure.placement_options || []).some((option) => option.accepted);
   $("figure-placement").disabled = running || !hasPlacement;
-  $("figure-layout-mode").disabled = running || table || !hasPlacement;
+  $("figure-layout-mode").disabled = running || !hasPlacement;
   $("figure-approve").textContent = figure.status === "approved"
     ? (captionDirty
       ? "更新 Caption → PDF"
@@ -1067,7 +1303,7 @@ function renderDataPanels(figure) {
         <div class="data-panel-head"><strong></strong><span class="status"></span></div>
         <div class="data-panel-preview"></div>
         <div class="figure-progress data-panel-progress" hidden>
-          <div class="figure-progress-track"><span></span></div><strong></strong>
+          <progress class="figure-progress-track" max="100" value="0"></progress><strong></strong>
         </div>
         <label class="data-panel-prompt-label">这张子图的修改 Prompt</label>
         <textarea class="data-panel-prompt" rows="3" placeholder="例如：缩短标题，把图例移到右上角；只调整这一张图，不改变数据。"></textarea>
@@ -1140,7 +1376,7 @@ function renderDataPanels(figure) {
 
     const progress = card.querySelector(".data-panel-progress");
     progress.hidden = panel.status !== "agent_generating";
-    progress.querySelector(".figure-progress-track span").style.width = `${Math.max(0, Math.min(100, panel.progress || 0))}%`;
+    progress.querySelector(".figure-progress-track").value = Math.max(0, Math.min(100, panel.progress || 0));
     progress.querySelector("strong").textContent = panel.progress_message
       || (singlePanel ? "本地 Agent 正在处理这张图…" : "本地 Agent 正在处理这张子图…");
 
@@ -1232,7 +1468,7 @@ function scheduleAutomaticDataPanel(figure) {
 function scheduleAutomaticTableGenerate(figure) {
   // Reported directly: a researcher clicked into an empty table and nothing
   // happened -- generating one required finding "table-generate", which
-  // sits inside a collapsed "高级" (Advanced) <details> disclosure. Data
+  // sits inside the collapsed Advanced <details> disclosure. Data
   // figures already auto-generate the moment their panel is viewable (see
   // scheduleAutomaticDataPanel above); tables never had the equivalent, so
   // this mirrors that same pattern instead of requiring a manual click.
@@ -1415,7 +1651,7 @@ function renderFigures() {
   const running = figureIsRunning(figure);
   const singleData = figure.kind === "data" && (figure.panels || []).length === 1;
   progress.hidden = !running || (figure.kind === "data" && !singleData);
-  $("figure-progress-bar").style.width = `${Math.max(0, Math.min(100, figure.progress || 0))}%`;
+  $("figure-progress-bar").value = Math.max(0, Math.min(100, figure.progress || 0));
   const elapsed = running && Number.isFinite(figure.running_seconds)
     ? ` · 已等待 ${figure.running_seconds} 秒`
     : "";
@@ -1479,18 +1715,18 @@ function renderFigures() {
   const image = $("figure-preview-image");
   const pdf = $("figure-preview-pdf");
   const tablePreview = $("table-preview");
-  image.style.display = "none";
-  pdf.style.display = "none";
+  image.hidden = true;
+  pdf.hidden = true;
   tablePreview.hidden = true;
   if (isTable) {
     if (effectivePreviewUrl) {
       image.src = effectivePreviewUrl;
       image.alt = `${figure.id} LaTeX-compiled table preview`;
-      image.style.display = "block";
+      image.hidden = false;
     }
   } else if (effectivePreviewUrl && effectivePreviewType === "image") {
     image.src = effectivePreviewUrl;
-    image.style.display = "block";
+    image.hidden = false;
   } else if (effectivePreviewUrl) {
     const target = `${effectivePreviewUrl}#toolbar=0&navpanes=0&view=FitH`;
     if (pdf.dataset.source !== target) {
@@ -1503,7 +1739,7 @@ function renderFigures() {
       pdf.src = target;
       verifyFigurePdfCandidate(figure.id, effectivePreviewUrl, target);
     }
-    pdf.style.display = "block";
+    pdf.hidden = false;
   }
 
   const mechanism = figure.kind === "mechanism" && !placeholderOnly;
@@ -1559,11 +1795,11 @@ function renderFigures() {
     : (figure.status === "approved"
       ? "Caption 已写入正文与 PDF"
       : "当前正文将使用此 Caption");
-  $("mechanism-controls").style.display = mechanism ? "grid" : "none";
-  $("mechanism-approve-after-placement").style.display = mechanism ? "flex" : "none";
-  $("data-controls").style.display = !placeholderOnly && !mechanism && !isTable && !sourceFigure ? "block" : "none";
-  $("table-agent-controls").style.display = isTable && !state.online_project ? "block" : "none";
-  $("table-controls").style.display = isTable && !placeholderOnly ? "block" : "none";
+  $("mechanism-controls").hidden = !mechanism;
+  $("mechanism-approve-after-placement").hidden = !mechanism;
+  $("data-controls").hidden = placeholderOnly || mechanism || isTable || sourceFigure;
+  $("table-agent-controls").hidden = !isTable || Boolean(state.online_project);
+  $("table-controls").hidden = !isTable || placeholderOnly;
   $("table-workflow-note").textContent = state.online_project
     ? "上方图片由当前 LaTeX 真实编译；可生成结构化初稿并直接编辑 LaTeX。"
     : "上方图片由当前 LaTeX 真实编译。初稿与实验结果相关修改均由本地 Agent 完成。";
@@ -1607,7 +1843,7 @@ function renderFigures() {
   });
   if (figure.placement_after) placement.value = figure.placement_after;
   $("figure-placement-row").hidden = placeholderOnly;
-  $("figure-layout-control").hidden = isTable || placeholderOnly;
+  $("figure-layout-control").hidden = placeholderOnly;
   $("figure-layout-mode").value = figure.layout_mode || "single-column";
   $("figure-prompt").textContent = figure.draw_prompt
     ? "按右侧指令更新 Prompt"
@@ -1732,7 +1968,7 @@ function render() {
   if (referencePaper.title) {
     const meta = referencePaper.venue || "";
     referenceEl.replaceChildren();
-    referenceEl.append("参考论文：");
+    referenceEl.append(studioT("参考论文：", "Reference paper: "));
     if (referencePaper.url) {
       const link = document.createElement("a");
       link.href = referencePaper.url;
@@ -1743,7 +1979,7 @@ function render() {
     } else {
       referenceEl.append(referencePaper.title);
     }
-    if (meta) referenceEl.append(`（${meta}）`);
+    if (meta) referenceEl.append(studioT(`（${meta}）`, ` (${meta})`));
     referenceEl.hidden = false;
   } else {
     referenceEl.hidden = true;
@@ -1869,7 +2105,7 @@ function render() {
     || sectionDraftRunning
     || sectionDraftArtifactsPending
     || fullDraftRequestBusy
-    || proseRequestBusy
+    || Boolean(queuedSectionDraftStart)
     || !state.outline_confirmed
     || !state.api_key_configured
     || sectionPending === 0
@@ -1896,6 +2132,8 @@ function render() {
     ? `${sectionDraftJob.progress_message || "正在生成当前 Section…"}`
     : activeSectionArtifactJob
     ? `正在完成本 Section 图表（${(sectionDraftJob.pending_artifacts || []).join("、")}）`
+    : queuedSectionDraftStart === activeSection
+    ? "当前段落完成后自动生成本 Section…"
     : sectionPending
       ? `一键生成当前 Section（${sectionPending} 段待完成）`
       : "当前 Section 已完成";
@@ -1945,13 +2183,15 @@ function renderFullDraft() {
   if (job && job.progress_message) {
     summary.textContent = job.progress_message;
   } else if (!state.outline_confirmed) {
-    summary.textContent = "请先确认 outline；批量模式不会绕过论文结构确认。";
+    summary.textContent = studioT("请先确认 outline；批量模式不会绕过论文结构确认。", "Confirm the outline first; batch drafting does not bypass structure approval.");
   } else if (!state.api_key_configured) {
-    summary.textContent = "请先按页面顶部说明配置 LLM API Key。";
+    summary.textContent = studioT("请先按页面顶部说明配置 LLM API Key。", "Configure the LLM API key using the instructions at the top of the page.");
   } else if (!pending) {
-    summary.textContent = `全部 ${total} 个段落已经写入 LaTeX，可继续逐段修改。`;
+    summary.textContent = studioT(`全部 ${total} 个段落已经写入 LaTeX，可继续逐段修改。`, `All ${total} paragraphs have been written to LaTeX and remain editable.`);
   } else {
-    summary.textContent = `将按项目写作顺序补齐 ${pending} / ${total} 个未完成段落；已接受内容不会被覆盖。`;
+    summary.textContent = state.online_project
+      ? studioT(`将按项目写作顺序补齐 ${pending} / ${total} 个未完成段落；计划图表以带 Caption 和 label 的 placeholder 保留，已接受内容不会被覆盖。`, `Draft ${pending} of ${total} unfinished paragraphs in project order. Planned figures and tables remain placeholders with captions and labels; accepted content will not be overwritten.`)
+      : studioT(`将按项目写作顺序补齐 ${pending} / ${total} 个未完成段落，并生成、插入全部绑定的真实图表；placeholder 不计为完成，已接受内容不会被覆盖。`, `Draft ${pending} of ${total} unfinished paragraphs in project order, then generate and insert every bound real figure and table; placeholders do not count as complete, and accepted content will not be overwritten.`);
   }
 
   const start = $("full-draft-start");
@@ -1960,8 +2200,8 @@ function renderFullDraft() {
   start.textContent = job && ["failed", "cancelled"].includes(job.status)
     ? "继续补齐未完成正文"
     : pending === 0
-      ? "全文初稿已生成"
-      : "直接生成全文初稿";
+      ? studioT("全文初稿已生成", "Full first draft generated")
+      : studioT("直接生成全文初稿", "Generate full first draft");
   cancel.hidden = !running;
   cancel.disabled = fullDraftRequestBusy;
 
@@ -2056,7 +2296,11 @@ async function generateCurrent(automatic = false) {
   } finally {
     proseRequestBusy = false;
     setBusy(false);
-    if (queuedFullDraftStart) {
+    if (queuedSectionDraftStart) {
+      const section = queuedSectionDraftStart;
+      queuedSectionDraftStart = "";
+      void startSectionDraftFromBrowser(section);
+    } else if (queuedFullDraftStart) {
       queuedFullDraftStart = false;
       void startFullDraftFromBrowser();
     }
@@ -2149,17 +2393,12 @@ $("title-gpt-prompt").addEventListener("input", (event) => {
 $("title-generate").onclick = async () => {
   if (titleBusy) return;
   const prompt = $("title-gpt-prompt").value.trim();
-  if (!prompt) {
-    $("title-status").textContent = "请先填写 Title GPT Prompt。";
-    $("title-status").classList.add("error");
-    return;
-  }
   try {
     setTitleBusy(true, "正在生成标题候选；不会自动保存…");
     const payload = await request("/api/title/generate", {
       method: "POST",
       body: JSON.stringify({
-        prompt,
+        prompt: prompt || "Generate one concise, specific academic title that reflects the paper's actual problem and contribution. Do not add unsupported claims.",
         current_title: $("paper-title").value.trim(),
         model: $("model").value.trim(),
       }),
@@ -2392,7 +2631,7 @@ async function submitGeneratedReset(typed) {
     $("pdf-pages").dataset.signature = "";
     $("pdf-navigation").replaceChildren();
     $("pdf-navigation").dataset.signature = "";
-    $("pdf-viewer").style.display = "none";
+    $("pdf-viewer").hidden = true;
     $("pdf-download").hidden = true;
     updatePdfPageIndicator();
     const payload = await request("/api/reset-generated-paper", {
@@ -2537,9 +2776,15 @@ async function startFullDraftFromBrowser() {
   }
 }
 $("full-draft-start").onclick = () => startFullDraftFromBrowser();
-async function startSectionDraftFromBrowser() {
-  if (fullDraftRequestBusy || proseRequestBusy) return;
-  const requestedSection = activeSection;
+async function startSectionDraftFromBrowser(section = activeSection) {
+  if (fullDraftRequestBusy || queuedSectionDraftStart) return;
+  const requestedSection = section;
+  if (proseRequestBusy) {
+    queuedSectionDraftStart = requestedSection;
+    render();
+    showMessage(`${state.sections[requestedSection].title} 已加入队列；当前段落生成完成后会自动开始整节生成。`);
+    return;
+  }
   fullDraftRequestBusy = true;
   $("section-draft-start").disabled = true;
   try {
@@ -2773,6 +3018,7 @@ function updateFigurePlacement() {
       ? {
           table_id: activeFigure,
           placement_after: $("figure-placement").value,
+          layout_mode: $("figure-layout-mode").value,
         }
       : {
           figure_id: activeFigure,
@@ -2780,7 +3026,7 @@ function updateFigurePlacement() {
           layout_mode: $("figure-layout-mode").value,
         },
     figure && figure.kind === "table"
-      ? "正在移动表格并重新编译 PDF…"
+      ? "正在更新表格位置与单栏/双栏排版并重新编译 PDF…"
       : "正在更新插图位置与排版方式…",
   );
 }

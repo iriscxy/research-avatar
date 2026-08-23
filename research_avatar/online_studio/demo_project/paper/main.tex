@@ -1,29 +1,28 @@
-\documentclass[sigconf,review,anonymous]{acmart}
+\documentclass[11pt]{article}
+\usepackage[review]{acl}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{microtype}
 \usepackage{graphicx}
-\usepackage{amsmath,booktabs,flafter,placeins}
+\usepackage{amsmath,amssymb,booktabs,flafter,placeins}
 \usepackage{xurl}
-\settopmatter{printacmref=true,printccs=true,printfolios=true}
-\renewcommand\footnotetextcopyrightpermission[1]{}
-\acmConference[KDD '26]{ACM SIGKDD Conference on Knowledge Discovery and Data Mining}{August 9--13, 2026}{Jeju, Republic of Korea}
 \widowpenalty=10000
 \clubpenalty=10000
-\emergencystretch=2em
-\title{MORE: Adaptive Multi-Objective Learning for E-commerce Dialogue Systems}
+\title{Does Random Option Ordering Change Language Model Answers? A Study of Permutation Invariance in Multiple-Choice QA}
 \author{Anonymous Author(s)}
 \date{}
 \begin{document}
+\maketitle
 \begin{abstract}
 \input{sections/abstract}
 \end{abstract}
-\keywords{task-oriented dialogue, multi-objective learning, reinforcement learning, e-commerce}
-\ccsdesc[500]{Computing methodologies~Natural language generation}
-\maketitle
 \input{sections/introduction}
 \input{sections/related_work}
 \input{sections/method}
 \input{sections/experiments}
-\input{sections/analysis}
+\input{sections/discussion}
 \input{sections/conclusion}
-\FloatBarrier
 \input{sections/bibliography}
 \end{document}

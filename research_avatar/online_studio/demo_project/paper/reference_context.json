@@ -1,215 +1,142 @@
 {
-  "reference_title": "DyFlow: Dynamic Workflow Framework for Agentic Reasoning",
+  "reference_title": "The Cylindrical Representation Hypothesis for Language Model Steering",
+  "reference_source": "",
+  "public_demo_distilled": true,
   "sections": {
     "abstract": {
-      "mode": "source",
-      "declared_reference_mode": "abstracted",
-      "source_heading": "Front matter",
-      "logic_summary_zh": "仅向当前目标段落提供 EXP PLAN 中已批准并嵌入的参考原文，用于模仿论证动作，不复制研究结论或措辞。",
+      "source_heading": "Abstract",
+      "logic_summary_zh": "参考摘要先提出问题和局限，再给出解释、证据与审慎结论。",
       "excerpts": [
         {
-          "id": "DYF-SRC-L005",
-          "source_paragraph_id": "DYF-SRC-L005",
-          "source_heading": "Front matter",
-          "text": "Agent systems based on large language models (LLMs) have shown great potential in complex reasoning tasks, but building efficient and generalizable workflows remains a major challenge. Most existing approaches rely on manually designed processes, which limits their adaptability across different tasks. While a few methods attempt automated workflow generation, they are often tied to specific datasets or query types and make limited use of intermediate feedback, reducing system robustness and reasoning depth. Moreover, their operations are typically predefined and inflexible. To address these limitations, we propose DyFlow , a dynamic workflow generation framework that adaptively constructs and adjusts reasoning procedures based on task requirements and real-time intermediate feedback, thereby enhancing cross-task generalization. DyFlow consists of two core components: a designer and an executor. The designer decomposes complex problems into a sequence of sub-goals defined by high-level objectives and dynamically plans the next steps based on intermediate outputs and feedback. These plans are then carried out by the executor, which executes each operation using dynamic operators with context-aware parameterization, enabling flexible and semantically grounded reasoning. We systematically evaluate DyFlow across diverse domains, including social reasoning, biomedical tasks, mathematical problem solving, and code generation. Results demonstrate that DyFlow significantly outperforms existing baselines, achieving substantial Pass@k improvements and exhibiting robust generalization across diverse domains. The code is publicly available at https://github.com/wyf23187/DyFlow ."
+          "reference_paragraph_id": "REF-ABS-P1",
+          "text": "Open with the problem, identify the limitation of the prevailing account, introduce the proposed explanation, summarize the evidence, and close with a bounded implication.",
+          "distilled": true
         }
       ]
     },
     "introduction": {
-      "mode": "source",
-      "declared_reference_mode": "abstracted",
-      "source_heading": "1 Introduction",
-      "logic_summary_zh": "仅向当前目标段落提供 EXP PLAN 中已批准并嵌入的参考原文，用于模仿论证动作，不复制研究结论或措辞。",
+      "source_heading": "Introduction",
+      "logic_summary_zh": "参考引言从重要性收窄到缺口，再提出方案与可验证边界。",
       "excerpts": [
         {
-          "id": "DYF-SRC-L009",
-          "source_paragraph_id": "DYF-SRC-L009",
-          "source_heading": "1 Introduction",
-          "text": "Large language models (LLMs) have demonstrated remarkable abilities in language understanding, generation, and complex reasoning tasks ( achiam2023gpt ; song2024hazards ; song2025quite ) . They support many applications, from dialogue systems and content generation to autonomous agents and multi-step decision-making ( jin2019pubmedqa ; wu2023autogen ; song2025injecting ; wang2025word ) . Recently, there has been a growing trend of deploying LLMs as agents , where multiple LLMs collaborate to tackle complex tasks. Debate-based systems enable agents to critique each other’s solutions ( du2023improving ) , and team-based agents distribute tasks across specialized roles ( hong2023metagpt ; li2023camel ) ."
+          "reference_paragraph_id": "REF-I-P1",
+          "text": "Establish why the problem matters and define the concrete behavior under study.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L011",
-          "source_paragraph_id": "DYF-SRC-L011",
-          "source_heading": "1 Introduction",
-          "text": "However, most existing multi-agent frameworks use static , pre-defined workflows, as illustrated in Figure 1 . Each agent’s role and task sequence is fixed beforehand, proceeding rigidly without intermediate feedback. For instance, CAMEL ( li2023camel ) assigns agents pre-defined roles via system prompts, MetaGPT ( hong2023metagpt ) enforces collaboration based on standard operating procedures, and AutoGen ( wu2023autogen ) and OpenAgents ( xie2023openagents ) orchestrate agents through static communication graphs or APIs. When a sub-task fails or produces flawed output, these systems typically halt or propagate errors due to the lack of mechanisms for revising plans or goals. Recent frameworks introduce some adaptability but with limitations: AFlow ( zhang2024aflow ) and ADAS ( hu2024automated ) optimize workflows via offline search guided by dataset-level performance, still tied to specific training distributions. DyLAN ( liu2023dynamic ) and MaAS ( zhang2025multi ) offer query-specific agent configurations but do not adjust subgoals based on real-time feedback."
+          "reference_paragraph_id": "REF-I-P2",
+          "text": "Narrow from the broad motivation to the unresolved empirical gap.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L041",
-          "source_paragraph_id": "DYF-SRC-L041",
-          "source_heading": "2.2 Feedback-based Correction in LLM Systems",
-          "text": "However, these correction mechanisms have been underutilized in workflow planning. Effective correction at the workflow level requires more than recovering from execution failures, as it demands the ability to dynamically revise subgoal decomposition and operator selection in response to intermediate signals. This poses stricter requirements for granularity and adaptability than existing designs can satisfy. DyFlow addresses this gap by directly integrating feedback into the planning loop. It adjusts subgoal plans and operator configurations in real time based on contextual signals, enabling fine-grained and resilient reasoning workflows that evolve with task progress."
+          "reference_paragraph_id": "REF-I-P3",
+          "text": "State the proposed perspective and explain how it resolves the gap.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L015",
-          "source_paragraph_id": "DYF-SRC-L015",
-          "source_heading": "1 Introduction",
-          "text": "To address these limitations, we propose DyFlow , a feedback-driven framework for LLM-based agents that dynamically adapts subgoal planning during execution. DyFlow is built on a hierarchical designer-executor architecture and operates in a sequenced manner: Given a task, the high-level designer initializes the process by planning the first subgoal and its corresponding operator execution graph based on the task requirements. The low-level executor then carries out this subgoal, leveraging tools, APIs, or external functions as required. At each execution step, DyFlow collects intermediate outputs, tool feedback, and possible error signals. Based on this updated context, the designer generates a revised subgoal plan tailored to the current state. This feedback loop continues throughout the task, enabling DyFlow to adjust its reasoning trajectory in real time. If a subgoal fails or encounters unexpected results, DyFlow can proactively revise the plan, retry the subgoal, or reassign responsibilities—supporting both high-level strategy shifts and fine-grained execution corrections. Compared to prior methods such as DyLAN ( liu2023dynamic ) and ReAct ( yao2023react ) , which only adapt agent roles or individual actions, DyFlow enables dynamic restructuring at the subgoal level, offering greater robustness and flexibility in complex, real-world tasks."
-        },
-        {
-          "id": "DYF-SRC-L027",
-          "source_paragraph_id": "DYF-SRC-L027",
-          "source_heading": "1 Introduction",
-          "text": "We demonstrate DyFlow’s robustness across diverse domains, models, and tasks through systematic experiments covering generalization, efficiency, and ablation."
+          "reference_paragraph_id": "REF-I-P4",
+          "text": "Separate what the study can determine from what remains uncertain.",
+          "distilled": true
         }
       ]
     },
     "related_work": {
-      "mode": "source",
-      "declared_reference_mode": "abstracted",
-      "source_heading": "2.1 Static and Dynamic Agentic Workflows",
-      "logic_summary_zh": "仅向当前目标段落提供 EXP PLAN 中已批准并嵌入的参考原文，用于模仿论证动作，不复制研究结论或措辞。",
+      "source_heading": "Related Work",
+      "logic_summary_zh": "参考论文先分类方法与理论，再定位自身贡献。",
       "excerpts": [
         {
-          "id": "DYF-SRC-L033",
-          "source_paragraph_id": "DYF-SRC-L033",
-          "source_heading": "2.1 Static and Dynamic Agentic Workflows",
-          "text": "Many LLM-based agent systems are built upon static workflows, where agent roles, execution order, and interaction protocols are predefined and fixed throughout the task. For example, MetaGPT ( hong2023metagpt ) follows standard operating procedures (SOPs) encoded into prompt templates to coordinate collaborative coding, while AutoGen ( wu2023autogen ) orchestrates multi-agent dialogues through rigid communication graphs. CAMEL ( li2023camel ) and OpenAgents ( xie2023openagents ) further reinforce this paradigm by hard-coding agent roles or API usage. Although such designs facilitate structured cooperation, they lack the capacity to revise plans in response to failures or evolving context, resulting in limited robustness and adaptability."
+          "reference_paragraph_id": "REF-RW-P1",
+          "text": "Group the closest methodological work by shared objective and limitation.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L035",
-          "source_paragraph_id": "DYF-SRC-L035",
-          "source_heading": "2.1 Static and Dynamic Agentic Workflows",
-          "text": "To reduce reliance on manual design, a line of research has explored automated agent construction. AFlow ( zhang2024aflow ) refines code-centric workflows using Monte Carlo Tree Search, ADAS ( hu2024automated ) performs meta-search over agent architectures, and AgentSquare ( shang2024agentsquare ) evolves modular components via composition. These systems automate workflow design, yet they still adopt one-shot planning: once constructed, the workflow remains fixed during execution. Other methods such as DyLAN ( liu2023dynamic ) and MaAS ( zhang2025multi ) dynamically configure agents or select templates based on task complexity, but lack mechanisms to adapt subgoal plans based on runtime feedback. More recently, ScoreFlow ( wang2025scoreflow ) and MaAS introduce continuous or conditional search spaces over workflows and agent architectures, offering more expressive design flexibility. However, they still treat planning as a pre-execution optimization problem, separated from the execution process itself."
+          "reference_paragraph_id": "REF-RW-P2",
+          "text": "Contrast the target contribution with methods that optimize performance rather than explain behavior.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L039",
-          "source_paragraph_id": "DYF-SRC-L039",
-          "source_heading": "2.2 Feedback-based Correction in LLM Systems",
-          "text": "Intermediate feedback has been explored for improving LLM reasoning ability across various settings. In single-agent systems, Reflexion ( shinn2023reflexion ) performs retrospective self-evaluation across episodes, while Tree of Thoughts ( yao2023tree ) enables trajectory-level revision via search. DSPy ( khattab2023dspy ) introduces assertion-based checks to detect and fix failures at the module level. In multi-agent frameworks, AutoGen ( wu2023autogen ) supports retrying failed actions within fixed communication rounds."
+          "reference_paragraph_id": "REF-RW-P3",
+          "text": "Synthesize the theoretical thread and locate the paper's distinct scope.",
+          "distilled": true
         }
       ]
     },
     "method": {
-      "mode": "source",
-      "declared_reference_mode": "abstracted",
-      "source_heading": "3.1 Formalization of DyFlow Planning",
-      "logic_summary_zh": "仅向当前目标段落提供 EXP PLAN 中已批准并嵌入的参考原文，用于模仿论证动作，不复制研究结论或措辞。",
+      "source_heading": "Method",
+      "logic_summary_zh": "参考方法部分先概述思路，再定义过程和实现细节。",
       "excerpts": [
         {
-          "id": "DYF-SRC-L053",
-          "source_paragraph_id": "DYF-SRC-L053",
-          "source_heading": "3.1 Formalization of DyFlow Planning",
-          "text": "DyFlow formulates complex reasoning tasks as a dynamic sequence of decision-making steps. Each task p\\in\\mathcal{P} requires a series of interdependent actions to reach a solution. At every step t , the system maintains a state s_{t} , which captures the complete context necessary for planning and execution. s_{t} includes the original task specification, previously generated plans (G_{0},\\dots,G_{t-1}) , intermediate outputs such as partial answers or review verdicts, and any encountered errors. The process begins with an initial state s_{0} , containing only the task itself, and this state is progressively updated as the system executes each planning step."
+          "reference_paragraph_id": "REF-PR-P1",
+          "text": "Introduce the controlled approximation used to connect the hypothesis to observable behavior.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L055",
-          "source_paragraph_id": "DYF-SRC-L055",
-          "source_heading": "3.1 Formalization of DyFlow Planning",
-          "text": "DyFlow draws from a finite set of operator templates \\mathcal{O}=\\{O_{1},\\dots,O_{N}\\} , each corresponding to a basic type of reasoning or execution step. These templates define reusable operations that can be instantiated according to context. At each step, DyFlow constructs a structured plan represented as a stage subgraph G_{t}=(V_{t},E_{t},v_{\\text{start}}^{t},C_{\\text{end}}^{t}) . This directed graph specifies a set of actions to execute: V_{t} contains operator instances, each instantiated from a template in \\mathcal{O} . Formally, an operator instance o\\in V_{t} is defined as a tuple o=(O_{k},\\phi,\\psi) , where O_{k}\\in\\mathcal{O} is the template, \\phi is a fine-grained instruction tailored to the current context, and \\psi is a list of input keys referencing a global memory buffer \\mathcal{M} , which stores previous outputs as key–value pairs. This design allows operator instances to flexibly use information across reasoning steps. The edge set E_{t} encodes dependencies between these operations, v_{\\text{start}}^{t} marks the entry point of execution, and C_{\\text{end}}^{t} defines conditions for plan termination. A complete list of operator templates and their descriptions is provided in Appendix C ."
+          "reference_paragraph_id": "REF-PR-P2",
+          "text": "Define the probing procedure before presenting implementation details.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L077",
-          "source_paragraph_id": "DYF-SRC-L077",
-          "source_heading": "3.3 Distilled Self-Play Learning",
-          "text": "While the executor requires no additional training and can be directly instantiated using existing LLMs, the designer is trained separately to develop strong planning capabilities. We train the designer policy \\pi_{\\theta} using a two-phase method that combines knowledge distillation with self-play preference optimization ouyang2022training ; ethayarajh2024kto ; rafailov2023direct . The goal is to enable the designer to construct context-sensitive subgoal plans that improve execution outcomes. While the executor remains fixed throughout, the designer is trained to dynamically generate structured reasoning workflows."
+          "reference_paragraph_id": "REF-PR-P3",
+          "text": "Describe the ordered stages that construct and inspect the local analysis space.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L083",
-          "source_paragraph_id": "DYF-SRC-L083",
-          "source_heading": "3.3 Distilled Self-Play Learning",
-          "text": "This process distills knowledge from successful trajectories, producing the reference policy \\pi_{\\text{ref}} for the next phase."
-        },
-        {
-          "id": "DYF-SRC-L079",
-          "source_paragraph_id": "DYF-SRC-L079",
-          "source_heading": "3.3 Distilled Self-Play Learning",
-          "text": "The learning process begins by generating trajectories \\tau=(s_{0},G_{0},s_{1},G_{1},\\dots,G_{T-1},s_{T}) using the current or a past version of the policy \\pi_{\\theta} across a diverse set of tasks. Each trajectory is executed by the workflow executor, and its outcome is compared to the correct solution to assess success. For successful trajectories, all stage-subgraph pairs (f_{\\text{summary}}(s_{t}),G_{t}) are labeled as “preferred,” reflecting effective planning. For failed trajectories, the corresponding pairs are labeled as “discarded,” capturing planning errors. All positive and negative examples are derived from these self-play trajectories, enabling the designer to learn from its own performance."
-        },
-        {
-          "id": "DYF-SRC-L087",
-          "source_paragraph_id": "DYF-SRC-L087",
-          "source_heading": "3.3 Distilled Self-Play Learning",
-          "text": "Here, l\\in\\{\\text{preferred},\\text{discarded}\\} indicates whether the subgraph G is effective or not, and \\beta is a hyperparameter controlling the strength of preference alignment. Here, L_{\\text{pref}}^{\\text{single}} is computed based on whether each subgraph G is labeled as preferred or discarded, with \\beta controlling the alignment strength between \\pi_{\\theta} and \\pi_{\\text{ref}} . By leveraging feedback from self-generated trajectories, this off-policy self-play phase ensures the designer makes context-sensitive, adaptive decisions. This iterative self-improvement strategy equips DyFlow to deliver robust and versatile reasoning capabilities across a wide range of applications."
+          "reference_paragraph_id": "REF-PR-P4",
+          "text": "Specify fixed settings, swept variables, and the resulting measurements.",
+          "distilled": true
         }
       ]
     },
     "experiments": {
-      "mode": "source",
-      "declared_reference_mode": "abstracted",
-      "source_heading": "4.1 Experimental Setup",
-      "logic_summary_zh": "仅向当前目标段落提供 EXP PLAN 中已批准并嵌入的参考原文，用于模仿论证动作，不复制研究结论或措辞。",
+      "source_heading": "Experiments",
+      "logic_summary_zh": "参考实验部分依次说明设置、数据、比较方法与指标。",
       "excerpts": [
         {
-          "id": "DYF-SRC-L099",
-          "source_paragraph_id": "DYF-SRC-L099",
-          "source_heading": "4.1 Experimental Setup",
-          "text": "Datasets. We consider 5 diverse reasoning domains, each represented by a benchmark dataset: (1) Logical Reasoning using the LiveBench dataset white2024livebench , (2) Math Reasoning using the MATH benchmark hendrycksmath2021 , (3) Medical Reasoning with PubMedQA jin2019pubmedqa , (4) Code Reasoning via HumanEval chen2021evaluating , and (5) Social Reasoning using the SocialMaze xu2025socialmaze benchmark. These datasets differ in their input structures, intermediate reasoning steps, and solution formats, and together cover a broad spectrum of reasoning behaviors."
+          "reference_paragraph_id": "REF-V-P6",
+          "text": "Name the evaluated models and justify the selected intervention points.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L111",
-          "source_paragraph_id": "DYF-SRC-L111",
-          "source_heading": "4.1.1 Performance Comparison",
-          "text": "Table 1 reports the performance of DyFlow and all baselines across five reasoning domains. DyFlow consistently outperforms prior methods, achieving the highest average accuracy (61.45) with improvements observed across logic, math, medical, code, and social reasoning tasks. Notably, while trained only on MATH, PubMedQA, and LiveBench, DyFlow generalizes robustly to the held-out HumanEval and SocialMaze benchmarks. These results highlight the transferability of DyFlow’s adaptive planning strategy across structurally diverse domains. In particular, DyFlow achieves 17.18 on SocialMaze, a challenging multi-turn benchmark that requires high-level reasoning, substantially outperforming all baselines in this zero-shot setting. This strong performance demonstrates that DyFlow’s feedback-driven, adaptive planning enables effective subgoal revision and robust reasoning, even on previously unseen, highly complex tasks."
+          "reference_paragraph_id": "REF-V-P7",
+          "text": "Describe dataset construction and the sampling protocol.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L117",
-          "source_paragraph_id": "DYF-SRC-L117",
-          "source_heading": "4.1.1 Performance Comparison",
-          "text": "In addition to Pass@1, we further evaluate the performance of DyFlow under the top-k setting. As shown in Figure 3 , DyFlow consistently outperforms CoT across all k values from 1 to 5, with increasingly wider margins at higher k . This indicates that DyFlow not only generates more accurate first predictions, but also demonstrates greater reasoning stability across multiple completions, with a higher potential to produce strong solutions."
+          "reference_paragraph_id": "REF-V-P8",
+          "text": "Define the compared methods and the inference-time sweep.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L123",
-          "source_paragraph_id": "DYF-SRC-L123",
-          "source_heading": "4.2 Generalization Analysis",
-          "text": "This section evaluates DyFlow’s generalization capabilities across three dimensions: designer models, execution models, and datasets. Each dimension demonstrates DyFlow’s ability to maintain robust performance under varying conditions, leveraging its adaptive planning mechanisms."
-        },
-        {
-          "id": "DYF-SRC-L141",
-          "source_paragraph_id": "DYF-SRC-L141",
-          "source_heading": "4.2 Generalization Analysis",
-          "text": "The gains are especially notable when DyFlow is paired with stronger executors and applied to more complex tasks. For instance, Phi-4 with DyFlow achieves performance close to GPT-4.1-mini with CoT, while incurring only half the cost. When applied to GPT-4.1-mini, DyFlow brings further improvements, particularly on SocialMaze and LiveBench. These results indicate that structured planning from DyPlanner enhances reasoning quality and stability across a variety of executor backbones."
+          "reference_paragraph_id": "REF-V-P9",
+          "text": "State the evaluation metric and how the response trend is summarized.",
+          "distilled": true
         }
       ]
     },
-    "analysis": {
-      "mode": "source",
-      "declared_reference_mode": "abstracted",
-      "source_heading": "4.3 Ablation Study",
-      "logic_summary_zh": "仅向当前目标段落提供 EXP PLAN 中已批准并嵌入的参考原文，用于模仿论证动作，不复制研究结论或措辞。",
+    "discussion": {
+      "source_heading": "Discussion",
+      "logic_summary_zh": "参考讨论区分可观察结论、不可确定部分与适用边界。",
       "excerpts": [
         {
-          "id": "DYF-SRC-L151",
-          "source_paragraph_id": "DYF-SRC-L151",
-          "source_heading": "4.3 Ablation Study",
-          "text": "To assess the contribution of DyFlow’s core components, we conduct ablation experiments targeting both the designer training process and the execution-time mechanisms, as summarized in Table 4 . On the training side, we remove either the knowledge distillation (SFT) or the offline preference optimization (KTO). Both lead to consistent drops in performance, indicating that these two phases are complementary: SFT provides structural guidance for initializing the designer, while KTO enables refinement based on trajectory-level feedback. On the execution side, disabling dynamic operator selection forces the executor to follow a fixed-stage template, reducing its ability to adjust reasoning based on intermediate results."
+          "reference_paragraph_id": "REF-P-P1",
+          "text": "Frame the interpretation around which quantities are observable and which are not.",
+          "distilled": true
         },
         {
-          "id": "DYF-SRC-L129",
-          "source_paragraph_id": "DYF-SRC-L129",
-          "source_heading": "4.2 Generalization Analysis",
-          "text": "To assess the robustness of our training framework across different designer architectures, we apply the same DyFlow learning pipeline to three backbone models: Claude-3.7-Sonnet, GPT-4.1, and Phi-4. We include MaAS as the strongest existing baseline."
-        },
-        {
-          "id": "DYF-SRC-L131",
-          "source_paragraph_id": "DYF-SRC-L131",
-          "source_heading": "4.2 Generalization Analysis",
-          "text": "As shown in Table 2 , DyFlow consistently outperforms MaAS across all designer backbones. More specifically, our DyPlanner is initialized from the 14B open-weight Phi-4 model. Despite its relatively small scale, DyPlanner achieves performance comparable to larger proprietary designers such as GPT-4.1 and Claude-3.7-Sonnet across most domains. This demonstrates that DyFlow’s strong planning capability does not stem from model size alone, but also from our dedicated two-phase optimization strategy. By combining supervised subgraph distillation with offline preference-based refinement, we equip a compact model with the ability to perform high-quality structured planning across diverse tasks. As shown in Table 9 , DyPlanner offers a more cost-efficient and scalable alternative without sacrificing performance. These results suggest that dynamic, feedback-aware designers can emerge from lightweight open models when trained with appropriate trajectory-level signals, making DyFlow well-suited for real-world deployment in resource-constrained settings."
-        },
-        {
-          "id": "DYF-SRC-L263",
-          "source_paragraph_id": "DYF-SRC-L263",
-          "source_heading": "Appendix D Experiment Details",
-          "text": "We report the cost of DyFlow in both training and inference, and compare it with baseline systems using proprietary or open-weight models. As shown in Table 9 , DyPlanner achieves the lowest inference cost across all domains while maintaining comparable or superior performance to larger proprietary designers such as GPT-4.1 and Claude-3.7. Despite being based on the compact Phi-4 model, DyPlanner enables DyFlow to match or outperform these stronger backbones in structured reasoning tasks. This confirms the effectiveness of our training pipeline, which distills high-quality planning behavior into a lightweight designer with minimal runtime cost."
-        },
-        {
-          "id": "DYF-SRC-L159",
-          "source_paragraph_id": "DYF-SRC-L159",
-          "source_heading": "4.4 Case Study",
-          "text": "We conduct a qualitative comparison between DyFlow and a standard reasoning baseline without error correction. The baseline generates a fixed reasoning path based on initial inputs and executes it without revisiting intermediate outputs, making it susceptible to early mistakes and incomplete solutions. As illustrated in Figure 5 , DyFlow instead treats planning as an ongoing process. Guided by the designer, it dynamically assigns operators based on intermediate feedback and task state. When execution produces partial or inconsistent outputs, DyFlow adapts its subgoal plan and invokes refinement operators to identify and correct reasoning errors during runtime. This includes dynamically selecting the appropriate data inputs, adjusting instructions, and refining intermediate results using targeted operator calls."
+          "reference_paragraph_id": "REF-P-P2",
+          "text": "State the formal limitation that bounds predictability.",
+          "distilled": true
         }
       ]
     },
     "conclusion": {
-      "mode": "source",
-      "declared_reference_mode": "abstracted",
-      "source_heading": "5 Conclusion",
-      "logic_summary_zh": "仅向当前目标段落提供 EXP PLAN 中已批准并嵌入的参考原文，用于模仿论证动作，不复制研究结论或措辞。",
+      "source_heading": "Conclusion",
+      "logic_summary_zh": "参考结论总结贡献、证据边界和未来方向。",
       "excerpts": [
         {
-          "id": "DYF-SRC-L163",
-          "source_paragraph_id": "DYF-SRC-L163",
-          "source_heading": "5 Conclusion",
-          "text": "In this paper, we presented DyFlow, a framework for dynamic workflow construction in LLM-based reasoning systems. By modeling reasoning as subgraph planning with modular operator execution, DyFlow enables flexible adaptation to intermediate feedback and diverse task requirements. Our evaluations across five reasoning domains demonstrate that DyFlow improves task success rates and generalizes across diverse reasoning tasks. Future work may explore integrating richer error detection signals and expanding the operator set to support more complex interaction protocols."
+          "reference_paragraph_id": "REF-CON-P1",
+          "text": "Recap the contribution, the explanatory mechanism, the evidence boundary, and concrete future work.",
+          "distilled": true
         }
       ]
     }

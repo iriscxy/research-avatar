@@ -114,6 +114,8 @@ researcher-profile/PROFILE.html
 | `$expplan` | 逐段规划 Projected Paper 和待填图表，再反推出实验合同 |
 | `$runplan` | 把整个实验拆成 Goals，按依赖顺序逐项执行 |
 
+未明确请求翻译时，`$researchlit` 不会调用任何翻译 API；如需翻译，必须由研究者显式指定目标语言。
+
 论文写作不由 Skill 启动：Research Studio 的论文阶段直接读取当前项目的已批准结构、参考论文和实验结果，并在浏览器中逐段调用 LLM API、确认后写入 LaTeX。
 
 ---

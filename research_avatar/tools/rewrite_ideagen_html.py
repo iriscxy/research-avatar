@@ -57,9 +57,14 @@ def eligible_string(node: NavigableString) -> bool:
         return False
     if parent.get("class") and any(value in {"badge", "tag", "status", "selected-banner"} for value in parent.get("class", [])):
         return False
-    # Treat compact table judgments as prose too. Six CJK characters reliably
-    # separates explanatory content from IDs, tiers, badges, and terse labels.
-    return len(re.findall(r"[\u3400-\u9fff]", text)) >= 6
+    # Treat compact table judgments as prose too.  Reports may be written in
+    # Chinese or English, so eligibility cannot depend on CJK characters alone.
+    # Fixed labels and IDs were already removed above; six CJK characters or
+    # six whitespace-delimited words reliably separates explanatory prose from
+    # the remaining terse cells in either language.
+    cjk_count = len(re.findall(r"[\u3400-\u9fff]", text))
+    word_count = len(re.findall(r"\b[\w'-]+\b", text, flags=re.UNICODE))
+    return cjk_count >= 6 or word_count >= 6
 
 
 def protected_tokens(text: str) -> list[str]:
@@ -92,16 +97,17 @@ def response_items(
             "required_protected_tokens": item["protected_tokens"],
         })
     system = (
-        "You are the final readability editor for a Chinese research-idea webpage. "
+        "You are the final readability editor for a research-idea webpage. "
         "Rewrite every supplied text fragment so an adjacent-area researcher understands it on first read. "
-        "Use direct, concrete Chinese; make the actor, action, comparison, and observable consequence explicit. "
+        "Keep each fragment in its input language and use direct, concrete prose; make the actor, action, comparison, and observable consequence explicit. "
         "Explain necessary jargon briefly in the same fragment, split overloaded clauses, and remove noun piles. "
         "The fragment will be inserted back into its original context: do not repeat a neighboring label, heading, or linked paper title already present in context. "
-        "Use the domain glossary consistently: linguistic register means 语域或文体, token means 词元, steering means 激活引导, false refusal means 误拒答, and representation means 内部表示. "
-        "Also translate matched style counterfactuals as 语义相同但风格不同的配对反事实样本, actuation as 执行拒答动作, guard as 独立安全防护器, and Pareto as 安全—误拒答权衡. "
+        "For Chinese input, use the domain glossary consistently: linguistic register means 语域或文体, token means 词元, steering means 激活引导, false refusal means 误拒答, and representation means 内部表示. "
+        "For Chinese input, translate matched style counterfactuals as 语义相同但风格不同的配对反事实样本, actuation as 执行拒答动作, guard as 独立安全防护器, and Pareto as 安全—误拒答权衡. "
         "Preserve epistemic modality exactly: a proposed comparison, hypothesis, risk, or falsifier must never become a completed experiment or positive result. "
         "Do not write vague fragments such as 概念几何高 or Pareto过拒; state the concrete property or trade-off instead. "
         "Preserve the exact scientific meaning, uncertainty, novelty verdict, falsifier, scope, numbers, IDs, and every protected token. "
+        "Never introduce a new acronym, all-capital abbreviation, camel-case identifier, numeric value, or idea ID; if the input spells a term out, keep it spelled out. "
         "Do not add evidence, citations, claims, recommendations, or markdown. Context is only for grammar; output only the rewritten fragment. "
         "Return one JSON object with key items; items must be an array of objects with exactly id and text, in input order. "
         + retry_note
@@ -246,6 +252,7 @@ def main() -> int:
                             args.provider,
                             retry_note=(
                                 "This is a correction request. Copy every required protected token verbatim, with the same occurrence count. "
+                                "Do not introduce any new acronym, all-capital abbreviation, camel-case identifier, numeric value, or idea ID. "
                                 "Do not merge clauses that contain repeated numbers or identifiers. The output must contain exactly "
                                 f"the same protected-token multiset as the input. Required tokens: {required}."
                             ),

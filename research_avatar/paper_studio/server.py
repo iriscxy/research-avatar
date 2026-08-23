@@ -101,8 +101,12 @@ ONLINE_DISABLED_ARTIFACT_AGENT_PATHS = {
     "/api/table/agent-edit",
 }
 ONLINE_PLACEHOLDER_FIGURE_MESSAGE = (
-    "网页版保留图位、图题和正文引用，但不直接绘制机制图；"
-    "请下载项目 ZIP，并在本地终端运行 Code Agent 完成绘图。"
+    "线上版以带 Caption 和 label 的 placeholder 保留该图位，不提供正式绘图。"
+    "完整功能请下载项目 ZIP 后在本地版使用。"
+)
+ONLINE_PLACEHOLDER_TABLE_MESSAGE = (
+    "线上版以带 Caption 和 label 的 placeholder 保留该表位，不提供表格生成。"
+    "完整功能请下载项目 ZIP 后在本地版使用。"
 )
 DEMO_MODE = os.environ.get("PAPER_STUDIO_DEMO_MODE", "").lower() in {
     "1",
@@ -149,7 +153,7 @@ SECTION_DRAFT_JOB_LOCK = DRAFT_BATCH_JOB_LOCK
 CANCELLED_SECTION_DRAFT_JOBS: set[str] = set()
 # Serializes latexmk/bibtex runs against PAPER. The HTTP server is
 # threaded, and multiple callers can trigger a compile concurrently (the
-# explicit "编译 PDF" button, the pdf/locate auto-rebuild fallback, a
+# explicit Compile PDF button, the pdf/locate auto-rebuild fallback, a
 # batch-writing job) -- on the shared, long-lived Demo session in
 # particular, two overlapping compiles racing on the same main.aux/main.bbl
 # can corrupt each other's intermediate files well enough to produce a
@@ -301,6 +305,12 @@ def load_project_config(
             panel_ids = [str(item.get("id", "")) for item in definition.get("panels", [])]
             if len(panel_ids) != len(set(panel_ids)) or any(not item for item in panel_ids):
                 raise ProjectConfigError(f"{kind}.{artifact_id} panel ids must be unique")
+            if kind == "figures" and "include_scale" in definition:
+                scale = definition["include_scale"]
+                if not isinstance(scale, (int, float)) or isinstance(scale, bool) or not 0.5 <= float(scale) <= 1.0:
+                    raise ProjectConfigError(
+                        f"figures.{artifact_id}.include_scale must be between 0.5 and 1.0"
+                    )
             if kind == "tables" and not isinstance(definition.get("data_grid"), dict):
                 raise ProjectConfigError(f"tables.{artifact_id}.data_grid is required")
             if kind == "tables":
@@ -1232,7 +1242,16 @@ def figure_latex(
     else:
         wide = definition["width"].startswith("two-column")
     environment = "figure*" if wide else "figure"
-    width = "\\textwidth" if wide else "\\columnwidth"
+    include_scale = float(definition.get("include_scale", 1.0))
+    width = (
+        "\\textwidth"
+        if wide
+        else (
+            "\\columnwidth"
+            if include_scale >= 0.999
+            else f"{include_scale:g}\\columnwidth"
+        )
+    )
     # A narrow float may be anchored after the last accepted paragraph while
     # all following sections are still empty. With top-only placement,
     # ``flafter`` prevents it from moving before that anchor and LaTeX can
@@ -1412,7 +1431,12 @@ def table_placeholder_latex(
     caption = latex_escape_caption(
         str(table_state.get("caption") or definition["caption"]).strip()
     )
-    wide = str(definition.get("width", "")).startswith("two-column")
+    layout_mode = str(table_state.get("layout_mode") or "").strip()
+    wide = (
+        layout_mode == "two-column"
+        if layout_mode
+        else str(definition.get("width", "")).startswith("two-column")
+    )
     environment = "table*" if wide else "table"
     box_width = r"0.94\textwidth" if wide else r"0.94\columnwidth"
     placeholder = latex_escape_title(
@@ -2100,6 +2124,15 @@ def paragraph_architecture(paragraph: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def online_citation_placeholder_minimum(section: str, paragraph_index: int) -> int:
+    """Reserve fillable citation slots in literature-facing hosted prose."""
+    if section == "introduction":
+        return 2 if paragraph_index < 2 else 0
+    if section == "related_work":
+        return 2
+    return 0
+
+
 def _default_state() -> dict[str, Any]:
     return {
         "schema_version": "1.2",
@@ -2195,6 +2228,11 @@ def _default_state() -> dict[str, Any]:
                 "agent_prompt": "",
                 "agent_history": [],
                 "placement_after": None,
+                "layout_mode": (
+                    "two-column"
+                    if TABLES[table_id]["width"].startswith("two-column")
+                    else "single-column"
+                ),
                 "progress": 0,
                 "progress_message": "",
                 "job_token": None,
@@ -3345,6 +3383,7 @@ def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pd
     figure, axes = plt.subplots(figsize=(3.32, 2.4))
     positions = np.arange(len(labels))
     percent_x = all(re.fullmatch(r"[-+]?\d+(?:\.\d+)?%", label) for label in labels)
+    line_chart = str(definition.get("chart_type") or "").strip().casefold() == "line"
     width = 0.8 / max(len(series), 1)
     for index, (label, values) in enumerate(series):
         interval = interval_columns.get(label, {})
@@ -3354,7 +3393,7 @@ def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pd
                 [max(0.0, value - low) for value, low in zip(values, interval["low"])],
                 [max(0.0, high - value) for value, high in zip(values, interval["high"])],
             ])
-        if percent_x and len(labels) >= 3:
+        if line_chart or (percent_x and len(labels) >= 3):
             axes.errorbar(
                 positions, values, yerr=error, marker="o", linewidth=1.25,
                 capsize=2.5, label=label,
@@ -3370,7 +3409,7 @@ def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pd
                 positions + index * width, values, width, yerr=error,
                 capsize=2.5 if error is not None else 0, label=label,
             )
-    tick_positions = positions if percent_x or (len(series) == 1 and interval_columns) else positions + width * (len(series) - 1) / 2
+    tick_positions = positions if line_chart or percent_x or (len(series) == 1 and interval_columns) else positions + width * (len(series) - 1) / 2
     axes.set_xticks(tick_positions)
     axes.set_xticklabels(labels, rotation=20, ha="right", fontsize=7)
     axes.tick_params(axis="y", labelsize=7)
@@ -3399,7 +3438,10 @@ def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pd
 
 
 def generate_table_latex(
-    table_id: str, metrics: dict[str, Any], prompt: str = ""
+    table_id: str,
+    metrics: dict[str, Any],
+    prompt: str = "",
+    layout_mode: str | None = None,
 ) -> str:
     definition = TABLES[table_id]
     available_columns, available_rows = table_grid(table_id, metrics)
@@ -3408,7 +3450,11 @@ def generate_table_latex(
     )
     columns = spec["columns"]
     rows = spec["rows"]
-    wide = definition["width"].startswith("two-column")
+    wide = (
+        layout_mode == "two-column"
+        if layout_mode in {"single-column", "two-column"}
+        else definition["width"].startswith("two-column")
+    )
     environment = "table*" if wide else "table"
     alignment = "l" + "c" * (len(columns) - 1)
     compact_wide_header = wide and len(columns) >= 8
@@ -3969,7 +4015,10 @@ def synchronize_artifact_workbenches_from_manuscript(
             # A pending placeholder has the final label solely to keep paragraph
             # compilation transactional.  It is not an editable result table.
             continue
-        latex = validate_table_latex_source(table_id, latex)
+        recovered_layout_mode = table_layout_mode_from_latex(latex)
+        latex = validate_table_latex_source(
+            table_id, latex, layout_mode=recovered_layout_mode
+        )
         recovered_at = int(source_path.stat().st_mtime)
         updates = {
             "latex": latex,
@@ -3982,6 +4031,7 @@ def synchronize_artifact_workbenches_from_manuscript(
             or (definition.get("related_paragraphs", {}).get(section, []) or [None])[-1],
             "progress": 100,
             "progress_message": "已从论文源码恢复表格工作台。",
+            "layout_mode": recovered_layout_mode,
         }
         latex_changed = stored.get("latex", "").strip() != latex
         for field, value in updates.items():
@@ -4030,14 +4080,25 @@ def direct_full_draft_table_source(
                 count=1,
             )
         return (
-            validate_table_latex_source(table_id, approved_latex),
+            validate_table_latex_source(
+                table_id,
+                approved_latex,
+                layout_mode=str(stored.get("layout_mode") or "") or None,
+            ),
             str(stored.get("generation_prompt") or default_table_prompt(table_id)),
             True,
         )
     prompt = default_table_prompt(table_id)
     return (
         validate_table_latex_source(
-            table_id, generate_table_latex(table_id, metrics, prompt)
+            table_id,
+            generate_table_latex(
+                table_id,
+                metrics,
+                prompt,
+                layout_mode=str(stored.get("layout_mode") or "") or None,
+            ),
+            layout_mode=str(stored.get("layout_mode") or "") or None,
         ),
         prompt,
         False,
@@ -4071,7 +4132,9 @@ def materialize_batch_artifacts(
         if not str(paragraph.get("accepted_text", "")).strip():
             continue
         paths = figure_paths(figure_id)
-        if definition.get("kind") == "data" and not paths["pdf"].is_file():
+        if definition.get("kind") == "data" and not (
+            paths["pdf"].is_file() and paths["preview"].is_file()
+        ):
             # Resetting a generated paper deliberately removes prior outputs.
             # A browser full-draft rerun must therefore recreate deterministic
             # result figures from metrics instead of merely recovering files
@@ -4185,6 +4248,38 @@ def materialize_batch_artifacts(
     return True
 
 
+def batch_figure_has_real_deliverables(
+    state: dict[str, Any], figure_id: str
+) -> bool:
+    """Reject placeholder-only or stale figures at the batch completion gate."""
+    if is_hosted_placeholder_artifact(figure_id):
+        return True
+    stored = state.get("figures", {}).get(figure_id, {})
+    if stored.get("status") != "approved":
+        return False
+    definition = FIGURES[figure_id]
+    paths = figure_paths(figure_id)
+    if definition.get("kind") == "data":
+        expected_panels = [
+            str(panel.get("id"))
+            for panel in definition.get("panels", [])
+            if panel.get("id")
+        ]
+        stored_panels = stored.get("panels", {})
+        return bool(
+            stored.get("composed_at")
+            and paths["pdf"].is_file()
+            and paths["preview"].is_file()
+            and all(
+                stored_panels.get(panel_id, {}).get("status") == "built"
+                for panel_id in expected_panels
+            )
+        )
+    if definition.get("kind") == "mechanism":
+        return completed_mechanism_deliverables_match_current_draft(figure_id)
+    return paths["pdf"].is_file()
+
+
 def pending_batch_artifacts(
     state: dict[str, Any], artifact_ids: list[str] | None = None
 ) -> list[str]:
@@ -4216,7 +4311,11 @@ def pending_batch_artifacts(
             continue
         collection = "figures" if artifact_id in FIGURES else "tables"
         artifact_state = state[collection][artifact_id]
-        if artifact_state.get("status") != "approved":
+        if artifact_id in FIGURES:
+            ready = batch_figure_has_real_deliverables(state, artifact_id)
+        else:
+            ready = artifact_state.get("status") == "approved"
+        if not ready:
             pending.append(artifact_id)
     return pending
 
@@ -4251,10 +4350,19 @@ def refresh_full_draft_artifact_status(state: dict[str, Any]) -> None:
         else:
             job["status"] = "completed"
             job["progress_message"] = (
-                f"{SECTION_MAP[str(job.get('section'))]['title']} 的正文与绑定图表均已完成，"
-                "并已写入 LaTeX 和 PDF。"
-                if section_scope
-                else "全文初稿与全部图表已写入 LaTeX，并完成 PDF 编译。"
+                (
+                    f"{SECTION_MAP[str(job.get('section'))]['title']} 的正文已写入 LaTeX 和 PDF，"
+                    "计划图表已以 placeholder 保留。"
+                    if section_scope
+                    else "全文初稿已写入 LaTeX 并完成 PDF 编译，计划图表已以 placeholder 保留。"
+                )
+                if ONLINE_PROJECT_MODE
+                else (
+                    f"{SECTION_MAP[str(job.get('section'))]['title']} 的正文与绑定图表均已完成，"
+                    "并已写入 LaTeX 和 PDF。"
+                    if section_scope
+                    else "全文初稿与全部图表已写入 LaTeX，并完成 PDF 编译。"
+                )
             )
 
 
@@ -4361,6 +4469,11 @@ def completed_manuscript_issues(state: dict[str, Any]) -> list[str]:
             str(stored.get("latex") or "")
         ):
             issues.append(f"{table_id}: unresolved table placeholder")
+    for figure_id in state.get("figures", {}):
+        if is_hosted_placeholder_artifact(figure_id):
+            continue
+        if not batch_figure_has_real_deliverables(state, figure_id):
+            issues.append(f"{figure_id}: unresolved figure placeholder or missing real deliverables")
     metrics = metrics_bundle()
     if not bool(metrics.get("synthetic", False)):
         for path in (PAPER / "sections").glob("*.tex"):
@@ -4408,16 +4521,57 @@ def normalize_table_numeric_precision(latex: str) -> str:
     )
 
 
-def validate_table_latex_source(table_id: str, latex: str) -> str:
+def table_layout_mode_from_latex(latex: str) -> str:
+    """Return the float span encoded by one complete table environment."""
+    if re.search(r"\\begin\{table\*\}", latex):
+        return "two-column"
+    if re.search(r"\\begin\{table\}", latex):
+        return "single-column"
+    raise StudioError("表格 LaTeX 缺少 table/table* 环境。")
+
+
+def convert_table_latex_layout(table_id: str, latex: str, layout_mode: str) -> str:
+    """Convert only the outer float environment, preserving every table cell."""
+    if layout_mode not in {"single-column", "two-column"}:
+        raise StudioError("表格排版方式仅支持 single-column 或 two-column。")
+    source = latex.strip()
+    current_mode = table_layout_mode_from_latex(source)
+    if current_mode == layout_mode:
+        return validate_table_latex_source(table_id, source, layout_mode=layout_mode)
+    environment = "table*" if layout_mode == "two-column" else "table"
+    placement = "t" if layout_mode == "two-column" else "tb"
+    source = re.sub(
+        r"\\begin\{table\*?\}(?:\[[^\]]*\])?",
+        lambda _match: f"\\begin{{{environment}}}[{placement}]",
+        source,
+        count=1,
+    )
+    source = re.sub(
+        r"\\end\{table\*?\}",
+        lambda _match: f"\\end{{{environment}}}",
+        source,
+        count=1,
+    )
+    return validate_table_latex_source(table_id, source, layout_mode=layout_mode)
+
+
+def validate_table_latex_source(
+    table_id: str, latex: str, *, layout_mode: str | None = None
+) -> str:
     source = latex.strip()
     definition = TABLES[table_id]
     if not source:
         raise StudioError("表格 LaTeX 不能为空。")
     if not re.search(r"\\begin\{table\*?\}", source):
         raise StudioError("表格 LaTeX 缺少 table/table* 环境。")
-    expected_environment = (
-        "table*" if str(definition.get("width", "")).startswith("two-column") else "table"
+    if layout_mode is not None and layout_mode not in {"single-column", "two-column"}:
+        raise StudioError("表格排版方式仅支持 single-column 或 two-column。")
+    expected_wide = (
+        layout_mode == "two-column"
+        if layout_mode is not None
+        else str(definition.get("width", "")).startswith("two-column")
     )
+    expected_environment = "table*" if expected_wide else "table"
     if not re.search(
         rf"\\begin\{{{re.escape(expected_environment)}\}}.*?"
         rf"\\end\{{{re.escape(expected_environment)}\}}",
@@ -4563,6 +4717,7 @@ def edit_table_with_local_agent(
     instruction: str,
     *,
     metrics: dict[str, Any] | None = None,
+    layout_mode: str | None = None,
 ) -> str:
     """Ask the installed Codex CLI—not the Responses API—to revise one table."""
     codex = shutil_which("codex")
@@ -4572,6 +4727,18 @@ def edit_table_with_local_agent(
     if not instruction:
         raise StudioError("请填写希望本地 Agent 如何修改表格。")
     definition = TABLES[table_id]
+    if layout_mode not in {None, "single-column", "two-column"}:
+        raise StudioError("表格排版方式仅支持 single-column 或 two-column。")
+    layout_mode = layout_mode or (
+        table_layout_mode_from_latex(latex)
+        if latex.strip()
+        else (
+            "two-column"
+            if str(definition.get("width", "")).startswith("two-column")
+            else "single-column"
+        )
+    )
+    required_environment = "table*" if layout_mode == "two-column" else "table"
     columns, rows = table_grid(table_id, metrics or metrics_bundle())
     evidence = json.dumps(
         {"columns": columns, "rows": rows},
@@ -4596,6 +4763,8 @@ def edit_table_with_local_agent(
    \\resizebox{{\\textwidth}}{{!}}{{...}}。
 7. 所有小数指标统一显示到小数点后三位；这是展示精度，不得改变行列对应关系或
    使用不可追溯的新数值。
+8. 必须使用 {required_environment} 浮动环境；这是研究者当前选择的
+   {layout_mode} 排版，不得自行切换。
 
 <researcher_instruction>
 {instruction}
@@ -4654,7 +4823,11 @@ def edit_table_with_local_agent(
                 output.read_text(encoding="utf-8", errors="replace")
             )
         )
-    return validate_table_latex_source(table_id, revised)
+    return validate_table_latex_source(
+        table_id,
+        revised,
+        layout_mode=layout_mode,
+    )
 
 
 def table_agent_worker(
@@ -4670,9 +4843,21 @@ def table_agent_worker(
             stored["progress"] = 35
             stored["progress_message"] = "本地 codex agent 正在重写 LaTeX 表格…"
             stored["job_revision"] = int(stored.get("job_revision", 0)) + 1
+            layout_mode = str(
+                stored.get("layout_mode")
+                or (
+                    "two-column"
+                    if str(TABLES[table_id].get("width", "")).startswith("two-column")
+                    else "single-column"
+                )
+            )
             save_state(state)
         revised = edit_table_with_local_agent(
-            table_id, latex, instruction, metrics=metrics_bundle()
+            table_id,
+            latex,
+            instruction,
+            metrics=metrics_bundle(),
+            layout_mode=layout_mode,
         )
         require_substantive_table_revision(latex, revised, instruction)
         try:
@@ -4691,6 +4876,7 @@ def table_agent_worker(
                 revised,
                 repair_instruction,
                 metrics=metrics_bundle(),
+                layout_mode=layout_mode,
             )
             require_substantive_table_revision(latex, revised, instruction)
             compile_table_preview(table_id, revised)
@@ -4787,7 +4973,7 @@ def table_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
                 **definition,
                 "placeholder_only": is_hosted_placeholder_artifact(table_id),
                 "placeholder_message": (
-                    ONLINE_PLACEHOLDER_FIGURE_MESSAGE
+                    ONLINE_PLACEHOLDER_TABLE_MESSAGE
                     if is_hosted_placeholder_artifact(table_id)
                     else ""
                 ),
@@ -4803,6 +4989,13 @@ def table_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
                 "agent_prompt": stored.get("agent_prompt", ""),
                 "agent_history": stored.get("agent_history", []),
                 "placement_after": placement_after,
+                "layout_mode": stored.get("layout_mode")
+                or (
+                    "two-column"
+                    if definition["width"].startswith("two-column")
+                    else "single-column"
+                ),
+                "width": stored.get("layout_mode") or definition["width"],
                 "progress": int(stored.get("progress", 0)),
                 "progress_message": stored.get("progress_message", ""),
                 "placement_options": [
@@ -5079,20 +5272,30 @@ def experimental_setup_issues(section: str, purpose: str, text: str) -> list[str
         if str(item.get("name") or "").casefold() not in text.casefold()
     ]
     issues = ["missing setup item: " + item for item in missing]
-    # A compact setup must cite externally sourced datasets and baselines, but
-    # the required count has to come from this project's approved contract.
-    # Requiring three citations unconditionally made any valid plan without
-    # ``dataset_citations``/``baseline_contract`` impossible to write, and the
-    # repair prompt then leaked names from one unrelated Steering Commutator
-    # fixture.  Cap the density at three while accepting zero when expplan did
-    # not declare any published setup items.
-    external_setup_items = [
-        item
+    # A local manuscript can require only citation keys explicitly supplied by
+    # the approved contract; a baseline name or URL alone is not a usable
+    # BibTeX identity and may describe this study's own control. Hosted writing
+    # intentionally uses empty \cite{} slots, so count citation commands there
+    # rather than only non-empty keys.
+    declared_keys = {
+        str(item.get("citation_key") or "").strip()
         for item in required_setup_items
-        if str(item.get("name") or "").strip()
-    ]
-    required_citation_count = min(3, len(external_setup_items))
-    if required_citation_count and len(citation_keys(text)) < required_citation_count:
+        if str(item.get("citation_key") or "").strip()
+    }
+    if ONLINE_PROJECT_MODE:
+        external_count = sum(
+            1
+            for item in required_setup_items
+            if str(item.get("url") or item.get("citation_key") or "").strip()
+        )
+        required_citation_count = min(3, external_count)
+        observed_citation_count = len(
+            re.findall(r"\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{[^}]*\}", text)
+        )
+        citations_missing = observed_citation_count < required_citation_count
+    else:
+        citations_missing = not declared_keys.issubset(citation_keys(text))
+    if citations_missing:
         issues.append("published datasets and baselines lack introducing citations")
     protocol = metrics_bundle().get("evaluation_protocol", {})
     protocol_models = protocol.get("models", []) if isinstance(protocol, dict) else []
@@ -5235,7 +5438,13 @@ def experiment_setup_context() -> dict[str, Any]:
     implementation_rows = contract.get("implementation_contract", [])
     metric_rows = contract.get("metric_contract", [])
     datasets = [
-        {"name": str(row.get("name", "")).strip(), "url": str(row.get("url", "")).strip()}
+        {
+            "name": str(row.get("name", "")).strip(),
+            "url": str(row.get("url", "")).strip(),
+            "citation_key": str(
+                row.get("citation_key") or row.get("bibtex_key") or ""
+            ).strip(),
+        }
         for row in dataset_rows
         if isinstance(row, dict) and str(row.get("name", "")).strip()
     ]
@@ -5256,6 +5465,10 @@ def experiment_setup_context() -> dict[str, Any]:
                 "name": name,
                 "role": str(row.get("scientific_role", "")).strip(),
                 "implementation": implementations.get(name, ""),
+                "url": str(row.get("url", "")).strip(),
+                "citation_key": str(
+                    row.get("citation_key") or row.get("bibtex_key") or ""
+                ).strip(),
             }
         )
     our_methods = [
@@ -5409,6 +5622,41 @@ LATEX_PROSE_UNICODE_MATH_RANGES = (
     (0x2A00, 0x2AFF),  # Supplemental Mathematical Operators
 )
 
+# Commands in this set are valid only in TeX math mode. Keep this syntactic
+# allow-list separate from the prose-content checks: its sole purpose is to
+# prevent a generated paragraph such as ``100 \times 5`` from reaching
+# pdflatex and aborting a long batch-writing job.
+LATEX_MATH_ONLY_COMMANDS = frozenset(
+    {
+        "alpha", "beta", "gamma", "delta", "epsilon", "theta", "lambda",
+        "mu", "pi", "rho", "sigma", "tau", "phi", "chi", "psi", "omega",
+        "Gamma", "Delta", "Theta", "Lambda", "Pi", "Sigma", "Phi", "Psi", "Omega",
+        "times", "cdot", "pm", "mp", "div", "le", "leq", "ge", "geq",
+        "neq", "approx", "sim", "in", "notin", "subset", "subseteq",
+        "supset", "supseteq", "cup", "cap", "sum", "prod", "frac", "sqrt",
+        "mathbb", "mathcal", "mathbf", "mathrm", "operatorname",
+    }
+)
+
+
+def latex_command_names(source: str) -> list[str]:
+    """Tokenize control-word names without interpreting manuscript meaning."""
+    names: list[str] = []
+    index = 0
+    while index < len(source):
+        if source[index] != "\\":
+            index += 1
+            continue
+        index += 1
+        if index >= len(source) or not source[index].isalpha():
+            index += 1
+            continue
+        start = index
+        while index < len(source) and source[index].isalpha():
+            index += 1
+        names.append(source[start:index])
+    return names
+
 
 def _is_latex_unsafe_unicode_math(character: str) -> bool:
     codepoint = ord(character)
@@ -5483,6 +5731,14 @@ def latex_prose_issues(source: str) -> list[str]:
     )
     if unicode_math:
         issues.append("Unicode math glyphs: " + " ".join(unicode_math))
+    math_commands = sorted(
+        set(latex_command_names(masked)).intersection(LATEX_MATH_ONLY_COMMANDS)
+    )
+    if math_commands:
+        issues.append(
+            "math command outside math delimiters: "
+            + " ".join("\\" + command for command in math_commands)
+        )
     specials = {
         "_": "raw underscore",
         "%": "raw percent sign",
@@ -6714,11 +6970,20 @@ def resolve_citations_from_online_bibliography(
     section: str,
     purpose: str,
     paragraph: str,
+    minimum_placeholders: int = 0,
 ) -> tuple[str, str]:
     """Mark every genuine hosted citation obligation with ``\\cite{}``."""
     if SECTION_MAP.get(section, {}).get("render") == "abstract":
         return previous_response_id, remove_manuscript_citations(paragraph)
     prior_counts = prior_section_citation_counts(section, paragraph)
+    minimum_placeholders = max(0, int(minimum_placeholders))
+    minimum_instruction = (
+        f" This paragraph must retain at least {minimum_placeholders} literal "
+        "\\cite{} placeholder(s) at the clauses that most clearly depend on prior "
+        "literature, so the researcher can fill them after export."
+        if minimum_placeholders
+        else ""
+    )
     response = post_openai(
         {
             "model": model,
@@ -6733,7 +6998,8 @@ model, dataset, benchmark, or metric. Use no citation for this paper's own metho
 proposed experiment, interpretation, common knowledge, or self-contained definition.
 Preserve the paragraph's scientific content, numbers, headings, and artifact references.
 Do not remove an external claim merely because no bibliography is available; mark its
-citation position with \\cite{}. Do not append a citation dump at paragraph end.""",
+citation position with \\cite{}. Do not append a citation dump at paragraph end."""
+            + minimum_instruction,
             "input": f"""<section>{section}</section>
 <paragraph_purpose>{purpose}</paragraph_purpose>
 <paragraph>{paragraph}</paragraph>
@@ -6746,7 +7012,34 @@ Return the citation-audited paragraph only.""",
     response_id = str(response.get("id") or "")
     if not revised or not response_id:
         raise StudioError("Online citation audit did not return a paragraph.")
-    return response_id, online_citation_markers(revised)
+    revised = online_citation_markers(revised)
+    if revised.count(r"\cite{}") < minimum_placeholders:
+        response = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the same complete LaTeX-ready paragraph. Preserve "
+                    "all wording, claims, numbers, headings, and artifact references. "
+                    f"Insert at least {minimum_placeholders} exact literal \\cite{{}} "
+                    "placeholder(s), attached locally to the most appropriate external "
+                    "background or prior-literature clauses. Do not invent citation "
+                    "keys, authors, titles, years, or bibliography records."
+                ),
+                "input": f"<paragraph>{revised}</paragraph>",
+                "text": {"verbosity": "low"},
+            }
+        )
+        revised = online_citation_markers(
+            normalize_latex_ready_text(extract_output_text(response))
+        )
+        response_id = str(response.get("id") or "")
+    if not revised or not response_id or revised.count(r"\cite{}") < minimum_placeholders:
+        raise StudioError(
+            "Online citation audit did not preserve the required empty citation slots."
+        )
+    return response_id, revised
 
 
 def repair_empty_citation_placeholders(
@@ -7073,6 +7366,7 @@ def call_openai(
     figure_states: dict[str, dict[str, Any]] | None = None,
     required_heading_style: str | None = None,
     include_section_context: bool | None = None,
+    minimum_online_citation_placeholders: int = 0,
 ) -> tuple[str, str, list[str]]:
     fresh_rewrite = bool(
         re.search(
@@ -8194,6 +8488,7 @@ evidence.{(
             section=section,
             purpose=purpose,
             paragraph=online_citation_markers(text),
+            minimum_placeholders=minimum_online_citation_placeholders,
         )
     else:
         text = local_survey_citations(text)
@@ -8848,6 +9143,11 @@ def draft_batch_worker(
                 artifacts=[str(item) for item in paragraph.get("artifacts", [])],
                 figure_states=figure_states,
                 include_section_context=include_section_context,
+                minimum_online_citation_placeholders=(
+                    online_citation_placeholder_minimum(section, paragraph_index)
+                    if ONLINE_PROJECT_MODE
+                    else 0
+                ),
             )
 
             with job_lock:
@@ -8952,10 +9252,19 @@ def draft_batch_worker(
                         + "、".join(pending_artifacts)
                         if pending_artifacts
                         else (
-                            f"{SECTION_MAP[section_filter]['title']} 的正文与绑定图表均已完成，"
-                            "并已写入 LaTeX 和 PDF。"
-                            if section_filter
-                            else "全文初稿与全部图表已写入 LaTeX，并完成 PDF 编译。"
+                            (
+                                f"{SECTION_MAP[section_filter]['title']} 的正文已写入 LaTeX 和 PDF，"
+                                "计划图表已以 placeholder 保留。"
+                                if section_filter
+                                else "全文初稿已写入 LaTeX 并完成 PDF 编译，计划图表已以 placeholder 保留。"
+                            )
+                            if ONLINE_PROJECT_MODE
+                            else (
+                                f"{SECTION_MAP[section_filter]['title']} 的正文与绑定图表均已完成，"
+                                "并已写入 LaTeX 和 PDF。"
+                                if section_filter
+                                else "全文初稿与全部图表已写入 LaTeX，并完成 PDF 编译。"
+                            )
                         )
                     ),
                     pending_artifacts=pending_artifacts,
@@ -12133,9 +12442,10 @@ class Handler(BaseHTTPRequestHandler):
         if draft_batch_running(state):
             raise StudioError("批量写作任务正在生成；请等待任务完成。")
         editor = state["title_editor"]
-        prompt = str(body.get("prompt", "")).strip()
-        if not prompt:
-            raise StudioError("请先填写 Title GPT Prompt。")
+        prompt = str(body.get("prompt", "")).strip() or (
+            "Generate one concise, specific academic title that reflects the paper's actual "
+            "problem and contribution. Do not add unsupported claims."
+        )
         model = str(body.get("model") or state.get("model") or DEFAULT_MODEL).strip()
         current_title = normalize_plain_title(
             str(body.get("current_title") or manuscript_title_display())
@@ -12316,6 +12626,13 @@ class Handler(BaseHTTPRequestHandler):
             artifacts=[str(item) for item in paragraph.get("artifacts", [])],
             figure_states=state["figures"],
             include_section_context=include_section_context,
+            minimum_online_citation_placeholders=(
+                online_citation_placeholder_minimum(
+                    section, section_state["paragraphs"].index(paragraph)
+                )
+                if ONLINE_PROJECT_MODE
+                else 0
+            ),
         )
         # The model call is intentionally outside the lock, but it can outlive
         # the browser request that started a batch-writing job. Never save the
@@ -13285,6 +13602,14 @@ class Handler(BaseHTTPRequestHandler):
         if not ready:
             raise StudioError(reason)
         table_state = state["tables"][table_id]
+        layout_mode = str(
+            table_state.get("layout_mode")
+            or (
+                "two-column"
+                if str(TABLES[table_id].get("width", "")).startswith("two-column")
+                else "single-column"
+            )
+        )
         prompt = str(
             body.get(
                 "generation_prompt",
@@ -13298,10 +13623,17 @@ class Handler(BaseHTTPRequestHandler):
         if ONLINE_PROJECT_MODE:
             # No local Agent subprocess online -- generate_table_latex's
             # deterministic structured-prompt parser already handles the
-            # exact same 数据源/列/行/Caption/字号/最优值 directives this
+            # same source-data/column/row/caption/font-size/best-value directives this
             # prompt uses, so route there instead of the (blocked) Agent.
             latex = validate_table_latex_source(
-                table_id, generate_table_latex(table_id, metrics_bundle(), prompt)
+                table_id,
+                generate_table_latex(
+                    table_id,
+                    metrics_bundle(),
+                    prompt,
+                    layout_mode=layout_mode,
+                ),
+                layout_mode=layout_mode,
             )
             compile_table_preview(table_id, latex)
             table_state.update(
@@ -13359,7 +13691,21 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def validate_table_latex(self, table_id: str, latex: str) -> str:
-        return validate_table_latex_source(table_id, latex)
+        state = load_state()
+        table_state = state.get("tables", {}).get(table_id, {})
+        layout_mode = str(
+            table_state.get("layout_mode")
+            or (
+                "two-column"
+                if str(TABLES[table_id].get("width", "")).startswith("two-column")
+                else "single-column"
+            )
+        )
+        return validate_table_latex_source(
+            table_id,
+            latex,
+            layout_mode=layout_mode,
+        )
 
     def handle_table_agent_edit(self, body: dict[str, Any]) -> None:
         table_id = self.require_table(body)
@@ -13513,11 +13859,33 @@ class Handler(BaseHTTPRequestHandler):
         if not paragraph.get("accepted_text"):
             raise StudioError(f"{placement_after} 尚未写入正文，不能把表放在它后面。")
         table_state = state["tables"][table_id]
-        previous_placement = table_state.get("placement_after")
+        layout_mode = str(
+            body.get("layout_mode")
+            or table_state.get("layout_mode")
+            or (
+                "two-column"
+                if definition["width"].startswith("two-column")
+                else "single-column"
+            )
+        ).strip()
+        if layout_mode not in {"single-column", "two-column"}:
+            raise StudioError("表格排版方式仅支持单栏或双栏。")
+        previous_state = dict(table_state)
+        previous_latex = str(table_state.get("latex") or "")
+        converted_latex = previous_latex
+        if previous_latex.strip() and not table_latex_is_placeholder(previous_latex):
+            converted_latex = convert_table_latex_layout(
+                table_id, previous_latex, layout_mode
+            )
+            compile_table_preview(table_id, converted_latex)
         table_state["placement_after"] = placement_after
+        table_state["layout_mode"] = layout_mode
+        if converted_latex:
+            table_state["latex"] = converted_latex
         if table_state.get("status") != "approved":
             table_state["last_message"] = (
-                f"表格位置已设为 {placement_after} 后；确认表格时会写入正文。"
+                f"表格位置已设为 {placement_after} 后，排版方式为 {layout_mode}；"
+                "确认表格时会写入正文。"
             )
             save_state(state)
             self.send_json(
@@ -13544,13 +13912,20 @@ class Handler(BaseHTTPRequestHandler):
             rollback = section_path.with_suffix(".tex.rollback")
             rollback.write_text(previous_source, encoding="utf-8")
             os.replace(rollback, section_path)
-            table_state["placement_after"] = previous_placement
+            state["tables"][table_id] = previous_state
+            if previous_latex.strip() and not table_latex_is_placeholder(previous_latex):
+                try:
+                    compile_table_preview(table_id, previous_latex)
+                except StudioError:
+                    pass
             compile_paper()
             raise StudioError(
-                "移动表格后 LaTeX 编译失败；位置已回滚。\n" + compile_result.message
+                "更新表格位置或宽度后 LaTeX 编译失败；修改已回滚。\n"
+                + compile_result.message
             )
         table_state["last_message"] = (
-            f"该表已移动到 {placement_after} 后，PDF 已重新编译。"
+            f"该表已移动到 {placement_after} 后并切换为 {layout_mode}，"
+            "PDF 已重新编译。"
         )
         state["compile"] = {
             "status": "ok",

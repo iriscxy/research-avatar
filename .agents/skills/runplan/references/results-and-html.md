@@ -23,9 +23,11 @@ after strict whole-report validation. DOM injection, regex replacement,
 single-cell overwrite, and provenance post-processing of the delivered report
 are invalid generation paths.
 
-`05` must visibly render the **same approved paper artifacts**, not a prose
-summary of them. Fill each result table's exact approved cells with validated
-real values and uncertainty; render each figure's approved panels as actual
+`05` must visibly render the **approved data-bearing experiment artifacts** in
+paper order, not a prose summary of them. Determine this set from artifacts
+named by `03.result_requirements`; never render a writing-only figure with no
+acquired datum. Fill each result table's exact approved cells with validated
+real values and uncertainty; render each experiment figure's approved panels as actual
 plots or traceable qualitative content generated from validated ledger rows and
 their raw sources. Preserve the approved `single_column` / `double_column`
 span, rows, columns, panels, axes, legends, and aggregation. Unfinished targets
@@ -62,16 +64,21 @@ panel plot while that panel's source table is not fully filled is a hard
 validation failure. A completed panel must have a generated plot even if other
 panels in the same figure remain pending.
 
+“Beside” is required desktop geometry: place the source-data table on the left
+and its corresponding plot on the right in a two-column row. Preserve this
+left-table/right-plot arrangement when copying the figure into the
+completed-Goal snapshot in `04`. Only a narrow responsive viewport may stack
+the table above the plot; missing snapshot CSS must never silently turn the
+desktop RunPlan layout into a vertical sequence.
+
 Apply the same figure/table pairing to the completed-Goal snapshots in `04`.
-Every owned figure shown under a completed Goal must contain a table immediately
+Every owned data-bearing figure shown under a completed Goal must contain a table immediately
 beside its visual. For a data-driven figure, copy the exact source-data table
 from the same `05` artifact snapshot; the visible values, statuses, target IDs,
-and provenance links must remain identical. For a qualitative mechanism,
-motivation, or case-study figure, render an evidence-input table describing the
-panel, input/evidence item, source or locator, and verification status. Do not
-invent numeric cells merely to satisfy this layout. A completed Goal containing
-a figure without its adjacent table is a hard validation failure in both `04`
-and `05`.
+and provenance links must remain identical. Conceptual motivation or mechanism
+figures without result requirements never enter `04` or `05`. A completed Goal
+containing an experiment figure without its adjacent table is a hard validation
+failure in both `04` and `05`.
 
 Make every `FILLED` paper-facing number in a result table—and every filled
 number in a figure's adjacent source-data table—a page-local provenance link.
@@ -99,7 +106,9 @@ show:
   kind, calculation/aggregation rule, obtained time, verified time, and
   verification status;
 - `RUN_LOCAL`: raw artifact, exact JSON/JSONL locator, the command actually
-  run, code files, config files, environment files, and code revision;
+  run, working directory, executable entrypoint, code files, config files,
+  environment and input files, run-manifest path, stdout/stderr log paths, exit
+  status, start/end timestamps, produced raw files, and code revision;
 - `REUSE_REPORTED`: exact paper/dataset source and stable table/figure/row/
   column locator, plus a prominent statement that it was not rerun locally.
   Store that statement canonically as `reuse_notice="not rerun locally"` in
@@ -127,13 +136,13 @@ Render exactly two user-facing experiment artifacts. In both files, each `<secti
 
 1. `1. Execution Estimate` (`execution-estimate`): Goals, GPUs, approximate time, and assumptions;
 2. `2. Implementation Sources` (`implementation-sources`): the inherited per-method implementation contract;
-3. `3. Figure/Table Coverage` (`artifact-coverage`): the complete approved artifact checklist;
+3. `3. Figure/Table Coverage` (`artifact-coverage`): the complete data-bearing experiment-artifact checklist;
 4. `4. Parts and Goals` (`parts-and-goals`): ordered `Pn` parts with nested `Gn.m` goals, status, and destination. Before approval it shows the two-path Goal confirmation gate and no Current Goal. After approval, the exactly one Current Goal panel is nested inside the matching goal card and moves with `proposed_goal_id` / `active_goal`; its copyable `/goal` is only a manual/recovery affordance.
 
 `05_EXP_RESULT.html` has exactly these ordered top-level sections:
 
 1. `1. Artifact Completion` (`artifact-completion`);
-2. `2. Paper Tables and Figures` (`paper-artifacts`): approved artifacts in paper order with unchanged geometry and pending states;
+2. `2. Paper Tables and Figures` (`paper-artifacts`): approved data-bearing artifacts in paper order with unchanged geometry and pending states;
 3. `3. 生成过程` (`generation-process`): one collapsible provenance index containing raw path, actual command, code/config, calculation, and verification.
 
 Every title in both files must own substantive project-specific content; an empty section, title-only slot, or placeholder-only body is invalid. Do not add, rename, reorder, or omit these sections. Before presenting either file, run `python3 research_avatar/tools/validate_report_structure.py --kind runplan --html reports/04_RUN_PLAN.html` and `python3 research_avatar/tools/validate_report_structure.py --kind results --html reports/05_EXP_RESULT.html` in addition to the ledger/result validators.

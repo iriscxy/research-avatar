@@ -47,7 +47,10 @@ def adapt_invocations(text: str, names: tuple[str, ...]) -> str:
 
 
 def adapt_markdown(text: str, skill_name: str, names: tuple[str, ...]) -> str:
-    text = text.replace(".agents/skills", ".claude/skills")
+    # Skill bodies are runtime-specific mirrors, but the shared maintenance
+    # README must keep pointing contributors to the canonical .agents source.
+    if skill_name:
+        text = text.replace(".agents/skills", ".claude/skills")
     text = text.replace("Codex `spawn_agent` tool", "Agent tool")
     text = text.replace("Codex `spawn_agent`", "the Agent tool")
     text = text.replace("Codex Plan tracking", "native Plan tracking")

@@ -4,88 +4,30 @@
 
 % PAPER_STUDIO_PARAGRAPH:E-P1
 
-We evaluate MORE on three datasets: Proactive Sale and Customer Service, two e-commerce dialogue benchmarks collected from production traffic in distinct service scenarios, and the public MultiWOZ 2.2 corpus. All methods share the matched backbone and the same reward modules so that differences isolate the optimization algorithm. Sixteen baselines cover three families: preference optimization methods (SFT, DPO, KTO, RLHF, RewardNet), multi-objective coordination approaches (EMORL, C-DynaOpt), and task-oriented dialogue systems (SimpleTOD, UBAR, GALAXY, Mars, TOATOD, AutoTOD, ProTOD), together with the chain-of-thought variant CoT and the scaffolded SGP-TOD. Every result is reported as the average over five checkpoints with paired significance markings. The evaluation metrics span BLEU, a Reasoning score, a Naturalness score, task success and diversity, the online production outcomes, human agreement, and inference efficiency.
+We will evaluate permutation invariance on multiple-choice question answering benchmarks. For each question, we will construct all possible option orderings via exhaustive permutation. The primary metric will be the fraction of questions where the predicted answer remains unchanged across all orderings; the secondary metric will measure the variance of class scores. Baselines will include a random-order strategy and a fixed canonical ordering. We will use greedy decoding with a fixed seed and will report results per dataset and model size.
 
 % PAPER_STUDIO_PARAGRAPH:E-P2
 
-Table~\ref{offline-private-table} reports the ByteDance offline comparison across the Proactive Sale (PS) and Customer Service (CS) scenarios. On PS, MORE attains the highest BLEU (47.49), ROUGE (64.13), Naturalness (1.65), Reasoning (1.55), FID (1.28), Coverage (1.57), and RUD (0.95) among all methods. On CS, MORE similarly leads with BLEU 38.45, ROUGE 57.22, Naturalness 1.35, Reasoning 1.40, FID 1.39, Coverage 1.46, and RUD 0.92. The strongest prior baseline on the human-aligned dimensions is EMORL, which reaches Naturalness 1.29 (PS) and 1.20 (CS), whereas RLHF achieves the best CS BLEU among non-MORE methods at 37.71. MORE thus produces joint gains: it improves over the best competing method on the lexical metrics and the human-aligned Naturalness, Reasoning, FID, and Coverage dimensions simultaneously rather than trading off one family for the other.
+The main comparison will contrast permutation-invariance rates across the benchmark datasets and model sizes described above. Table~\ref{tab:main-results} will present the primary metric for each condition, reporting the fraction of questions with unchanged predictions alongside the secondary variance measure. Figure~\ref{fig:planned-results} will display the corresponding distributional trend across option-order count. For every cell, the unavailable value is denoted as xx. No measurements are currently available, and we will compute these values once the experimental pipeline is executed.
 
-\begin{table*}[t]
+\begin{figure}[t]
   \centering
-  \small
-  \setlength{\tabcolsep}{3.5pt}
-  \sbox0{\begin{tabular}{lcccccccccccccc}
-    \toprule
-    Method / condition & PS BLEU & PS ROUGE & PS NAT & PS RSN & PS FID & PS COV & PS RUD & CS BLEU & CS ROUGE & CS NAT & CS RSN & CS FID & CS COV & CS RUD \\
-    \midrule
-    SFT & 46.55 & 61.42 & 0.77 & 1.2 & 1.13 & 1.43 & 0.46 & 36.97 & 54.55 & 0.78 & 1.18 & 1.21 & 1.36 & 0.52 \\
-    DPO & 43.35 & 58.34 & 1.16 & 1.37 & 1.15 & 1.49 & 0.75 & 35.31 & 53.19 & 0.97 & 1.29 & 1.17 & 1.42 & 0.77 \\
-    KTO & 43.99 & 60.17 & 1.04 & 1.38 & 1.12 & 1.47 & 0.71 & 36.64 & 55.24 & 0.94 & 1.25 & 1.22 & 1.41 & 0.73 \\
-    RLHF & 44.14 & 61.77 & 0.96 & 1.37 & 1.14 & 1.48 & 0.8 & 37.71 & 56.7 & 1.03 & 1.28 & 1.3 & 1.35 & 0.84 \\
-    CoT & 46.24 & 62.7 & 0.79 & 1.41 & 1.1 & 1.45 & 0.77 & 37.58 & 56.61 & 0.89 & 1.31 & 1.28 & 1.38 & 0.81 \\
-    C-DynaOpt & 46.77 & 62.83 & 1.22 & 1.44 & 1.21 & 1.52 & 0.84 & 37.62 & 56.59 & 1.14 & 1.27 & 1.32 & 1.36 & 0.85 \\
-    EMORL & 46.51 & 62.14 & 1.29 & 1.42 & 1.23 & 1.51 & 0.88 & 37.85 & 56.8 & 1.2 & 1.28 & 1.25 & 1.4 & 0.9 \\
-    MORE & 47.49 & 64.13 & 1.65 & 1.55 & 1.28 & 1.57 & 0.95 & 38.45 & 57.22 & 1.35 & 1.4 & 1.39 & 1.46 & 0.92 \\
-    \bottomrule
-  \end{tabular}}
-  \ifdim\wd0>\linewidth\resizebox{\linewidth}{!}{\usebox0}\else\usebox0\fi
-  \caption{ByteDance offline evaluation}
-  \label{offline-private-table}
-\end{table*}
+  \fbox{\parbox[c][6em][c]{0.92\linewidth}{\centering F2 placeholder: complete the final artwork after project export}}
+  \caption{Planned primary result analysis showing the distributional trend of permutation-invariance rates across option-order count, with unavailable values denoted as xx; no measurements are yet available.}
+  \label{fig:planned-results}
+\end{figure}
+
+\begin{table}[t]
+  \centering
+  \fbox{\parbox[c][0.1\textheight][c]{0.94\columnwidth}{\centering T1 placeholder: complete the final table after project export}}
+  \caption{Planned main experimental comparison across methods and evaluation criteria.}
+  \label{tab:main-results}
+\end{table}
 
 % PAPER_STUDIO_PARAGRAPH:E-P3
 
-Table~\ref{multiwoz-table} reports the end-to-end evaluation on MultiWOZ 2.2. MORE attains the highest task success among all compared methods at 84.8, together with the highest inform score of 92.5 and the best combined score of 107.35. Notably, MORE preserves a competitive BLEU of 18.7, exceeding prior task-oriented systems such as RewardNet (17.6), TOATOD (17.0), and UBAR (17.6), while trailing only GALAXY (19.6) and Mars (19.9) on this lexical metric. This result indicates that MORE's task success gains do not come at the expense of response fluency. Regarding diversity, MORE generates 3,226 unique unigrams and 25,834 unique trigrams, roughly doubling the coverage of AutoTOD (1,722 and 10,188) and exceeding ProTOD (1,951 and 14,345). However, this increased diversity is accompanied by a higher CBE of 2.96 relative to GALAXY (1.75) and Mars (1.65), reflecting a modest trade-off between lexical variety and coherence.
-
-\begin{table*}[t]
-  \centering
-  \small
-  \setlength{\tabcolsep}{3.5pt}
-  \sbox0{\begin{tabular}{lccccccc}
-    \toprule
-    Method / condition & BLEU & Inform & Success & Combined & CBE & Unique unigrams & Unique trigrams \\
-    \midrule
-    SimpleTOD & 15.0 & 84.4 & 70.1 & 92.3 & N/A & N/A & N/A \\
-    UBAR & 17.6 & 83.4 & 70.3 & 94.5 & 2.1 & 478 & 5238 \\
-    GALAXY & 19.6 & 85.4 & 75.7 & 100.2 & 1.75 & 295 & 2275 \\
-    Mars & 19.9 & 88.9 & 78.0 & 103.4 & 1.65 & 288 & 2264 \\
-    TOATOD & 17.0 & 90.0 & 79.8 & 101.9 & N/A & N/A & N/A \\
-    RewardNet & 17.6 & 87.6 & 81.5 & 102.2 & 1.99 & 423 & 3942 \\
-    SGP-TOD & 9.1 & 83.9 & 69.9 & 86.0 & N/A & N/A & N/A \\
-    AutoTOD & 9.3 & 87.2 & 82.8 & 94.3 & 2.62 & 1722 & 10188 \\
-    ProTOD & 8.9 & 91.7 & 83.3 & 96.4 & 3.26 & 1951 & 14345 \\
-    MORE & 18.7 & 92.5 & 84.8 & 107.35 & 2.96 & 3226 & 25834 \\
-    \bottomrule
-  \end{tabular}}
-  \ifdim\wd0>\linewidth\resizebox{\linewidth}{!}{\usebox0}\else\usebox0\fi
-  \caption{MultiWOZ 2.2 end-to-end evaluation}
-  \label{multiwoz-table}
-\end{table*}
+No experiment results are available in the hosted project, so this paragraph cannot report any observed pattern. The evidence currently establishes the evaluation protocol alone: the primary metric, the secondary variance measure, the exhaustive permutation procedure, and the planned baselines. The evidence does not establish whether option ordering affects predictions, whether any effect varies by dataset or model size, or whether the secondary metric behaves consistently with the primary one. These questions remain open until the planned comparison is executed and the measurements are supplied.
 
 % PAPER_STUDIO_PARAGRAPH:E-P4
 
-Table~\ref{online-table} reports the six primary outcomes from the 14-day online A/B evaluation across the two ByteDance tasks. On Proactive Sale, MORE improves overall conversion by 16.53\%, reached conversion by 30.09\%, and the GSB metric by 61.34\%. On Customer Service, MORE improves user satisfaction by 1.12\% and the GSB metric by 57.0\%, while reducing the handoff rate by 1.83\%. All six metrics reflect relative changes against the production baseline over the same evaluation window.
-
-\begin{table*}[t]
-  \centering
-  \small
-  \sbox0{\begin{tabular}{lc}
-    \toprule
-    Method / condition & Change \\
-    \midrule
-    Proactive Sale · Overall conversion & 16.53 \\
-    Proactive Sale · Reached conversion & 30.09 \\
-    Proactive Sale · GSB & 61.34 \\
-    Customer Service · User satisfaction & 1.12 \\
-    Customer Service · Handoff rate & -1.83 \\
-    Customer Service · GSB & 57.0 \\
-    \bottomrule
-  \end{tabular}}
-  \ifdim\wd0>\linewidth\resizebox{\linewidth}{!}{\usebox0}\else\usebox0\fi
-  \caption{Fourteen-day ByteDance online A/B outcomes}
-  \label{online-table}
-\end{table*}
-
-% PAPER_STUDIO_PARAGRAPH:E-P5
-
-We additionally examined cohort-level outcomes to verify that the observed gains were not concentrated in a narrow user segment. Partitioning the evaluation population by acquisition channel and engagement quartile, we found that the relative improvements in conversion and satisfaction held consistently across all cohorts, with no cohort exhibiting a negative directional shift relative to the production baseline. The handoff-rate reduction on Customer Service was similarly uniform, although the magnitude varied by roughly a factor of two between the most and least engaged quartiles. Direct human-agent comparisons, in which crowd-sourced raters assessed paired responses from MORE and the production agent, mirrored the automated metric directions: raters preferred MORE responses in 63\% of paired judgments, with the remaining judgments split evenly between ties and production preferences. These cohort and human-agent results corroborate the aggregate online findings within the same 14-day window, without extending to claims about long-term retention or out-of-distribution traffic mixes.
+Robustness checks will focus on two dimensions. First, we will vary decoding temperature to test whether permutation-invariance rates remain stable beyond the greedy setting. Second, we will repeat the analysis using a fixed canonical ordering as the reference condition to isolate ordering effects. No significance thresholds or confidence intervals have been specified, and no effect-size measurement is available; all corresponding values are denoted as xx.

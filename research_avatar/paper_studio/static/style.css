@@ -2,6 +2,8 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0;min-height:100%;background:var(--wash);color:var(--ink);font:14px/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif}
+.studio-language-control{position:fixed;z-index:1000;right:18px;bottom:16px;display:flex;align-items:center;gap:8px;padding:6px 9px;border:1px solid #cddeda;border-radius:8px;background:#ffffffeb;color:#506771;font-size:12px;box-shadow:0 4px 16px #16384412}.studio-language-control select{width:auto;min-width:92px;margin:0;padding:5px 26px 5px 8px;font-size:12px}
+.research-studio-embedded .studio-language-control{display:none}
 button,input,textarea{font:inherit}
 button{cursor:pointer;border:0;border-radius:8px;padding:10px 14px;font-weight:700}
 button:disabled{cursor:not-allowed;opacity:.45}
@@ -57,3 +59,27 @@ agent-chat-close{width:30px;height:30px;padding:0;border:0;border-radius:50%;bac
 #mechanism-preview-switch{align-items:center;flex-wrap:wrap}#mechanism-preview-switch button{flex:0 0 auto}#mechanism-preview-note{color:var(--muted);font-size:11px;line-height:1.45}
 .mechanism-generation-prerequisite{display:grid;gap:4px;padding:12px 14px;border:1px solid #dfb967;border-radius:10px;background:#fff7e4;color:#72500d}.mechanism-generation-prerequisite[hidden]{display:none}.mechanism-generation-prerequisite strong{font-size:13px}.mechanism-generation-prerequisite span{font-size:12px;line-height:1.55}
 .preview-tools .download-link{display:inline-flex;align-items:center;justify-content:center;padding:6px 9px;font-size:11px;text-decoration:none;white-space:nowrap}
+
+/* Display state is controlled with the hidden attribute so the hosted CSP can
+   keep blocking inline styles without breaking PDF and artifact workspaces. */
+.pdf-viewer{display:flex}
+.figure-preview-image,.figure-preview-pdf{display:block}
+progress.figure-progress-track{display:block;width:100%;height:8px;border:0;border-radius:999px;overflow:hidden;appearance:none}
+progress.figure-progress-track::-webkit-progress-bar{background:#dce9e7}
+progress.figure-progress-track::-webkit-progress-value{background:var(--teal);transition:width .35s ease}
+progress.figure-progress-track::-moz-progress-bar{background:var(--teal)}
+
+@media(max-width:720px){
+  html,body,.app,.workspace{max-width:100%;overflow-x:hidden}
+  .sidebar{padding:18px 12px}
+  .sections{max-width:100%;padding:10px 0;overscroll-behavior-x:contain}
+  .topbar{height:auto;min-height:90px;align-items:stretch;flex-direction:column;gap:10px}
+  .status-row{width:100%;max-width:100%;overflow-x:auto;padding-bottom:3px;overscroll-behavior-x:contain}
+  .status-row>*{flex:0 0 auto}
+  .editor-grid,.figures-workspace{max-width:100%;overflow-x:hidden}
+  .editor,.preview,.figure-sequence,.figure-detail{min-width:0;max-width:100%}
+  .paragraph-selector-head{align-items:stretch;flex-direction:column}
+  .paragraph-selector-head button{width:100%;white-space:normal}
+  .preview-head{height:auto;min-height:58px;align-items:flex-start;flex-direction:column;gap:8px}
+  .preview-head .preview-tools{width:100%;max-width:100%;overflow-x:auto;padding-bottom:2px}
+}

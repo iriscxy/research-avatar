@@ -41,8 +41,8 @@ class RunPlanProgressTests(unittest.TestCase):
         state["execution_mode"] = "sequential_all_goals"
         rendered = render_parts_and_goals(state)
         self.assertIn('data-execution-mode="sequential_all_goals"', rendered)
-        self.assertIn("自动依次执行全部 Goal", rendered)
-        self.assertIn("任一检查失败会停止队列", rendered)
+        self.assertIn("all Goals were confirmed once and executed sequentially", rendered)
+        self.assertIn("any failed check stops the queue", rendered)
         self.assertEqual(rendered.count('class="current-goal"'), 1)
 
     def test_unknown_execution_mode_is_rejected(self):
@@ -56,8 +56,8 @@ class RunPlanProgressTests(unittest.TestCase):
         state["execution_mode"] = "awaiting_goal_confirmation"
         rendered = render_parts_and_goals(state)
         self.assertIn('data-execution-mode="awaiting_goal_confirmation"', rendered)
-        self.assertIn("一次确认全部 Goals", rendered)
-        self.assertIn("逐个查看并确认", rendered)
+        self.assertIn("choose automatic sequential execution", rendered)
+        self.assertIn("one-Goal-at-a-time review", rendered)
         self.assertNotIn('class="current-goal"', rendered)
 
     def test_current_goal_is_nested_in_matching_goal_card(self):
@@ -77,7 +77,7 @@ class RunPlanProgressTests(unittest.TestCase):
         self.assertEqual(rendered.count('data-copy-goal-target='), 1)
         self.assertIn('data-copy-goal-target="goal-command-G1-1"', rendered)
         self.assertIn('id="goal-command-G1-1">' + expected.replace("'", "&#x27;"), rendered)
-        self.assertIn('>复制 /goal</button>', rendered)
+        self.assertIn('>Copy /goal</button>', rendered)
         self.assertIn('navigator.clipboard.writeText(value)', rendered)
         self.assertIn('research-studio-copy-goal', rendered)
         self.assertIn('research-studio-copy-goal-result', rendered)
@@ -283,7 +283,7 @@ class RunPlanProgressTests(unittest.TestCase):
         self.assertIn('data-local-result-href="05_EXP_RESULT.html#provenance-R-F2-1"', source)
         self.assertIn('class="result-value"', source)
 
-    def test_completed_goal_embeds_every_figure_with_an_adjacent_table(self):
+    def test_completed_goal_does_not_embed_figures_without_acquisition_targets(self):
         state = fixture_state(proposed="G2.1")
         state["goals"][0]["artifact_ids"] = ["F1", "F2"]
         with TemporaryDirectory() as directory:
@@ -308,15 +308,21 @@ class RunPlanProgressTests(unittest.TestCase):
             )
             result = refresh(plan)
             source = plan.read_text(encoding="utf-8")
-        self.assertEqual(result["completed_artifact_snapshots"], 2)
-        self.assertIn('data-artifact-id="F2"', source)
-        self.assertIn("0.717", source)
-        self.assertIn('data-artifact-id="F1"', source)
-        self.assertIn("verified evidence input", source)
+        self.assertEqual(result["completed_artifact_snapshots"], 0)
+        self.assertNotIn('data-artifact-id="F2"', source)
+        self.assertNotIn('data-artifact-id="F1"', source)
 
-    def test_completed_goal_rejects_figure_without_adjacent_table(self):
+    def test_completed_goal_rejects_data_figure_without_adjacent_table(self):
         state = fixture_state(proposed="G2.1")
-        state["goals"][0]["artifact_ids"] = ["F1"]
+        state["goals"][0]["artifact_ids"] = ["F2"]
+        state["acquisition_contracts"] = [{
+            "id": "A-F2-1",
+            "artifact_id": "F2",
+            "target_id": "f2-point",
+            "source_type": "RUN_LOCAL",
+            "producing_goal": "G1.1",
+            "figure_source_cell": True,
+        }]
         with TemporaryDirectory() as directory:
             root = Path(directory)
             plan = root / "04_RUN_PLAN.html"
@@ -327,10 +333,13 @@ class RunPlanProgressTests(unittest.TestCase):
                 + json.dumps(state) + '</script></body></html>', encoding="utf-8",
             )
             report.write_text(
-                '<section data-artifact-id="F1"><h3>Figure only</h3><svg></svg></section>',
+                '<section data-artifact-id="F2"><h3>Figure only</h3><svg></svg>'
+                '<div data-target-id="f2-point" data-result-id="R-F2-1">'
+                '<a href="#provenance-R-F2-1" data-provenance-summary="verified" '
+                'title="verified">0.82</a></div></section>',
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(ValueError, "lacks its adjacent source/evidence table"):
+            with self.assertRaisesRegex(ValueError, "lacks its adjacent source-data table"):
                 refresh(plan)
 
     def test_completed_goal_rejects_unlinked_target(self):

@@ -18,7 +18,7 @@ const stageStorageKey = "research-studio.active-stage";
 const artifactSandbox = "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads";
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
-const statusLabel = status => ({complete:"完成",in_progress:"进行中",waiting_confirmation:"等待确认",not_started:"未开始"}[status] || status);
+const statusLabel = status => ({complete:"Complete",in_progress:"In progress",waiting_confirmation:"Awaiting confirmation",not_started:"Not started"}[status] || status);
 
 async function copyText(value) {
   try {
@@ -77,12 +77,12 @@ function renderStage() {
   const stage = app.state.stages[app.stage];
   document.body.classList.toggle("paper-focus", stage.id === "paper");
   renderPipeline();
-  const command = stage.command || "等待该阶段生成内容";
+  const command = stage.command || "Waiting for this stage to be generated";
   const copyableCommand = command.startsWith("python3 -m ");
   previewCommand.textContent = command;
   previewCommandCopy.hidden = !copyableCommand;
   previewCommandCopy.disabled = false;
-  previewCommandCopy.textContent = "复制命令";
+  previewCommandCopy.textContent = "Copy command";
   previewCopyStatus.textContent = "";
   const availableArtifacts = stage.artifacts?.filter(item => item.exists) || [];
   const rememberedKey = app.artifactByStage[stage.id];
@@ -99,7 +99,7 @@ function renderArtifactTabs(stage, selectedKey) {
   artifactTabs.innerHTML = available.map(artifact => (
     `<button type="button" data-artifact-key="${escapeHtml(artifact.key)}" `
     + `class="artifact-tab ${artifact.key === selectedKey ? "active" : ""}">`
-    + `${escapeHtml(artifact.key === "results" ? "实验结果" : artifact.key === "runplan" ? "执行计划" : artifact.title)}`
+    + `${escapeHtml(artifact.key === "results" ? "Experiment results" : artifact.key === "runplan" ? "Run plan" : artifact.title)}`
     + "</button>"
   )).join("");
 }
@@ -109,13 +109,13 @@ previewCommandCopy.addEventListener("click", async () => {
   if (!command.startsWith("python3 -m ")) return;
   previewCommandCopy.disabled = true;
   const copied = await copyText(command);
-  previewCommandCopy.textContent = copied ? "已复制 ✓" : "复制失败";
+  previewCommandCopy.textContent = copied ? "Copied ✓" : "Copy failed";
   previewCopyStatus.textContent = copied
-    ? "命令已复制，可粘贴到项目终端运行。"
-    : "浏览器无法访问剪贴板，请手动选择命令。";
+    ? "Command copied. Paste it into the project terminal."
+    : "The browser cannot access the clipboard. Select the command manually.";
   window.setTimeout(() => {
     previewCommandCopy.disabled = false;
-    previewCommandCopy.textContent = "复制命令";
+    previewCommandCopy.textContent = "Copy command";
     previewCopyStatus.textContent = "";
   }, 2200);
 });
@@ -125,7 +125,7 @@ function clearPreview() {
   app.previewSignature = "";
   previewFrame.hidden = true; previewFrame.removeAttribute("src");
   previewFrame.setAttribute("sandbox", artifactSandbox);
-  previewEmpty.hidden = false; previewOpen.hidden = true; previewTitle.textContent = "等待生成";
+  previewEmpty.hidden = false; previewOpen.hidden = true; previewTitle.textContent = "Waiting for output";
 }
 
 function selectArtifact(key) {
@@ -168,7 +168,7 @@ async function loadState({preserveStage = true} = {}) {
     renderStage();
   } catch (error) {
     clearPreview();
-    previewTitle.textContent = `加载失败：${error.message}`;
+    previewTitle.textContent = `Load failed: ${error.message}`;
   } finally {
     app.loading = false;
   }

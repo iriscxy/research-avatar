@@ -55,7 +55,11 @@ stable `acquisition_id` and records:
   the approved table plus the execution split fixed by `$runplan`, model,
   condition, seed policy, executable command template, code/config/input paths,
   raw output path, JSON/JSONL locator, computation formula, aggregation and
-  uncertainty rule; do not infer dataset or metric from internal target names;
+  uncertainty rule; also require a run-manifest path that will capture the
+  exact executed command and arguments, working directory, executable
+  entrypoint, code/config/environment/input files, stdout and stderr log paths,
+  exit status, start/end timestamps, code revision, and produced raw files;
+  do not infer dataset or metric from internal target names;
 - for `REUSE_REPORTED`: exact paper/dataset source, table/figure/row/column or
   other stable locator, reported protocol match, and an explicit note that the
   value was not rerun locally;
@@ -98,6 +102,14 @@ Use an **incremental evidence-capture contract** during execution:
    rounded table. The raw persisted records are authoritative; display
    formatting happens only after derivation unless the acquisition contract
    explicitly encodes protocol-level pre-operation rounding.
+
+Before recording the first result of each local invocation, persist its run
+manifest beside the raw outputs. Populate it from the process that was actually
+launched—not from the planned command template—and preserve its stdout/stderr
+logs even on failure. Every ledger row produced by that invocation must resolve
+to this manifest and repeat the exact command, code/config/environment files,
+raw artifact locator, and code revision. A terminal transcript, shell history,
+or narrative description is not a substitute for the manifest.
 
 Map every embedded-contract `result_requirements` item to its producing goal,
 artifact/target ID, acquisition contract, source, raw file and JSON key path

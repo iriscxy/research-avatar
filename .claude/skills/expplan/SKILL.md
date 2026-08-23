@@ -182,7 +182,7 @@ replicator must resolve. Record a `reproducibility_status` (`complete` or
 `partial_due_to_source_omissions`) and mirror the algorithm, objectives,
 configuration, unknowns, and status under `grounding.model_design`.
 
-This requirement also applies when `$expplan` reconstructs an experiment plan
+This requirement also applies when `/expplan` reconstructs an experiment plan
 from one goal paper. In that mode, derive the model design from the goal paper's
 verified method text and figures, preserve uncertainty where implementation
 details are missing, and never fill a gap from the separate structural

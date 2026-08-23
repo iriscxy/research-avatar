@@ -25,6 +25,11 @@ paper/
 !research_avatar/online_studio/demo_project/paper/
 research_avatar/online_studio/demo_project/paper/*
 !research_avatar/online_studio/demo_project/paper/reference_context.json
+!research_avatar/online_studio/demo_project/paper/.outline-approved
+!research_avatar/online_studio/demo_project/paper/sections/
+research_avatar/online_studio/demo_project/paper/sections/*
+!research_avatar/online_studio/demo_project/paper/sections/discussion.tex
+!research_avatar/online_studio/demo_project/paper/sections/bibliography.tex
 
 # Local researcher and paper-run data. Skills regenerate these per project.
 researcher-profile/
@@ -54,3 +59,5 @@ inputs/
 /try.txt
 /evaluations/
 /docs/acl-non-data-figure-style-study.md
+/uploaded-evidence/
+/research_avatar/online_studio/demo_project/uploaded-evidence/

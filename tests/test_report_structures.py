@@ -124,6 +124,9 @@ class ReportStructureTests(unittest.TestCase):
         structures = json.loads(
             (ROOT / "research_avatar/web/demo/report-structures.json").read_text(encoding="utf-8")
         )
+        english_structures = json.loads(
+            (ROOT / "research_avatar/web/demo/report-structures.en.json").read_text(encoding="utf-8")
+        )
         self.assertIn("<span>内容总结</span>", source)
         self.assertNotIn("HTML 内容总结", source)
         self.assertNotIn("功能展示", source)
@@ -140,14 +143,16 @@ class ReportStructureTests(unittest.TestCase):
                 re.sub(r"^\d+(?:\.\d+)?\.?\s*", "", title)
                 for _section_id, title in REPORT_STRUCTURES[report_kind]["sections"]
             ]
-            actual = [section["title"] for section in structures[demo_key]["sections"]]
+            if report_kind == "results":
+                expected = ["Acquisition Process" if title == "生成过程" else title for title in expected]
+            actual = [section["title"] for section in english_structures[demo_key]["sections"]]
             self.assertEqual(actual, expected, report_kind)
         expected_subsections = [
             re.sub(r"^\d+(?:\.\d+)?\.?\s*", "", title)
             for _section_id, title in REPORT_STRUCTURES["expplan"]["subsections"]
         ]
         self.assertEqual(
-            [section["title"] for section in structures["projected-paper"]["sections"]],
+            [section["title"] for section in english_structures["projected-paper"]["sections"]],
             expected_subsections,
         )
         for key, contract in structures.items():

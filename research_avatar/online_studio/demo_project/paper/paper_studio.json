@@ -1,1068 +1,471 @@
 {
   "schema_version": "1.0",
   "project": {
-    "id": "more",
-    "name": "MORE",
-    "initial_title": "MORE: Adaptive Multi-Objective Learning for E-commerce Dialogue Systems",
-    "venue": "KDD 2026 Research Track",
-    "bibliography_style": "ACM-Reference-Format",
+    "id": "does-random-option-ordering-change-language-model-answers-a-stud-581d43e4",
+    "name": "Does Random Option Ordering Change Language Model Answers? A Study of Permutation Invariance in Multiple-Choice QA",
+    "initial_title": "Does Random Option Ordering Change Language Model Answers? A Study of Permutation Invariance in Multiple-Choice QA",
+    "venue": "ACL",
     "target": {
-      "venue": "KDD 2026 Research Track",
-      "track": "Research Track",
-      "cycle": "2026",
-      "submission_content_pages": 8
+      "venue": "ACL"
     },
     "reference_paper": {
-      "title": "DyFlow: Dynamic Workflow Framework for Agentic Reasoning",
-      "authors": "Y Wang, Z Xu, Y Huang, X Wang, Z Song, Lang Gao, C Wang, X Tang, et al.",
-      "venue": "NeurIPS 2025",
-      "publication_key": "wang2025dyflow",
-      "url": "https://arxiv.org/abs/2509.26062"
+      "title": "The Cylindrical Representation Hypothesis for Language Model Steering",
+      "authors": "Uploaded structural reference",
+      "bibtex_key": "uploadedstructuralreference",
+      "publication_key": "uploadedstructuralreference"
     },
-    "decision_source": "reports/03_EXPERIMENT_PLAN.html",
-    "eyebrow": "LOCAL PAPER STUDIO",
+    "decision_source": "lightweight-onboarding",
+    "eyebrow": "ONLINE PAPER STUDIO",
     "studio_title": "Paper Studio",
-    "subtitle": "基于已批准段落规划与可追溯实验结果逐段写作"
+    "subtitle": "从科研项目主旨与指定参考论文开始写作"
   },
   "sections": [
     {
       "id": "abstract",
       "title": "Abstract",
+      "latex_title": "",
+      "start_label": "",
       "file": "abstract.tex",
-      "result_keys": [],
       "render": "abstract",
+      "result_keys": [
+        "lightweight_project"
+      ],
+      "writing_mode": "draft",
       "paragraphs": [
         {
-          "id": "A-P1",
-          "purpose": "Summarize the correctness–naturalness conflict, MORE, the evaluation slate, the main online gains, and the human comparison.",
-          "rhetorical_role": "abstract synthesis",
-          "relation_to_previous": "paper opening",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "id": "ABS-P1",
+          "purpose": "Summarize the problem of permutation sensitivity, the proposed study, and the main conclusion.",
+          "rhetorical_role": "Abstract summary",
+          "relation_to_previous": "None",
+          "relation_to_next": "None",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L005"
-          ],
-          "artifact_dependencies": []
+            "REF-ABS-P1"
+          ]
         }
       ]
     },
     {
       "id": "introduction",
       "title": "Introduction",
+      "latex_title": "Introduction",
+      "start_label": "sec:introduction",
       "file": "introduction.tex",
-      "result_keys": [],
       "render": "section",
+      "result_keys": [
+        "lightweight_project"
+      ],
+      "writing_mode": "draft",
       "paragraphs": [
         {
           "id": "I-P1",
-          "purpose": "Frame e-commerce dialogue as simultaneous profile reasoning and natural response generation.",
-          "rhetorical_role": "problem framing",
-          "relation_to_previous": "A-P1 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
-          "artifacts": [],
-          "heading": "",
-          "heading_style": "",
-          "reference_paragraph_ids": [
-            "DYF-SRC-L009"
-          ],
-          "artifact_dependencies": [
+          "purpose": "Establish the concrete problem of option-order sensitivity and why it matters.",
+          "rhetorical_role": "Problem statement",
+          "relation_to_previous": "None",
+          "relation_to_next": "Identifies gap.",
+          "artifacts": [
             "F1"
+          ],
+          "reference_paragraph_ids": [
+            "REF-I-P1"
           ]
         },
         {
           "id": "I-P2",
-          "purpose": "Contrast the failure modes of correctness-only and fluency-only systems using the motivating example.",
-          "rhetorical_role": "concrete motivation",
-          "relation_to_previous": "I-P1 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
-          "artifacts": [
-            "F1"
-          ],
-          "heading": "",
-          "heading_style": "",
+          "purpose": "Explain the closest unresolved gap and why existing approaches do not settle it.",
+          "rhetorical_role": "Gap identification",
+          "relation_to_previous": "States problem.",
+          "relation_to_next": "Proposes approach.",
+          "artifacts": [],
           "reference_paragraph_ids": [
-            "DYF-SRC-L011"
-          ],
-          "artifact_dependencies": [
-            "F1"
+            "REF-I-P2"
           ]
         },
         {
           "id": "I-P3",
-          "purpose": "Use the reported reward-mixing instability to define the optimization problem and Figure 2 evidence.",
-          "rhetorical_role": "empirical gap",
-          "relation_to_previous": "I-P2 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
-          "artifacts": [
-            "F2"
-          ],
-          "heading": "",
-          "heading_style": "",
+          "purpose": "State the proposed study of permutation invariance and its contributions.",
+          "rhetorical_role": "Proposed approach",
+          "relation_to_previous": "Identifies gap.",
+          "relation_to_next": "Defines evaluation question.",
+          "artifacts": [],
           "reference_paragraph_ids": [
-            "DYF-SRC-L041"
-          ],
-          "artifact_dependencies": [
-            "F2"
+            "REF-I-P3"
           ]
         },
         {
           "id": "I-P4",
-          "purpose": "Preview the staged reasoning scaffold and adaptive gradient-ranked multi-reward solution.",
-          "rhetorical_role": "solution preview",
-          "relation_to_previous": "I-P3 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "purpose": "Define the evaluation question and claim boundary that the study must resolve.",
+          "rhetorical_role": "Evaluation question",
+          "relation_to_previous": "States approach.",
+          "relation_to_next": "None",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L015"
-          ],
-          "artifact_dependencies": []
-        },
-        {
-          "id": "I-P5",
-          "purpose": "State the offline, online, and efficiency contributions with their tested scope.",
-          "rhetorical_role": "contributions",
-          "relation_to_previous": "I-P4 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
-          "artifacts": [],
-          "heading": "",
-          "heading_style": "",
-          "reference_paragraph_ids": [
-            "DYF-SRC-L027"
-          ],
-          "artifact_dependencies": []
+            "REF-I-P4"
+          ]
         }
-      ],
-      "latex_title": "Introduction",
-      "start_label": "sec:introduction"
+      ]
     },
     {
       "id": "related_work",
       "title": "Related Work",
+      "latex_title": "Related Work",
+      "start_label": "sec:related-work",
       "file": "related_work.tex",
-      "result_keys": [],
       "render": "section",
+      "result_keys": [
+        "lightweight_project"
+      ],
+      "writing_mode": "draft",
       "paragraphs": [
         {
-          "id": "RW-P1",
-          "purpose": "Explain why profile-conditioned dialogue does not by itself solve dynamic attribute reasoning.",
-          "rhetorical_role": "personalization boundary",
-          "relation_to_previous": "I-P5 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "id": "R-P1",
+          "purpose": "Organize the closest methodological research thread on prompt sensitivity and identify its boundary.",
+          "rhetorical_role": "Thread 1",
+          "relation_to_previous": "None",
+          "relation_to_next": "Covers evaluation thread.",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L033"
-          ],
-          "artifact_dependencies": []
+            "REF-RW-P1"
+          ]
         },
         {
-          "id": "RW-P2",
-          "purpose": "Position the study within task-oriented dialogue and e-commerce-specific constraints.",
-          "rhetorical_role": "task boundary",
-          "relation_to_previous": "RW-P1 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "id": "R-P2",
+          "purpose": "Cover the closest task or evaluation thread and state this paper's evidence-backed distinction.",
+          "rhetorical_role": "Thread 2",
+          "relation_to_previous": "Covers methods.",
+          "relation_to_next": "Synthesizes position.",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L035"
-          ],
-          "artifact_dependencies": []
+            "REF-RW-P2"
+          ]
         },
         {
-          "id": "RW-P3",
-          "purpose": "Contrast single-reward dialogue RL with adaptive multi-objective coordination.",
-          "rhetorical_role": "optimization boundary",
-          "relation_to_previous": "RW-P2 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "id": "R-P3",
+          "purpose": "Synthesize the two threads into the precise position occupied by this paper.",
+          "rhetorical_role": "Synthesis",
+          "relation_to_previous": "Covers evaluation.",
+          "relation_to_next": "None",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L039"
-          ],
-          "artifact_dependencies": []
+            "REF-RW-P3"
+          ]
         }
-      ],
-      "latex_title": "Related Work",
-      "start_label": "sec:related-work"
+      ]
     },
     {
       "id": "method",
-      "title": "MORE",
+      "title": "Method",
+      "latex_title": "Method",
+      "start_label": "sec:method",
       "file": "method.tex",
-      "result_keys": [],
       "render": "section",
+      "result_keys": [
+        "lightweight_project"
+      ],
+      "writing_mode": "draft",
       "paragraphs": [
         {
           "id": "M-P1",
-          "purpose": "Formalize response generation from dialogue history, current query, and a structured user profile.",
-          "rhetorical_role": "problem formulation",
-          "relation_to_previous": "RW-P3 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "purpose": "Give an overview of the proposed experimental approach and connect it to the research problem.",
+          "rhetorical_role": "Overview",
+          "relation_to_previous": "None",
+          "relation_to_next": "Defines core procedure.",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L053"
-          ],
-          "artifact_dependencies": []
+            "REF-PR-P1"
+          ]
         },
         {
           "id": "M-P2",
-          "purpose": "Define group-relative candidate generation, normalized advantage, clipped updating, and KL anchoring.",
-          "rhetorical_role": "optimization backbone",
-          "relation_to_previous": "M-P1 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "purpose": "Define the core procedure, notation, and design choices precisely enough to reproduce it.",
+          "rhetorical_role": "Procedure definition",
+          "relation_to_previous": "Overview.",
+          "relation_to_next": "Describes execution details.",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L055"
-          ],
-          "artifact_dependencies": []
+            "REF-PR-P2"
+          ]
         },
         {
           "id": "M-P3",
-          "purpose": "Construct masked attribute completion and programmatic numerical reasoning as verifiable scaffold tasks.",
-          "rhetorical_role": "reasoning scaffold",
-          "relation_to_previous": "M-P2 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "purpose": "Describe execution details and distinguish fixed choices from tested variables.",
+          "rhetorical_role": "Execution details",
+          "relation_to_previous": "Defines procedure.",
+          "relation_to_next": "Explains expected mechanism.",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L077"
-          ],
-          "artifact_dependencies": [
-            "F3"
+            "REF-PR-P3"
           ]
         },
         {
           "id": "M-P4",
-          "purpose": "Explain why the reasoning-enhanced policy becomes a frozen reference instead of a jointly mixed objective.",
-          "rhetorical_role": "staged constraint",
-          "relation_to_previous": "M-P3 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "purpose": "Explain the expected mechanism of permutation sensitivity while marking it as a hypothesis.",
+          "rhetorical_role": "Hypothesis",
+          "relation_to_previous": "Describes execution.",
+          "relation_to_next": "None",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L083"
-          ],
-          "artifact_dependencies": [
-            "F3"
-          ]
-        },
-        {
-          "id": "M-P5",
-          "purpose": "Define the response-quality reward channels evaluated for every candidate.",
-          "rhetorical_role": "reward definition",
-          "relation_to_previous": "M-P4 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
-          "artifacts": [],
-          "heading": "",
-          "heading_style": "",
-          "reference_paragraph_ids": [
-            "DYF-SRC-L079"
-          ],
-          "artifact_dependencies": [
-            "F3"
-          ]
-        },
-        {
-          "id": "M-P6",
-          "purpose": "Describe rank-based gradient weighting as context-sensitive coordination across reward channels.",
-          "rhetorical_role": "adaptive aggregation",
-          "relation_to_previous": "M-P5 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
-          "artifacts": [
-            "F3"
-          ],
-          "heading": "",
-          "heading_style": "",
-          "reference_paragraph_ids": [
-            "DYF-SRC-L087"
-          ],
-          "artifact_dependencies": [
-            "F3"
+            "REF-PR-P4"
           ]
         }
-      ],
-      "latex_title": "MORE",
-      "start_label": "sec:method"
+      ]
     },
     {
       "id": "experiments",
       "title": "Experiments",
+      "latex_title": "Experiments",
+      "start_label": "sec:experiments",
       "file": "experiments.tex",
-      "result_keys": [
-        "artifacts.T1.rows",
-        "artifacts.T2.rows",
-        "artifacts.T3.rows"
-      ],
       "render": "section",
+      "result_keys": [
+        "lightweight_project"
+      ],
+      "writing_mode": "draft",
       "paragraphs": [
         {
           "id": "E-P1",
-          "purpose": "Specify three datasets, matched backbones, baseline families, five-checkpoint averaging, and all evaluation metrics.",
-          "rhetorical_role": "experimental setup",
-          "relation_to_previous": "M-P6 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "purpose": "Describe datasets, baselines, metrics, and evaluation protocol using only uploaded evidence.",
+          "rhetorical_role": "Setup",
+          "relation_to_previous": "None",
+          "relation_to_next": "Introduces main comparison.",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L099"
-          ],
-          "artifact_dependencies": []
+            "REF-V-P6"
+          ]
         },
         {
           "id": "E-P2",
-          "purpose": "Report the complete ByteDance offline comparison and identify joint gains across overlap and human-aligned dimensions.",
-          "rhetorical_role": "private offline result",
-          "relation_to_previous": "E-P1 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "purpose": "Introduce the planned main comparison, cite its bound table and data-figure placeholders, and use xx for every unavailable result without claiming an observed outcome.",
+          "rhetorical_role": "Main comparison",
+          "relation_to_previous": "Describes setup.",
+          "relation_to_next": "Analyzes supported pattern.",
           "artifacts": [
-            "T1"
+            "T1",
+            "F2"
           ],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L111"
-          ],
-          "artifact_dependencies": [
-            "T1"
+            "REF-V-P7"
           ]
         },
         {
           "id": "E-P3",
-          "purpose": "Report MultiWOZ task success and diversity while retaining the BLEU and CBE trade-offs.",
-          "rhetorical_role": "public benchmark result",
-          "relation_to_previous": "E-P2 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
-          "artifacts": [
-            "T2"
-          ],
-          "heading": "",
-          "heading_style": "",
+          "purpose": "Analyze the supported result pattern and state what the evidence does and does not establish.",
+          "rhetorical_role": "Analysis",
+          "relation_to_previous": "Introduces comparison.",
+          "relation_to_next": "Closes with robustness.",
+          "artifacts": [],
           "reference_paragraph_ids": [
-            "DYF-SRC-L117"
-          ],
-          "artifact_dependencies": [
-            "T2"
+            "REF-V-P8"
           ]
         },
         {
           "id": "E-P4",
-          "purpose": "Report the six primary 14-day A/B changes with precise relative-change language.",
-          "rhetorical_role": "online result",
-          "relation_to_previous": "E-P3 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
-          "artifacts": [
-            "T3"
-          ],
-          "heading": "",
-          "heading_style": "",
-          "reference_paragraph_ids": [
-            "DYF-SRC-L123"
-          ],
-          "artifact_dependencies": [
-            "T3"
-          ]
-        },
-        {
-          "id": "E-P5",
-          "purpose": "Describe cohort and human-agent comparisons as additional bounded deployment evidence.",
-          "rhetorical_role": "deployment analysis",
-          "relation_to_previous": "E-P4 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "purpose": "Close the evaluation with robustness checks or explicit evidence gaps, preserving placeholders where measurements are absent.",
+          "rhetorical_role": "Robustness",
+          "relation_to_previous": "Analyzes results.",
+          "relation_to_next": "None",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L141"
-          ],
-          "artifact_dependencies": []
+            "REF-V-P9"
+          ]
         }
-      ],
-      "latex_title": "Experiments",
-      "start_label": "sec:experiments"
+      ]
     },
     {
-      "id": "analysis",
-      "title": "Analysis and Discussion",
-      "file": "analysis.tex",
-      "result_keys": [
-        "artifacts.T4.rows"
-      ],
+      "id": "discussion",
+      "title": "Discussion",
+      "latex_title": "Discussion",
+      "start_label": "sec:discussion",
+      "file": "discussion.tex",
       "render": "section",
+      "result_keys": [
+        "lightweight_project"
+      ],
+      "writing_mode": "draft",
       "paragraphs": [
         {
-          "id": "AN-P1",
-          "purpose": "Use component ablations to test adaptive weighting, staged training, and the reasoning scaffold.",
-          "rhetorical_role": "ablation",
-          "relation_to_previous": "E-P5 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "id": "D-P1",
+          "purpose": "Cite the bound result-table and data-figure placeholders, explain what comparisons and trends they are designed to test, state the current evidence gap explicitly, and discuss only hypotheses without claiming observed findings.",
+          "rhetorical_role": "Interpretation",
+          "relation_to_previous": "None",
+          "relation_to_next": "Discusses limitations.",
           "artifacts": [
-            "T4"
+            "T1",
+            "F2"
           ],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L151"
-          ],
-          "artifact_dependencies": [
-            "T4"
+            "REF-P-P1"
           ]
         },
         {
-          "id": "AN-P2",
-          "purpose": "Validate human judgments and their agreement with model-based evaluation.",
-          "rhetorical_role": "human validation",
-          "relation_to_previous": "AN-P1 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
+          "id": "D-P2",
+          "purpose": "Discuss limitations, failure modes, and threats to validity grounded in the project materials.",
+          "rhetorical_role": "Limitations",
+          "relation_to_previous": "Interprets findings.",
+          "relation_to_next": "None",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L129"
-          ],
-          "artifact_dependencies": [
-            "F4"
-          ]
-        },
-        {
-          "id": "AN-P3",
-          "purpose": "Interpret adaptive reward-weight variation without treating it as causal identification.",
-          "rhetorical_role": "weight analysis",
-          "relation_to_previous": "AN-P2 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
-          "artifacts": [
-            "F4"
-          ],
-          "heading": "",
-          "heading_style": "",
-          "reference_paragraph_ids": [
-            "DYF-SRC-L131"
-          ],
-          "artifact_dependencies": [
-            "F4"
-          ]
-        },
-        {
-          "id": "AN-P4",
-          "purpose": "Report latency and output-length reductions against explicit chain-of-thought inference.",
-          "rhetorical_role": "efficiency",
-          "relation_to_previous": "AN-P3 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
-          "artifacts": [],
-          "heading": "",
-          "heading_style": "",
-          "reference_paragraph_ids": [
-            "DYF-SRC-L263"
-          ],
-          "artifact_dependencies": []
-        },
-        {
-          "id": "AN-P5",
-          "purpose": "Use the loan-interest example to expose distinct numerical, coverage, and phrasing failures.",
-          "rhetorical_role": "qualitative analysis",
-          "relation_to_previous": "AN-P4 establishes the preceding move",
-          "relation_to_next": "the next paragraph extends or tests this move",
-          "artifacts": [
-            "F5"
-          ],
-          "heading": "",
-          "heading_style": "",
-          "reference_paragraph_ids": [
-            "DYF-SRC-L159"
-          ],
-          "artifact_dependencies": [
-            "F5"
+            "REF-P-P2"
           ]
         }
-      ],
-      "latex_title": "Analysis and Discussion",
-      "start_label": "sec:analysis"
+      ]
     },
     {
       "id": "conclusion",
       "title": "Conclusion",
+      "latex_title": "Conclusion",
+      "start_label": "sec:conclusion",
       "file": "conclusion.tex",
-      "result_keys": [],
       "render": "section",
+      "result_keys": [
+        "lightweight_project"
+      ],
+      "writing_mode": "draft",
       "paragraphs": [
         {
           "id": "C-P1",
-          "purpose": "Conclude that staged reasoning plus adaptive reward coordination improves the tested trade-off while broader generalization remains open.",
-          "rhetorical_role": "conclusion",
-          "relation_to_previous": "AN-P5 establishes the preceding move",
-          "relation_to_next": "paper conclusion",
+          "purpose": "Close the argument with supported findings, limitations, and concrete future work.",
+          "rhetorical_role": "Summary",
+          "relation_to_previous": "None",
+          "relation_to_next": "None",
           "artifacts": [],
-          "heading": "",
-          "heading_style": "",
           "reference_paragraph_ids": [
-            "DYF-SRC-L163"
-          ],
-          "artifact_dependencies": []
+            "REF-CON-P1"
+          ]
         }
-      ],
-      "latex_title": "Conclusion",
-      "start_label": "sec:conclusion"
+      ]
     }
   ],
   "batch_writing_order": [
+    "abstract",
     "introduction",
     "related_work",
     "method",
     "experiments",
-    "analysis",
-    "conclusion",
-    "abstract"
+    "discussion",
+    "conclusion"
   ],
   "figure_order": [
     "F1",
-    "F2",
-    "F3",
-    "F4",
-    "F5"
+    "F2"
   ],
   "figures": {
     "F1": {
-      "title": "Correctness-only and fluency-only responses fail differently; MORE targets the joint criterion.",
-      "label": "motivation-figure",
-      "width": "two-column",
+      "title": "Problem motivation and evaluation question",
+      "label": "fig:motivation",
+      "kind": "mechanism",
+      "phase": 1,
+      "width": "single-column",
       "source_sections": [
         "introduction"
       ],
-      "description": "Correctness-only and fluency-only responses fail differently; MORE targets the joint criterion.",
-      "caption": "Correctness-only and fluency-only responses fail differently; MORE targets the joint criterion.",
+      "description": "A concrete visual motivation that shows the real problem setting, the unresolved failure or comparison, and the paper's evaluation question.",
+      "caption": "Motivation and evaluation question of the study; the hosted Studio reserves this location for artwork completed after project export.",
       "result_keys": [],
-      "related_paragraphs": {
-        "introduction": [
-          "I-P2"
-        ]
-      },
-      "dimensions": [],
-      "visible_dimensions": [],
-      "x_axis_label": "",
-      "y_axis_label": "",
-      "source_asset": "",
-      "online_placeholder": false,
-      "kind": "mechanism",
-      "panels": [],
       "depends_on_paragraphs": {
         "introduction": [
-          "I-P1",
-          "I-P2"
+          "I-P1"
         ]
       },
-      "deliverable_stem": "f1",
       "generation_requires_paragraphs": {
         "introduction": [
-          "I-P1",
-          "I-P2"
+          "I-P1"
+        ]
+      },
+      "panels": [],
+      "deliverable_stem": "motivation",
+      "related_paragraphs": {
+        "introduction": [
+          "I-P1"
         ]
       }
     },
     "F2": {
-      "title": "Approximate visual reconstruction of the reported reward-only and mixed-reward training dynamics; exact arrays were not published.",
-      "label": "training-dynamics-figure",
-      "width": "two-column",
-      "source_sections": [
-        "introduction"
-      ],
-      "description": "Approximate visual reconstruction of the reported reward-only and mixed-reward training dynamics; exact arrays were not published.",
-      "caption": "Approximate visual reconstruction of the reported reward-only and mixed-reward training dynamics; exact arrays were not published.",
-      "result_keys": [
-        "artifacts.F2.rows"
-      ],
-      "related_paragraphs": {
-        "introduction": [
-          "I-P3"
-        ]
-      },
-      "dimensions": [
-        "checkpoint",
-        "training objective"
-      ],
-      "visible_dimensions": [
-        "checkpoint",
-        "training objective"
-      ],
-      "x_axis_label": "Normalized checkpoint",
-      "y_axis_label": "Normalized reasoning proxy",
-      "source_asset": "figsrc/training_dynamics_curve_data.json",
-      "online_placeholder": false,
+      "title": "Planned primary result analysis",
+      "label": "fig:planned-results",
       "kind": "data",
-      "rhetorical_role": "empirical gap",
-      "canvas_in": [
-        7.0,
-        3.2
+      "phase": 1,
+      "width": "single-column",
+      "source_sections": [
+        "discussion"
       ],
-      "data_grid": {
-        "type": "records",
-        "path": "artifacts.F2.rows",
-        "columns": [
-          {
-            "key": "checkpoint",
-            "label": "Checkpoint"
-          },
-          {
-            "key": "reasoning_only",
-            "label": "Reasoning only"
-          },
-          {
-            "key": "fixed_rsn_gen",
-            "label": "Fixed Rsn+Gen"
-          }
+      "description": "Placeholder for the planned primary numerical comparison; no measurements are available in the hosted project yet.",
+      "caption": "Planned primary result analysis; values and curves will be filled after the experiment evidence is supplied.",
+      "result_keys": [],
+      "depends_on_paragraphs": {
+        "discussion": [
+          "D-P1"
         ]
       },
       "panels": [
         {
-          "id": "training_dynamics",
-          "title": "Estimated training dynamics",
-          "goal": "Contrast stable reasoning-only training with oscillatory fixed joint optimization under reported variability constraints.",
-          "result_keys": [
-            "artifacts.F2.rows"
-          ]
+          "id": "a",
+          "title": "Planned primary result analysis",
+          "goal": "Show the planned numerical trend or comparison without inventing measurements.",
+          "result_keys": []
         }
       ],
-      "depends_on_paragraphs": {
-        "introduction": [
-          "I-P3"
+      "data_grid": {
+        "type": "records",
+        "path": "lightweight_results.rows",
+        "columns": [
+          {
+            "key": "condition",
+            "label": "Condition"
+          },
+          {
+            "key": "main_result",
+            "label": "Main result"
+          }
         ]
       },
-      "deliverable_stem": "f2"
-    },
-    "F3": {
-      "title": "Qualitative reconstruction of the reasoning scaffold, frozen reference, adaptive reward coordination, and direct-response inference.",
-      "label": "framework-figure",
-      "width": "two-column",
-      "source_sections": [
-        "method"
-      ],
-      "description": "Qualitative reconstruction of the reasoning scaffold, frozen reference, adaptive reward coordination, and direct-response inference.",
-      "caption": "Qualitative reconstruction of the reasoning scaffold, frozen reference, adaptive reward coordination, and direct-response inference.",
-      "result_keys": [],
+      "deliverable_stem": "planned_results",
+      "online_placeholder": true,
       "related_paragraphs": {
-        "method": [
-          "M-P6"
-        ]
-      },
-      "dimensions": [],
-      "visible_dimensions": [],
-      "x_axis_label": "",
-      "y_axis_label": "",
-      "source_asset": "",
-      "online_placeholder": false,
-      "kind": "mechanism",
-      "panels": [],
-      "depends_on_paragraphs": {
-        "method": [
-          "M-P3",
-          "M-P4",
-          "M-P5",
-          "M-P6"
-        ]
-      },
-      "deliverable_stem": "f3",
-      "generation_requires_paragraphs": {
-        "method": [
-          "M-P3",
-          "M-P4",
-          "M-P5",
-          "M-P6"
-        ]
-      }
-    },
-    "F4": {
-      "title": "Approximate visual reconstruction of human-evaluation profiles and adaptive reward-weight distributions; exact arrays were not published.",
-      "label": "human-weight-figure",
-      "width": "two-column",
-      "source_sections": [
-        "analysis"
-      ],
-      "description": "Approximate visual reconstruction of human-evaluation profiles and adaptive reward-weight distributions; exact arrays were not published.",
-      "caption": "Approximate visual reconstruction of human-evaluation profiles and adaptive reward-weight distributions; exact arrays were not published.",
-      "result_keys": [],
-      "related_paragraphs": {
-        "analysis": [
-          "AN-P3"
-        ]
-      },
-      "dimensions": [],
-      "visible_dimensions": [],
-      "x_axis_label": "",
-      "y_axis_label": "",
-      "source_asset": "",
-      "online_placeholder": false,
-      "kind": "mechanism",
-      "panels": [],
-      "depends_on_paragraphs": {
-        "analysis": [
-          "AN-P2",
-          "AN-P3"
-        ]
-      },
-      "deliverable_stem": "f4",
-      "generation_requires_paragraphs": {
-        "analysis": [
-          "AN-P2",
-          "AN-P3"
-        ]
-      }
-    },
-    "F5": {
-      "title": "Qualitative reconstruction of the reported loan-interest case and reward-priority response variants.",
-      "label": "case-study-figure",
-      "width": "two-column",
-      "source_sections": [
-        "analysis"
-      ],
-      "description": "Qualitative reconstruction of the reported loan-interest case and reward-priority response variants.",
-      "caption": "Qualitative reconstruction of the reported loan-interest case and reward-priority response variants.",
-      "result_keys": [],
-      "related_paragraphs": {
-        "analysis": [
-          "AN-P5"
-        ]
-      },
-      "dimensions": [],
-      "visible_dimensions": [],
-      "x_axis_label": "",
-      "y_axis_label": "",
-      "source_asset": "",
-      "online_placeholder": false,
-      "kind": "mechanism",
-      "panels": [],
-      "depends_on_paragraphs": {
-        "analysis": [
-          "AN-P5"
-        ]
-      },
-      "deliverable_stem": "f5",
-      "generation_requires_paragraphs": {
-        "analysis": [
-          "AN-P5"
+        "discussion": [
+          "D-P1"
         ]
       }
     }
   },
   "table_order": [
-    "T1",
-    "T2",
-    "T3",
-    "T4"
+    "T1"
   ],
   "tables": {
     "T1": {
-      "title": "ByteDance offline evaluation",
-      "label": "offline-private-table",
-      "width": "two-column",
+      "title": "Planned main experimental comparison",
+      "label": "tab:main-results",
+      "kind": "table",
+      "phase": 1,
+      "width": "single-column",
       "source_sections": [
-        "experiments"
+        "discussion"
       ],
-      "description": "ByteDance offline evaluation",
-      "caption": "ByteDance offline evaluation",
-      "result_keys": [
-        "artifacts.T1.rows"
-      ],
+      "description": "Placeholder for the planned main experimental comparison.",
+      "caption": "Planned main experimental comparison across methods and evaluation criteria.",
+      "result_keys": [],
       "related_paragraphs": {
-        "experiments": [
-          "E-P2"
+        "discussion": [
+          "D-P1"
         ]
       },
-      "dimensions": [
-        "method",
-        "dataset",
-        "metric"
-      ],
-      "visible_dimensions": [
-        "method",
-        "dataset",
-        "metric"
-      ],
-      "x_axis_label": "",
-      "y_axis_label": "",
-      "source_asset": "",
-      "online_placeholder": false,
-      "kind": "table",
+      "online_placeholder": true,
       "data_grid": {
         "type": "records",
-        "path": "artifacts.T1.rows",
+        "path": "lightweight_results.rows",
         "columns": [
           {
-            "key": "method_condition",
-            "label": "Method / condition"
+            "key": "method",
+            "label": "Method"
           },
           {
-            "key": "ps_bleu",
-            "label": "PS BLEU"
-          },
-          {
-            "key": "ps_rouge",
-            "label": "PS ROUGE"
-          },
-          {
-            "key": "ps_nat",
-            "label": "PS NAT"
-          },
-          {
-            "key": "ps_rsn",
-            "label": "PS RSN"
-          },
-          {
-            "key": "ps_fid",
-            "label": "PS FID"
-          },
-          {
-            "key": "ps_cov",
-            "label": "PS COV"
-          },
-          {
-            "key": "ps_rud",
-            "label": "PS RUD"
-          },
-          {
-            "key": "cs_bleu",
-            "label": "CS BLEU"
-          },
-          {
-            "key": "cs_rouge",
-            "label": "CS ROUGE"
-          },
-          {
-            "key": "cs_nat",
-            "label": "CS NAT"
-          },
-          {
-            "key": "cs_rsn",
-            "label": "CS RSN"
-          },
-          {
-            "key": "cs_fid",
-            "label": "CS FID"
-          },
-          {
-            "key": "cs_cov",
-            "label": "CS COV"
-          },
-          {
-            "key": "cs_rud",
-            "label": "CS RUD"
+            "key": "main_result",
+            "label": "Main result"
           }
         ]
       },
       "prompt": {
-        "columns": "Method / condition | PS BLEU | PS ROUGE | PS NAT | PS RSN | PS FID | PS COV | PS RUD | CS BLEU | CS ROUGE | CS NAT | CS RSN | CS FID | CS COV | CS RUD",
-        "rows": "source",
-        "font_size": "small",
-        "best_values": "none"
-      }
-    },
-    "T2": {
-      "title": "MultiWOZ 2.2 end-to-end evaluation",
-      "label": "multiwoz-table",
-      "width": "two-column",
-      "source_sections": [
-        "experiments"
-      ],
-      "description": "MultiWOZ 2.2 end-to-end evaluation",
-      "caption": "MultiWOZ 2.2 end-to-end evaluation",
-      "result_keys": [
-        "artifacts.T2.rows"
-      ],
-      "related_paragraphs": {
-        "experiments": [
-          "E-P3"
-        ]
-      },
-      "dimensions": [
-        "method",
-        "dataset",
-        "metric"
-      ],
-      "visible_dimensions": [
-        "method",
-        "dataset",
-        "metric"
-      ],
-      "x_axis_label": "",
-      "y_axis_label": "",
-      "source_asset": "",
-      "online_placeholder": false,
-      "kind": "table",
-      "data_grid": {
-        "type": "records",
-        "path": "artifacts.T2.rows",
-        "columns": [
-          {
-            "key": "method_condition",
-            "label": "Method / condition"
-          },
-          {
-            "key": "bleu",
-            "label": "BLEU"
-          },
-          {
-            "key": "inform",
-            "label": "Inform"
-          },
-          {
-            "key": "success",
-            "label": "Success"
-          },
-          {
-            "key": "combined",
-            "label": "Combined"
-          },
-          {
-            "key": "cbe",
-            "label": "CBE"
-          },
-          {
-            "key": "unique_unigrams",
-            "label": "Unique unigrams"
-          },
-          {
-            "key": "unique_trigrams",
-            "label": "Unique trigrams"
-          }
-        ]
-      },
-      "prompt": {
-        "columns": "Method / condition | BLEU | Inform | Success | Combined | CBE | Unique unigrams | Unique trigrams",
-        "rows": "source",
-        "font_size": "small",
-        "best_values": "none"
-      }
-    },
-    "T3": {
-      "title": "Fourteen-day ByteDance online A/B outcomes",
-      "label": "online-table",
-      "width": "two-column",
-      "source_sections": [
-        "experiments"
-      ],
-      "description": "Fourteen-day ByteDance online A/B outcomes",
-      "caption": "Fourteen-day ByteDance online A/B outcomes",
-      "result_keys": [
-        "artifacts.T3.rows"
-      ],
-      "related_paragraphs": {
-        "experiments": [
-          "E-P4"
-        ]
-      },
-      "dimensions": [
-        "scenario",
-        "metric"
-      ],
-      "visible_dimensions": [
-        "scenario",
-        "metric"
-      ],
-      "x_axis_label": "",
-      "y_axis_label": "",
-      "source_asset": "",
-      "online_placeholder": false,
-      "kind": "table",
-      "data_grid": {
-        "type": "records",
-        "path": "artifacts.T3.rows",
-        "columns": [
-          {
-            "key": "method_condition",
-            "label": "Method / condition"
-          },
-          {
-            "key": "change",
-            "label": "Change"
-          }
-        ]
-      },
-      "prompt": {
-        "columns": "Method / condition | Change",
-        "rows": "source",
-        "font_size": "small",
-        "best_values": "none"
-      }
-    },
-    "T4": {
-      "title": "Proactive Sale component ablation",
-      "label": "component-ablation-table",
-      "width": "two-column",
-      "source_sections": [
-        "analysis"
-      ],
-      "description": "Proactive Sale component ablation",
-      "caption": "Proactive Sale component ablation",
-      "result_keys": [
-        "artifacts.T4.rows"
-      ],
-      "related_paragraphs": {
-        "analysis": [
-          "AN-P1"
-        ]
-      },
-      "dimensions": [
-        "variant",
-        "dataset",
-        "metric"
-      ],
-      "visible_dimensions": [
-        "variant",
-        "dataset",
-        "metric"
-      ],
-      "x_axis_label": "",
-      "y_axis_label": "",
-      "source_asset": "",
-      "online_placeholder": false,
-      "kind": "table",
-      "data_grid": {
-        "type": "records",
-        "path": "artifacts.T4.rows",
-        "columns": [
-          {
-            "key": "method_condition",
-            "label": "Method / condition"
-          },
-          {
-            "key": "bleu",
-            "label": "BLEU"
-          },
-          {
-            "key": "rouge",
-            "label": "ROUGE"
-          },
-          {
-            "key": "nat",
-            "label": "NAT"
-          },
-          {
-            "key": "rsn",
-            "label": "RSN"
-          },
-          {
-            "key": "fid",
-            "label": "FID"
-          },
-          {
-            "key": "cov",
-            "label": "COV"
-          }
-        ]
-      },
-      "prompt": {
-        "columns": "Method / condition | BLEU | ROUGE | NAT | RSN | FID | COV",
+        "columns": "Method | Main result",
         "rows": "source",
         "font_size": "small",
         "best_values": "none"

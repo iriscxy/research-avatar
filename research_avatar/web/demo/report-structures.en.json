@@ -1,0 +1,47 @@
+{
+  "profile": {"artifact":"Researcher Profile","note":"Research directions, method preferences, writing style, and experimental habits","sections":[
+    {"number":"H","title":"Source and Coverage","content":"The profile records its Scholar export, publication records, local writing samples, generation time, and missing inputs.","details":["Scholar snapshot","Local publication records","Writing and experiment samples"]},
+    {"number":"1","title":"Research Identity","content":"The main threads are trustworthy AI, LLM safety, and verifiable evaluation, with failure observations converted into controlled, falsifiable questions."},
+    {"number":"2","title":"Research Lineage","content":"The trajectory extends from task modeling and robust evaluation to safety interventions, representation mechanisms, and evidence contracts."},
+    {"number":"3","title":"Writing Style","content":"Abstracts close the loop from problem and gap to method and evidence; observations, explanations, and scope are kept separate."},
+    {"number":"4","title":"Experiment Templates","content":"Run low-cost falsification tests first, freeze data and randomness, and make every result recomputable from saved operands."},
+    {"number":"5","title":"Workflow Preferences","content":"Every reported number links to its result path, calculation, and command; major research decisions retain approval records."},
+    {"number":"6","title":"Publication Records","content":"Publication records remain searchable; self-citation is limited and structure is calibrated using the author's closest venue-matched paper."}
+  ]},
+  "literature": {"artifact":"Literature Survey","note":"Verified evidence organized as Problem → Approaches → Evaluation → Gaps","sections":[
+    {"number":"1","title":"Problem","content":"Define the sample task as multi-objective coordination: task quality, robustness, and compute cannot be hidden by one average score."},
+    {"number":"2","title":"Approaches","content":"Organize prior work by data strategy, training objective, optimization method, and deployment constraint instead of paper-by-paper listing."},
+    {"number":"3","title":"Evaluation","content":"Separate automatic metrics, human judgments, interactive success, online outcomes, and compute, then verify whether comparisons are fair."},
+    {"number":"4","title":"Gaps","content":"Key gaps concern reward-conflict detection, judge validity, public reproducibility, and matched quality–cost comparisons."}
+  ]},
+  "ideas": {"artifact":"Research-Idea Assessment","note":"A selected direction grounded in verified gaps, with falsifiers and deployment risks retained","sections":[
+    {"number":"1","title":"Literature Landscape","content":"The sample field contains several method families; its central issues are objective conflict, judge validity, and cost matching."},
+    {"number":"2","title":"Ranked Decision Slate","content":"Candidate I1 is selected; the remaining candidates cover algorithmic, theoretical, and evaluation paths."},
+    {"number":"3","title":"Candidate Cards","content":"Each card states the problem, mechanism, expected evidence, failure condition, and difference from recent work."},
+    {"number":"4","title":"Human Selection","content":"Only after the researcher confirms I1 does the system pass it to experiment planning; the demo is not tied to a real project name."}
+  ]},
+  "expplan": {"artifact":"Experiment Plan","note":"Claims determine artifacts, thresholds, controls, and evidence boundaries before execution","sections":[
+    {"number":"1","title":"Target Conference and Reference Paper","content":"Lock the venue first, then map concrete reference-paper sections and paragraph functions to the target paper. Structure is reused, not content."},
+    {"number":"2","title":"Projected Paper","content":"Extract representative Introduction and Experiments mappings from the complete plan and bind them to the option-order study's own evidence."}
+  ]},
+  "projected-paper": {"artifact":"Paper Structure and Evidence Plan","note":"Titles, paragraphs, artifacts, implementation, and decision rules are planned together","sections":[
+    {"number":"2.1","title":"Projected Title and Abstract","content":"The working title, abstract logic, and evidence boundary use a generic example."},
+    {"number":"2.2","title":"Projected Paper Structure and Evidence Shells","content":"Abstract, Introduction, Related Work, Method, Experiments, Analysis, and Conclusion are planned with paragraph-level artifact bindings."}
+  ]},
+  "runplan": {"artifact":"Experiment Execution Plan","note":"Paper artifacts are decomposed into dependency-ordered goals with explicit outputs","sections":[
+    {"number":"1","title":"Execution Estimate","content":"Every goal declares its budget, dependencies, estimated time, and stopping condition before execution."},
+    {"number":"2","title":"Implementation Sources","content":"Every result records raw logs, the executed command, calculation rule, and verification status."},
+    {"number":"3","title":"Figure/Table Coverage","content":"G1.1→F1/F2/F3, G2.1→T1, G2.2→T2, G3.1→T3, G4.1→T4, and G5.1→F4/F5."},
+    {"number":"4","title":"Parts and Goals","content":"Inspect each goal's part, state, actual output, and completion criterion."}
+  ]},
+  "results": {"artifact":"Experiment Results and Evidence","note":"Every paper evidence unit is verified and retains row- or cell-level provenance","sections":[
+    {"number":"1","title":"Artifact Completion","content":"Each figure and table records whether results exist, verification passed, and which goal produced it."},
+    {"number":"2","title":"Paper Tables and Figures","content":"Exact values remain distinct from approximate reconstructions, qualitative cases, and missing results."},
+    {"number":"3","title":"Acquisition Process","content":"Each table cell links to its acquisition contract, result locator, command, and verification time."}
+  ]},
+  "paper-studio": {"artifact":"Paper-Writing Workspace","note":"Prose, figures, LaTeX, and PDF stay synchronized","sections":[
+    {"number":"Prose","title":"Paragraph Writing and Approval","content":"Each paragraph is generated from its plan and written to LaTeX only after approval."},
+    {"number":"Figures","title":"Figure Generation and Editing","content":"Figure prompts, data, captions, placement, and compiled output remain linked."},
+    {"number":"Tables","title":"Data and Typesetting","content":"All table values come from verified evidence and can be traced to their acquisition process."}
+  ]}
+}

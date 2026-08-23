@@ -489,6 +489,7 @@ class PaperStudioTests(unittest.TestCase):
             "full-draft-start", "full-draft-cancel",
             "runtime-key-open", "runtime-key-close", "runtime-key-provider",
             "runtime-key-input", "runtime-key-cancel", "runtime-key-submit",
+            "studio-language-select",
         }
         self.assertEqual(set(parser.control_ids), expected_controls)
         self.assertEqual(len(parser.control_ids), len(expected_controls))
@@ -565,6 +566,18 @@ class PaperStudioTests(unittest.TestCase):
             latex_prose_issues(
                 r"Accuracy is 86.0\% for \(H_s \in \mathbb{R}\); see "
                 r"Figure~\ref{fig:layer_wise} and \cite{safe_key}."
+            ),
+            [],
+        )
+
+    def test_latex_prose_preflight_flags_math_commands_outside_math_mode(self):
+        issues = latex_prose_issues(
+            r"Temperature is 0, resulting in 100 \times 5 = 500 API calls."
+        )
+        self.assertIn(r"math command outside math delimiters: \times", issues)
+        self.assertEqual(
+            latex_prose_issues(
+                r"Temperature is 0, resulting in \(100 \times 5 = 500\) API calls."
             ),
             [],
         )
@@ -1188,7 +1201,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('return "abstract";', source)
         self.assertNotIn("paper-studio.active-section", source)
         self.assertNotIn("paper-studio.active-view", source)
-        self.assertIn("static/app.js?v=20260821.3-abstracted-reference", index)
+        self.assertIn("static/app.js?v=20260823.14-table-layout", index)
 
     def test_full_draft_click_queues_behind_an_inflight_paragraph_generation(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
@@ -1620,7 +1633,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260821.3-abstracted-reference"', html)
+        self.assertIn('src="static/app.js?v=20260823.14-table-layout"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1753,14 +1766,14 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260821.3-abstracted-reference"', html)
+        self.assertIn('src="static/app.js?v=20260823.14-table-layout"', html)
         self.assertNotIn("系统确定的段落任务", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
         self.assertIn('id="pdf-page-indicator"', html)
         self.assertIn("function updatePdfPageIndicator()", source)
         self.assertIn("pages.onscroll = updatePdfPageIndicator", source)
-        self.assertIn('href="static/style.css?v=20260820.5-terminal-help"', html)
+        self.assertIn('href="static/style.css?v=20260823.5-mobile-overflow"', html)
         self.assertLess(
             html.index('id="compile"'),
             html.index('id="reset-generated"'),
@@ -2533,9 +2546,16 @@ args = parser.parse_args()
         self.assertIn('for="table-agent-prompt">修改命令</label>', source)
         self.assertIn("调用本地 Agent</button>", source)
         self.assertNotIn("（非 API）", source)
-        self.assertNotRegex(
+        # CSP-safe markup starts dynamic controls hidden; renderFigures removes
+        # the native hidden attribute for local table editing.
+        self.assertRegex(
             source,
             r'id="table-agent-controls"[^>]*\shidden(?:\s|>)',
+        )
+        app = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn(
+            '$("table-agent-controls").hidden = !isTable || Boolean(state.online_project);',
+            app,
         )
 
     def test_citation_keys(self):
@@ -2789,6 +2809,44 @@ args = parser.parse_args()
         self.assertIn(r"literal marker \cite{}", captured["instructions"])
         self.assertNotIn("tools", captured)
 
+    def test_online_intro_and_related_work_reserve_empty_citation_slots(self):
+        self.assertEqual(studio.online_citation_placeholder_minimum("introduction", 0), 2)
+        self.assertEqual(studio.online_citation_placeholder_minimum("introduction", 1), 2)
+        self.assertEqual(studio.online_citation_placeholder_minimum("introduction", 2), 0)
+        self.assertEqual(studio.online_citation_placeholder_minimum("related_work", 0), 2)
+        self.assertEqual(studio.online_citation_placeholder_minimum("method", 0), 0)
+
+    def test_online_required_citation_slot_is_retried_and_preserved(self):
+        payloads = []
+
+        def fake_post(payload):
+            payloads.append(payload)
+            if len(payloads) == 1:
+                return {"id": "resp-audit", "output_text": "Prior evaluations use fixed option orders."}
+            return {
+                "id": "resp-required-slot",
+                "output_text": r"Prior evaluations use fixed option orders \cite{}.",
+            }
+
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(studio, "post_openai", side_effect=fake_post),
+        ):
+            response_id, text = studio.resolve_citations_from_online_bibliography(
+                model="deepseek-v4-flash",
+                previous_response_id="resp-draft",
+                section="introduction",
+                purpose="Establish the evaluation background.",
+                paragraph="Prior evaluations use fixed option orders.",
+                minimum_placeholders=1,
+            )
+
+        self.assertEqual(response_id, "resp-required-slot")
+        self.assertEqual(text, r"Prior evaluations use fixed option orders \cite{}.")
+        self.assertEqual(len(payloads), 2)
+        self.assertIn("at least 1 literal", payloads[0]["instructions"])
+        self.assertIn(r"exact literal \cite{}", payloads[1]["instructions"])
+
     def test_online_prompt_marks_citation_obligations_without_keys(self):
         payloads = []
 
@@ -2823,6 +2881,44 @@ args = parser.parse_args()
         self.assertIn("Never search the web", writer["instructions"])
         self.assertNotIn("tools", writer)
         self.assertEqual(len(payloads), 2)
+
+    def test_online_intro_generation_enforces_a_fillable_citation_slot(self):
+        payloads = []
+
+        def fake_post(payload):
+            payloads.append(payload)
+            if len(payloads) < 3:
+                return {
+                    "id": f"resp-{len(payloads)}",
+                    "output_text": "Multiple-choice benchmarks commonly use one fixed option order.",
+                }
+            return {
+                "id": "resp-slot",
+                "output_text": (
+                    r"Multiple-choice benchmarks are widely used \cite{}. "
+                    r"They commonly use one fixed option order \cite{}."
+                ),
+            }
+
+        with (
+            patch.object(studio, "post_openai", side_effect=fake_post),
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(studio, "bibliography_keys", return_value=set()),
+        ):
+            response_id, text, added = call_openai(
+                section="introduction",
+                model="deepseek-v4-flash",
+                previous_response_id=None,
+                purpose="Establish the benchmark evaluation background.",
+                required_heading=None,
+                comment="",
+                current_text="",
+                minimum_online_citation_placeholders=2,
+            )
+
+        self.assertEqual((response_id, added), ("resp-slot", []))
+        self.assertEqual(text.count(r"\cite{}"), 2)
+        self.assertEqual(len(payloads), 3)
 
     def test_local_prompt_decides_citations_and_uses_only_survey_verified_keys(self):
         captured = {}
@@ -3791,6 +3887,26 @@ args = parser.parse_args()
             studio.validate_table_latex_source("T1", source)
         corrected = source.replace("{table}", "{table*}")
         self.assertEqual(studio.validate_table_latex_source("T1", corrected), corrected)
+
+    def test_table_layout_conversion_preserves_cells_and_supports_both_spans(self):
+        wide = (
+            r"\begin{table*}[t]\caption{Main}\label{tab:main}"
+            r"\begin{tabular}{lc}Method & Score \\ A & 0.5\end{tabular}"
+            r"\end{table*}"
+        )
+        narrow = studio.convert_table_latex_layout("T1", wide, "single-column")
+        self.assertIn(r"\begin{table}[tb]", narrow)
+        self.assertIn(r"Method & Score \\ A & 0.5", narrow)
+        self.assertNotIn(r"\begin{table*}", narrow)
+        self.assertEqual(
+            studio.table_layout_mode_from_latex(narrow),
+            "single-column",
+        )
+
+        restored = studio.convert_table_latex_layout("T1", narrow, "two-column")
+        self.assertIn(r"\begin{table*}[t]", restored)
+        self.assertIn(r"Method & Score \\ A & 0.5", restored)
+        self.assertEqual(studio.table_layout_mode_from_latex(restored), "two-column")
 
     def test_next_unaccepted_wraps_in_plan_order(self):
         paragraphs = [
@@ -5132,8 +5248,14 @@ args = parser.parse_args()
         self.assertIn('id="mechanism-flow-paper"', html)
         self.assertIn("function updateMechanismFlow(figure)", source)
         self.assertIn('"按右侧指令更新 Prompt"', source)
-        self.assertIn('style.display = mechanism ? "grid" : "none"', source)
+        self.assertIn('$("mechanism-controls").hidden = !mechanism;', source)
         self.assertIn("grid-template-columns:minmax(0,1.35fr) minmax(240px,.8fr)", style)
+
+    def test_mobile_layout_contains_document_overflow_guards(self):
+        style = (studio.STATIC / "style.css").read_text(encoding="utf-8")
+        self.assertIn("html,body,.app,.workspace{max-width:100%;overflow-x:hidden}", style)
+        self.assertIn(".status-row{width:100%;max-width:100%;overflow-x:auto", style)
+        self.assertIn(".paragraph-selector-head{align-items:stretch;flex-direction:column}", style)
 
     def test_built_mechanism_previews_final_pdf_instead_of_image_draft(self):
         with TemporaryDirectory() as directory:
@@ -5396,8 +5518,8 @@ args = parser.parse_args()
 
     def test_setup_citation_requirement_scales_with_declared_external_items(self):
         setup = {
-            "datasets": [{"name": "Dataset A"}],
-            "baselines": [{"name": "Method B"}],
+            "datasets": [{"name": "Dataset A", "citation_key": "sourceA"}],
+            "baselines": [{"name": "Method B", "citation_key": "sourceB"}],
         }
         with (
             patch.object(
@@ -5424,6 +5546,30 @@ args = parser.parse_args()
         )
         self.assertNotIn(
             "published datasets and baselines lack introducing citations", two_citations
+        )
+
+    def test_online_setup_counts_empty_citation_slots(self):
+        setup = {
+            "datasets": [{"name": "Dataset A", "url": "https://example.test/a"}],
+            "baselines": [{"name": "Method B", "url": "https://example.test/b"}],
+        }
+        with (
+            patch.object(
+                studio,
+                "SECTION_MAP",
+                {"setup": {"title": "Experimental Setup", "render": "section"}},
+            ),
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(studio, "experiment_setup_context", return_value=setup),
+            patch.object(studio, "metrics_bundle", return_value={"evaluation_protocol": {}}),
+        ):
+            issues = studio.experimental_setup_issues(
+                "setup",
+                "State the experimental setup, dataset, and baseline selection.",
+                r"Dataset A is used \cite{}; Method B is used \cite{}.",
+            )
+        self.assertNotIn(
+            "published datasets and baselines lack introducing citations", issues
         )
 
     def test_split_setup_paragraph_checks_only_its_planned_models(self):
@@ -5742,11 +5888,11 @@ args = parser.parse_args()
                 if item["id"] == data["id"]
             )
             self.assertTrue(hosted_data["placeholder_only"])
-            with self.assertRaisesRegex(StudioError, "网页版保留图位"):
+            with self.assertRaisesRegex(StudioError, "线上版以带 Caption"):
                 handler.reject_online_placeholder_figure(data["id"])
 
         with patch.object(studio, "ONLINE_PROJECT_MODE", True):
-            with self.assertRaisesRegex(StudioError, "网页版保留图位"):
+            with self.assertRaisesRegex(StudioError, "线上版以带 Caption"):
                 handler.reject_online_placeholder_figure(mechanism["id"])
             handler.reject_online_placeholder_figure(data["id"])
 
@@ -5756,7 +5902,10 @@ args = parser.parse_args()
         self.assertIn("figure.placeholder_only", source)
         self.assertIn('"PHASE PLACEHOLDER"', source)
         self.assertIn('$("figure-placement-row").hidden = placeholderOnly;', source)
-        self.assertIn('isTable && !state.online_project', source)
+        self.assertIn(
+            '$("table-agent-controls").hidden = !isTable || Boolean(state.online_project);',
+            source,
+        )
 
     def test_online_verified_source_figure_is_not_a_placeholder(self):
         state = _default_state()
@@ -5784,7 +5933,7 @@ args = parser.parse_args()
         self.assertTrue(table["placeholder_only"])
         self.assertEqual(
             table["placeholder_message"],
-            studio.ONLINE_PLACEHOLDER_FIGURE_MESSAGE,
+            studio.ONLINE_PLACEHOLDER_TABLE_MESSAGE,
         )
 
     def test_read_only_demo_control_list_covers_every_mutating_action(self):
@@ -5815,10 +5964,15 @@ args = parser.parse_args()
         # Regression: the demo used to let a visitor click an interactive
         # control, fail, and get redirected into a "bring your own key"
         # dialog that no longer exists. The demo is view-only now -- no
-        # postMessage escape hatch, no redirect, just a disabled control
-        # surface and a plain blocked-request fallback.
+        # API-key postMessage escape hatch, no redirect, just a disabled control
+        # surface and a plain blocked-request fallback. The sole parent message
+        # synchronizes the non-sensitive interface-language preference.
         self.assertNotIn("paper-studio-demo-api-key-required", source)
-        self.assertNotIn("window.parent.postMessage", source)
+        self.assertIn(
+            'window.parent.postMessage({type: "research-avatar-language", language}',
+            source,
+        )
+        self.assertEqual(source.count("window.parent.postMessage"), 1)
         self.assertNotIn('demo_key_required: "1"', source)
         self.assertIn("function applyReadOnlyDemoRestrictions()", source)
         self.assertIn('if (!state || !state.demo_mode) return;', source)
@@ -6135,19 +6289,25 @@ args = parser.parse_args()
             "artifact_ids": scoped,
         }
 
-        studio.refresh_full_draft_artifact_status(state)
-
-        self.assertEqual(
-            state["section_draft_job"]["pending_artifacts"], [selected_artifact]
+        status_ready = lambda current, figure_id: (
+            current["figures"][figure_id]["status"] == "approved"
         )
-        self.assertEqual(state["section_draft_job"]["status"], "artifacts_pending")
-        state[selected_collection][selected_artifact]["status"] = "approved"
-        studio.refresh_full_draft_artifact_status(state)
-        self.assertEqual(state["section_draft_job"]["status"], "completed")
-        self.assertEqual(state["section_draft_job"]["pending_artifacts"], [])
-        self.assertIsNone(state["full_draft_job"])
-        state[selected_collection][selected_artifact]["status"] = "pending"
-        studio.refresh_full_draft_artifact_status(state)
+        with patch.object(
+            studio, "batch_figure_has_real_deliverables", side_effect=status_ready
+        ):
+            studio.refresh_full_draft_artifact_status(state)
+
+            self.assertEqual(
+                state["section_draft_job"]["pending_artifacts"], [selected_artifact]
+            )
+            self.assertEqual(state["section_draft_job"]["status"], "artifacts_pending")
+            state[selected_collection][selected_artifact]["status"] = "approved"
+            studio.refresh_full_draft_artifact_status(state)
+            self.assertEqual(state["section_draft_job"]["status"], "completed")
+            self.assertEqual(state["section_draft_job"]["pending_artifacts"], [])
+            self.assertIsNone(state["full_draft_job"])
+            state[selected_collection][selected_artifact]["status"] = "pending"
+            studio.refresh_full_draft_artifact_status(state)
         self.assertEqual(
             state["section_draft_job"]["pending_artifacts"], [selected_artifact]
         )
@@ -6210,12 +6370,18 @@ args = parser.parse_args()
         for table_id in ("T1", "T2"):
             state["tables"][table_id]["status"] = "approved"
 
-        self.assertEqual(studio.pending_batch_artifacts(state), ["F1"])
-        state["full_draft_job"] = {"status": "artifacts_pending"}
-        studio.refresh_full_draft_artifact_status(state)
-        self.assertEqual(state["full_draft_job"]["pending_artifacts"], ["F1"])
-        state["figures"]["F1"]["status"] = "approved"
-        studio.refresh_full_draft_artifact_status(state)
+        status_ready = lambda current, figure_id: (
+            current["figures"][figure_id]["status"] == "approved"
+        )
+        with patch.object(
+            studio, "batch_figure_has_real_deliverables", side_effect=status_ready
+        ):
+            self.assertEqual(studio.pending_batch_artifacts(state), ["F1"])
+            state["full_draft_job"] = {"status": "artifacts_pending"}
+            studio.refresh_full_draft_artifact_status(state)
+            self.assertEqual(state["full_draft_job"]["pending_artifacts"], ["F1"])
+            state["figures"]["F1"]["status"] = "approved"
+            studio.refresh_full_draft_artifact_status(state)
         self.assertEqual(state["full_draft_job"]["status"], "completed")
         self.assertEqual(state["full_draft_job"]["pending_artifacts"], [])
 
@@ -6254,8 +6420,39 @@ args = parser.parse_args()
         for table_id in studio.TABLE_ORDER:
             state["tables"][table_id]["status"] = "approved"
 
-        with patch.object(studio, "ONLINE_PROJECT_MODE", True):
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", True),
+            patch.object(
+                studio,
+                "batch_figure_has_real_deliverables",
+                side_effect=lambda current, figure_id: (
+                    studio.is_hosted_placeholder_artifact(figure_id)
+                    or current["figures"][figure_id]["status"] == "approved"
+                ),
+            ),
+        ):
             self.assertEqual(studio.pending_batch_artifacts(state), [])
+
+    def test_local_full_draft_rejects_approved_figure_without_real_files(self):
+        state = _default_state()
+        figure_id = studio.FIGURE_ORDER[0]
+        state["figures"][figure_id]["status"] = "approved"
+        with (
+            patch.object(studio, "ONLINE_PROJECT_MODE", False),
+            patch.object(
+                studio,
+                "figure_paths",
+                return_value={
+                    "pdf": Path("/definitely/missing/figure.pdf"),
+                    "preview": Path("/definitely/missing/figure.png"),
+                    "shapes": Path("/definitely/missing/figure_shapes.json"),
+                    "pptx": Path("/definitely/missing/figure.pptx"),
+                },
+            ),
+        ):
+            self.assertFalse(
+                studio.batch_figure_has_real_deliverables(state, figure_id)
+            )
 
     def test_online_full_draft_treats_explicit_data_and_table_placeholders_as_complete(self):
         state = _default_state()
@@ -6377,6 +6574,11 @@ args = parser.parse_args()
                 patch.object(studio, "STATE_DIR", state_dir),
                 patch.object(studio, "STATE_FILE", state_file),
                 patch.object(studio, "full_draft_worker", side_effect=fake_worker) as worker,
+                patch.object(
+                    studio,
+                    "batch_figure_has_real_deliverables",
+                    return_value=True,
+                ),
                 patch.dict(studio.os.environ, {studio.API_KEY_ENVIRONMENT_VARIABLE: "secret"}),
                 patch("builtins.print"),
             ):

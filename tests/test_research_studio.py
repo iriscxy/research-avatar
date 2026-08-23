@@ -328,7 +328,7 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertIn('id="preview-command"', index_source)
         self.assertIn('id="preview-command-copy"', index_source)
         self.assertIn('id="preview-copy-status"', index_source)
-        self.assertIn("请在终端运行以下命令", index_source)
+        self.assertIn("Run the following command in the local terminal", index_source)
         self.assertIn('previewCommand.textContent = command', app_source)
         self.assertIn('command.startsWith("python3 -m ")', app_source)
         self.assertIn('previewCommandCopy.addEventListener("click"', app_source)
@@ -349,7 +349,7 @@ class ResearchStudioTests(unittest.TestCase):
 
         self.assertEqual(stage["artifacts"][0]["key"], "paper_studio")
         self.assertTrue(stage["artifacts"][0]["interactive"])
-        self.assertEqual(stage["artifacts"][0]["url"], studio.PAPER_STUDIO_ROUTE + "/")
+        self.assertEqual(stage["artifacts"][0]["url"], studio.PAPER_STUDIO_EMBED_URL)
         self.assertNotIn("paper_pdf", [item["key"] for item in stage["artifacts"]])
 
         source = (
@@ -406,7 +406,7 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertTrue(result["created"])
         self.assertTrue(stage["paper_studio"]["configured"])
         self.assertEqual(stage["status"], "in_progress")
-        self.assertEqual(stage["command"], "Paper Studio 已就绪")
+        self.assertEqual(stage["command"], "Paper Studio is ready")
 
     @patch("research_avatar.tools.init_paper_studio_from_pipeline.initialize")
     def test_incomplete_run_does_not_initialize_paper_studio(self, initialize):
@@ -563,17 +563,16 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertNotIn('reportDocument("paper-studio"', demo_source)
         self.assertNotIn("调研范围与分类", demo_source)
         self.assertIn("结构参考 · Ref Paper", demo_source)
-        self.assertIn("目标证据 · T1–T4", demo_source)
+        self.assertIn("F2 · Permutation consistency", demo_source)
+        self.assertIn("Number of random permutations included", demo_source)
         self.assertNotIn("MORE", demo_source)
-        self.assertIn("上方 1–4 如何落实到下面的实验任务", demo_source)
-        self.assertIn("${goal.id} → ${artifacts(goal)}", demo_source)
-        self.assertIn("goalMap", demo_source)
-        self.assertIn("下方六张任务卡逐项执行并核验", demo_source)
+        self.assertIn("compact-goal-hierarchy", demo_source)
+        self.assertIn("publicArtifactLabels", demo_source)
+        self.assertIn("consistency_by_count.json", demo_source)
         self.assertNotIn("First-Divergence Repair", demo_source)
         self.assertNotIn("F3A · Only the first-exit layer", demo_source)
         self.assertNotIn("F4 · Safety–utility sensitivity", demo_source)
         self.assertNotIn("results/typo_margin", demo_source)
-        self.assertIn("表格逐格核对论文数值", demo_source)
         self.assertIn('"全部任务已确认"', demo_source)
         self.assertIn("一次确认全部任务", demo_source)
         self.assertIn("逐项确认", demo_source)
@@ -632,7 +631,7 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertEqual(state["selected_id"], "I2")
         self.assertEqual(state["reason"], "Best falsifier")
         self.assertIn("Selected: I2 — Second", updated)
-        self.assertIn("已选择 I2", updated)
+        self.assertIn("Selected I2", updated)
         self.assertIn(
             '<article class="idea" data-idea-id="I1"><h3>I1 · First</h3><p class="pitch">One</p></article>',
             updated,
@@ -644,7 +643,7 @@ class ResearchStudioTests(unittest.TestCase):
             path.write_text("result_id,status,metric,value\n", encoding="utf-8")
             rendered = render_ledger_html(path)
         self.assertIn("<th>result_id</th>", rendered)
-        self.assertIn("目前没有实验结果", rendered)
+        self.assertIn("No experiment results yet", rendered)
         self.assertIn("0 result rows · 4 fields", rendered)
 
     def test_publications_renderer_builds_searchable_cards(self):
@@ -754,16 +753,16 @@ class ResearchStudioTests(unittest.TestCase):
             "profile", "literature", "ideas", "expplan", "runplan", "paper"
         ])
         self.assertEqual(state["stages"][0]["metrics"][1]["value"], "2")
-        self.assertEqual(state["stages"][1]["title"], "文献 Survey")
-        self.assertEqual(state["stages"][2]["title"], "Idea 选择")
+        self.assertEqual(state["stages"][1]["title"], "Literature Survey")
+        self.assertEqual(state["stages"][2]["title"], "Idea Selection")
         self.assertEqual(state["stages"][3]["status"], "complete")
         self.assertEqual(state["stages"][4]["metrics"][1]["value"], "G1.1")
         self.assertEqual(state["stages"][4]["goals"][0]["status"], "completed")
         self.assertEqual(
             [item["key"] for item in state["stages"][4]["artifacts"]],
-            ["results", "runplan"],
+            ["runplan"],
         )
-        self.assertEqual(state["stages"][4]["default_artifact_key"], "results")
+        self.assertEqual(state["stages"][4]["default_artifact_key"], "runplan")
         self.assertEqual(state["stages"][4]["results_backend"]["key"], "results")
 
     def test_build_state_overlays_available_reconstruction_tabs_and_falls_back(self):
@@ -815,8 +814,9 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertEqual(state["stages"][3]["artifacts"][0]["title"], "CAA Plan")
         self.assertEqual(
             [item["title"] for item in state["stages"][4]["artifacts"]],
-            ["CAA Results", "CAA Run"],
+            ["CAA Run"],
         )
+        self.assertEqual(state["stages"][4]["results_backend"]["title"], "CAA Results")
 
 
 if __name__ == "__main__":

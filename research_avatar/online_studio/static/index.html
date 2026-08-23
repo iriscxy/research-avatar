@@ -5,36 +5,42 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <title>Online Paper Studio</title>
-  <link rel="stylesheet" href="/online-assets/style.css?v=20260819.1">
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/online-assets/style.css?v=20260823.4-visible-language-control">
 </head>
 <body>
   <main class="shell">
+    <div class="top-toolbar">
+      <div id="account-bar" class="account-bar hidden">
+        <span id="account-label"></span>
+        <button id="logout" class="link-button" type="button" data-zh="退出登录" data-en="Sign out">退出登录</button>
+      </div>
+      <label class="language-control" for="language-select"><span data-zh="界面语言" data-en="Interface language">界面语言</span>
+        <select id="language-select" aria-label="Language"><option value="zh">中文</option><option value="en">English</option></select>
+      </label>
+    </div>
     <section id="auth-card" class="card auth-card">
       <p class="eyebrow">SECURE SIGN IN</p>
-      <h1 class="auth-title">登录 Online Paper Studio</h1>
-      <p class="lede">登录后，你的资料、项目和写作会话只绑定到当前账户。</p>
+      <h1 class="auth-title" data-zh="登录 Online Paper Studio" data-en="Sign in to Online Paper Studio">登录 Online Paper Studio</h1>
+      <p class="lede" data-zh="登录后，你的资料、项目和写作会话只绑定到当前账户。" data-en="Your materials, projects, and writing sessions remain bound to your account.">登录后，你的资料、项目和写作会话只绑定到当前账户。</p>
       <form id="auth-form">
-        <label>邮箱<input name="email" type="email" required autocomplete="email"></label>
-        <label>密码<input name="password" type="password" required minlength="6" maxlength="1024" autocomplete="current-password"><small>新账户密码至少 6 个字符。</small></label>
+        <label><span data-zh="邮箱" data-en="Email">邮箱</span><input name="email" type="email" required autocomplete="email"></label>
+        <label><span data-zh="密码" data-en="Password">密码</span><input name="password" type="password" required minlength="6" maxlength="1024" autocomplete="current-password"><small data-zh="新账户密码至少 6 个字符。" data-en="New account passwords require at least 6 characters.">新账户密码至少 6 个字符。</small></label>
         <p id="auth-message" role="status" aria-live="polite"></p>
         <div class="auth-buttons">
-          <button type="submit" data-action="login">登录</button>
-          <button type="submit" data-action="signup" class="secondary">注册并登录</button>
+          <button type="submit" data-action="login" data-zh="登录" data-en="Sign in">登录</button>
+          <button type="submit" data-action="signup" class="secondary" data-zh="注册并登录" data-en="Create account">注册并登录</button>
         </div>
       </form>
-      <div class="divider"><span>或者</span></div>
-      <a id="google-login" class="google-login hidden" href="/auth/google/start">使用 Google 账户登录</a>
+      <div class="divider"><span data-zh="或者" data-en="or">或者</span></div>
+      <a id="google-login" class="google-login hidden" href="/auth/google/start" data-zh="使用 Google 账户登录" data-en="Continue with Google">使用 Google 账户登录</a>
     </section>
 
     <div id="workspace-shell" class="hidden">
       <p id="session-notice" class="session-notice hidden" role="status" aria-live="polite"></p>
-      <div class="account-bar">
-        <span id="account-label"></span>
-        <button id="logout" class="link-button" type="button">退出登录</button>
-      </div>
       <nav class="product-tabs" aria-label="Online Paper Studio">
         <button id="demo-tab" class="product-tab active" type="button" data-panel="demo-panel" aria-selected="true">Demo</button>
-        <button id="use-tab" class="product-tab" type="button" data-panel="use-panel" aria-selected="false">免费纯文字 PaperWrite 版</button>
+        <button id="use-tab" class="product-tab" type="button" data-panel="use-panel" aria-selected="false" data-zh="免费纯文字 PaperWrite 版" data-en="Free text-only PaperWrite">免费纯文字 PaperWrite 版</button>
       </nav>
 
       <section id="demo-panel" class="product-panel">
@@ -43,8 +49,8 @@
 
       <section id="use-panel" class="product-panel hidden">
         <div id="session-actions" class="session-actions hidden">
-          <button id="resume-studio" class="resume" type="button">继续当前写作会话 →</button>
-          <button id="reset-studio" class="secondary" type="button">清空当前内容并重新上传</button>
+          <button id="resume-studio" class="resume" type="button" data-zh="继续当前写作会话 →" data-en="Resume current writing session →">继续当前写作会话 →</button>
+          <button id="reset-studio" class="secondary" type="button" data-zh="清空当前内容并重新上传" data-en="Clear session and upload again">清空当前内容并重新上传</button>
           <span id="reset-message" role="status" aria-live="polite"></span>
         </div>
 
@@ -52,26 +58,26 @@
         <form id="setup-form" class="card unified-setup">
       <div class="setup-heading">
         <p class="step-index">01</p>
-        <div><h2>上传论文写作材料</h2><p>只需提交科研项目主旨和结构参考论文。系统分析参考论文的章节与段落逻辑，并为目标论文逐段写作；实验部分写成待执行的实验设计，定量值统一使用 xx；Introduction 默认保留 Motivation 图位，其他计划图表也保留 placeholder，导出后可在本地终端继续完成。</p></div>
+        <div><h2 data-zh="上传论文写作材料" data-en="Upload paper-writing materials">上传论文写作材料</h2><p data-zh="只需提交科研项目主旨和结构参考论文。系统分析参考论文的章节与段落逻辑，并为目标论文逐段写作；实验部分写成待执行的实验设计，定量值统一使用 xx；Introduction 默认保留 Motivation 图位，其他计划图表也保留 placeholder，导出后可在本地终端继续完成。" data-en="Upload a project brief and one structural reference paper. The system analyzes the reference paper's section and paragraph logic, then drafts the target paper paragraph by paragraph. Unavailable results remain xx and planned figures and tables remain placeholders for later local completion.">只需提交科研项目主旨和结构参考论文。系统分析参考论文的章节与段落逻辑，并为目标论文逐段写作；实验部分写成待执行的实验设计，定量值统一使用 xx；Introduction 默认保留 Motivation 图位，其他计划图表也保留 placeholder，导出后可在本地终端继续完成。</p></div>
       </div>
-      <label>目标会议 / 期刊（venue）<input name="venue" required placeholder="例如 ACL 2027、EMNLP 2026 Findings"></label>
-      <label>当前工作说明
+      <label><span data-zh="目标会议 / 期刊（venue）" data-en="Target conference / journal">目标会议 / 期刊（venue）</span><input name="venue" required placeholder="例如 ACL 2027、EMNLP 2026 Findings" data-placeholder-zh="例如 ACL 2027、EMNLP 2026 Findings" data-placeholder-en="e.g. ACL 2027 or EMNLP 2026 Findings"></label>
+      <label><span data-zh="当前工作说明" data-en="Project brief">当前工作说明</span>
         <input name="project_brief_file" type="file" accept=".doc,.docx,.txt,.pdf,.md,.markdown,.json,.html,.htm" required>
-        <small>说明研究问题、方法、数据、当前进展、预期贡献和限制，让写作 API 明确项目在做什么。</small>
+        <small data-zh="说明研究问题、方法、数据、当前进展、预期贡献和限制，让写作 API 明确项目在做什么。" data-en="Describe the research question, method, data, progress, expected contribution, and limitations so the writing API understands the project.">说明研究问题、方法、数据、当前进展、预期贡献和限制，让写作 API 明确项目在做什么。</small>
       </label>
-      <label>结构参考论文
+      <label><span data-zh="结构参考论文" data-en="Structural reference paper">结构参考论文</span>
         <input name="reference_paper_file" type="file" accept=".txt,.pdf,.md,.markdown,.html,.htm" required>
-        <small>上传一篇完整论文。系统只模仿它的章节组织和论证推进，不复制其研究主张、数字或措辞。</small>
+        <small data-zh="上传一篇完整论文。系统只模仿它的章节组织和论证推进，不复制其研究主张、数字或措辞。" data-en="Upload one complete paper. The system follows only its section organization and argumentative progression, never its claims, numbers, or wording.">上传一篇完整论文。系统只模仿它的章节组织和论证推进，不复制其研究主张、数字或措辞。</small>
       </label>
       <p id="message" role="status" aria-live="polite"></p>
-      <button id="submit" type="submit">进入 Paper Studio →</button>
-      <p class="security">在线写作会话是临时工作区，统一使用共享 DeepSeek API；关闭或超时前请从写作台导出项目 ZIP。</p>
+      <button id="submit" type="submit" data-zh="进入 Paper Studio →" data-en="Open Paper Studio →">进入 Paper Studio →</button>
+      <p class="security" data-zh="在线写作会话是临时工作区，统一使用共享 DeepSeek API；关闭或超时前请从写作台导出项目 ZIP。" data-en="Online writing sessions are temporary workspaces using a shared DeepSeek API. Export the project ZIP before closing or timing out.">在线写作会话是临时工作区，统一使用共享 DeepSeek API；关闭或超时前请从写作台导出项目 ZIP。</p>
         </form>
         </div>
         <iframe id="studio-frame" class="studio-frame hidden" src="about:blank" title="论文写作界面"></iframe>
       </section>
     </div>
   </main>
-  <script src="/online-assets/app.js?v=20260822.1-paperwrite-label" defer></script>
+  <script src="/online-assets/app.js?v=20260823.6-localized-errors" defer></script>
 </body>
 </html>

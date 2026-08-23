@@ -68,10 +68,11 @@ Each goal is the smallest independently runnable, verifiable evidence slice.
 Conditional goals remain visible but locked. Group work only when it answers
 one decision and remains one interpretable milestone.
 
-Every approved artifact must have at least one owning goal; every acquisition
-target must have exactly one producing goal. Count-only conceptual figures map
-to the goal that establishes their specification but receive no numeric
-acquisition contract.
+Every approved result requirement must have exactly one producing goal. Only
+artifacts with at least one `result_requirements` entry belong to RunPlan
+coverage, Goal ownership, `04`, `05`, or the result ledger. A conceptual,
+motivation, mechanism, or other writing-stage figure with no acquired datum
+remains in `03` for Paper Writing and must not be drawn or embedded in RunPlan.
 
 ## Durable state and evidence
 
@@ -115,12 +116,21 @@ confirmation gate and during every goal boundary.
 ## Reports and validation
 
 `04` must show execution estimates, inherited implementation sources, complete
-artifact coverage, and the nested part/goal hierarchy with durable status
-marks. Every completed Goal must show each owned figure together with its
+coverage of data-bearing experiment artifacts, and the nested part/goal
+hierarchy with durable status marks. Every completed Goal must show each owned
+experiment figure together with its
 adjacent source-data table; qualitative figures use an evidence-input table and
 must not invent numeric values. `05` must preserve each approved paper
 table/figure geometry, pending and filled targets, actual data-driven plots,
 and clickable/hoverable provenance.
+
+Treat “how this value was obtained” as a reproducibility record, not a short
+source note. For every locally produced value, the complete generation process
+must identify the exact command actually executed, working directory,
+executable entrypoint and code files, config and environment files, inputs,
+raw outputs and locator, stdout/stderr logs, exit status, timestamps, code
+revision, calculation or aggregation, and verification. Persist these facts at
+execution time; never reconstruct them later from a command template or prose.
 An artifact appears once under its earliest owning goal and is updated there as
 later goals fill additional targets.
 
