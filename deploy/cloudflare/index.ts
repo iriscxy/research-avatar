@@ -161,6 +161,9 @@ export class OnlineStudioContainerV48 extends OnlineStudioContainer {}
 export class OnlineStudioContainerV49 extends OnlineStudioContainer {}
 export class OnlineStudioContainerV50 extends OnlineStudioContainer {}
 export class OnlineStudioContainerV51 extends OnlineStudioContainer {}
+// Demo-paper and embedded-language release. Rotate the class so an existing
+// V51 instance cannot continue serving its previous image and static assets.
+export class OnlineStudioContainerV52 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
