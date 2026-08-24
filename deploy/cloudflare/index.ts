@@ -170,6 +170,9 @@ export class OnlineStudioContainerV53 extends OnlineStudioContainer {}
 // DeepSeek-only APAC placement release. Rotate the class so traffic cannot
 // remain attached to an already-running V53 instance in Europe or America.
 export class OnlineStudioContainerV54 extends OnlineStudioContainer {}
+// Read-only editor-navigation release. Rotate to ship the Paper Studio bundle
+// that hides its nested language control and permits transient PDF navigation.
+export class OnlineStudioContainerV55 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
