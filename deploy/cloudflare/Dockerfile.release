@@ -13,6 +13,7 @@ RUN set -eux; \
     codex --version
 COPY research_avatar/online_studio/ /opt/research-avatar/research_avatar/online_studio/
 COPY research_avatar/online_studio/ /usr/local/lib/python3.12/site-packages/research_avatar/online_studio/
+RUN python3 -c 'import json, pathlib; root = pathlib.Path("/opt/research-avatar/research_avatar/online_studio/demo_project"); config = json.loads((root / "paper/paper_studio.json").read_text()); missing = [value for value in config.get("paths", {}).values() if not (root / value).is_file()]; assert not missing, f"Demo paper_studio.json references files absent from the container image: {missing}"'
 COPY research_avatar/paper_studio/ /opt/research-avatar/research_avatar/paper_studio/
 COPY research_avatar/paper_studio/ /usr/local/lib/python3.12/site-packages/research_avatar/paper_studio/
 COPY research_avatar/web/demo/ /opt/research-avatar/research_avatar/web/demo/

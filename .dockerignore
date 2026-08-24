@@ -40,7 +40,6 @@ research_avatar/online_studio/demo_project/paper/*.out
 research_avatar/online_studio/demo_project/paper/*.synctex.gz
 research_avatar/online_studio/demo_project/paper/.paper_studio/api_usage.jsonl
 research_avatar/online_studio/demo_project/paper/.paper_studio/paper_pages
-research_avatar/online_studio/demo_project/paper/metrics.json
 research_avatar/online_studio/demo_project/paper/uploaded_sources.txt
 research_avatar/online_studio/demo_project/paper/working_abstract.txt
 outputs

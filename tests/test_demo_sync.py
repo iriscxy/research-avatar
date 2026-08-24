@@ -137,6 +137,7 @@ class DemoSyncTests(unittest.TestCase):
         dockerfile = (ROOT / "deploy/cloudflare/Dockerfile.release").read_text(
             encoding="utf-8"
         )
+        dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
         self.assertIn(
             "COPY research_avatar/paper_studio/ "
             "/opt/research-avatar/research_avatar/paper_studio/",
@@ -152,6 +153,14 @@ class DemoSyncTests(unittest.TestCase):
         self.assertNotIn(".agents/skills", dockerfile)
         self.assertIn("research_avatar/tools/plan_conformance.py", dockerfile)
         self.assertIn("research_avatar/tools/validate_experiment_plan.py", dockerfile)
+        self.assertNotIn(
+            "research_avatar/online_studio/demo_project/paper/metrics.json",
+            dockerignore.splitlines(),
+        )
+        self.assertIn(
+            "Demo paper_studio.json references files absent from the container image",
+            dockerfile,
+        )
 
     def test_demo_copy_has_a_legacy_fallback_and_plan_is_sampled(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
