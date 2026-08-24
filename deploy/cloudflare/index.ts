@@ -167,6 +167,9 @@ export class OnlineStudioContainerV52 extends OnlineStudioContainer {}
 // Demo metrics packaging release. V52 was built without the metrics file that
 // its bundled paper_studio.json requires, so a fresh class is mandatory.
 export class OnlineStudioContainerV53 extends OnlineStudioContainer {}
+// DeepSeek-only APAC placement release. Rotate the class so traffic cannot
+// remain attached to an already-running V53 instance in Europe or America.
+export class OnlineStudioContainerV54 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
