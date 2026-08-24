@@ -640,7 +640,7 @@ function uniqueArtifacts(artifacts = []) {
 
 // POST-shaped but read-only: the gateway lets these through on a demo
 // session too (see DEMO_SAFE_WRITE_PATHS in online_studio/server.py).
-const DEMO_SAFE_WRITE_PATHS = new Set(["/api/pdf/locate"]);
+const DEMO_SAFE_WRITE_PATHS = new Set(["/api/pdf/locate", "/api/select-paragraph"]);
 
 async function request(path, options = {}) {
   const method = String(options.method || "GET").toUpperCase();
@@ -1925,7 +1925,7 @@ function applyReadOnlyDemoRestrictions() {
     const element = $(id);
     if (element) element.disabled = true;
   });
-  document.querySelectorAll(".figure-card, .figure-actions button, .paragraph-nav button")
+  document.querySelectorAll(".figure-card, .figure-actions button")
     .forEach((element) => { element.disabled = true; });
 }
 

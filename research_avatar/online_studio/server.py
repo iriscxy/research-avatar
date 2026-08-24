@@ -64,7 +64,7 @@ GOOGLE_STATE_COOKIE = "online_studio_google_state"
 # non-GET method. /api/pdf/locate is the double-click-PDF-to-source-line
 # lookup: it needs a POST body for click coordinates, but the response is
 # purely a computed location, nothing on disk changes.
-DEMO_SAFE_WRITE_PATHS = {"/api/pdf/locate"}
+DEMO_SAFE_WRITE_PATHS = {"/api/pdf/locate", "/api/select-paragraph"}
 # Base64 expands the three bounded HTML files plus the 32 MB ZIP by roughly 4/3.
 MAX_BODY_BYTES = 80 * 1024 * 1024
 MAX_FILE_BYTES = 8 * 1024 * 1024

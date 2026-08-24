@@ -2785,7 +2785,7 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn('"PAPER_STUDIO_ONLINE": "0" if demo_mode else "1"', source)
         self.assertIn('"PAPER_STUDIO_DEMO_MODE": "1" if demo_mode else "0"', source)
 
-    def test_pdf_locate_reaches_a_demo_session_despite_being_a_post(self):
+    def test_read_only_navigation_posts_reach_a_demo_session(self):
         # Regression: double-click-to-source-line on the PDF preview posts
         # to /api/pdf/locate (click coordinates in the body), which is a
         # pure lookup -- it never mutates the manuscript. The demo's
@@ -2810,9 +2810,10 @@ class OnlineStudioTests(unittest.TestCase):
             handler.send_header = MagicMock()
             handler.end_headers = MagicMock()
             handler.wfile = MagicMock()
-            handler._proxy(session, "/api/pdf/locate", read_only=True)
-        connection.request.assert_called_once()
-        handler.send_response.assert_called_once_with(200)
+            for path in ("/api/pdf/locate", "/api/select-paragraph"):
+                handler._proxy(session, path, read_only=True)
+        self.assertEqual(connection.request.call_count, 2)
+        self.assertEqual(handler.send_response.call_count, 2)
 
     def test_setup_page_only_asks_for_generated_html_and_openai_key(self):
         source = (online.STATIC / "index.html").read_text(encoding="utf-8")

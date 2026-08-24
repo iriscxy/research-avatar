@@ -17,6 +17,10 @@ class DemoSyncTests(unittest.TestCase):
         self.assertIn(".embedded-demo .demo-language-control{display:none}", style)
         self.assertIn('url.searchParams.set("lang", language)', app)
         self.assertIn('localStorage.setItem("research-avatar-language", language)', app)
+        self.assertIn(
+            'src="/demo-studio/?lang=${encodeURIComponent(uiLanguage)}&embedded=research-studio"',
+            app,
+        )
         self.assertIn('<div class="demo-top-row">', index)
         self.assertIn(".demo-top-row{position:sticky;top:0", style)
         self.assertNotIn(".demo-language-control{position:fixed", style)
@@ -104,7 +108,10 @@ class DemoSyncTests(unittest.TestCase):
     def test_paper_demo_mounts_the_real_completed_application(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         self.assertNotIn("data-paper-demo-view", source)
-        self.assertIn('iframe src="/demo-studio/"', source)
+        self.assertIn(
+            'iframe src="/demo-studio/?lang=${encodeURIComponent(uiLanguage)}&embedded=research-studio"',
+            source,
+        )
         self.assertIn("本地当前状态快照 · 只读，输入与写入操作均已锁定", source)
         self.assertNotIn("建议在新页面打开", source)
         self.assertNotIn('class="paper-studio-open-callout"', source)

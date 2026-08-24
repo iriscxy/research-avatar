@@ -12939,7 +12939,11 @@ class Handler(BaseHTTPRequestHandler):
             raise StudioError("Unknown paragraph in this section.")
         index = matches[0]
         section_state["current_index"] = index
-        save_state(state)
+        # In the shared read-only Demo, paragraph selection is transient UI
+        # navigation. Return the requested editor state without changing the
+        # committed demo project seen by other visitors.
+        if not DEMO_MODE:
+            save_state(state)
         self.send_json({"ok": True, "state": public_state(state)})
 
     def handle_pdf_locate(self, body: dict[str, Any]) -> None:

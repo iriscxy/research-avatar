@@ -5946,7 +5946,11 @@ args = parser.parse_args()
             self.assertIn(f'"{control_id}"', source)
         self.assertIn("const DEMO_READ_ONLY_CONTROL_IDS = [", source)
         self.assertIn(
-            'document.querySelectorAll(".figure-card, .figure-actions button, .paragraph-nav button")',
+            'document.querySelectorAll(".figure-card, .figure-actions button")',
+            source,
+        )
+        self.assertIn(
+            'new Set(["/api/pdf/locate", "/api/select-paragraph"])',
             source,
         )
         self.assertIn(
@@ -5955,6 +5959,26 @@ args = parser.parse_args()
         )
         for control_id in ("compile", "model", "model-apply", "runtime-key-open"):
             self.assertIn(f'"{control_id}"', source)
+
+    def test_demo_paragraph_selection_is_transient_navigation(self):
+        state = _default_state()
+        section = "introduction"
+        target = state["sections"][section]["paragraphs"][1]["id"]
+        handler = object.__new__(Handler)
+        handler.require_section = lambda body: section
+        response = {}
+        handler.send_json = lambda payload: response.update(payload)
+        with (
+            patch.object(studio, "DEMO_MODE", True),
+            patch.object(studio, "load_state", return_value=state),
+            patch.object(studio, "save_state") as save,
+        ):
+            handler.handle_select_paragraph({"section": section, "paragraph_id": target})
+        save.assert_not_called()
+        self.assertEqual(
+            response["state"]["sections"][section]["current_paragraph"]["id"],
+            target,
+        )
 
     def test_demo_mode_is_public_but_never_exposes_a_key(self):
         with patch.object(studio, "DEMO_MODE", True):

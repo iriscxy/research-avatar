@@ -258,7 +258,7 @@ const paperStudioScreenshots = () => `<section class="paper-studio-live">
   <h4>Paper Studio</h4>
   <div class="paper-studio-frame-shell">
     <div class="paper-studio-frame-bar"><span>本地当前状态快照 · 只读，输入与写入操作均已锁定</span></div>
-    <iframe src="/demo-studio/" title="Paper Studio read-only demo" loading="lazy"></iframe>
+    <iframe src="/demo-studio/?lang=${encodeURIComponent(uiLanguage)}&embedded=research-studio" title="Paper Studio read-only demo" loading="lazy"></iframe>
   </div>
 </section>`;
 
