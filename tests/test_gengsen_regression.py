@@ -41,8 +41,15 @@ def scientific_contract() -> dict:
         "url": "https://example.org/protocol",
         "alternative_explanations": [],
         "companion_requirements": [],
+        "unit": "%",
+        "evidence_source": "DERIVED",
+        "input_fields": ["prediction", "reference"],
+        "calculation": "compute the registered score from saved predictions and references",
+        "implementation": "code/metrics.py:score",
+        "protocol_checks": ["schema validation", "saved-operands recomputation"],
     }
     return {
+        "scientific_integrity_version": 1,
         "approval_status": "pending",
         "profile_contract": {
             "profile_path": "researcher-profile/PROFILE.html",
@@ -104,6 +111,15 @@ def scientific_contract() -> dict:
                 "weaken_pattern": "gain only in CoRe",
                 "falsify_pattern": "no currentness gain under matched recall",
                 "uncertainty_rule": "95% bootstrap interval",
+                "outcome_rule": {
+                    "rule_id": "OR-C1",
+                    "primary_metric_id": "M-current",
+                    "operator": "greater_than",
+                    "support_threshold": 0.5,
+                    "uncertainty_condition": "95% interval excludes the null",
+                    "tie_outcome": "inconclusive",
+                    "missing_outcome": "inconclusive",
+                },
             },
         }],
         "decision_space_contract": [{
@@ -142,6 +158,9 @@ class GengsenRegressionTests(unittest.TestCase):
             '"closest_work":"Prior memory","overlap":"retrieval",'
             '"independent_difference":"authority mechanism","latest_search_date":"2026-08-09",'
             '"review_context":"fresh","reviewer_run_id":"gengsen-review-1",'
+            '"counterevidence_queries":["authority memory","temporal authority memory","source authority retrieval"],'
+            '"recent_search_window":{"start":"2026-02-09","end":"2026-08-09"},'
+            '"dataset_assets":[],'
             '"source_urls":["https://arxiv.org/abs/2601.00001",'
             '"https://aclanthology.org/2026.acl-long.1/"]}]}</script>'
             '<article data-idea-id="I1" data-scope-necessity="EVALUATION_SCOPE_ONLY" '
@@ -178,6 +197,58 @@ class GengsenRegressionTests(unittest.TestCase):
                 "metric_contract", "measurement_contract", "decision_space_contract", "uses a proxy"
             ))]
             self.assertEqual(relevant, [])
+
+    def test_expplan_rejects_claim_metric_cartesian_overbinding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "03.html"
+            contract = scientific_contract()
+            contract["claims"][0]["measurement_contract"]["metric_ids"] = ["M-current"]
+            write_plan(path, contract)
+            errors = EXPPLAN_VALIDATOR.validate(path)
+            self.assertTrue(any("inverse metric claim_mappings" in error for error in errors))
+
+    def test_expplan_rejects_human_metric_without_real_annotation_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "03.html"
+            contract = scientific_contract()
+            contract["metric_contract"][0]["evidence_source"] = "HUMAN_ANNOTATION"
+            write_plan(path, contract)
+            errors = EXPPLAN_VALIDATOR.validate(path)
+            self.assertTrue(any("HUMAN_ANNOTATION" in error for error in errors))
+
+    def test_expplan_rejects_baseline_name_prompting_as_implementation(self):
+        contract = {
+            "implementation_contract": [{
+                "method": "Named baseline",
+                "source_kind": "LOCAL",
+                "source_url": "",
+                "implementation_verification": {
+                    "protocol_source": "https://example.edu/paper",
+                    "required_components": ["algorithm update"],
+                    "conformance_tests": ["equation fixture"],
+                    "method_name_in_model_prompt": True,
+                },
+            }],
+            "repository_contract": {"references": []},
+        }
+        errors = EXPPLAN_VALIDATOR.validate_implementation_integrity(contract)
+        self.assertTrue(any("forbid method-name prompting" in error for error in errors))
+
+    def test_expplan_rejects_public_url_for_unpublished_dataset(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "03.html"
+            contract = scientific_contract()
+            contract["dataset_citations"] = [{
+                "name": "Private pilot set",
+                "status": "SELF_BUILT_UNPUBLISHED",
+                "url": "https://example.org/not-a-real-publication",
+                "version": "v1",
+                "availability": "private during review",
+                "collection_contract": "protocols/private-pilot.md",
+            }]
+            write_plan(path, contract)
+            errors = EXPPLAN_VALIDATOR.validate(path)
+            self.assertTrue(any("private/unpublished data must not have a URL" in error for error in errors))
 
     def test_runplan_preserves_and_freezes_the_decision_space(self):
         contract = scientific_contract()

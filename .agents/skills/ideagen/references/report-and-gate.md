@@ -55,6 +55,10 @@ Validate the complete rewritten staging report, then atomically replace
 `reports/02_IDEA_REPORT.html`. The pre-rewrite draft remains internal; only the
 validated API-rewritten HTML is shown to the researcher.
 
+Rewrite eligible explanatory footnotes together with the body. Preserve the
+complete ID/href footnote graph and direct-link targets byte-for-byte; record
+the footnote count and reference-graph digest before and after rewriting.
+
 After the rewrite, run all ordinary validators **and**:
 
 ```bash

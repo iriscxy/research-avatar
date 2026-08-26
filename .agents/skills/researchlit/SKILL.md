@@ -36,9 +36,23 @@ official sources such as ACL Anthology, OpenReview, DBLP, publisher/venue pages,
 and DOI records. Use arXiv as a preprint fallback. Never infer missing metadata;
 mark uncertainty `[UNVERIFIED]` or omit the lead.
 
+Keep one canonical verified-paper record per work with the fetched final URL,
+page title, stable identifier, and verification date. Render every link and all
+paper/family counts from these records; never type a count separately in prose.
+Before delivery, reopen every rendered paper URL and reject redirects to an
+unrelated work, title/identifier mismatches, placeholder hosts, and dead links.
+Embed those canonical records once as `literature-verification` JSON. Render
+paper cards and families with matching `data-paper-id` and `data-family-id`;
+derive the visible counts from the arrays.
+
 Merge by stable ID or normalized title, preserve disagreements, and synthesize
 5–7 themes, live debates, recent trends, and structural gaps. Prefer verified
 published evidence where comparable while retaining materially new preprints.
+
+Every angle includes a separately recorded current/previous-year recency lane.
+Before describing a gap, run mechanism-level counterevidence queries whose
+purpose is to falsify that gap. Search-family breadth must not dilute
+recent-work coverage.
 
 Read
 [`references/search-and-synthesis.md`](references/search-and-synthesis.md)
@@ -93,6 +107,7 @@ Run on the completed canonical English survey, before translation if requested
 and otherwise before returning:
 
 ```bash
+python3 research_avatar/tools/validate_literature_report.py reports/01_LIT_SURVEY.html
 python3 research_avatar/tools/validate_report_structure.py --kind literature --html reports/01_LIT_SURVEY.html
 ```
 

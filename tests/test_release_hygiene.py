@@ -11,13 +11,28 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from research_avatar.tools.rewrite_ideagen_html import provider_settings
+from bs4 import BeautifulSoup
+
+from research_avatar.tools.rewrite_ideagen_html import provider_settings, reference_graph
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseHygieneTests(unittest.TestCase):
+    def test_ideagen_rewrite_reference_graph_covers_footnotes_and_links(self):
+        soup = BeautifulSoup(
+            '<p>Claim<a href="#fn-1">1</a></p>'
+            '<aside id="fn-1" role="doc-footnote">Evidence</aside>'
+            '<a href="https://example.edu/paper">Paper</a>',
+            "html.parser",
+        )
+        before = reference_graph(soup)
+        soup.find("p").contents[0].replace_with("Rewritten claim")
+        after = reference_graph(soup)
+        self.assertEqual(before, after)
+        self.assertEqual(before["footnote_count"], 1)
+
     def test_studios_use_launch_directory_as_project_root(self):
         with TemporaryDirectory() as directory:
             environment = os.environ.copy()

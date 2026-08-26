@@ -123,6 +123,26 @@ Work backward from testable claims:
   dev/final freezing; `$expplan` does not choose train/dev/test splits.
 - Give every result target exactly one source action: `RUN_LOCAL` or explicitly
   approved `REUSE_REPORTED`.
+- Set `scientific_integrity_version=1`. Every metric records a unit, evidence
+  source (`BENCHMARK_LABEL`, `MODEL_OUTPUT`, `SYSTEM_TRACE`,
+  `HUMAN_ANNOTATION`, `LLM_JUDGE`, or `DERIVED`), raw input fields, executable
+  calculation, implementation entrypoint, and protocol checks. Claim-side
+  `metric_ids` and metric-side `claim_mappings` must be exact inverses; never
+  bind every metric to every claim as a convenience.
+- Give every claim a deterministic `outcome_rule`. A tie, missing value,
+  interval crossing the registered null, or failure to meet the registered
+  margin is `inconclusive` or `weakened` as specified, never automatically
+  `supported` by an LLM judgment.
+- A human-named construct requires a real `HUMAN_ANNOTATION` contract with
+  annotator count, item count, blinding, rubric, annotation file, and agreement
+  calculation. An LLM judge is `LLM_JUDGE`, never “human agreement.”
+- Every baseline and proposed method has an `implementation_verification`
+  record naming the protocol source, required algorithmic components, and
+  conformance tests. `method_name_in_model_prompt` must be false: prompting a
+  model with a baseline name is not an implementation of that baseline.
+- Represent a project-created unpublished dataset as
+  `SELF_BUILT_UNPUBLISHED`, with its planned collection/versioning contract and
+  no external dataset URL. Never fabricate a publication or repository link.
 
 ## Projected paper
 
@@ -166,6 +186,11 @@ diagnostic, or other falsifiable artifact. A list of subsection names, a single
 high-level method sentence, or a Method overview caption is insufficient.
 Store the same design under `grounding.model_design` so browser writing receives
 one authoritative model specification.
+
+Store notation once as a structured `symbol_registry`; Method equations,
+algorithm steps, figure prompts, captions, and Paper Studio consume those same
+symbol IDs. A figure may not introduce an alternative glyph or rename a
+threshold independently.
 
 The block must be **concise but reproduction-grade**. A competent implementer
 should be able to reconstruct the disclosed model without reopening scattered

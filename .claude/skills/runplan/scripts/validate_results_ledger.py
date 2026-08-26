@@ -736,6 +736,55 @@ def validate(args: argparse.Namespace) -> list[str]:
                 f"embedded acquisition contract {acquisition_id}: an acquisition with a derivation cannot be atomic"
             )
 
+    if experiment_contract.get("scientific_integrity_version") == 1:
+        metrics_by_id = {
+            str(metric.get("id")): metric
+            for metric in experiment_contract.get("metric_contract", [])
+            if isinstance(metric, dict) and metric.get("id")
+        }
+        for acquisition_id, acquisition in acquisitions.items():
+            metric_id = str(acquisition.get("metric_id", "")).strip()
+            metric = metrics_by_id.get(metric_id)
+            if metric is None:
+                errors.append(
+                    f"embedded acquisition contract {acquisition_id}: metric_id does not resolve "
+                    "to the approved metric contract"
+                )
+                continue
+            for field in ("evidence_source", "unit"):
+                if acquisition.get(field) != metric.get(field):
+                    errors.append(
+                        f"embedded acquisition contract {acquisition_id}: {field} differs "
+                        "from the approved metric contract"
+                    )
+            if acquisition.get("metric") not in {metric.get("id"), metric.get("name")}:
+                errors.append(
+                    f"embedded acquisition contract {acquisition_id}: metric label differs "
+                    "from the approved metric"
+                )
+            if metric.get("evidence_source") == "HUMAN_ANNOTATION":
+                human = acquisition.get("human_annotation_evidence")
+                required_human = {
+                    "annotation_file", "rubric_path", "annotator_id_field",
+                    "item_id_field", "label_field",
+                }
+                if not isinstance(human, dict) or any(
+                    human.get(field) in (None, "", []) for field in required_human
+                ):
+                    errors.append(
+                        f"embedded acquisition contract {acquisition_id}: human metric lacks "
+                        "human_annotation_evidence"
+                    )
+            if metric.get("evidence_source") == "LLM_JUDGE":
+                judge = acquisition.get("judge_evidence")
+                required_judge = {"model", "prompt_path", "raw_judgments_path"}
+                if not isinstance(judge, dict) or any(
+                    judge.get(field) in (None, "", []) for field in required_judge
+                ):
+                    errors.append(
+                        f"embedded acquisition contract {acquisition_id}: judge metric lacks judge_evidence"
+                    )
+
     if args.goal and not any(row["goal_id"] == args.goal for row in rows):
         errors.append(f"no ledger row exists for requested goal {args.goal}")
 
@@ -769,6 +818,8 @@ def validate(args: argparse.Namespace) -> list[str]:
                     "target_id": row["target_id"].strip(),
                     "source_type": row["source_type"].strip(),
                     "producing_goal": row["goal_id"].strip(),
+                    "metric": row["metric"].strip(),
+                    "unit": row["unit"].strip(),
                 }
                 for field, actual in expected.items():
                     if str(acquisition.get(field, "")).strip() != actual:
@@ -863,6 +914,64 @@ def validate(args: argparse.Namespace) -> list[str]:
                 args.plan.read_text(encoding="utf-8"), state, acquisitions
             )
         )
+        completed_goal_ids = {
+            str(goal.get("id", ""))
+            for goal in state.get("goals", [])
+            if isinstance(goal, dict) and goal.get("status") == "completed"
+        }
+        latest_by_acquisition: dict[str, dict[str, str]] = {}
+        for row in rows:
+            latest_by_acquisition[row.get("acquisition_id", "").strip()] = row
+        for acquisition_id, acquisition in acquisitions.items():
+            goal_id = str(acquisition.get("producing_goal", ""))
+            if goal_id not in completed_goal_ids:
+                continue
+            latest = latest_by_acquisition.get(acquisition_id)
+            if latest is None:
+                errors.append(
+                    f"completed goal {goal_id} lacks a ledger row for {acquisition_id}"
+                )
+            elif latest.get("status") != "REAL" or latest.get("verification_status") != "VERIFIED":
+                errors.append(
+                    f"completed goal {goal_id} has no current verified REAL result for {acquisition_id}"
+                )
+        if experiment_contract.get("scientific_integrity_version") == 1:
+            decisions = state.get("claim_decisions")
+            decisions_by_claim = {
+                str(item.get("claim_id")): item
+                for item in decisions if isinstance(item, dict) and item.get("claim_id")
+            } if isinstance(decisions, list) else {}
+            for claim in experiment_contract.get("claims", []):
+                claim_id = str(claim.get("id", ""))
+                claim_metric_ids = {
+                    str(metric_id) for metric_id in
+                    claim.get("measurement_contract", {}).get("metric_ids", [])
+                }
+                claim_acquisitions = [
+                    acquisition for acquisition in acquisitions.values()
+                    if str(acquisition.get("metric_id", "")) in claim_metric_ids
+                ]
+                if not claim_acquisitions or any(
+                    str(acquisition.get("producing_goal", "")) not in completed_goal_ids
+                    for acquisition in claim_acquisitions
+                ):
+                    continue
+                decision = decisions_by_claim.get(claim_id)
+                outcome_rule = claim.get("measurement_contract", {}).get("outcome_rule", {})
+                if not isinstance(decision, dict):
+                    errors.append(f"final evidence lacks a deterministic claim decision for {claim_id}")
+                    continue
+                if decision.get("rule_id") != outcome_rule.get("rule_id"):
+                    errors.append(f"claim decision {claim_id} does not use the approved outcome rule")
+                if decision.get("evaluation_mode") != "deterministic_rule":
+                    errors.append(f"claim decision {claim_id} must be evaluated by deterministic_rule")
+                if decision.get("outcome") not in {
+                    "supported", "weakened", "falsified", "inconclusive"
+                }:
+                    errors.append(f"claim decision {claim_id} has an invalid outcome")
+                result_ids = decision.get("metric_result_ids")
+                if not isinstance(result_ids, list) or not result_ids:
+                    errors.append(f"claim decision {claim_id} lacks metric_result_ids")
     return errors
 
 
@@ -881,7 +990,9 @@ def self_test() -> int:
         "A1": {"artifact_id": "F2", "target_id": "F2.a.p1.x", "figure_source_cell": True},
         "A2": {"artifact_id": "F2", "target_id": "F2.a.p1.y", "figure_source_cell": True},
     }
-    pending_report = ('<section class="figure-result" data-artifact-id="F2" '
+    layout_css = ('<style>.result-panel .panel-pair{display:grid;'
+                  'grid-template-columns:minmax(0,1fr) minmax(0,1fr)}</style>')
+    pending_report = (layout_css + '<section class="figure-result" data-artifact-id="F2" '
                       'data-source-target-ids="F2.a.p1.x F2.a.p1.y">'
                       '<table><tr><td data-target-id="F2.a.p1.x">[PENDING]</td>'
                       '<td data-target-id="F2.a.p1.y">[PENDING]</td></tr></table></section>')
@@ -891,7 +1002,7 @@ def self_test() -> int:
         pending_report.replace("</section>", '<img class="result-plot"></section>'), figure_acquisitions
     )):
         return 1
-    filled_report = ('<section class="figure-result" data-artifact-id="F2" '
+    filled_report = (layout_css + '<section class="figure-result" data-artifact-id="F2" '
                      'data-source-target-ids="F2.a.p1.x F2.a.p1.y">'
                      '<table><tr><td data-target-id="F2.a.p1.x" data-result-id="R1">1</td>'
                      '<td data-target-id="F2.a.p1.y" data-result-id="R2">2</td></tr></table>'
@@ -906,7 +1017,7 @@ def self_test() -> int:
                "dimensions": {"panel": "panel-b"}},
     }
     split_panel_report = (
-        '<section class="figure-result" data-artifact-id="F2" '
+        layout_css + '<section class="figure-result" data-artifact-id="F2" '
         'data-source-target-ids="F2.a.x F2.b.x">'
         '<div class="result-panel"><h4>panel-a</h4><table><tr>'
         '<td data-target-id="F2.a.x" data-result-id="R1">1</td></tr></table>'
@@ -920,8 +1031,14 @@ def self_test() -> int:
         root = Path(directory)
         raw = root / "metrics.json"
         code = root / "run.py"
+        manifest = root / "run-manifest.json"
+        stdout_log = root / "stdout.log"
+        stderr_log = root / "stderr.log"
         raw.write_text('{"score": 0.75}\n', encoding="utf-8")
         code.write_text("# fixture\n", encoding="utf-8")
+        manifest.write_text('{"exit_status": 0}\n', encoding="utf-8")
+        stdout_log.write_text("score=0.75\n", encoding="utf-8")
+        stderr_log.write_text("", encoding="utf-8")
         ledger = root / "ledger.csv"
         row = {column: "" for column in COLUMNS}
         row.update({
@@ -948,6 +1065,7 @@ def self_test() -> int:
                 "id": "A-T1-score-fixture", "artifact_id": "T1",
                 "target_id": "score.fixture", "source_type": "RUN_LOCAL",
                 "producing_goal": "G00", "atomic_or_aggregate": "atomic",
+                "metric": "score", "unit": "",
             }],
         })
         plan_path.write_text(
@@ -957,7 +1075,9 @@ def self_test() -> int:
         args = argparse.Namespace(
             ledger=ledger, plan=plan_path, report=None, goal="G00", strict_report=False
         )
-        if validate(args):
+        strict_errors = validate(args)
+        if strict_errors:
+            print("SELF-TEST VALIDATION ERRORS:", *strict_errors, sep="\n- ")
             return 1
         provenance_payload = {
             row["result_id"]: {
@@ -972,6 +1092,16 @@ def self_test() -> int:
                 "config_files": row["config_files"],
                 "environment_files": row["environment_files"],
                 "code_revision": row["code_revision"],
+                "working_directory": str(root),
+                "executable_entrypoint": str(code),
+                "input_files": [str(raw)],
+                "run_manifest_path": str(manifest),
+                "stdout_log_path": str(stdout_log),
+                "stderr_log_path": str(stderr_log),
+                "exit_status": 0,
+                "started_at": "2026-01-01T00:00:00Z",
+                "ended_at": "2026-01-01T00:00:30Z",
+                "produced_raw_files": [str(raw)],
             }
         }
         hover_summary = html.escape(
@@ -1006,7 +1136,9 @@ def self_test() -> int:
         )
         args.report = report_path
         args.strict_report = True
-        if validate(args):
+        strict_errors = validate(args)
+        if strict_errors:
+            print("SELF-TEST STRICT ERRORS:", *strict_errors, sep="\n- ")
             return 1
         report_path.write_text(
             report_path.read_text(encoding="utf-8").replace(

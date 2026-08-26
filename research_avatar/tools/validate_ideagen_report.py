@@ -29,6 +29,9 @@ ACTION = {
 }
 NOVELTY_TIERS = {"novel": "A", "differentiable": "B"}
 PLACEHOLDER_HOSTS = {"example.com", "example.org", "example.net", "localhost"}
+DATASET_STATUSES = {
+    "PUBLISHED", "PUBLIC_REPOSITORY", "USER_PROVIDED_PRIVATE", "SELF_BUILT_UNPUBLISHED",
+}
 
 
 def valid_source_url(value: object) -> bool:
@@ -99,6 +102,29 @@ def validate(source: str) -> list[str]:
                 errors.append(f"{idea_id}: novelty audit must record review_context=fresh")
             if not str(audit.get("reviewer_run_id", "")).strip():
                 errors.append(f"{idea_id}: novelty audit missing reviewer_run_id")
+            queries = audit.get("counterevidence_queries")
+            if not isinstance(queries, list) or len({str(item).strip() for item in queries if str(item).strip()}) < 3:
+                errors.append(f"{idea_id}: novelty audit requires at least three counterevidence_queries")
+            window = audit.get("recent_search_window")
+            if not isinstance(window, dict) or not all(
+                str(window.get(field, "")).strip() for field in ("start", "end")
+            ):
+                errors.append(f"{idea_id}: novelty audit lacks recent_search_window")
+            assets = audit.get("dataset_assets")
+            if not isinstance(assets, list):
+                errors.append(f"{idea_id}: novelty audit dataset_assets must be a list")
+            else:
+                for asset_index, asset in enumerate(assets):
+                    if not isinstance(asset, dict) or asset.get("status") not in DATASET_STATUSES:
+                        errors.append(f"{idea_id}: dataset_assets[{asset_index}] has invalid status")
+                        continue
+                    if not str(asset.get("name", "")).strip():
+                        errors.append(f"{idea_id}: dataset_assets[{asset_index}] lacks name")
+                    if asset.get("status") in {"USER_PROVIDED_PRIVATE", "SELF_BUILT_UNPUBLISHED"}:
+                        if str(asset.get("url", "")).strip():
+                            errors.append(f"{idea_id}: private/unpublished dataset must not have an external URL")
+                        if not str(asset.get("availability", "")).strip():
+                            errors.append(f"{idea_id}: private/unpublished dataset lacks availability metadata")
         if status not in ALLOWED:
             errors.append(f"{idea_id}: invalid or missing data-scope-necessity")
             continue

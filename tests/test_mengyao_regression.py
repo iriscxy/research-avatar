@@ -176,6 +176,11 @@ class MengyaoRegressionTests(unittest.TestCase):
                 "independent_difference": "matched falsification control",
                 "latest_search_date": "2026-08-09",
                 "review_context": "fresh", "reviewer_run_id": "review-001",
+                "counterevidence_queries": [
+                    "adaptive stability", "active stopping stability", "matched falsification control"
+                ],
+                "recent_search_window": {"start": "2026-02-09", "end": "2026-08-09"},
+                "dataset_assets": [],
                 "source_urls": ["https://arxiv.org/abs/2601.00001",
                                 "https://aclanthology.org/2026.acl-long.1/"],
             }]

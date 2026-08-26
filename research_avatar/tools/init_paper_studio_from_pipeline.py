@@ -412,6 +412,9 @@ def repair_reference_context(root: Path, plan: Path) -> dict:
         else {}
     )
     metrics["model_design"] = contract.get("grounding", {}).get("model_design", {})
+    metrics["symbol_registry"] = contract.get("consistency_requirements", {}).get(
+        "symbol_registry", []
+    )
     results_report = root / "reports/05_EXP_RESULT.html"
     result_evidence_synced = False
     if results_report.is_file():
@@ -642,6 +645,9 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
         # Keep the approved Method specification in the bounded report-derived
         # evidence bundle. Paper Studio must not reduce it to paragraph titles.
         "model_design": grounding.get("model_design", {}),
+        "symbol_registry": contract.get("consistency_requirements", {}).get(
+            "symbol_registry", []
+        ),
         "evaluation_protocol": grounding.get("evaluation_protocol", {}),
         "experimental_setup": {
             "datasets": grounding.get("datasets", []),

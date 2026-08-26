@@ -114,6 +114,13 @@ show:
   Store that statement canonically as `reuse_notice="not rerun locally"` in
   the provenance payload and render it in reader-facing language.
 
+Render numeric values with at most three decimal places unless the approved
+display policy says otherwise, while retaining full precision in raw files and
+the ledger. Display the unit or an explicit `unitless` marker. Derive every
+Goal/artifact status badge from the latest validated acquisition rows: never
+leave `PENDING` after all rows validate, and never show `FILLED` or `completed`
+while a required row is missing or invalidated.
+
 Embed the exact provenance records once as escaped JSON in
 `<script type="application/json" id="result-provenance">...</script>` and
 render the cards from that payload with DOM `textContent`, not interpolated

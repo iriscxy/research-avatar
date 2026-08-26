@@ -43,6 +43,12 @@ For **each surviving candidate**, assess novelty at the candidate level rather t
 
 2. **Run 2–3 targeted searches for that candidate.** Search the core mechanism, task/setting, and claimed contribution across recent work (~2 years), with an explicit final check of the latest 6 months. Reuse relevant evidence from A1 / `01_LIT_SURVEY.html` rather than repeating the full landscape survey; A4 only performs focused collision checks.
 
+   The last-6-month check is a counterevidence pass: use the exact core
+   mechanism, its synonyms, and mechanism+task combinations with the explicit
+   goal of finding work that would absorb the candidate. Store the executed
+   queries, date window, closest collision, and bounded difference in the
+   novelty audit. Classic-work coverage cannot substitute for this pass.
+
 3. **Inspect the closest 3–5 papers sufficiently to judge overlap.** Do not decide from titles or snippets alone when abstracts or full text are available. Record the closest work, overlapping components, the candidate's concrete difference, overlap with the researcher's own work, and any uncertainty or missing evidence.
 
 Assign exactly one novelty status:
@@ -56,13 +62,18 @@ A4 is an evidence and duplicate-check stage, not the final quality-ranking stage
 
 Write the result directly into `reports/02_IDEA_REPORT.html`; **do not create `NOVELTY_DOSSIER.md` or another novelty artifact**. Include a novelty-evidence table with at least: `ID | Idea | Novelty status | Closest work | Overlap | Concrete difference | Own-work overlap | Evidence gaps | Confidence`.
 
+For every dataset asset, record one of `PUBLISHED`, `PUBLIC_REPOSITORY`,
+`USER_PROVIDED_PRIVATE`, or `SELF_BUILT_UNPUBLISHED`. The last two have no
+invented publication link. A self-built unpublished dataset instead records
+its planned collection, versioning, access, and release status.
+
 
 For every disruptive seed surviving A2, run the **absorbability test** (D4 in `references/disruptive-branch.md`): if the closest work could absorb it as one module/loss/prompt/data-slice/benchmark-axis/scale-run without changing its central causal story, label it `incremental/absorbed` and drop it from wildcard eligibility (retain in the audit). This is where paper titles and prior ideas are reintroduced and the closest collision is recorded.
 
 ## A5 — Objective gate · qualitative review · ranking
 Separate the objective filter from the qualitative ranking; do **not** use numeric scores, weighted totals, or a novelty scorecard.
 1. **Objective gate (mechanical only):** drop a candidate only on an objective fact — compute clearly beyond the profile's hardware, or a provably-unavailable dataset. Never drop on "looks complex" / "might already be done"; annotate uncertainty instead.
-2. **Qualitative record per idea:** novelty status · closest work · concrete difference · confidence · feasibility (compute/data/implementation vs the profile stack) · risk LOW/MED/HIGH · contribution type (empirical / method / benchmark / theory / diagnostic) · fit (which *Dominant Method*/niche) · single-mechanism test (below) · scope-necessity test (below) · strongest reviewer objection · honest rough effort · **Ethics risk** (only if Step 2 flagged the idea; keep separate from technical `risk`).
+2. **Qualitative record per idea:** novelty status · closest work · concrete difference · confidence · feasibility (compute/data/implementation vs the profile stack) · risk LOW/MED/HIGH · contribution type (empirical / method / benchmark / theory / diagnostic) · fit (which *Dominant Method*/niche) · single-mechanism test (below) · scope-necessity test (below) · strongest reviewer objection · honest rough effort · **Ethics risk** (only if Step 2 flagged the idea; keep separate from technical `risk`). Feasibility contains only whether the work can be built and evaluated with available data, compute, access, time, and expertise. Incremental overlap, novelty collisions, and likely reviewer objections belong under novelty/reviewer risk, never under feasibility.
 2a. **Single-mechanism test — anti-"boring mashup" diagnosis (apply to EVERY idea).** State the idea's ONE core mechanism in a single sentence, then try to break the idea into independent contributions. If it decomposes into "improvement A + improvement B" (e.g. `technique X` *plus* `apply it to domain Y`), explicitly diagnose the decomposition and try to reforge it around one insight so the second component becomes a consequence or falsification test rather than a bolt-on module. (E.g. "defense A + also works on audio" is a mashup; "harmful intent lives on one modality-invariant axis, so the same conditional defense transfers to audio *for free* — and if it needs a separate audio module, the core claim is false" is one mechanism whose audio result tests the claim.) An unresolved A+B candidate is **capped at `differentiable`, never `novel`**, and ranked below true single-mechanism ideas, but the diagnosis alone does not automatically remove it from the researcher's decision slate when it retains a concrete difference and an actionable reforge path. This is not a licence to invent a grand unifying theory over a genuinely engineering idea.
 2b. **Scope-necessity test (EVERY idea).** For each domain, modality, structure,
 scale, temporal/deployment setting, or population foregrounded in the title or claim,

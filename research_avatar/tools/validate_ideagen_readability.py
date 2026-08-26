@@ -11,7 +11,7 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup, NavigableString
 
-from rewrite_ideagen_html import RECEIPT_ID, eligible_string, normalize
+from rewrite_ideagen_html import RECEIPT_ID, eligible_string, normalize, reference_graph
 
 
 def main() -> int:
@@ -34,6 +34,13 @@ def main() -> int:
         errors.append("readability receipt must record a complete supported LLM API pass")
     if not str(receipt.get("model", "")).strip():
         errors.append("readability receipt lacks model")
+    before_graph = str(receipt.get("reference_graph_before_sha256", ""))
+    after_graph = str(receipt.get("reference_graph_after_sha256", ""))
+    current_graph = reference_graph(soup)["sha256"]
+    if not before_graph or before_graph != after_graph or after_graph != current_graph:
+        errors.append("readability rewrite did not preserve the link/footnote reference graph")
+    if receipt.get("footnote_count") != reference_graph(soup)["footnote_count"]:
+        errors.append("readability receipt footnote count differs from final HTML")
     response_ids = receipt.get("api_response_ids")
     if not isinstance(response_ids, list) or not response_ids or any(not str(value).strip() for value in response_ids):
         errors.append("readability receipt lacks API response IDs")

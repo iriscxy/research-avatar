@@ -106,6 +106,13 @@ result before the next run, derive aggregates only from saved full-precision
 operands, refresh `05`, validate provenance, update `04`, and evaluate the
 approved gate. Negative evidence is valid completion evidence.
 
+Copy every approved metric's stable `metric_id`, unit, evidence source, input
+schema, and calculation into each acquisition contract. The ledger validator
+must reject reinterpretation. `HUMAN_ANNOTATION` requires the real annotation
+file, rubric, blinded item/annotator IDs, and label fields; an LLM judge cannot
+fill it. `LLM_JUDGE` instead preserves its model, prompt file, raw judgments,
+and calibration record.
+
 Automatic mode advances only on `continue`. Stop on `refine`, `pivot`,
 `stopped`, `blocked`, validation failure, exhausted budget, or a new
 researcher-controlled decision. Manual mode proposes the next goal and stops.
@@ -133,6 +140,13 @@ revision, calculation or aggregation, and verification. Persist these facts at
 execution time; never reconstruct them later from a command template or prose.
 An artifact appears once under its earliest owning goal and is updated there as
 later goals fill additional targets.
+
+Goal and artifact status are derived from the latest validated ledger row for
+every owned acquisition, never manually assigned. A completed goal requires a
+current `REAL`/`VERIFIED` row for every acquisition. After final-evidence goals
+complete, evaluate every claim only through its approved deterministic
+`outcome_rule` and persist `claim_decisions`; ties, missing evidence, or an
+interval that misses the registered condition cannot become `supported`.
 
 Read [`references/results-and-html.md`](references/results-and-html.md) while
 rendering or validating `04` and `05`.

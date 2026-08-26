@@ -817,7 +817,7 @@ Treat the profile's visual_signature as a hard art-direction constraint. Read <c
 
 Match recurring ACL conventions: pure white background; publication-ready editable-vector appearance; flat fills; thin dark strokes; compact alignment; generous whitespace; precise sans-serif labels; restrained colorblind-safe accents; repeated shapes for repeated scientific entities; solid arrows for primary flow and dashed arrows only for a different, explicitly named relation. Use color to reinforce meaning, never as the only distinction. Avoid decorative poster art, photorealism, people, scenery, mascots, gradients, glow, glass, 3D depth, heavy shadows, marketing graphics, large title cards, and empirical result plots.
 
-Apply a cold-reader gate. From the figure and one-sentence caption alone, a researcher must identify the input or compared states, the proposed operation, the output, and the paper-specific difference. Every arrow and visual object must correspond to the supplied evidence. Do not invent modules, claims, outcomes, numerical results, or causal relations. Keep labels short and print-readable at the target column width; put explanations in the caption, not inside the figure.
+Apply a cold-reader gate. From the figure and one-sentence caption alone, a researcher must identify the input or compared states, the proposed operation, the output, and the paper-specific difference. Every arrow and visual object must correspond to the supplied evidence. Do not invent modules, claims, outcomes, numerical results, or causal relations. Keep labels short and print-readable at the target column width; put explanations in the caption, not inside the figure. When the evidence contains a symbol_registry, copy its glyphs and meanings exactly: do not introduce aliases, rename a threshold, or use a different owner/source symbol in the figure than in the manuscript.
 
 The supplied format and type profiles are mandatory. Restate the canvas, column target, composition, object inventory, reading order, label budget, palette roles, line semantics, and prohibited content in the final image-generation prompt. On revision turns, preserve correct prior decisions while applying the latest instruction. Do not mention named drawing software; describe the visible result rather than a tool-specific style."""
 
@@ -5348,6 +5348,7 @@ def section_evidence(
         selected["target_project_brief"] = lightweight["project_evidence"]
     if _is_method_section(section) and isinstance(metrics.get("model_design"), dict):
         selected["approved_model_design"] = metrics["model_design"]
+        selected["symbol_registry"] = metrics.get("symbol_registry", [])
     if _is_experiment_section(section):
         setup = experiment_setup_context()
         if setup:

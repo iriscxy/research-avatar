@@ -44,6 +44,24 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def reference_graph(soup: BeautifulSoup) -> dict[str, object]:
+    """Capture link/target integrity independently from rewritten prose."""
+    links = [
+        {"href": str(tag.get("href", "")), "id": str(tag.get("id", ""))}
+        for tag in soup.find_all("a")
+    ]
+    target_ids = sorted(
+        str(tag.get("id")) for tag in soup.find_all(attrs={"id": True})
+        if str(tag.get("id")) != RECEIPT_ID
+    )
+    footnote_count = len(soup.find_all(attrs={"role": "doc-footnote"}))
+    payload = {"links": links, "target_ids": target_ids, "footnote_count": footnote_count}
+    digest = hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return {**payload, "sha256": digest}
+
+
 def eligible_string(node: NavigableString) -> bool:
     text = normalize(str(node))
     if not text or text.lower() in FIXED_LABELS:
@@ -215,6 +233,8 @@ def main() -> int:
         if repaired:
             node.replace_with(repaired)
 
+    reference_graph_before = reference_graph(soup)
+
     nodes = [node for node in soup.find_all(string=True) if isinstance(node, NavigableString) and eligible_string(node)]
     if not nodes:
         raise RuntimeError("no eligible visible explanatory text was found")
@@ -280,6 +300,10 @@ def main() -> int:
             "output_sha256": digest,
         })
 
+    reference_graph_after = reference_graph(soup)
+    if reference_graph_after != reference_graph_before:
+        raise RuntimeError("readability rewrite changed the HTML link/footnote reference graph")
+
     receipt = {
         "schema_version": "1.0",
         "status": "complete",
@@ -292,6 +316,9 @@ def main() -> int:
         "api_usage": summarize_records(api_usage_records),
         "api_usage_records": api_usage_records,
         "nodes": records,
+        "footnote_count": reference_graph_before["footnote_count"],
+        "reference_graph_before_sha256": reference_graph_before["sha256"],
+        "reference_graph_after_sha256": reference_graph_after["sha256"],
     }
     receipt_tag = soup.new_tag("script", type="application/json", id=RECEIPT_ID)
     receipt_tag.string = json.dumps(receipt, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")

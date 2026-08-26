@@ -50,6 +50,10 @@ stable `acquisition_id` and records:
   figure source-data table; these targets drive the final plot directly;
 - metric, unit, dimensions, and exactly `atomic` or `derived`; every aggregate,
   gap, ratio, mean, or transformed value is `derived` and needs its derivation;
+- the exact approved `metric_id` and `evidence_source`, copied rather than
+  inferred from a visible label. Human annotations additionally record the
+  annotation/rubric paths and item, annotator, and label fields; LLM judges
+  record the judge model, prompt path, raw judgments, and calibration evidence;
 - exactly one `source_type`: `RUN_LOCAL` or `REUSE_REPORTED`;
 - for `RUN_LOCAL`: experiment, method/baseline, the dataset and metric read from
   the approved table plus the execution split fixed by `/runplan`, model,

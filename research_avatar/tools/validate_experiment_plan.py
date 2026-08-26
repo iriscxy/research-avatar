@@ -11,6 +11,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 
 CONTRACT_RE = re.compile(
@@ -19,6 +20,18 @@ CONTRACT_RE = re.compile(
 APPROVAL_FIELDS = {
     "approval_status", "approved_at", "approval_channel", "approval_contract_sha256",
     "approval_contract_version",
+}
+
+EVIDENCE_SOURCES = {
+    "BENCHMARK_LABEL",
+    "HUMAN_ANNOTATION",
+    "LLM_JUDGE",
+    "MODEL_OUTPUT",
+    "SYSTEM_TRACE",
+    "DERIVED",
+}
+DATASET_STATUSES = {
+    "PUBLISHED", "PUBLIC_REPOSITORY", "USER_PROVIDED_PRIVATE", "SELF_BUILT_UNPUBLISHED",
 }
 
 
@@ -39,6 +52,51 @@ def identity_matches_authors(identity: str, authors: object) -> bool:
         initial_surname = rf"\b{re.escape(clean_identity[0][0])}\s+{re.escape(clean_identity[-1])}\b"
         return re.search(initial_surname, clean_authors) is not None
     return False
+
+
+def nonplaceholder_url(value: object) -> bool:
+    parsed = urlparse(str(value))
+    host = (parsed.hostname or "").lower()
+    return (
+        parsed.scheme in {"http", "https"}
+        and bool(parsed.path.strip("/"))
+        and host not in {"example.com", "example.org", "example.net", "localhost"}
+    )
+
+
+def validate_implementation_integrity(contract: dict) -> list[str]:
+    """Cross-check algorithm implementation claims independently of visible prose."""
+    errors: list[str] = []
+    implementations = contract.get("implementation_contract", [])
+    repository_urls = {
+        str(reference.get("url", "")).rstrip("/")
+        for reference in contract.get("repository_contract", {}).get("references", [])
+        if isinstance(reference, dict) and reference.get("url")
+    }
+    for item in implementations if isinstance(implementations, list) else []:
+        if not isinstance(item, dict):
+            errors.append("implementation_contract entries must be objects")
+            continue
+        method = item.get("method")
+        verification = item.get("implementation_verification")
+        required = {
+            "protocol_source", "required_components", "conformance_tests",
+            "method_name_in_model_prompt",
+        }
+        if not isinstance(verification, dict) or any(field not in verification for field in required):
+            errors.append(f"implementation {method} lacks implementation_verification")
+            continue
+        if not str(verification.get("protocol_source", "")).strip():
+            errors.append(f"implementation {method} lacks a protocol source")
+        for field in ("required_components", "conformance_tests"):
+            if not isinstance(verification.get(field), list) or not verification.get(field):
+                errors.append(f"implementation {method} requires non-empty {field}")
+        if verification.get("method_name_in_model_prompt") is not False:
+            errors.append(f"implementation {method} must forbid method-name prompting")
+        source_url = str(item.get("source_url", "")).rstrip("/")
+        if item.get("source_kind") == "OFFICIAL_GITHUB" and source_url not in repository_urls:
+            errors.append(f"implementation {method} source is absent from repository_contract")
+    return errors
 PENDING_TD_RE = re.compile(
     r'<td\b[^>]*class\s*=\s*["\'][^"\']*\bpending\b[^"\']*["\'][^>]*>\s*\[PENDING\]\s*</td>',
     re.I,
@@ -122,6 +180,11 @@ def validate(plan: Path) -> list[str]:
                 contract.get("parent_approval_sha256", "")
             ).strip():
                 errors.append("an amended contract requires parent_approval_sha256")
+    if contract.get("scientific_integrity_version") != 1:
+        errors.append(
+            "scientific_integrity_version must be 1; regenerate the plan with "
+            "claim/metric, implementation, and evidence-source integrity contracts"
+        )
     if contract.get("approval_status") not in {"pending", "approved"}:
         errors.append("approval_status must be pending or approved")
     if contract.get("approval_status") == "approved":
@@ -210,11 +273,32 @@ def validate(plan: Path) -> list[str]:
         errors.append("target, references, and plan require ISO confirmation/generation dates")
     if contract.get("dataset_confirmation", {}).get("confirmed") is not True:
         errors.append("dataset slate was not explicitly confirmed before HTML generation")
+    errors.extend(validate_implementation_integrity(contract))
+    for index, dataset in enumerate(contract.get("dataset_citations", [])):
+        status = dataset.get("status") if isinstance(dataset, dict) else None
+        if status not in DATASET_STATUSES:
+            errors.append(f"dataset_citations[{index}] has invalid or missing status")
+            continue
+        url = str(dataset.get("url", "")).strip()
+        if status in {"PUBLISHED", "PUBLIC_REPOSITORY"} and not nonplaceholder_url(url):
+            errors.append(f"dataset_citations[{index}] requires a real public URL")
+        if status in {"USER_PROVIDED_PRIVATE", "SELF_BUILT_UNPUBLISHED"}:
+            if url:
+                errors.append(f"dataset_citations[{index}] private/unpublished data must not have a URL")
+            if any(
+                not str(dataset.get(field, "")).strip()
+                for field in ("version", "availability", "collection_contract")
+            ):
+                errors.append(
+                    f"dataset_citations[{index}] private/unpublished data lacks "
+                    "version/availability/collection_contract"
+                )
     for index, metric in enumerate(contract.get("metric_contract", [])):
         required_metric_fields = (
             "id", "name", "provenance", "definition", "range", "decision_rule", "aggregation", "url",
             "construct", "claim_mappings", "cannot_establish",
-            "alternative_explanations", "companion_requirements",
+            "alternative_explanations", "companion_requirements", "unit", "evidence_source",
+            "input_fields", "calculation", "implementation", "protocol_checks",
         )
         missing = [field for field in required_metric_fields if not str(metric.get(field, "")).strip()]
         if missing:
@@ -238,10 +322,42 @@ def validate(plan: Path) -> list[str]:
         for field in ("alternative_explanations", "companion_requirements"):
             if not isinstance(metric.get(field), list):
                 errors.append(f"metric_contract[{index}].{field} must be a list")
+        for field in ("input_fields", "protocol_checks"):
+            if not isinstance(metric.get(field), list) or not metric.get(field):
+                errors.append(f"metric_contract[{index}].{field} must be a non-empty list")
+        evidence_source = metric.get("evidence_source")
+        if evidence_source not in EVIDENCE_SOURCES:
+            errors.append(
+                f"metric_contract[{index}].evidence_source must be one of "
+                f"{sorted(EVIDENCE_SOURCES)}"
+            )
+        if evidence_source == "HUMAN_ANNOTATION":
+            human = metric.get("human_annotation_contract")
+            required_human = {
+                "annotator_count", "item_count", "blinding", "rubric_path",
+                "annotation_file", "agreement_calculation",
+            }
+            if not isinstance(human, dict) or any(
+                human.get(field) in (None, "", []) for field in required_human
+            ):
+                errors.append(
+                    f"metric_contract[{index}] HUMAN_ANNOTATION requires a complete "
+                    "human_annotation_contract"
+                )
+        if evidence_source == "LLM_JUDGE":
+            judge = metric.get("judge_contract")
+            required_judge = {"model", "prompt_path", "output_schema", "calibration"}
+            if not isinstance(judge, dict) or any(
+                judge.get(field) in (None, "", []) for field in required_judge
+            ):
+                errors.append(
+                    f"metric_contract[{index}] LLM_JUDGE requires a complete judge_contract"
+                )
     measurement_fields = {
         "construct_definition", "primary_observable", "metric_ids", "measurement_role",
         "cannot_establish", "alternative_explanations", "required_controls",
         "support_pattern", "weaken_pattern", "falsify_pattern", "uncertainty_rule",
+        "outcome_rule",
     }
     metrics_by_id = {
         metric.get("id"): metric for metric in contract.get("metric_contract", []) if metric.get("id")
@@ -273,6 +389,54 @@ def validate(plan: Path) -> list[str]:
             errors.append(f"claims[{index}] is marked DIRECT but has no directly mapped metric")
         if measurement.get("measurement_role") == "PROXY_WITH_COMPANION" and not measurement.get("required_controls"):
             errors.append(f"claims[{index}] uses a proxy without a required companion control/measure")
+        outcome_rule = measurement.get("outcome_rule")
+        required_outcome = {
+            "rule_id", "primary_metric_id", "operator", "support_threshold",
+            "uncertainty_condition", "tie_outcome", "missing_outcome",
+        }
+        if not isinstance(outcome_rule, dict) or any(
+            outcome_rule.get(field) in (None, "", []) for field in required_outcome
+        ):
+            errors.append(
+                f"claims[{index}].measurement_contract requires a complete deterministic outcome_rule"
+            )
+        elif outcome_rule.get("primary_metric_id") not in measurement.get("metric_ids", []):
+            errors.append(
+                f"claims[{index}].outcome_rule primary_metric_id is not in the claim metric_ids"
+            )
+
+    claim_ids = {
+        str(claim.get("id")) for claim in contract.get("claims", [])
+        if isinstance(claim, dict) and claim.get("id")
+    }
+    inverse_metric_ids: dict[str, set[str]] = {claim_id: set() for claim_id in claim_ids}
+    for metric_index, metric in enumerate(contract.get("metric_contract", [])):
+        metric_id = str(metric.get("id", ""))
+        mapped_claim_ids = [
+            str(mapping.get("claim_id", ""))
+            for mapping in metric.get("claim_mappings", []) if isinstance(mapping, dict)
+        ]
+        if len(mapped_claim_ids) != len(set(mapped_claim_ids)):
+            errors.append(f"metric_contract[{metric_index}] has duplicate claim mappings")
+        for claim_id in mapped_claim_ids:
+            if claim_id not in claim_ids:
+                errors.append(
+                    f"metric_contract[{metric_index}] maps to unknown claim_id {claim_id}"
+                )
+            else:
+                inverse_metric_ids[claim_id].add(metric_id)
+    for claim_index, claim in enumerate(contract.get("claims", [])):
+        claim_id = str(claim.get("id", ""))
+        declared = {
+            str(metric_id)
+            for metric_id in claim.get("measurement_contract", {}).get("metric_ids", [])
+        }
+        inverse = inverse_metric_ids.get(claim_id, set())
+        if declared != inverse:
+            errors.append(
+                f"claims[{claim_index}] metric_ids disagree with inverse metric claim_mappings: "
+                f"declared={sorted(declared)}, inverse={sorted(inverse)}"
+            )
     decisions = contract.get("decision_space_contract", [])
     if not decisions:
         errors.append("contract lacks decision_space_contract")
@@ -738,10 +902,16 @@ def validate(plan: Path) -> list[str]:
         if not metric_contract:
             errors.append("contract lacks metric_contract")
         for metric in metric_contract:
-            token = metric.get("name")
-            url = metric.get("url")
-            provenance = metric.get("provenance")
-            if token not in visible_text(setup) or provenance not in visible_text(setup):
+            token = str(metric.get("name", ""))
+            url = str(metric.get("url", ""))
+            provenance = str(metric.get("provenance", ""))
+            unit = str(metric.get("unit", ""))
+            if (
+                token not in visible_text(setup)
+                or provenance not in visible_text(setup)
+                or not unit
+                or unit not in visible_text(setup)
+            ):
                 errors.append(f"Setup lacks metric provenance for {token}")
             if f'href="{url}"' not in setup:
                 errors.append(f"Setup lacks metric source citation {url}")
@@ -812,6 +982,29 @@ def validate(plan: Path) -> list[str]:
                 errors.append("visible model design exceeds the concise 7000-character ceiling")
             if not re.search(r"(?:λ|lambda|weight|loss|objective)", design_text, re.I):
                 errors.append("visible model design lacks an objective or weighting rule")
+        symbol_registry = contract.get("consistency_requirements", {}).get("symbol_registry")
+        if not isinstance(symbol_registry, list) or not symbol_registry:
+            errors.append("Method plan requires one structured consistency_requirements.symbol_registry")
+        else:
+            symbol_ids = [
+                str(symbol.get("id", "")) for symbol in symbol_registry
+                if isinstance(symbol, dict)
+            ]
+            if len(symbol_ids) != len(set(symbol_ids)) or any(not value for value in symbol_ids):
+                errors.append("symbol_registry IDs must be unique and non-empty")
+            for symbol_index, symbol in enumerate(symbol_registry):
+                if not isinstance(symbol, dict) or any(
+                    not str(symbol.get(field, "")).strip()
+                    for field in ("id", "latex", "meaning")
+                ):
+                    errors.append(f"symbol_registry[{symbol_index}] lacks id/latex/meaning")
+            if model_design.get("symbol_ids") != symbol_ids:
+                errors.append("grounding.model_design.symbol_ids must preserve the symbol registry order")
+            known_symbol_ids = set(symbol_ids)
+            for artifact in contract.get("paper_artifacts", []):
+                referenced = artifact.get("symbol_ids", []) if isinstance(artifact, dict) else []
+                if any(str(symbol_id) not in known_symbol_ids for symbol_id in referenced):
+                    errors.append(f"artifact {artifact.get('id')} references an unknown symbol ID")
         target_work = contract.get("target_work")
         if isinstance(target_work, dict):
             authority = str(model_design.get("source_authority", "")).strip()

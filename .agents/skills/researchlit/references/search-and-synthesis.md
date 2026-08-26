@@ -37,6 +37,10 @@ volume for its own sake. Do NOT do one or two searches.
    - **Anti-hallucination (hard rule):** report ONLY papers actually retrieved and
      whose id it saw on the page; anything unsure → mark `[UNVERIFIED]`, **never
      fabricate** an id/DOI/title. Drop unverifiable leads rather than list them.
+   - Run a separate recency lane covering the current year and previous year,
+     including arXiv-only work. Family quotas never replace this lane. Record
+     the exact recency queries and search date, and explicitly report when it
+     returns no verified paper.
 3. **Sandbox note:** sandboxed Bash throttles the S2/arXiv **API** (HTTP 429).
    Prefer direct `arxiv.org/abs/<id>` / `arxiv.org/pdf/<id>` + web open/fetch, or the
    `research_avatar/tools/` helpers, over hammering the API. (See project memory.)
@@ -49,6 +53,11 @@ volume for its own sake. Do NOT do one or two searches.
    and higher-cited work as the representative citation. Keep recent preprints when
    they are materially newer or uniquely relevant; publication status and citation
    count are prioritization signals, not a reason to erase relevant new work.
+5. Before declaring a gap, run a **gap-falsification search** using the proposed
+   missing mechanism as an exact phrase, its main synonyms, and combinations
+   with the task and intervention. Search specifically for work that would make
+   the gap false. Retain the queries, closest collision, and bounded difference;
+   “no paper in the selected families” is not novelty evidence.
 
 > Prefer delegating the searches to agents so raw search dumps stay out of the
 > main context — you keep the merged, verified paper list, not the transcripts.
