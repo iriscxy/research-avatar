@@ -330,7 +330,13 @@ paragraph IDs, artifact IDs, artifact LaTeX labels, result requirement IDs, and
 result target IDs must each be globally unique within their namespace before
 the HTML is rendered. Figure and table numbers follow the ordered artifact
 registry; headings, shells, the compact ledger, Run Plan, and Paper Studio may
-consume those identifiers but may not independently renumber them.
+consume those identifiers but may not independently renumber them. Do not rely
+on the structure-writing model to enforce uniqueness: pass its target outline
+through `canonicalize_target_identifiers` before rendering or persistence. That
+allocator preserves the first valid unique suggestion and deterministically
+replaces only missing or colliding section/paragraph IDs; validation remains a
+final assertion rather than the mechanism that discovers the problem for the
+user.
 
 **GATE (human is judge — enforce it, don't just present):** in the approval conversation, summarize claims, selected baseline coverage/actions, exact reuse sources, omitted-Required risks, repository authority/fallbacks, the reference-aligned one-sentence-per-paragraph blueprint, every inline figure/table shell and its unfilled targets, variable feasibility, ablations, first three dependency-sketch experiments, budget, and artifact placement. Do not add these as extra visible HTML sections. Baseline and repository contracts must be resolved before the final HTML is written, so the GATE asks only for approval or revision of the complete plan. Reject the plan before this gate if any claim lacks a valid measurement contract, a proxy is asked to establish a stronger construct without a companion direct measure/control, any researcher-controlled decision is outside the authorized decision-space contract, any section/subsection omits its planned paragraphs, any paragraph lacks exactly one concrete planning sentence, any promised artifact lacks a visible shell, any numeric shell cell lacks exactly one result requirement, any result requirement lacks a single authorized source action and experiment/source locator, or any required target cannot be deterministically acquired. **Then STOP and call `ask the user directly`** for the researcher to `approve` / `revise` the plan (offer those options; `revise` collects what to change) — exactly as the intermediate baseline/reuse/repository gates already do. **Do NOT auto-proceed to `/runplan`; wait for the researcher's approval token.** This holds even in a skill-test run (fabricated data does not skip the gate).
 

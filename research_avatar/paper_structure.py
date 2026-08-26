@@ -385,6 +385,8 @@ def normalize_structure_design(
     if not isinstance(outline, list) or not outline:
         return
 
+    canonicalize_target_identifiers(outline)
+
     analysis = payload.get("structure_reference_analysis")
     reference_sections = analysis.get("body_sections", []) if isinstance(analysis, dict) else []
     reference_ids: set[str] = set()
@@ -637,6 +639,98 @@ def normalize_structure_design(
             }
             paragraph["artifact_refs"] = sorted(
                 inherited, key=lambda item: (rank.get(item, len(rank)), item)
+            )
+
+
+def _identifier_slug(value: Any, fallback: str) -> str:
+    """Return a conservative ASCII identifier without interpreting prose."""
+    characters: list[str] = []
+    previous_separator = False
+    for character in str(value or "").strip().casefold():
+        if character.isascii() and character.isalnum():
+            characters.append(character)
+            previous_separator = False
+        elif characters and not previous_separator:
+            characters.append("-")
+            previous_separator = True
+    slug = "".join(characters).strip("-")
+    return slug or fallback
+
+
+def _paragraph_prefix(section: dict[str, Any]) -> str:
+    """Choose a readable section-local prefix for generated paragraph IDs."""
+    identity = " ".join(
+        str(section.get(field) or "") for field in ("section_id", "id", "title")
+    ).casefold()
+    known = (
+        (("abstract",), "ABS"),
+        (("introduction",), "I"),
+        (("related", "work"), "RW"),
+        (("method", "approach"), "M"),
+        (("experiment", "evaluation"), "E"),
+        (("analysis",), "A"),
+        (("discussion",), "D"),
+        (("limitation", "ethic"), "L"),
+        (("conclusion",), "C"),
+        (("appendix",), "APP"),
+    )
+    for needles, prefix in known:
+        if any(needle in identity for needle in needles):
+            return prefix
+    slug = _identifier_slug(section.get("section_id") or section.get("title"), "S")
+    initials = "".join(part[0] for part in slug.split("-") if part)
+    return (initials or slug[:3] or "S").upper()
+
+
+def _claim_unique_identifier(candidate: str, fallback: str, used: set[str]) -> str:
+    """Allocate one stable ID while preserving the first valid model suggestion."""
+    suggested = candidate.strip()
+    base = suggested if suggested and suggested not in used else fallback
+    identifier = base
+    suffix = 2
+    while identifier in used:
+        identifier = f"{base}-{suffix}"
+        suffix += 1
+    used.add(identifier)
+    return identifier
+
+
+def canonicalize_target_identifiers(outline: list[dict[str, Any]]) -> None:
+    """Make target section and paragraph IDs globally unique before validation.
+
+    Rhetorical content remains Agent-owned. IDs are mechanical registry keys, so
+    the application, rather than the language model, resolves missing or repeated
+    keys. The first non-empty unique suggestion is retained; only an invalid or
+    colliding suggestion is replaced.
+    """
+    used_sections: set[str] = set()
+    used_paragraphs: set[str] = set()
+    for section_index, section in enumerate(outline, 1):
+        if not isinstance(section, dict):
+            continue
+        raw_section_id = str(section.get("section_id") or section.get("id") or "")
+        section_fallback = _identifier_slug(
+            section.get("title"), f"section-{section_index}"
+        )
+        section_id = _claim_unique_identifier(
+            raw_section_id, section_fallback, used_sections
+        )
+        section["section_id"] = section_id
+        if "id" in section:
+            section["id"] = section_id
+
+        prefix = _paragraph_prefix(section)
+        paragraphs = section.get("paragraphs", [])
+        if not isinstance(paragraphs, list):
+            continue
+        for paragraph_index, paragraph in enumerate(paragraphs, 1):
+            if not isinstance(paragraph, dict):
+                continue
+            raw_paragraph_id = str(paragraph.get("id") or "")
+            paragraph["id"] = _claim_unique_identifier(
+                raw_paragraph_id,
+                f"{prefix}-P{paragraph_index}",
+                used_paragraphs,
             )
 
 

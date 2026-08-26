@@ -3,6 +3,7 @@ import copy
 
 from research_avatar.paper_structure import (
     PaperStructureError,
+    canonicalize_target_identifiers,
     design_structure_with_agent,
     normalize_reference_line_ranges,
     normalize_structure_design,
@@ -191,6 +192,40 @@ class PaperStructureTests(unittest.TestCase):
             sum(item["length_share"] for item in payload["paper_outline"]), 1.0
         )
         self.assertTrue(all(item["length_share"] > 0 for item in payload["paper_outline"]))
+
+    def test_canonical_registry_repairs_duplicate_target_paragraph_ids(self):
+        outline = [
+            {
+                "section_id": "analysis",
+                "title": "Analysis",
+                "paragraphs": [{"id": "A-P1"}],
+            },
+            {
+                "section_id": "discussion",
+                "title": "Discussion",
+                "paragraphs": [{"id": "A-P1"}, {"id": ""}],
+            },
+        ]
+        canonicalize_target_identifiers(outline)
+        paragraph_ids = [
+            paragraph["id"]
+            for section in outline
+            for paragraph in section["paragraphs"]
+        ]
+        self.assertEqual(paragraph_ids, ["A-P1", "D-P1", "D-P2"])
+        self.assertEqual(len(paragraph_ids), len(set(paragraph_ids)))
+
+    def test_canonical_registry_repairs_duplicate_target_section_ids(self):
+        outline = [
+            {"section_id": "analysis", "title": "Analysis", "paragraphs": []},
+            {"section_id": "analysis", "title": "Discussion", "paragraphs": []},
+            {"section_id": "", "title": "Conclusion", "paragraphs": []},
+        ]
+        canonicalize_target_identifiers(outline)
+        self.assertEqual(
+            [section["section_id"] for section in outline],
+            ["analysis", "discussion", "conclusion"],
+        )
 
     def test_artifacts_are_inherited_from_covered_contract_obligations(self):
         contract = copy.deepcopy(self.contract)
