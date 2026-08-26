@@ -122,6 +122,51 @@ def target_ids(contract: dict) -> list[str]:
     return targets
 
 
+def validate_projected_identifier_registry(contract: dict) -> list[str]:
+    """Require every Projected Paper identifier namespace to be complete and unique."""
+    errors: list[str] = []
+    raw_sections = contract.get("paper_outline", [])
+    sections = [section for section in raw_sections if isinstance(section, dict)]
+    paragraphs = [
+        paragraph
+        for section in sections if isinstance(section, dict)
+        for paragraph in section.get("paragraphs", []) if isinstance(paragraph, dict)
+    ]
+    artifacts = [
+        artifact for artifact in contract.get("paper_artifacts", [])
+        if isinstance(artifact, dict)
+    ]
+    requirements = [
+        requirement for requirement in contract.get("result_requirements", [])
+        if isinstance(requirement, dict)
+    ]
+    registries = {
+        "section IDs": [section.get("id") or section.get("section_id") for section in sections],
+        "paragraph IDs": [paragraph.get("id") for paragraph in paragraphs],
+        "artifact IDs": [artifact.get("id") for artifact in artifacts],
+        "LaTeX labels": [artifact.get("label") for artifact in artifacts],
+        "result requirement IDs": [requirement.get("id") for requirement in requirements],
+        "result target IDs": target_ids(contract),
+    }
+    for namespace, raw_values in registries.items():
+        values = [str(value).strip() if value is not None else "" for value in raw_values]
+        if any(not value for value in values):
+            errors.append(f"Projected Paper {namespace} must be non-empty")
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for value in values:
+            if not value:
+                continue
+            if value in seen:
+                duplicates.add(value)
+            seen.add(value)
+        if duplicates:
+            errors.append(
+                f"Projected Paper {namespace} are not unique: {sorted(duplicates)}"
+            )
+    return errors
+
+
 def scalar_strings(value: object) -> list[str]:
     if isinstance(value, dict):
         return [item for child in value.values() for item in scalar_strings(child)]
@@ -154,6 +199,7 @@ def validate(plan: Path) -> list[str]:
         contract = json.loads(match.group(1))
     except json.JSONDecodeError as exc:
         return [f"invalid experiment-plan-contract JSON: {exc}"]
+    errors.extend(validate_projected_identifier_registry(contract))
     schema_version = str(contract.get("schema_version", "1.0"))
     if schema_version != "1.2":
         errors.append("schema_version must be 1.2; legacy two-reference plans require expplan migration")
@@ -1088,8 +1134,6 @@ def validate(plan: Path) -> list[str]:
     targets = target_ids(contract)
     if not targets:
         errors.append("no result targets")
-    if len(targets) != len(set(targets)):
-        errors.append("result target IDs are not unique")
     visible_table_targets = re.findall(r'data-target-id="([^"]+)"', page)
     approved_cells = {
         target

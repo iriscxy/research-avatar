@@ -250,6 +250,45 @@ class GengsenRegressionTests(unittest.TestCase):
             errors = EXPPLAN_VALIDATOR.validate(path)
             self.assertTrue(any("private/unpublished data must not have a URL" in error for error in errors))
 
+    def test_expplan_rejects_every_duplicate_projected_paper_identifier(self):
+        base = {
+            "paper_outline": [
+                {"id": "intro", "paragraphs": [{"id": "I-P1"}]},
+                {"id": "method", "paragraphs": [{"id": "M-P1"}]},
+            ],
+            "paper_artifacts": [
+                {"id": "F1", "label": "fig:overview"},
+                {"id": "T1", "label": "tab:main"},
+            ],
+            "result_requirements": [
+                {"id": "REQ-1", "cell_ids": ["t1-r1-c1"]},
+                {"id": "REQ-2", "panel_ids": ["f1-panel-a"]},
+            ],
+        }
+        mutations = {
+            "section IDs": lambda value: value["paper_outline"][1].update(id="intro"),
+            "paragraph IDs": lambda value: value["paper_outline"][1]["paragraphs"][0].update(id="I-P1"),
+            "artifact IDs": lambda value: value["paper_artifacts"][1].update(id="F1"),
+            "LaTeX labels": lambda value: value["paper_artifacts"][1].update(label="fig:overview"),
+            "result requirement IDs": lambda value: value["result_requirements"][1].update(id="REQ-1"),
+            "result target IDs": lambda value: value["result_requirements"][1].update(panel_ids=["t1-r1-c1"]),
+        }
+        import copy
+        for namespace, mutate in mutations.items():
+            with self.subTest(namespace=namespace):
+                contract = copy.deepcopy(base)
+                mutate(contract)
+                errors = EXPPLAN_VALIDATOR.validate_projected_identifier_registry(contract)
+                self.assertTrue(any(namespace in error and "not unique" in error for error in errors))
+
+    def test_expplan_accepts_unique_projected_paper_identifiers(self):
+        contract = {
+            "paper_outline": [{"id": "intro", "paragraphs": [{"id": "I-P1"}]}],
+            "paper_artifacts": [{"id": "F1", "label": "fig:overview"}],
+            "result_requirements": [{"id": "REQ-1", "panel_ids": ["f1-panel-a"]}],
+        }
+        self.assertEqual(EXPPLAN_VALIDATOR.validate_projected_identifier_registry(contract), [])
+
     def test_runplan_preserves_and_freezes_the_decision_space(self):
         contract = scientific_contract()
         decision = contract["decision_space_contract"]

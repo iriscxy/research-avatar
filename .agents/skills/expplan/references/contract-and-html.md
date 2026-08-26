@@ -11,6 +11,13 @@
   and the result key paths/dimensions needed to fill each artifact. Two planned
   artifacts may not share one label: an aggregate table never silently satisfies
   separately approved per-game and per-model tables.
+- **One canonical numbering registry:** before rendering, collect every Projected
+  Paper section ID, paragraph ID, artifact ID, artifact LaTeX label, result
+  requirement ID, and result target ID from the embedded contract. Every value
+  is non-empty and unique within its namespace. Generate visible figure/table
+  numbering only from the ordered unique artifact records; never assign or
+  repair numbers independently in HTML. The experiment-plan validator must
+  reject the plan before approval when any registry contains a duplicate.
 - **Minimal reader-facing section order:** render only `1. Target Conference and Reference Paper` (exactly two entries: target conference and the sole researcher-owned reference) → `2. Projected Paper` (prominent figure/table count, title, PROJECTED abstract, reference-mapped paper structure, concrete setup and baseline implementation inside the Experiments section, inline fillable empirical result shells, compact artifact ledger, and a compact approval control). Do not put the research question, implementation architecture, datasets, metrics, baselines, or any other setup material in Section 1. Do not render separate top-level sections for approval, claims, method/data/variables, experiment matrices, baseline registries, repository audits, run order, configs, budgets, risks, or grounding appendices. Those remain necessary internal design/decision inputs and machine-readable contract fields; Projected Paper must embody their paper-facing consequences.
 - **Keep the research contract and decision meetings unchanged.** Preserve the venue, single-reference, baseline/reuse, repository, and final approval gates and their order. This reorganization does not bypass or merge any human decision.
 - **Skill-test / fabricate-data run:** if this plan is part of an explicit skill-test (the downstream `results/` will be fabricated to exercise the pipeline), `03` must carry the same loud banner as the rest of the artifact set — `SKILL-TEST — fabricated data, NOT a scientific result` — at the top, so the whole `03`/`05` + paper set is consistently marked and none can pass as real (AGENTS.md discipline #1). The plan's own numbers stay `[X%]` placeholders marked PROJECTED regardless.

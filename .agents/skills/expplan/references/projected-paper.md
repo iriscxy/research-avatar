@@ -325,6 +325,13 @@ contract that `$runplan` later turns into an executable acquisition contract;
 it is not yet a goal schedule. Use `[]` for a required non-empty list. Before approval, set
 `approval_status` to `pending`.
 
+Treat IDs as a single-source registry, not presentation text. Section IDs,
+paragraph IDs, artifact IDs, artifact LaTeX labels, result requirement IDs, and
+result target IDs must each be globally unique within their namespace before
+the HTML is rendered. Figure and table numbers follow the ordered artifact
+registry; headings, shells, the compact ledger, Run Plan, and Paper Studio may
+consume those identifiers but may not independently renumber them.
+
 **GATE (human is judge — enforce it, don't just present):** in the approval conversation, summarize claims, selected baseline coverage/actions, exact reuse sources, omitted-Required risks, repository authority/fallbacks, the reference-aligned one-sentence-per-paragraph blueprint, every inline figure/table shell and its unfilled targets, variable feasibility, ablations, first three dependency-sketch experiments, budget, and artifact placement. Do not add these as extra visible HTML sections. Baseline and repository contracts must be resolved before the final HTML is written, so the GATE asks only for approval or revision of the complete plan. Reject the plan before this gate if any claim lacks a valid measurement contract, a proxy is asked to establish a stronger construct without a companion direct measure/control, any researcher-controlled decision is outside the authorized decision-space contract, any section/subsection omits its planned paragraphs, any paragraph lacks exactly one concrete planning sentence, any promised artifact lacks a visible shell, any numeric shell cell lacks exactly one result requirement, any result requirement lacks a single authorized source action and experiment/source locator, or any required target cannot be deterministically acquired. **Then STOP and call `ask the user directly`** for the researcher to `approve` / `revise` the plan (offer those options; `revise` collects what to change) — exactly as the intermediate baseline/reuse/repository gates already do. **Do NOT auto-proceed to `$runplan`; wait for the researcher's approval token.** This holds even in a skill-test run (fabricated data does not skip the gate).
 
 Before presenting the gate, run `python research_avatar/tools/validate_experiment_plan.py --plan reports/03_EXPERIMENT_PLAN.html`. Fix every failure. This validator enforces table-owned dataset/metric semantics, no expplan split, Python-generated projected figures, fixture isolation, target coverage, and non-visible internal result IDs.
