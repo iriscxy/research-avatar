@@ -70,7 +70,8 @@ def verified_survey_bibliography(source: str) -> str:
         flags=re.IGNORECASE | re.DOTALL,
     ):
         article = article_match.group(0)
-        if "已验证" not in _plain(article):
+        verification_text = _plain(article)
+        if "已验证" not in verification_text and "verified" not in verification_text.casefold():
             continue
         title_match = re.search(
             r"<h4\b[^>]*>\s*<a\b[^>]*href=[\"'](https?://[^\"']+)[\"'][^>]*>(.*?)</a>",

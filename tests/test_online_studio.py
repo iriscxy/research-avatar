@@ -852,6 +852,20 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("author = {Larson and others}", bibliography)
         self.assertNotIn("unverified", bibliography)
 
+    def test_english_verified_survey_cards_seed_the_citation_bank(self):
+        source = """
+        <article class="card" data-authors="Wu, Di and Wang, Hongwei">
+          <span class="verified">Verified · 2024</span>
+          <h4><a href="https://arxiv.org/abs/2410.10813">LongMemEval</a></h4>
+          <div class="who">Wu et al. · 2024</div>
+        </article>
+        """
+
+        bibliography = online.verified_survey_bibliography(source)
+
+        self.assertIn("@misc{survey2024241010813", bibliography)
+        self.assertIn("author = {Wu, Di and Wang, Hongwei}", bibliography)
+
     def test_verified_survey_bibliography_prefers_full_machine_readable_authors(self):
         source = """
         <article class="card"

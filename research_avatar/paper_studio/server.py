@@ -3073,10 +3073,25 @@ def parse_table_prompt(
         # prompt rejects its own perfectly valid column label as two unknown
         # columns.  Retain comma separation for older prompts that contain no
         # pipes.
-        separator = r"\s*\|\s*" if "|" in requested_columns else r"\s*[,，]\s*"
+        protected_columns = requested_columns
+        protected_labels: dict[str, str] = {}
+        # A scientific column label may itself use a conditional bar (for
+        # example ``error | recall=1``). Protect exact known labels before
+        # interpreting pipes as the prompt's column separator.
+        for index, label in enumerate(
+            sorted((str(item) for item in available_columns if "|" in str(item)), key=len, reverse=True)
+        ):
+            marker = f"__PAPER_STUDIO_COLUMN_{index}__"
+            updated, count = re.subn(
+                re.escape(label), marker, protected_columns, flags=re.IGNORECASE
+            )
+            if count:
+                protected_columns = updated
+                protected_labels[marker.casefold()] = label
+        separator = r"\s*\|\s*" if "|" in protected_columns else r"\s*[,，]\s*"
         names = [
-            item.strip()
-            for item in re.split(separator, requested_columns)
+            protected_labels.get(item.strip().casefold(), item.strip())
+            for item in re.split(separator, protected_columns)
             if item.strip()
         ]
         lookup = {name.casefold(): name for name in available_columns}
@@ -3167,6 +3182,7 @@ def latex_escape_cell(value: str) -> str:
         "ρ": r"$\rho$",
         "α": r"$\alpha$",
         "β": r"$\beta$",
+        "Δ": r"$\Delta$",
         "±": r"$\pm$",
         "×": r"$\times$",
         "✓": "Yes",
@@ -3175,6 +3191,7 @@ def latex_escape_cell(value: str) -> str:
         "✘": "No",
         "→": r"$\rightarrow$",
         "←": r"$\leftarrow$",
+        "↔": r"$\leftrightarrow$",
         "≤": r"$\leq$",
         "≥": r"$\geq$",
         "−": "-",
@@ -6715,6 +6732,20 @@ def post_openai(
             f"{config['label']} 当前不支持这个工具调用；请使用不带工具的文本请求。"
         )
     request_payload = payload
+    # GPT-4o's Responses API accepts only ``medium`` text verbosity. Several
+    # editing and audit passes ask newer models for ``low`` verbosity, so
+    # normalize that optional hint at the provider boundary instead of
+    # allowing an otherwise valid draft batch to fail midway.
+    model = str(payload.get("model") or "").casefold()
+    text_config = payload.get("text")
+    if (
+        provider == "openai"
+        and model.startswith("gpt-4o")
+        and isinstance(text_config, dict)
+        and text_config.get("verbosity") != "medium"
+    ):
+        request_payload = dict(payload)
+        request_payload["text"] = dict(text_config, verbosity="medium")
     history: list[dict[str, str]] | None = None
     api_url = config["base_url"] + "/responses"
     if config["protocol"] == "chat_completions":

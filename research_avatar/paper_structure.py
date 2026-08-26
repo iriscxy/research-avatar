@@ -220,6 +220,15 @@ every target ``plan_sentence`` to at most 30 English words. Arrays of IDs and
 method metadata are exempt from these prose limits. Concision must not remove
 any required key, content obligation, claim, artifact, or paragraph mapping.
 
+Encode subsection boundaries directly in the paragraph blueprint. For each
+Method, Experiments/Evaluation, and Discussion/Analysis section with multiple
+paragraphs, give the first paragraph of every logical subsection a concise
+``heading`` and set ``heading_style`` to ``subsection``; use empty strings for
+paragraphs that continue the current subsection. At minimum, Method needs an
+overview/formalization boundary, Experiments needs setup and results/analysis
+boundaries, and Discussion needs an interpretation boundary. Do not add these
+headings to Abstract or Introduction merely to satisfy this rule.
+
 If target_scientific_requirements.writing_boundary says experiment results are
 unavailable, still plan and draft every section. From Experiments/Evaluation
 onward, plan proposed experiment prose in future tense: specify the datasets,
@@ -264,7 +273,8 @@ Return JSON only, once, with this shape:
       "rhetorical_role": "...", "relation_to_previous": "...",
       "relation_to_next": "...", "covers": ["I-P1"],
       "supports": ["C1"], "evidence": ["..."],
-      "artifact_refs": ["F1"]{mapping_shape}
+      "artifact_refs": ["F1"],
+      "heading": "", "heading_style": ""{mapping_shape}
     }}]
   }}]
 }}

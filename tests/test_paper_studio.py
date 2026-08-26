@@ -386,6 +386,28 @@ class PaperStudioTests(unittest.TestCase):
         self.assertEqual(visible["api_key_setup"]["environment_variable"], "DEEPSEEK_API_KEY")
         self.assertNotIn(secret, json.dumps(visible, ensure_ascii=False))
 
+    def test_gpt_4o_low_verbosity_is_normalized_at_provider_boundary(self):
+        response = MagicMock()
+        response.read.return_value = json.dumps(
+            {"id": "resp-test", "output": [], "usage": {}}
+        ).encode("utf-8")
+        response.__enter__.return_value = response
+        response.__exit__.return_value = False
+        payload = {
+            "model": "gpt-4o",
+            "input": "Audit this paragraph.",
+            "text": {"verbosity": "low"},
+        }
+        with (
+            patch.dict(studio.os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True),
+            patch.object(studio.urllib.request, "urlopen", return_value=response) as urlopen,
+            patch.object(studio, "append_usage"),
+        ):
+            studio.post_openai(payload, provider="openai")
+        sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+        self.assertEqual(sent["text"]["verbosity"], "medium")
+        self.assertEqual(payload["text"]["verbosity"], "low")
+
     def test_provider_selection_is_limited_to_openai_and_deepseek(self):
         state = _default_state()
         state["llm_provider"] = "openai"
@@ -693,8 +715,8 @@ class PaperStudioTests(unittest.TestCase):
 
     def test_table_cell_escape_converts_direction_arrows_to_latex_math(self):
         self.assertEqual(
-            studio.latex_escape_cell("Accuracy ↑ / Spearman ρ / Drop ↓ / ✓ / ≤"),
-            r"Accuracy $\uparrow$ / Spearman $\rho$ / Drop $\downarrow$ / Yes / $\leq$",
+            studio.latex_escape_cell("Accuracy ↑ / Spearman ρ / Δ / A ↔ B / Drop ↓ / ✓ / ≤"),
+            r"Accuracy $\uparrow$ / Spearman $\rho$ / $\Delta$ / A $\leftrightarrow$ B / Drop $\downarrow$ / Yes / $\leq$",
         )
 
     def test_newer_accepted_section_survives_an_unrelated_stale_save(self):
@@ -4310,6 +4332,26 @@ args = parser.parse_args()
             latex = generate_table_latex("T2", metrics, prompt)
         self.assertIn("31.4", latex)
         self.assertIn("22.1", latex)
+
+    def test_pipe_delimited_prompt_preserves_conditional_bar_inside_known_label(self):
+        parsed = studio.parse_table_prompt(
+            "T1",
+            "\n".join(
+                [
+                    "数据源: results/",
+                    "列: Method | Error | recall=1 (%) | Accuracy",
+                    "行: source",
+                    "Caption: Conditional result.",
+                    "字号: small",
+                    "最优值: none",
+                ]
+            ),
+            ["Method", "Error | recall=1 (%)", "Accuracy"],
+            [["A", "4.0", "90.0"]],
+        )
+        self.assertEqual(
+            parsed["columns"], ["Method", "Error | recall=1 (%)", "Accuracy"]
+        )
 
     def test_table_prompt_accepts_natural_language_best_values_phrasing(self):
         # Regression: the demo project's own default table briefs describe

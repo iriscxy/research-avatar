@@ -153,6 +153,10 @@ Design the projected paper inside `reports/03_EXPERIMENT_PLAN.html`. Include:
 - stable paragraph IDs, one concrete planning sentence, rhetorical role,
   previous/next relations, claims/evidence, artifact bindings, and the required
   reference-paragraph mapping described above;
+- explicit subsection boundaries: on the first paragraph of each Method,
+  Experiments/Evaluation, and Discussion/Analysis subsection, set a concise
+  `heading` and `heading_style: subsection`; continuation paragraphs leave both
+  fields empty so Paper Studio renders each heading exactly once;
 - paper-shaped figure/table shells at their insertion points;
 - artifact ledger, implementation plan, budget, and stop/refine/pivot criteria.
 

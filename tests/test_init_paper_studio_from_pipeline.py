@@ -306,6 +306,19 @@ class InitPaperStudioFromPipelineTests(unittest.TestCase):
                 {"id": "I2", "title": "Selected report idea"},
             )
 
+    def test_selected_idea_accepts_canonical_selected_attribute(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "02_IDEA_REPORT.html"
+            path.write_text(
+                '<article data-idea-id="I3" data-selected="true">'
+                "<h3>I3 · Selected attribute idea</h3></article>",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                selected_idea_from_report(path),
+                {"id": "I3", "title": "Selected attribute idea"},
+            )
+
     def test_report_only_contract_requires_one_reference_and_all_five_html_files(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

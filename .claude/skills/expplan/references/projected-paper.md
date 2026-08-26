@@ -26,6 +26,13 @@ order. Use stable paragraph IDs such as `I-P1`, `RW1-P2`, `M2-P3`, `E3-P2`,
   available to the browser writer;
 - the artifact ID it introduces or interprets, only when applicable.
 
+Subsection structure is part of the executable blueprint, not decoration.
+Store each subsection title on its first paragraph as `heading`, with
+`heading_style: subsection`; leave both fields empty on continuation
+paragraphs. Method, Experiments/Evaluation, and Discussion/Analysis must use
+these explicit boundaries whenever they contain multiple logical parts, so the
+browser writer and final LaTeX preserve the approved hierarchy automatically.
+
 The sentence must name the actual topic and argumentative move, not a generic
 label such as “introduce the method” or a bundle of bullets disguised with
 semicolons. It should be specific enough that the paragraph-writing API can draft the

@@ -48,6 +48,7 @@ def selected_idea_from_report(path: Path) -> dict[str, str]:
     soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
     selected = soup.select_one(
         'article[data-idea-id][data-default-pick="true"], '
+        'article[data-idea-id][data-selected="true"], '
         'article[data-idea-id].selected'
     )
     if selected is None:
