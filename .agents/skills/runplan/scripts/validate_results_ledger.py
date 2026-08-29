@@ -14,6 +14,8 @@ import tempfile
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 
+from bs4 import BeautifulSoup
+
 
 COLUMNS = [
     "result_id", "goal_id", "artifact_id", "target_id", "acquisition_id", "source_type",
@@ -25,9 +27,6 @@ COLUMNS = [
 STATUSES = {"REAL", "MISSING", "INVALIDATED"}
 VERIFICATIONS = {"VERIFIED", "PENDING", "FAILED", "NOT_APPLICABLE"}
 SOURCE_TYPES = {"RUN_LOCAL", "REUSE_REPORTED"}
-STATE_RE = re.compile(
-    r'<script type="application/json" id="run-plan-state">(.*?)</script>', re.S
-)
 PROVENANCE_RE = re.compile(
     r'<script\b(?=[^>]*\btype="application/json")'
     r'(?=[^>]*\bid="result-provenance")[^>]*>(.*?)</script>', re.S
@@ -37,13 +36,41 @@ PROVENANCE_RE = re.compile(
 def load_plan_state(path: Path | None) -> dict[str, object]:
     if path is None or not path.exists():
         return {}
-    match = STATE_RE.search(path.read_text(encoding="utf-8"))
-    if not match:
+    soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
+    node = soup.find("script", id="run-plan-state", attrs={"type": "application/json"})
+    if node is None:
         raise ValueError("04_RUN_PLAN.html lacks embedded run-plan-state JSON")
-    value = json.loads(match.group(1))
+    value = json.loads(node.get_text())
     if not isinstance(value, dict):
         raise ValueError("embedded run-plan-state must be an object")
     return value
+
+
+def validate_reideation_checkpoint(state: dict[str, object]) -> list[str]:
+    """Require an auditable post-baseline ideation decision in completed runs."""
+    if state.get("state") != "completed" and state.get("status") != "completed":
+        return []
+    checkpoint = state.get("reideation_checkpoint")
+    if not isinstance(checkpoint, dict):
+        return ["completed run plan lacks reideation_checkpoint"]
+    required = {
+        "status", "conformance_status", "anomaly_status", "checked_goal_id",
+        "evidence_artifact", "decision",
+    }
+    if any(checkpoint.get(field) in (None, "") for field in required):
+        return ["reideation_checkpoint lacks required audit fields"]
+    if checkpoint.get("status") not in {"not_triggered", "decision_required"}:
+        return ["reideation_checkpoint has an invalid status"]
+    if checkpoint.get("status") == "decision_required":
+        if checkpoint.get("conformance_status") != "VERIFIED":
+            return ["reideation checkpoint cannot trigger before conformance is verified"]
+        if checkpoint.get("anomaly_status") != "VERIFIED_SCIENTIFIC_ANOMALY":
+            return ["reideation checkpoint requires a verified scientific anomaly"]
+        if not str(checkpoint.get("command", "")).strip() or not Path(
+            str(checkpoint.get("evidence_artifact", ""))
+        ).is_file():
+            return ["triggered reideation checkpoint lacks command or evidence artifact"]
+    return []
 
 
 def pointer_get(value: object, pointer: str) -> object:
@@ -90,6 +117,34 @@ def same_value(recorded: str, raw: object) -> bool:
     if isinstance(raw, str):
         return recorded == raw
     return recorded == json.dumps(raw, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def evaluate_outcome_rule(rule: dict[str, object], point: float, lower: float, upper: float) -> str:
+    """Mechanically evaluate a preregistered directional interval rule."""
+    threshold = float(rule["support_threshold"])
+    operator = str(rule["operator"])
+    if lower > upper:
+        raise ValueError("confidence interval lower bound exceeds upper bound")
+    if operator == "greater_than":
+        if lower > threshold:
+            return "supported"
+        if upper <= threshold:
+            return "falsified"
+        return "weakened" if point > threshold else "inconclusive"
+    if operator == "less_than":
+        if upper < threshold:
+            return "supported"
+        if lower >= threshold:
+            return "falsified"
+        return "weakened" if point < threshold else "inconclusive"
+    raise ValueError(f"unsupported outcome-rule operator: {operator}")
+
+
+def validate_human_annotation_files(evidence: dict[str, object], goal_status: str) -> list[str]:
+    """Refuse active human-metric execution without real annotation and rubric files."""
+    if goal_status not in {"running", "completed"}:
+        return []
+    return [field for field in ("annotation_file", "rubric_path") if not Path(str(evidence.get(field, ""))).is_file()]
 
 
 def raw_record(path: Path, locator: str) -> object:
@@ -573,6 +628,91 @@ def validate_decision_handoff(experiment_contract: dict[str, object], state: dic
     return errors
 
 
+def validate_implementation_conformance(
+    experiment_contract: dict[str, object], state: dict[str, object]
+) -> list[str]:
+    """Require executable receipts, not declarations, before completed methods are trusted."""
+    if state.get("state") != "completed" and state.get("status") != "completed":
+        return []
+    errors: list[str] = []
+    receipt = state.get("implementation_conformance")
+    if not isinstance(receipt, dict) or receipt.get("status") != "VERIFIED":
+        return ["completed run plan lacks a VERIFIED implementation_conformance receipt"]
+    if receipt.get("exit_status") != 0:
+        errors.append("implementation conformance command did not exit successfully")
+    for field in ("command", "stdout_log_path", "stderr_log_path", "code_files"):
+        if receipt.get(field) in (None, "", []):
+            errors.append(f"implementation conformance receipt lacks {field}")
+    for field in ("stdout_log_path", "stderr_log_path"):
+        value = str(receipt.get(field, ""))
+        if value and not Path(value).is_file():
+            errors.append(f"implementation conformance {field} does not exist: {value}")
+    for value in receipt.get("code_files", []) if isinstance(receipt.get("code_files"), list) else []:
+        if not Path(str(value)).is_file():
+            errors.append(f"implementation conformance code file does not exist: {value}")
+    actual = {
+        str(item.get("method", "")): item
+        for item in receipt.get("methods", []) if isinstance(item, dict)
+    }
+    approved = experiment_contract.get("implementation_contract", [])
+    approved_names = {str(item.get("method", "")) for item in approved if isinstance(item, dict)}
+    if set(actual) != approved_names:
+        errors.append("implementation conformance method coverage differs from the approved contract")
+    for item in approved:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("method", ""))
+        verified = actual.get(name, {})
+        expected = item.get("implementation_verification", {})
+        if verified.get("protocol_source") != expected.get("protocol_source"):
+            errors.append(f"{name}: conformance protocol source differs from the approved source")
+        if verified.get("verified_components") != expected.get("required_components"):
+            errors.append(f"{name}: conformance receipt does not cover all required components")
+        if verified.get("conformance_tests") != expected.get("conformance_tests"):
+            errors.append(f"{name}: conformance receipt does not identify the approved tests")
+        if not str(verified.get("entrypoint", "")).strip():
+            errors.append(f"{name}: conformance receipt lacks an executed entrypoint")
+    return errors
+
+
+def validate_protocol_conformance(
+    experiment_contract: dict[str, object], state: dict[str, object]
+) -> list[str]:
+    """Require actual benchmark-protocol checks before a run can be complete."""
+    if state.get("state") != "completed" and state.get("status") != "completed":
+        return []
+    public = [
+        item for item in experiment_contract.get("dataset_citations", [])
+        if isinstance(item, dict) and item.get("status") in {"PUBLISHED", "PUBLIC_REPOSITORY"}
+    ]
+    if not public:
+        return []
+    receipts = {
+        str(item.get("dataset", "")): item
+        for item in state.get("protocol_conformance", []) if isinstance(item, dict)
+    } if isinstance(state.get("protocol_conformance"), list) else {}
+    errors: list[str] = []
+    if set(receipts) != {str(item.get("name", "")) for item in public}:
+        errors.append("protocol conformance coverage differs from public benchmark coverage")
+    for dataset in public:
+        name = str(dataset.get("name", ""))
+        receipt = receipts.get(name, {})
+        approved = dataset.get("protocol_contract", {})
+        if receipt.get("status") != "VERIFIED" or receipt.get("exit_status") != 0:
+            errors.append(f"{name}: benchmark protocol has no successful VERIFIED receipt")
+        for field in (
+            "official_split_source", "prompt_or_input_source", "scorer_source",
+            "conformance_fixture", "conformance_command",
+        ):
+            if receipt.get(field) != approved.get(field):
+                errors.append(f"{name}: protocol receipt differs from approved {field}")
+        for field in ("conformance_fixture", "stdout_log_path", "stderr_log_path"):
+            value = str(receipt.get(field, ""))
+            if not value or not Path(value).is_file():
+                errors.append(f"{name}: protocol receipt path is missing: {field}={value}")
+    return errors
+
+
 def validate(args: argparse.Namespace) -> list[str]:
     errors: list[str] = []
     if not args.ledger.exists():
@@ -664,14 +804,17 @@ def validate(args: argparse.Namespace) -> list[str]:
                     errors.append(f"{goal_id}: visible corresponding-artifact mapping disagrees with embedded state")
             coverage_labels = (
                 f"Artifact coverage: {len(expected_artifacts)}/{len(expected_artifacts)}",
-                f"图表覆盖：{len(expected_artifacts)}/{len(expected_artifacts)}",
             )
             if not any(label in args.plan.read_text(encoding="utf-8") for label in coverage_labels):
                 errors.append("visible run plan lacks the complete figure/table coverage count")
             approved_implementation = experiment_contract.get("implementation_contract", [])
             if state.get("implementation_contract") != approved_implementation:
                 errors.append("run-plan implementation contract differs from the approved expplan")
+            errors.extend(validate_implementation_conformance(experiment_contract, state))
+            errors.extend(validate_protocol_conformance(experiment_contract, state))
             errors.extend(validate_decision_handoff(experiment_contract, state))
+            if experiment_contract.get("scientific_integrity_version") == 2:
+                errors.extend(validate_reideation_checkpoint(state))
             runplan_text = args.plan.read_text(encoding="utf-8")
             runplan_visible = re.sub(r'<script\b.*?</script>', '', runplan_text, flags=re.S)
             for item in approved_implementation:
@@ -736,7 +879,7 @@ def validate(args: argparse.Namespace) -> list[str]:
                 f"embedded acquisition contract {acquisition_id}: an acquisition with a derivation cannot be atomic"
             )
 
-    if experiment_contract.get("scientific_integrity_version") == 1:
+    if experiment_contract.get("scientific_integrity_version") in {1, 2}:
         metrics_by_id = {
             str(metric.get("id")): metric
             for metric in experiment_contract.get("metric_contract", [])
@@ -775,6 +918,18 @@ def validate(args: argparse.Namespace) -> list[str]:
                         f"embedded acquisition contract {acquisition_id}: human metric lacks "
                         "human_annotation_evidence"
                     )
+                else:
+                    producing_goal = str(acquisition.get("producing_goal", ""))
+                    goal_status = next(
+                        (str(goal.get("status", "")) for goal in state.get("goals", [])
+                         if isinstance(goal, dict) and str(goal.get("id", "")) == producing_goal),
+                        "",
+                    )
+                    for field in validate_human_annotation_files(human, goal_status):
+                        errors.append(
+                            f"embedded acquisition contract {acquisition_id}: {field} "
+                            f"does not exist for {goal_status} human-annotation goal"
+                        )
             if metric.get("evidence_source") == "LLM_JUDGE":
                 judge = acquisition.get("judge_evidence")
                 required_judge = {"model", "prompt_path", "raw_judgments_path"}
@@ -935,7 +1090,7 @@ def validate(args: argparse.Namespace) -> list[str]:
                 errors.append(
                     f"completed goal {goal_id} has no current verified REAL result for {acquisition_id}"
                 )
-        if experiment_contract.get("scientific_integrity_version") == 1:
+        if experiment_contract.get("scientific_integrity_version") in {1, 2}:
             decisions = state.get("claim_decisions")
             decisions_by_claim = {
                 str(item.get("claim_id")): item
@@ -972,6 +1127,39 @@ def validate(args: argparse.Namespace) -> list[str]:
                 result_ids = decision.get("metric_result_ids")
                 if not isinstance(result_ids, list) or not result_ids:
                     errors.append(f"claim decision {claim_id} lacks metric_result_ids")
+                    continue
+                primary_result_id = str(decision.get("primary_result_id", ""))
+                primary_row = next(
+                    (item for item in rows if item.get("result_id") == primary_result_id),
+                    None,
+                )
+                ci_locators = decision.get("confidence_interval_locators")
+                if primary_row is None or primary_result_id not in result_ids:
+                    errors.append(f"claim decision {claim_id} lacks a valid primary_result_id")
+                    continue
+                primary_target_id = str(outcome_rule.get("primary_target_id", ""))
+                if primary_target_id and primary_row.get("target_id") != primary_target_id:
+                    errors.append(f"claim decision {claim_id} does not use approved primary_target_id {primary_target_id}")
+                    continue
+                if not isinstance(ci_locators, dict) or not ci_locators.get("lower") or not ci_locators.get("upper"):
+                    errors.append(f"claim decision {claim_id} lacks confidence_interval_locators")
+                    continue
+                try:
+                    record = raw_record(
+                        Path(str(primary_row.get("raw_artifact", ""))),
+                        str(primary_row.get("raw_locator", "")),
+                    )
+                    point = float(primary_row["value"])
+                    lower = float(pointer_get(record, str(ci_locators["lower"])))
+                    upper = float(pointer_get(record, str(ci_locators["upper"])))
+                    computed = evaluate_outcome_rule(outcome_rule, point, lower, upper)
+                    if decision.get("outcome") != computed:
+                        errors.append(
+                            f"claim decision {claim_id} outcome {decision.get('outcome')} "
+                            f"disagrees with mechanical result {computed}"
+                        )
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    errors.append(f"claim decision {claim_id} cannot be mechanically recomputed: {exc}")
     return errors
 
 

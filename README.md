@@ -1,140 +1,131 @@
-# Research Avatar：个性化科研助手
+# Research Avatar: A Personalized Research Assistant
 
-Research Avatar 是一套面向**有经验研究者**的轻量级、个性化科研助手。它不是全自动的 AutoResearch 系统，也不会替你做研究判断——
+Research Avatar is a lightweight, personalized research assistant for experienced researchers. It is not a fully autonomous AutoResearch system and does not replace research judgment.
 
-> **机械性工作交给助手加速，关键研究决策由你完成；而"怎么加速"，全部围绕你自己的研究品味、写作风格和实验习惯来定制。**
-
----
-
-[在线论文写作：注册、上传并开始写作 →](https://research-avatar-studio.yingtaomj.workers.dev/)
-
+> **Let the assistant accelerate mechanical work while you retain control of important research decisions. Every acceleration step is adapted to your research taste, writing style, and experimental habits.**
 
 ---
 
-## 项目亮点
+[Online paper writing: register, upload, and start writing](https://research-avatar-studio.yingtaomj.workers.dev/)
 
-- 🧭 **整体思想**：读取研究者画像，由你确定全局方案，助手负责执行。
-- 🎭 **个性化**：一切定制都基于你自己的研究画像，而非通用配置（详见「具体实现 · 个性化」）。
-- 🧪 **实验**：从论文所需内容反推实验、把全体实验拆成可验证分步骤 Goals，所有结果数字均可追溯（详见「具体实现 · 实验」）。
-- ✍️ **论文写作**：可交互界面，模仿你的个人写作风格，配合可编辑图表产出（详见「具体实现 · 论文写作」）。
+---
 
-### 🔎 与 AutoResearch 的区别
+## Highlights
 
-| 对比维度 | 开源 AutoResearch 常见侧重 | Research Avatar 的侧重 |
+- **Researcher control:** The system reads a researcher profile, the researcher selects the overall direction, and the assistant executes the approved work.
+- **Personalization:** Configuration is grounded in the researcher's own profile rather than generic defaults.
+- **Experiments:** The system derives experiments from paper requirements, decomposes them into verifiable goals, and keeps every reported number traceable.
+- **Paper writing:** An interactive workspace follows the researcher's writing style and produces editable figures and tables.
+
+### How it differs from AutoResearch
+
+| Dimension | Common open-source AutoResearch focus | Research Avatar focus |
 |---|---|---|
-| 🧭 人机分工 | 强调端到端自动探索 | **由使用者确定全局方案，再自动执行** |
-| 🎭 个性化依据 | 以任务上下文和通用配置为主 | **Scholar + 工作习惯生成个人研究画像** |
-| 🔎 文献调研 | 一次返回大量论文、摘要和零散结论，难以用于研究判断 | **按四个要点组织，形成清晰、简洁的文献地图** |
-| 🧪 实验组织 | 从任务目标出发搜索、运行实验 | **把整个任务拆成 Goals，按顺序逐项完成** |
-| ✍️ 论文产出 | 自动汇总阶段性研究结果 | **模仿研究者的个性化写作风格** |
+| Human-agent roles | End-to-end automated exploration | **The researcher approves the global plan before automatic execution** |
+| Personalization | Task context and generic configuration | **Scholar profile plus working habits** |
+| Literature review | Large collections of papers, abstracts, and isolated observations | **A concise field map organized around four decision-relevant dimensions** |
+| Experiment organization | Search and execution from a task objective | **Ordered, independently verifiable goals** |
+| Paper output | Automatic synthesis of intermediate results | **Writing adapted to the researcher's personal style** |
 
 ---
 
-## 使用前准备
+## Prerequisites
 
-首次使用前，需要你**手动保存完整的 Google Scholar 个人主页 HTML**。随后把该 HTML 文件的本地路径交给 `$profileconstruct`，例如：
+Before first use, manually save the complete HTML of a Google Scholar profile. Then provide its local path to `$profileconstruct`, for example:
 
 ```text
-$profileconstruct 使用 ~/Downloads/scholar_profile.html
+$profileconstruct using ~/Downloads/scholar_profile.html
 ```
 
-你可以下载自己的 Scholar 主页，也可以下载希望模仿其研究品味和论文结构的研究者主页。
+You may use your own Scholar page or the page of a researcher whose research taste and paper organization you want to study.
 
-论文写作需要调用 LLM API。使用前，请在**本机终端中配置相应服务的 API Key**：
-
+Paper writing requires an LLM API. Configure the selected provider in a local terminal before use:
 
 ```bash
-# 使用 OpenAI 时需要
-export OPENAI_API_KEY="粘贴你的 API key"
+# Required for OpenAI
+export OPENAI_API_KEY="your API key"
 
-# 使用 DeepSeek 时需要
-export DEEPSEEK_API_KEY="粘贴你的 API key"
+# Required for DeepSeek
+export DEEPSEEK_API_KEY="your API key"
 ```
 
 ---
 
-## 推荐使用方式
+## Recommended workflow
 
-建议在终端的 Coding Agent 中依次调用以下科研流程：
+Invoke the following research workflow from a coding agent in a terminal:
 
-`$profileconstruct` → `$researchlit` → `$ideagen` → `$expplan` → `$runplan`
+`$profileconstruct` -> `$researchlit` -> `$ideagen` -> `$expplan` -> `$runplan`
 
-各步骤的可视化结果将在 http://127.0.0.1:8780 展示。完成上述流程后，可在同一界面的论文写作窗口中继续撰写论文。
+Each stage is visualized at <http://127.0.0.1:8780>. After completing the workflow, continue drafting in the paper-writing workspace on the same page.
 
+## Implementation
 
-## 具体实现
+### Personalization
 
-### 个性化：
-
-个性化的入口是一份权威画像：
+The authoritative personalization artifact is:
 
 ```text
 researcher-profile/PROFILE.html
 ```
 
-**数据来源**：`$profileconstruct` 会读取你的 Google Scholar 论文列表，并结合可用的 coding-agent 历史提取实验环境和工作习惯。
+`$profileconstruct` reads the researcher's Google Scholar publication list and uses available coding-agent history to extract experimental environments and working habits.
 
-**画像里的个性化内容**包括：
+The profile contains:
 
-- **Research Identity / Lineage**：你的研究身份，以及研究主题之间的发展脉络；
-- **Writing Style**：摘要层（论证结构、方法命名、贡献表述等语气）+ 全文层（章节主干、Related Work 位置、图表写法等篇章结构）；
-- **Experiment Templates**：常用启动器、训练框架、基础模型、GPU 配置、历史 OOM 记录；
-- **Workflow Preferences**：个人科研习惯，如优先低成本步骤、缓存中间结果、保证实验可恢复。
+- **Research Identity / Lineage:** research identity and the development of research themes;
+- **Writing Style:** abstract-level argument structure, method naming, and contribution framing, plus document-level section organization and figure/table conventions;
+- **Experiment Templates:** common launchers, training frameworks, base models, GPU configurations, and historical out-of-memory records;
+- **Workflow Preferences:** habits such as starting with low-cost steps, caching intermediate results, and making experiments resumable.
 
-> **Scholar 画像由你指定。** 可使用自己或希望参考的研究者；本机习惯仍来自你本人。
+The researcher chooses the Scholar profile. Local working habits still come from the current user.
 
-### 实验：
+### Experiments
 
-**1. 先规划论文，再反推实验**——先写预期摘要和段落框架，再为每条 claim 指定实验、指标和待填图表。
+1. **Plan the paper before deriving experiments.** Draft the expected abstract and paragraph architecture, then bind every claim to an experiment, metric, and fillable figure or table.
+2. **Decompose the plan into verifiable goals.** Execute goals in dependency order, verify their completion criteria, and update result artifacts.
+3. **Keep every number traceable.** Each result links to its raw record, execution command, calculation procedure, and verification status.
 
-**2. 把计划拆成可验证的 Goals**——将整个实验任务拆开，按照依赖顺序逐项执行、核验并更新图表。
+### Paper writing
 
-**3. 数字全程可追溯**——每个结果都链接到原始记录、运行命令、计算方式和验证状态。
-
-### 论文写作：
-
-**1. 两种正文生成方式**——使用 Experiment Planning 中已经批准的段落结构，可一键生成全文再逐段修改，也可从第一段开始逐段写。
-
-**2. 可交互论文工作台**——支持逐段生成、直接编辑、参考段落和矢量 PDF 预览；只有显式 Accept 后才事务性写入 LaTeX 并重新编译。
-
-**3. 论文写作风格个性化**——参考你的目标会议论文与 Writing Style，并检查自引、引用和全文逻辑。
-
-**4. 高质量 Prompt 画图**——先生成构图，再转换为可编辑 PPT/PDF。
-
-**5. 真实实验图表**——只读取 `results/` 中可追溯的实验数据。
+1. **Two drafting modes.** Use the approved Experiment Planning architecture to generate a complete first draft or draft one paragraph at a time.
+2. **Interactive paper workspace.** Generate and edit paragraphs, inspect reference structure and vector PDF previews, and write to LaTeX transactionally only after explicit acceptance.
+3. **Personalized writing style.** Follow the target venue, the researcher's Writing Style, and document-level citation and logic checks.
+4. **Publication-ready figure prompts.** Design a composition and convert it into editable PowerPoint and PDF artifacts.
+5. **Real experimental figures and tables.** Read only traceable data under `results/`.
 
 ---
 
 ## Skills
 
-| Skill | 作用 |
+| Skill | Purpose |
 |---|---|
-| `$profileconstruct` | 根据 Google Scholar 和历史 session 创建/更新研究者画像 |
-| `$researchlit "你的研究主题"` | 多角度检索并生成文献综述；只收录实际检索核对过的论文，每条引用可回到原始来源 |
-| `$ideagen` | 生成并核查候选 idea；可基于指定论文，或显式加入大胆候选 D1 |
-| `$expplan` | 逐段规划 Projected Paper 和待填图表，再反推出实验合同 |
-| `$runplan` | 把整个实验拆成 Goals，按依赖顺序逐项执行 |
+| `$profileconstruct` | Create or refresh the researcher profile from Google Scholar and available session history |
+| `$researchlit "research topic"` | Retrieve and verify literature from several angles and create a structured survey |
+| `$ideagen` | Generate and verify candidate ideas from the approved evidence base |
+| `$expplan` | Plan the Projected Paper paragraph by paragraph and derive its experimental contracts |
+| `$runplan` | Decompose the experiment into dependency-ordered executable goals |
 
-未明确请求翻译时，`$researchlit` 不会调用任何翻译 API；如需翻译，必须由研究者显式指定目标语言。
+Unless translation is explicitly requested, `$researchlit` does not call a translation API. The researcher must specify a target language before translation.
 
-论文写作不由 Skill 启动：Research Studio 的论文阶段直接读取当前项目的已批准结构、参考论文和实验结果，并在浏览器中逐段调用 LLM API、确认后写入 LaTeX。
+Paper writing is not started by a skill. The paper stage in Research Studio reads the approved architecture, structural reference, and experimental results, then calls the selected LLM API paragraph by paragraph in the browser before writing accepted content to LaTeX.
 
 ---
 
-## 交付文件
+## Deliverables
 
-交付物分四类：
+Deliverables are organized into four groups:
 
 ```text
 paper/
-├── main.tex                 # 1. 论文——可编辑的 LaTeX 源文件
-└── main.pdf                 #    编译后的最终论文
-results/                     # 2. 实验结果——原始记录、指标、配置与 provenance
-code/                        # 3. 代码——每个实验 goal 生成，贴合你的技术栈，可重跑
+├── main.tex                 # 1. Paper: editable LaTeX source
+└── main.pdf                 #    Compiled paper
+results/                     # 2. Experiment results, raw records, metrics, and provenance
+code/                        # 3. Reproducible code produced for each experiment goal
 reports/
-├── 01_LIT_SURVEY.html       # 4. 过程报告——文献综述
-├── 02_IDEA_REPORT.html      #    Idea 排序与选择
-├── 03_EXPERIMENT_PLAN.html  #    实验计划
-├── 04_RUN_PLAN.html         #    可恢复的实验执行计划与 goal 进度
-└── 05_EXP_RESULT.html       #    实验结果的人类可读汇总
+├── 01_LIT_SURVEY.html       # 4. Literature survey
+├── 02_IDEA_REPORT.html      #    Idea selection report
+├── 03_EXPERIMENT_PLAN.html  #    Experiment plan
+├── 04_RUN_PLAN.html         #    Resumable run plan and goal status
+└── 05_EXP_RESULT.html       #    Human-readable experiment results
 ```

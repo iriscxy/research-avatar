@@ -1,6 +1,7 @@
 .research-app{min-height:100vh;background:#edf2f0;overflow-x:hidden}
 .research-app [hidden]{display:none!important}
 .studio-main{padding:30px clamp(16px,3.3vw,52px) 38px}
+.studio-status{max-width:1500px;min-height:26px;display:flex;align-items:center;justify-content:flex-end;gap:14px;margin:0 auto 6px;color:#65777d;font:700 9px ui-sans-serif,system-ui,sans-serif}.studio-status span{white-space:nowrap}.studio-status b{color:#304b56}.studio-status code{font:700 9px ui-monospace,SFMono-Regular,Menlo,monospace}.connection-state{color:#087f74}.connection-state.disconnected{color:#b6463d}
 .pipeline{max-width:1500px;display:grid;grid-template-columns:repeat(6,minmax(112px,1fr));margin:0 auto 14px;border:1px solid #cbd8d5;border-radius:9px;background:#fff;overflow-x:auto;overflow-y:hidden}
 .pipeline-button{position:relative;min-height:40px;padding:6px 9px;border:0;border-right:1px solid var(--line);background:#fff;color:#61747c;text-align:left;cursor:pointer}
 .pipeline-button:last-child{border:0}
@@ -37,6 +38,7 @@
 .artifact-preview iframe{width:100%;min-height:720px;flex:1;border:0;background:#fff}
 .research-app.paper-focus{height:100vh;overflow:hidden}
 .paper-focus .studio-main{height:100vh;padding:6px;display:flex;flex-direction:column}
+.paper-focus .studio-status{width:100%;max-width:none;flex:0 0 auto;margin-bottom:4px}
 .paper-focus .pipeline{width:100%;max-width:none;flex:0 0 auto;margin:0 auto 6px;border-radius:8px}
 .paper-focus .pipeline-button{min-height:40px;padding:6px 9px}
 .paper-focus .pipeline-button:before{left:8px;top:7px;width:5px;height:5px}

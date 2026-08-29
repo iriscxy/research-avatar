@@ -23,6 +23,34 @@ from research_avatar.online_studio.package import build_archive
 import research_avatar.paper_studio.server as paper_studio
 
 
+class ResultArtifactPanelTests(unittest.TestCase):
+    def test_repeated_panel_headers_become_an_explicit_panel_column(self):
+        rows, labels = online._panelized_artifact_rows(
+            [
+                ["Included permutations", "Label-first", "Content-first"],
+                ["1", "1.000", "1.000"],
+                ["2", "0.950", "0.900"],
+                ["Included permutations", "Label-first", "Content-first"],
+                ["1", "1.000", "1.000"],
+                ["2", "0.692", "0.667"],
+            ],
+            [],
+            {
+                "required_data": [
+                    {"title": "ARC-Challenge"},
+                    {"title": "MMLU"},
+                ]
+            },
+        )
+
+        self.assertEqual(
+            labels,
+            ["Dataset", "Included permutations", "Label-first", "Content-first"],
+        )
+        self.assertEqual(rows[0], ["ARC-Challenge", "1", "1.000", "1.000"])
+        self.assertEqual(rows[-1], ["MMLU", "2", "0.692", "0.667"])
+
+
 PROFILE_HTML = """<!doctype html><html><body>
 <h1>Researcher profile</h1>
 <h2>Writing Style</h2><p>Concise, evidence-first prose.</p>
@@ -158,7 +186,7 @@ PLAN_CONTRACT = {
             "title": "Abstract",
             "reference_context": {
                 "source_heading": "Abstract",
-                "logic_summary_zh": "测试摘要的论证顺序。",
+                "logic_summary_zh": "Test the argument order of the abstract.",
                 "excerpts": [{"reference_paragraph_id": "R-A1", "start_line": 1, "end_line": 1, "text": "Verified abstract reference excerpt."}],
             },
             "paragraphs": [
@@ -170,7 +198,7 @@ PLAN_CONTRACT = {
             "title": "Experiments",
             "reference_context": {
                 "source_heading": "Experiments",
-                "logic_summary_zh": "测试实验部分的论证顺序。",
+                "logic_summary_zh": "Order of arguments in the test experiments section.",
                 "excerpts": [{"reference_paragraph_id": "R-E1", "start_line": 1, "end_line": 1, "text": "Verified experiments reference excerpt."}],
             },
             "paragraphs": [
@@ -182,7 +210,7 @@ PLAN_CONTRACT = {
             "title": "Conclusion",
             "reference_context": {
                 "source_heading": "Conclusion",
-                "logic_summary_zh": "测试结论部分的论证顺序。",
+                "logic_summary_zh": "Order of arguments in the test conclusions section.",
                 "excerpts": [{"reference_paragraph_id": "R-C1", "start_line": 1, "end_line": 1, "text": "Verified conclusion reference excerpt."}],
             },
             "paragraphs": [
@@ -297,7 +325,7 @@ def lightweight_structure_fixture(_root, contract, _source, _reference, **_kwarg
             "length_share": 1 / len(contract["paper_outline"]),
             "reference_context": {
                 "source_heading": section["title"],
-                "logic_summary_zh": "测试参考结构。",
+                "logic_summary_zh": "Test reference structure.",
                 "excerpts": [{
                     "reference_paragraph_id": "R1",
                     "start_line": 1,
@@ -738,7 +766,7 @@ class OnlineStudioTests(unittest.TestCase):
         with zipfile.ZipFile(buffer, "w") as archive:
             archive.writestr("../escape.json", "{}")
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(online.OnlineStudioError, "不允许的路径"):
+            with self.assertRaisesRegex(online.OnlineStudioError, "disallowed paths"):
                 online._extract_evidence_archive(buffer.getvalue(), Path(directory))
 
     def test_result_parser_survives_void_tags_inside_artifact(self):
@@ -756,7 +784,7 @@ class OnlineStudioTests(unittest.TestCase):
     def test_required_artifact_never_receives_fabricated_placeholder_rows(self):
         contract = {**PLAN_CONTRACT, "_result_tables": {"T1": []}}
         sections = online._outline_sections(contract)
-        with self.assertRaisesRegex(online.OnlineStudioError, "不会用占位值"):
+        with self.assertRaisesRegex(online.OnlineStudioError, "placeholder values will not be used"):
             online._artifact_definitions(contract, sections)
 
     def test_online_materials_keep_empty_result_figure_as_non_data_placeholder(self):
@@ -765,6 +793,10 @@ class OnlineStudioTests(unittest.TestCase):
             **contract["paper_artifacts"][0],
             "id": "F3",
             "kind": "figure",
+            "shell": {
+                **contract["paper_artifacts"][0].get("shell", {}),
+                "figure_type": "method_workflow",
+            },
         }]
         contract["result_requirements"] = [{"artifact_id": "F3"}]
         contract["paper_outline"] = json.loads(json.dumps(PLAN_CONTRACT["paper_outline"]))
@@ -776,6 +808,30 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertEqual(figures["F3"]["kind"], "mechanism")
         self.assertEqual(figures["F3"]["result_keys"], [])
         self.assertNotIn("F3", metrics["artifacts"])
+
+    def test_artifact_scaffolding_preserves_explicit_mechanism_figure_type(self):
+        contract = json.loads(json.dumps(PLAN_CONTRACT))
+        artifact = contract["paper_artifacts"][0]
+        artifact.update({"id": "F1", "kind": "figure"})
+        artifact["shell"]["figure_type"] = "model_architecture"
+        contract["result_requirements"] = []
+        contract["paper_outline"][0]["paragraphs"][0]["artifact_refs"] = ["F1"]
+        sections = online._outline_sections(contract)
+
+        figures, _tables, _metrics = online._artifact_definitions(contract, sections)
+
+        self.assertEqual(figures["F1"]["figure_type"], "model_architecture")
+
+    def test_artifact_scaffolding_rejects_missing_mechanism_figure_type(self):
+        contract = json.loads(json.dumps(PLAN_CONTRACT))
+        artifact = contract["paper_artifacts"][0]
+        artifact.update({"id": "F1", "kind": "figure"})
+        contract["result_requirements"] = []
+        contract["paper_outline"][0]["paragraphs"][0]["artifact_refs"] = ["F1"]
+        sections = online._outline_sections(contract)
+
+        with self.assertRaisesRegex(online.OnlineStudioError, "shell.figure_type"):
+            online._artifact_definitions(contract, sections)
 
     def test_artifact_width_reads_expplan_shell_span(self):
         contract = json.loads(json.dumps(PLAN_CONTRACT))
@@ -797,6 +853,7 @@ class OnlineStudioTests(unittest.TestCase):
         artifact["kind"] = "figure"
         artifact["x_axis_label"] = "Behavior"
         artifact["shell"]["y_axis_label"] = "Target-answer probability"
+        artifact["chart_type"] = "line"
         contract["_result_tables"] = {
             "T1": [["Behavior", "Score"], ["Refusal", ".86"]]
         }
@@ -808,6 +865,7 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertEqual(
             figures["T1"]["y_axis_label"], "Target-answer probability"
         )
+        self.assertEqual(figures["T1"]["chart_type"], "line")
 
     def test_source_figure_preserves_verified_asset_without_fake_metrics(self):
         contract = json.loads(json.dumps(PLAN_CONTRACT))
@@ -839,7 +897,7 @@ class OnlineStudioTests(unittest.TestCase):
 
     def test_verified_survey_cards_seed_the_online_citation_bank(self):
         source = """
-        <article class="card"><span class="verified">✅ 已验证</span>
+        <article class="card"><span class="verified">✅ Verified</span>
           <h4><a href="https://aclanthology.org/D19-1131/">Intent Dataset</a></h4>
           <div class="who">Larson et al. · EMNLP 2019 · DOI 10.1/test</div>
         </article>
@@ -870,7 +928,7 @@ class OnlineStudioTests(unittest.TestCase):
         source = """
         <article class="card"
           data-authors="Larson, Stefan and Mahendran, Anish and Peper, Joseph">
-          <span class="verified">✅ 已验证</span>
+          <span class="verified">✅ Verified</span>
           <h4><a href="https://aclanthology.org/D19-1131/">Intent Dataset</a></h4>
           <div class="who">Larson et al. · EMNLP 2019</div>
         </article>
@@ -883,11 +941,27 @@ class OnlineStudioTests(unittest.TestCase):
             bibliography,
         )
 
+    def test_verified_survey_bibliography_normalizes_semicolon_author_lists(self):
+        source = """
+        <article class="card">
+          <span class="verified">Verified · 2024</span>
+          <h4><a href="https://aclanthology.org/2024.findings-naacl.130/">Option Order</a></h4>
+          <div class="who">Pouya Pezeshkpour; Estevam Hruschka · 2024</div>
+        </article>
+        """
+
+        bibliography = online.verified_survey_bibliography(source)
+
+        self.assertIn(
+            "author = {Pouya Pezeshkpour and Estevam Hruschka}", bibliography
+        )
+
     def test_verified_survey_bibliography_drops_non_ascii_ui_metadata_note(self):
         source = """
         <article class="card" data-authors="Larson, Stefan and Mahendran, Anish">
+          <span class="verified">Verified</span>
           <h4><a href="https://aclanthology.org/D19-1131/">Intent Dataset</a></h4>
-          <div class="who">Larson et al. · EMNLP 2019 · 已验证</div>
+          <div class="who">Larson et al. · EMNLP 2019 · موثق</div>
         </article>
         """
 
@@ -895,11 +969,11 @@ class OnlineStudioTests(unittest.TestCase):
 
         self.assertIn("author = {Larson, Stefan and Mahendran, Anish}", bibliography)
         self.assertNotIn("note =", bibliography)
-        self.assertNotIn("已验证", bibliography)
+        self.assertNotIn("موثق", bibliography)
 
     def test_verified_survey_bibliography_rejects_authorless_verified_card(self):
         source = """
-        <article class="card"><span class="verified">✅ 已验证</span>
+        <article class="card"><span class="verified">✅ Verified</span>
           <h4><a href="https://example.org/paper">Authorless Paper</a></h4>
           <div class="who">ACL 2025</div>
         </article>
@@ -910,7 +984,7 @@ class OnlineStudioTests(unittest.TestCase):
 
     def test_verified_survey_bibliography_preserves_compound_display_surnames(self):
         source = """
-        <article class="card"><span class="verified">✅ 已验证</span>
+        <article class="card"><span class="verified">✅ Verified</span>
           <h4><a href="https://example.org/paper">Two-author Paper</a></h4>
           <div class="who">Goyal &amp; Daumé III · EACL 2026</div>
         </article>
@@ -945,7 +1019,7 @@ class OnlineStudioTests(unittest.TestCase):
             (root / "results").mkdir()
             (root / "reports/03_EXPERIMENT_PLAN.html").write_text(plan)
             (root / "reports/05_EXP_RESULT.html").write_text(incomplete)
-            with self.assertRaisesRegex(online.OnlineStudioError, "尚未填满"):
+            with self.assertRaisesRegex(online.OnlineStudioError, "not yet been filled"):
                 online._validated_upstream_contract(root, plan, incomplete)
 
     def test_evidence_packager_emits_only_supported_project_inputs(self):
@@ -1079,7 +1153,7 @@ class OnlineStudioTests(unittest.TestCase):
             ]
         )
         self.assertEqual([item[0] for item in sections], ["abstract", "evaluation_protocol"])
-        with self.assertRaisesRegex(online.OnlineStudioError, "第一个"):
+        with self.assertRaisesRegex(online.OnlineStudioError, "The first"):
             online._validated_sections(
                 [
                     {"title": "Introduction", "purpose": "Explain the paper motivation carefully."},
@@ -1100,7 +1174,7 @@ class OnlineStudioTests(unittest.TestCase):
                 "researcher@example.org", password
             )
             self.assertEqual(logged_in["id"], user["id"])
-            with self.assertRaisesRegex(online.OnlineStudioError, "不正确"):
+            with self.assertRaisesRegex(online.OnlineStudioError, "incorrect"):
                 online.authenticate_local_user(
                     "researcher@example.org", "wrong-password-value"
                 )
@@ -1117,7 +1191,7 @@ class OnlineStudioTests(unittest.TestCase):
     def test_onboarding_runs_in_background_and_reports_real_progress(self):
         def fake_create(_payload, *, user_id, progress):
             self.assertEqual(user_id, "user-1")
-            progress("reference_analysis", "正在逐段匹配…", 38)
+            progress("reference_analysis", "Matching paragraph by paragraph…", 38)
             return SimpleNamespace(session_id="ready-session")
 
         with patch.object(online, "create_session", side_effect=fake_create):
@@ -1463,18 +1537,18 @@ class OnlineStudioTests(unittest.TestCase):
             self.assertEqual(config["tables"]["T1"]["label"], "tab:main")
             # Regression: a real full-draft batch run completed all 19
             # paragraphs, then failed at the final table-materialization step
-            # with "表格 Prompt 含未知行：保持 05 的已验证顺序" -- the
+            # with "Table prompt contains unknown rows; preserve the validated order of 05." -- the
             # scaffolder hardcoded that phrase as the row directive, but
             # paper_studio's row-directive parser (default_table_prompt /
             # its "keep everything" branch) only recognizes the literal
-            # keywords "source"/"all"/"保持 results/ 顺序"/"全部", so it
+            # keywords "source"/"all"/"Maintain results order."/"all", so it
             # misread the phrase as a literal (unknown) row name and failed
             # every online project's final materialization step.
             self.assertEqual(config["tables"]["T1"]["prompt"]["rows"], "source")
             # Regression: the same materialization step then failed a second
-            # time with "最优值仅支持 none、max 或 min。" -- the scaffolder
+            # time with "The optimal value supports none, max, or min only." -- the scaffolder
             # also hardcoded a "best_values" phrase
-            # ("仅按 03 指定的 metric direction 标记") that the same parser's
+            # ("Only tag according to the metric direction specified in 03.") that the same parser's
             # best-value directive never recognizes, and no per-column
             # metric direction is actually read from "03" to derive a real
             # one, so it must default to the verified-safe "none".
@@ -1651,7 +1725,7 @@ class OnlineStudioTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
                 online.OnlineStudioError,
-                "请上传一篇完整的结构参考论文",
+                "Please upload a complete structure reference paper.",
             ):
                 online._write_lightweight_workspace(
                     Path(directory),
@@ -1778,6 +1852,7 @@ class OnlineStudioTests(unittest.TestCase):
                 "introduced_after": "E1",
                 "shell": {
                     "data_driven": False,
+                    "figure_type": "method_workflow",
                     "caption": "A conceptual mechanism that remains a placeholder online.",
                     "panels": ["mechanism"],
                 },
@@ -2277,7 +2352,7 @@ class OnlineStudioTests(unittest.TestCase):
             root = Path(directory)
             validator = subprocess.CompletedProcess([], 0, stdout="ok", stderr="")
             with patch.object(online.subprocess, "run", return_value=validator):
-                with self.assertRaisesRegex(online.OnlineStudioError, "官方 LaTeX 模板"):
+                with self.assertRaisesRegex(online.OnlineStudioError, "official LaTeX template"):
                     online._write_workspace(
                         root,
                         files=pipeline_files(venue="Some Unlisted Workshop 2099"),
@@ -2318,11 +2393,11 @@ class OnlineStudioTests(unittest.TestCase):
 
     def test_online_onboarding_describes_xx_and_placeholder_policy(self):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
-        self.assertIn("定量值统一使用 xx", html)
-        self.assertIn("Introduction 默认保留 Motivation 图位", html)
-        self.assertIn("在本地终端继续完成", html)
+        self.assertIn("all quantitative values set to xx", html)
+        self.assertIn("Introduction keeps the Motivation figure slot", html)
+        self.assertIn("local completion in the terminal", html)
         self.assertIn("placeholder", html)
-        self.assertNotIn("机制图仍需完整项目包中的绘图 Agent", html)
+        self.assertNotIn("The mechanism diagram still requires the drawing Agent from the complete project package.", html)
 
     def test_page_refresh_always_shows_landing_tabs_not_an_auto_redirect(self):
         # Regression: the landing page used to auto-redirect straight into
@@ -2334,9 +2409,9 @@ class OnlineStudioTests(unittest.TestCase):
         # session: an explicit choice, not automatic.
         script = (online.STATIC / "app.js").read_text(encoding="utf-8")
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
-        self.assertIn(">免费纯文字 PaperWrite 版</button>", html)
+        self.assertIn(">Free plain text PaperWrite edition</button>", html)
         self.assertNotIn(">Use it</button>", html)
-        self.assertIn("免费纯文字 PaperWrite 版", script)
+        self.assertIn("free plain text PaperWrite version", script)
         self.assertNotIn("window.location.assign('/studio')", script)
         self.assertIn(": 'demo-panel'", script)
         self.assertIn("get('open') === 'use'", script)
@@ -2360,10 +2435,10 @@ class OnlineStudioTests(unittest.TestCase):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
         script = (online.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('id="reset-studio"', html)
-        self.assertIn("清空当前内容并重新上传", html)
+        self.assertIn("Clear current content and re-upload.", html)
         self.assertIn("/api/online/session/reset", script)
         self.assertIn("showUploadView()", script)
-        self.assertIn("连续 4 小时未使用", script)
+        self.assertIn("idle for four hours", script)
         self.assertIn("window.setInterval", script)
 
     def test_free_paperwrite_uses_the_shared_section_draft_surface(self):
@@ -2377,10 +2452,10 @@ class OnlineStudioTests(unittest.TestCase):
             / "research_avatar/paper_studio/static/app.js"
         ).read_text(encoding="utf-8")
         self.assertIn('id="section-draft-start"', html)
-        self.assertIn("一键生成当前 Section", html)
+        self.assertIn("One-click generation of the current section.", html)
         self.assertIn('request("/api/section-draft/start"', script)
         self.assertIn("section_draft", script)
-        self.assertIn("请在本地终端运行 Code Agent", html)
+        self.assertIn("should be run with Code Agent in the local terminal", html)
 
     def test_studio_navigation_redirects_to_html_with_actionable_notice(self):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
@@ -2391,7 +2466,7 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn('id="session-notice"', html)
         self.assertIn("session_expired", script)
         self.assertIn("login_required", script)
-        self.assertIn("上一次临时写作会话已结束", script)
+        self.assertIn("last temporary writing session has ended", script)
         self.assertIn('new URL("/?login_required=1", request.url)', worker)
         self.assertIn('path === "/studio"', worker)
         self.assertIn('"/?session_expired=1"', Path(online.__file__).read_text(encoding="utf-8"))
@@ -2456,21 +2531,21 @@ class OnlineStudioTests(unittest.TestCase):
         for source in (html, script, server, worker):
             self.assertNotIn("access_token_required", source)
         self.assertNotIn('name="access_token"', html)
-        self.assertNotIn("部署访问口令", html)
+        self.assertNotIn("Deployment access token", html)
         self.assertNotIn("payload.get(\"access_token\")", server)
 
     def test_container_image_installs_every_tool_compile_table_preview_requires(self):
         # Regression: a real batch-writing run finished all 19 paragraphs,
-        # then failed at the final table-materialization step with "无法生成
-        # LaTeX 表格预览：缺少 pdfcrop。" -- the base container image
+        # then failed at the final table-materialization step with "Cannot generate
+        # LaTeX Table preview: missing pdfcrop." -- the base container image
         # installed poppler-utils (pdftoppm/pdfinfo/pdftocairo) and latexmk,
         # but never texlive-extra-utils, which is what actually provides the
         # pdfcrop binary compile_table_preview() shells out to. The
         # application code already checked for and reported the missing
         # tool correctly; the tool itself just wasn't installed.
         #
-        # Fixing that surfaced a second, one-level-deeper failure: "LaTeX 表格
-        # 预览编译失败" / "Ghostscript exited with error code 127" --
+        # Fixing that surfaced a second, one-level-deeper failure: "LaTeX table
+        # Preview compilation failed" / "Ghostscript exited with error code 127" --
         # pdfcrop itself shells out to `gs` to compute the bounding box, and
         # `--no-install-recommends` (set just above this loop's apt-get
         # command) suppresses ghostscript, which texlive-extra-utils only
@@ -2498,8 +2573,8 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("/api/online/session/job?job_id=", script)
         self.assertIn("const jobId = result.job_id", script)
         self.assertIn("encodeURIComponent(jobId)", script)
-        self.assertIn("已等待 ${elapsed} 秒", script)
-        self.assertIn("（预计 2–3 min）", script)
+        self.assertIn("Waiting ${elapsed} seconds", script)
+        self.assertIn("(Estimated 2–3 min", script)
         self.assertNotIn('name="project_package"', html)
         self.assertLess(
             html.index('name="project_brief_file"'),
@@ -2535,25 +2610,25 @@ class OnlineStudioTests(unittest.TestCase):
             "Adaptive Dialogue Learning",
         )
 
-    def test_use_it_title_keeps_compilable_prefix_from_bilingual_plan_title(self):
+    def test_use_it_title_keeps_compilable_prefix_from_multilingual_plan_title(self):
         self.assertEqual(
             online._lightweight_paper_title(
                 "",
                 "SOURCE ROLE: PROJECT BRIEF",
-                {"paper_title": "Steering Commutator：干预顺序何时改变结果？"},
+                {"paper_title": "Steering Commutator: متى يغير ترتيب التدخل النتيجة؟"},
                 "project-brief.html",
             ),
             "Steering Commutator",
         )
 
-    def test_use_it_title_prefers_projected_english_title_over_bilingual_idea(self):
+    def test_use_it_title_prefers_projected_english_title_over_multilingual_idea(self):
         self.assertEqual(
             online._lightweight_paper_title(
                 "",
                 "2.1 Projected Title and Abstract\n"
                 "Steering Commutator: When Intervention Order Changes Language Models\n"
                 "PROJECTED — not results",
-                {"selected_idea": {"title": "Steering Commutator：干预顺序何时改变结果？"}},
+                {"selected_idea": {"title": "Steering Commutator: متى يغير ترتيب التدخل النتيجة؟"}},
                 "03_EXPERIMENT_PLAN.html",
             ),
             "Steering Commutator: When Intervention Order Changes Language Models",
@@ -2562,7 +2637,7 @@ class OnlineStudioTests(unittest.TestCase):
     def test_use_it_title_uses_safe_default_for_non_ascii_only_title(self):
         self.assertEqual(
             online._lightweight_paper_title(
-                "", "# 纯中文标题", None, "项目说明.html"
+                "", "# عنوان فقط", None, "Project Description.html"
             ),
             "Research Paper Draft",
         )
@@ -2842,10 +2917,10 @@ class OnlineStudioTests(unittest.TestCase):
             "demoFrame.src = `/demo/?lang=${uiLanguage}&embedded=1&authenticated=",
             app,
         )
-        self.assertNotIn("先看看一篇论文是怎样完成的。", source)
-        self.assertNotIn("这是完整 Research Avatar 流程的可交互示例。", source)
-        self.assertNotIn("上传完整项目，开始自己的论文。", source)
-        self.assertNotIn("上传由 Research Avatar 生成的必要研究证据。", source)
+        self.assertNotIn("First see how a paper is completed.", source)
+        self.assertNotIn("This is an interactive example of the complete Research Avatar workflow.", source)
+        self.assertNotIn("Upload the complete project to begin your own paper.", source)
+        self.assertNotIn("Upload the necessary research evidence generated by Research Avatar.", source)
         style = (online.STATIC / "style.css").read_text(encoding="utf-8")
         self.assertIn("width: min(1500px, calc(100% - 32px))", style)
         self.assertIn(".use-columns { max-width: 1500px; align-items: start; }", style)
@@ -2873,7 +2948,7 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertEqual(source.count('<p class="step-index">01</p>'), 1)
         self.assertNotIn('<p class="step-index">02</p>', source)
         self.assertNotIn('name="scholar_file"', source)
-        self.assertNotIn("（必传）", source)
+        self.assertNotIn("(Required)", source)
         self.assertIn('name="project_brief_file"', source)
         self.assertNotIn('name="results_file"', source)
         self.assertNotIn('name="results_files"', source)
@@ -2969,6 +3044,16 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("The structural reference paper", app)
         self.assertIn("must be a uniquely named DOC, DOCX, TXT, PDF", app)
         self.assertIn("Unsupported document format", app)
+
+    def test_acl_review_line_numbers_stay_close_to_their_column(self):
+        root = Path(__file__).resolve().parents[1]
+        for relative in (
+            "research_avatar/online_studio/venue_templates/acl/acl.sty",
+            "research_avatar/online_studio/demo_project/paper/acl.sty",
+        ):
+            source = (root / relative).read_text(encoding="utf-8")
+            self.assertIn(r"\setlength{\linenumbersep}{8pt}", source)
+            self.assertNotIn(r"\setlength{\linenumbersep}{1.6cm}", source)
 
 
 if __name__ == "__main__":

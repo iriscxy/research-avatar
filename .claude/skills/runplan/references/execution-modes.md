@@ -115,7 +115,7 @@ authorized sequential queue—owns exactly one goal. Its command and
    must show the result table itself.
    Partially owned artifacts may keep other goals' cells pending, but the
    completed goal's own cells may not be pending. Infrastructure-only goals
-   marked `无直接图表` are exempt from the snapshot requirement.
+   marked `No direct artifact` are exempt from the snapshot requirement.
    Report negative results and uncertainty honestly; a goal means “produce
    evidence,” not “make the hypothesis succeed.”
 8. Evaluate only the preregistered gate and record the result. In

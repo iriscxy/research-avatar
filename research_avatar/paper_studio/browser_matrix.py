@@ -82,7 +82,7 @@ class Matrix:
         missing = copy.deepcopy(self.state)
         missing["api_key_configured"] = False
         missing["api_key_setup"] = {
-            "setup_command": 'export OPENAI_API_KEY="粘贴你的 API key"',
+            "setup_command": 'export OPENAI_API_KEY="Paste your API key."',
             "restart_command": "python3 -m research_avatar.paper_studio.server",
         }
         page, errors, posts = self.page(missing)
@@ -258,7 +258,7 @@ class Matrix:
         fixture["online_project"] = True
         target = next(item for item in fixture["figures"] if item["id"] == mechanism["id"])
         target["placeholder_only"] = True
-        target["placeholder_message"] = "线上不提供画图表功能，完整功能请使用本地版。"
+        target["placeholder_message"] = "The online version does not provide plotting features; please use the local version for full functionality."
         page, errors, posts = self.page(fixture)
         section = target["source_sections"][0]
         self.visit(
@@ -303,7 +303,7 @@ class Matrix:
         self.visit(page, "/?view=writing", "!document.querySelector('#writing-workspace').hidden")
         assert page.locator("#full-draft-start").is_enabled()
         assert page.locator("#full-draft-cancel").is_hidden()
-        assert "2 / 7" in page.locator("#full-draft-summary").inner_text()
+        assert "Draft 2 of 7" in page.locator("#full-draft-summary").inner_text()
         assert not posts and not errors
         page.close()
 
@@ -313,7 +313,7 @@ class Matrix:
             "completed": 1,
             "total": 2,
             "progress": 50,
-            "progress_message": "正在生成 Method · M2",
+            "progress_message": "Generating Method · M2",
         }
         page, errors, posts = self.page(running)
         self.visit(page, "/?view=writing", "!document.querySelector('#full-draft-cancel').hidden")
@@ -405,11 +405,11 @@ class Matrix:
         )
         assert page.locator("#table-save").is_disabled()
         assert page.locator("#table-approve").is_disabled()
-        assert page.locator("#table-approve").inner_text() == "已插入正文"
+        assert page.locator("#table-approve").inner_text() == "Body text has been inserted."
         page.locator("#table-latex").fill(page.locator("#table-latex").input_value() + "\n% revision")
         assert page.locator("#table-save").is_enabled()
         assert page.locator("#table-approve").is_enabled()
-        assert page.locator("#table-approve").inner_text() == "更新表格 → PDF"
+        assert page.locator("#table-approve").inner_text() == "Update table → PDF"
         assert not posts and not errors
         self.results["table_buttons"] = True
         page.close()
@@ -457,7 +457,7 @@ class Matrix:
                 body=json.dumps(
                     {
                         "ok": True,
-                        "message": "Caption 已保存并重新编译正文。",
+                        "message": "Caption Saved and recompiled the main text.",
                         "state": fixture,
                     }
                 ),
@@ -475,18 +475,18 @@ class Matrix:
         )
         if target.get("kind") == "data":
             assert page.locator(approve_selector).is_enabled()
-            assert page.locator(approve_selector).inner_text() == "重新插入"
+            assert page.locator(approve_selector).inner_text() == "Reinsert"
         else:
             assert page.locator(approve_selector).is_disabled()
-            assert page.locator(approve_selector).inner_text() == "已插入正文"
+            assert page.locator(approve_selector).inner_text() == "Body text has been inserted."
         page.locator("#figure-caption").fill(revised_caption)
         assert page.locator("#figure-caption-save").is_enabled()
         assert page.locator(approve_selector).is_enabled()
-        assert page.locator(approve_selector).inner_text() == "更新 Caption → PDF"
+        assert page.locator(approve_selector).inner_text() == "Update Caption → PDF"
         page.locator(approve_selector).click()
         page.wait_for_timeout(100)
         expected_final_label = (
-            "重新插入" if target.get("kind") == "data" else "已插入正文"
+            "Reinsert" if target.get("kind") == "data" else "Body text has been inserted."
         )
         assert page.locator(approve_selector).inner_text() == expected_final_label, {
             "label": page.locator(approve_selector).inner_text(),
@@ -610,7 +610,7 @@ class Matrix:
             assert body == {"title": revised_title}, body
             title_fixture["title_editor"]["current_title"] = revised_title
             title_fixture["title_editor"]["candidate"] = ""
-            title_fixture["title_editor"]["last_message"] = "标题已写入 LaTeX 并重新编译 PDF。"
+            title_fixture["title_editor"]["last_message"] = "The title has been written into LaTeX and the PDF recompiled."
             route.fulfill(
                 status=200,
                 content_type="application/json",
@@ -624,12 +624,12 @@ class Matrix:
         page.locator("#title-save").click()
         page.wait_for_function(
             "() => document.querySelector('#title-save').disabled "
-            "&& document.querySelector('#title-save').textContent === '已写入 PDF'",
+            "&& document.querySelector('#title-save').textContent === 'Written to PDF'",
             timeout=2000,
         )
         assert page.locator("#paper-title").input_value() == revised_title
         assert page.locator("#title-save").is_disabled()
-        assert page.locator("#title-save").inner_text() == "已写入 PDF"
+        assert page.locator("#title-save").inner_text() == "Written to PDF"
         assert len(posts) == 1 and not errors, {"posts": posts, "errors": errors}
         page.close()
 
@@ -667,12 +667,12 @@ class Matrix:
         page.locator("#accept").click()
         page.wait_for_function(
             "() => document.querySelector('#accept').disabled "
-            "&& document.querySelector('#accept').textContent === '已写入 LaTeX'",
+            "&& document.querySelector('#accept').textContent === 'LaTeX has been written.'",
             timeout=2000,
         )
         assert page.locator("#candidate").input_value() == revised_prose
         assert page.locator("#accept").is_disabled()
-        assert page.locator("#accept").inner_text() == "已写入 LaTeX"
+        assert page.locator("#accept").inner_text() == "LaTeX has been written."
         assert len(posts) == 1 and not errors, {"posts": posts, "errors": errors}
         page.close()
         self.results["title_and_prose_transactions"] = True
@@ -715,13 +715,13 @@ class Matrix:
             f"document.querySelector('#figure-title').textContent.startsWith('{target['id']}')",
         )
         page.locator("#table-latex").fill(revised)
-        assert page.locator("#table-approve").inner_text() == "更新表格 → PDF"
+        assert page.locator("#table-approve").inner_text() == "Update table → PDF"
         page.locator("#table-approve").click()
         page.wait_for_timeout(100)
         assert page.locator("#table-latex").input_value() == revised
         assert page.locator("#table-save").is_disabled()
         assert page.locator("#table-approve").is_disabled()
-        assert page.locator("#table-approve").inner_text() == "已插入正文"
+        assert page.locator("#table-approve").inner_text() == "Body text has been inserted."
         assert len(posts) == 1 and not errors, {"posts": posts, "errors": errors}
         self.results["approved_table_update"] = True
         page.close()
@@ -888,7 +888,7 @@ class Matrix:
         page.locator("#reset-project-confirm").fill("wrong-id")
         page.locator("#reset-generated-confirm").click()
         assert not posts
-        assert "项目 ID 不匹配" in page.locator("#reset-project-copy-status").inner_text()
+        assert "Project ID mismatch" in page.locator("#reset-project-copy-status").inner_text()
         selection = page.locator("#reset-project-confirm").evaluate(
             "node => [node.selectionStart, node.selectionEnd, node.value.length]"
         )
@@ -901,7 +901,7 @@ class Matrix:
             "}"
         )
         page.locator("#reset-project-copy").click()
-        assert "自动复制失败" in page.locator("#reset-project-copy-status").inner_text()
+        assert "Auto copy failed" in page.locator("#reset-project-copy-status").inner_text()
         selection = page.locator("#reset-project-id").evaluate(
             "node => [node.selectionStart, node.selectionEnd, node.value.length]"
         )
@@ -1345,30 +1345,19 @@ class Matrix:
             target.update(
                 ready=True,
                 status="built",
-                gpt_preview_url="/static/matrix-reference.png",
                 paper_preview_url="/paper.pdf",
                 preview_url="/paper.pdf",
                 preview_type="pdf",
-                # Pin explicitly rather than inherit whatever the live figure
-                # happens to have: a real project with gpt_preview_no_text
-                # already true made this fixture silently assume the wrong
-                # toggle-button copy and fail with an unhelpful bare assert.
-                gpt_preview_no_text=False,
             )
             page, errors, posts = self.page(fixture)
             self.visit(page, f"/?view=figures&section={target['source_sections'][0]}", "document.querySelector('#section-title').textContent !== 'Loading…'")
             card = page.locator(".figure-card", has_text=target["id"])
             if card.count() and "selected" not in (card.get_attribute("class") or ""):
                 card.click()
-            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示 GPT 原图"
-            assert page.locator("#figure-preview-pdf").is_visible()
-            page.locator("#mechanism-preview-toggle").click()
-            assert page.locator("#mechanism-preview-toggle").inner_text() == "显示可编辑 PPT/PDF 完整版"
-            assert page.locator("#figure-preview-image").is_visible()
-            page.locator("#mechanism-preview-toggle").click()
+            assert page.locator("#mechanism-preview-toggle").is_hidden()
             assert page.locator("#figure-preview-pdf").is_visible()
             assert not posts and not errors, {"posts": posts, "errors": errors}
-            results["mechanism_toggle"] = True
+            results["mechanism_preview"] = True
             page.close()
         self.results["preview_validation_and_toggle"] = results
 

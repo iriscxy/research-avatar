@@ -125,6 +125,23 @@ def validate(source: str) -> list[str]:
                             errors.append(f"{idea_id}: private/unpublished dataset must not have an external URL")
                         if not str(asset.get("availability", "")).strip():
                             errors.append(f"{idea_id}: private/unpublished dataset lacks availability metadata")
+            grounding = audit.get("source_grounding")
+            if audit_payload.get("grounding_contract_version") == 1 and (
+                not isinstance(grounding, list) or not grounding
+            ):
+                errors.append(f"{idea_id}: novelty audit requires source_grounding")
+            elif isinstance(grounding, list):
+                kinds = set()
+                for grounding_index, item in enumerate(grounding):
+                    if not isinstance(item, dict):
+                        errors.append(f"{idea_id}: source_grounding[{grounding_index}] must be an object")
+                        continue
+                    kinds.add(str(item.get("kind", "")))
+                    for field in ("title", "anchor", "failure_boundary"):
+                        if not str(item.get(field, "")).strip():
+                            errors.append(f"{idea_id}: source_grounding[{grounding_index}] lacks {field}")
+                if not kinds.intersection({"Gap", "Opening", "Live Debate"}):
+                    errors.append(f"{idea_id}: source_grounding must name a Survey Gap/Opening or Live Debate")
         if status not in ALLOWED:
             errors.append(f"{idea_id}: invalid or missing data-scope-necessity")
             continue

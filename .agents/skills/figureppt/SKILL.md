@@ -15,14 +15,17 @@ replacement label, hidden raster, or other local after-the-fact edit.
 
 ## Workflow
 
-1. Read the current manuscript evidence and approved figure slot.
+1. Read the current manuscript evidence and approved figure slot. Read the
+   slot's explicit `figure_type`; do not infer it from the title, caption,
+   description, section name, or keywords. Preserve its distinct rhetorical
+   profile throughout composition and refinement.
 2. Inspect three to five relevant peer-paper figures and write a project-local
    visual-grammar file that abstracts their shared composition, iconography,
    information density, and operation-bearing geometry. Record source figure/page
    locators. Never copy scientific content, labels, artwork, or layout identity.
 3. Have Codex derive a concise composition specification from the manuscript
    evidence and visual grammar, then author the complete native `shapes.json`
-   directly. Do not call GPT Image or use a generated raster as an intermediate.
+   directly as the authoritative composition.
 4. Reject a composition whose planned objects are mostly rectangles containing
    text. Require concrete manuscript-grounded artifacts, pictograms, state
    changes, paths, masks, checks, ranks, or other operation-bearing geometry.
@@ -64,8 +67,7 @@ readability/accessibility gates, and directory contract.
 - A method/mechanism figure contains no result bars, accuracy/ASR values, or
   unsupported causal claims.
 - Final editable deliverables use independent native modules, icons,
-  connectors, and labels. No generated raster is used as a composition
-  reference or final background layer.
+  connectors, and labels.
 - Use flat solid fills, no gradients/3D/theme shadows, a color-vision-safe
   palette, non-color encodings, ≥4.5:1 text contrast, and final-size label
   floors from the detailed reference.
@@ -82,5 +84,5 @@ The supported tool commands and dependencies are authoritative via:
 python3 research_avatar/tools/figure_ppt.py --help
 ```
 
-No image-generation API key is required. Native drawing uses `python-pptx`, and
+Native drawing uses `python-pptx`, and
 PDF export uses the configured unattended exporter.

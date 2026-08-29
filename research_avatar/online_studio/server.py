@@ -40,6 +40,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Callable
 
+from research_avatar.figure_contract import MECHANISM_FIGURE_TYPES
 from research_avatar.paper_studio.api_usage import append_usage, usage_record, usage_summary
 from research_avatar.paper_structure import (
     PaperStructureError,
@@ -177,7 +178,7 @@ def _project_zip_bytes(root: Path) -> bytes:
         files.append(path)
         total += size
         if len(files) > MAX_EXPORT_FILES or total > MAX_EXPORT_BYTES:
-            raise OnlineStudioError("项目过大，无法导出 ZIP；请先删除不需要的生成缓存。")
+            raise OnlineStudioError("Project is too large to export ZIP; please delete unnecessary generation caches.")
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
         for path in files:
@@ -216,7 +217,7 @@ class OnboardingJob:
     user_id: str
     status: str = "running"
     stage: str = "queued"
-    message: str = "正在校验上传材料…"
+    message: str = "Validating uploaded materials…"
     progress: int = 2
     session_id: str = ""
     error: str = ""
@@ -401,7 +402,7 @@ def _normalize_email(value: Any) -> str:
         or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email)
         or any(ord(character) < 32 for character in email)
     ):
-        raise OnlineStudioError("请输入有效的邮箱地址。")
+        raise OnlineStudioError("Please enter a valid email address.")
     return email
 
 
@@ -419,7 +420,7 @@ def create_local_user(email_value: Any, password_value: Any) -> dict[str, str]:
     email = _normalize_email(email_value)
     password = str(password_value or "")
     if len(password) < 6 or len(password) > 1024:
-        raise OnlineStudioError("密码必须为 6–1024 个字符。")
+        raise OnlineStudioError("Password must be 6–1024 characters.")
     salt = secrets.token_bytes(16)
     digest = _password_digest(password, salt)
     user_id = secrets.token_urlsafe(24)
@@ -434,7 +435,7 @@ def create_local_user(email_value: Any, password_value: Any) -> dict[str, str]:
                 (user_id, email, email, salt, digest, int(time.time())),
             )
     except sqlite3.IntegrityError as exc:
-        raise OnlineStudioError("该邮箱已经注册，请直接登录。") from exc
+        raise OnlineStudioError("This email address is already registered; please log in directly.") from exc
     return {"id": user_id, "email": email, "provider": "local"}
 
 
@@ -457,7 +458,7 @@ def authenticate_local_user(email_value: Any, password_value: Any) -> dict[str, 
     except (ValueError, OverflowError):
         actual = b"\1" * 32
     if not row or not secrets.compare_digest(actual, expected):
-        raise OnlineStudioError("邮箱或密码不正确。")
+        raise OnlineStudioError("Email or password is incorrect.")
     return {"id": str(row["id"]), "email": str(row["email"]), "provider": "local"}
 
 
@@ -602,7 +603,7 @@ def exchange_google_code(code: str, redirect_uri: str) -> str:
         token_payload = json.loads(response.read().decode("utf-8"))
     encoded_id_token = str(token_payload.get("id_token") or "")
     if not encoded_id_token:
-        raise OnlineStudioError("Google 未返回 ID token。")
+        raise OnlineStudioError("Google ID token not returned.")
     return encoded_id_token
 
 
@@ -611,14 +612,14 @@ def verify_google_id_token(encoded_id_token: str) -> dict[str, Any]:
         from google.auth.transport.requests import Request as GoogleRequest
         from google.oauth2 import id_token as google_id_token
     except ImportError as exc:
-        raise OnlineStudioError("服务端缺少 Google 登录验证依赖。") from exc
+        raise OnlineStudioError("The server lacks the Google login authentication dependency.") from exc
     claims = google_id_token.verify_oauth2_token(
         encoded_id_token,
         GoogleRequest(),
         os.environ["GOOGLE_OAUTH_CLIENT_ID"],
     )
     if not isinstance(claims, dict):
-        raise OnlineStudioError("Google ID token 内容无效。")
+        raise OnlineStudioError("Google ID token Content invalid.")
     return claims
 
 
@@ -726,24 +727,24 @@ def _validated_sections(raw_sections: Any) -> list[tuple[str, str, str, str]]:
     if raw_sections is None:
         return list(DEFAULT_SECTIONS)
     if not isinstance(raw_sections, list) or not 2 <= len(raw_sections) <= 12:
-        raise OnlineStudioError("论文结构必须包含 2–12 个 section。")
+        raise OnlineStudioError("Paper structure must contain 2–12 sections.")
     sections: list[tuple[str, str, str, str]] = []
     used_ids: set[str] = set()
     for index, item in enumerate(raw_sections):
         if not isinstance(item, dict):
-            raise OnlineStudioError("论文结构格式无效。")
+            raise OnlineStudioError("The paper structure format is invalid.")
         title = str(item.get("title") or "").strip()
         purpose = str(item.get("purpose") or "").strip()
         if not title or len(title) > 80 or not title.isascii():
-            raise OnlineStudioError("Section 标题必须是 1–80 个字符的英文/ASCII 文本。")
+            raise OnlineStudioError("Section The title must be 1 to 80 characters of English ASCII text.")
         if len(purpose) < 10 or len(purpose) > 800:
-            raise OnlineStudioError("每个 section 的写作目的必须为 10–800 个字符。")
+            raise OnlineStudioError("The writing purpose of each section must be 10 to 800 characters.")
         render = "abstract" if index == 0 else "section"
         if index == 0 and title.lower() != "abstract":
-            raise OnlineStudioError("第一个 section 必须是 Abstract。")
+            raise OnlineStudioError("The first section must be Abstract.")
         section_id = "abstract" if index == 0 else _safe_slug(title, f"section-{index + 1}").replace("-", "_")
         if section_id in used_ids:
-            raise OnlineStudioError(f"Section 标题生成了重复 ID：{title}")
+            raise OnlineStudioError(f"Section The title generated a duplicate ID.{title}")
         used_ids.add(section_id)
         sections.append((section_id, title, render, purpose))
     return sections
@@ -751,27 +752,27 @@ def _validated_sections(raw_sections: Any) -> list[tuple[str, str, str, str]]:
 
 def _decode_html_files(raw_files: Any) -> list[tuple[str, str]]:
     if not isinstance(raw_files, list) or not raw_files:
-        raise OnlineStudioError("请至少上传一个 HTML 文件。")
+        raise OnlineStudioError("Please upload at least one HTML file.")
     if len(raw_files) > MAX_FILES:
-        raise OnlineStudioError(f"一次最多上传 {MAX_FILES} 个 HTML 文件。")
+        raise OnlineStudioError(f"Up to one upload at a time. {MAX_FILES} An HTML file.")
     decoded: list[tuple[str, str]] = []
     seen: set[str] = set()
     for item in raw_files:
         if not isinstance(item, dict):
-            raise OnlineStudioError("上传文件格式无效。")
+            raise OnlineStudioError("Uploaded file format is invalid.")
         name = Path(str(item.get("name") or "")).name
         if not name or name.lower() in seen or Path(name).suffix.lower() not in {".html", ".htm"}:
-            raise OnlineStudioError("文件必须是名称唯一的 .html 或 .htm 文件。")
+            raise OnlineStudioError("Files must have unique names and be .html or .htm files.")
         try:
             content = base64.b64decode(str(item.get("data") or ""), validate=True)
         except (ValueError, TypeError) as exc:
-            raise OnlineStudioError(f"{name} 不是有效的上传内容。") from exc
+            raise OnlineStudioError(f"{name} Not valid upload content.") from exc
         if not content or len(content) > MAX_FILE_BYTES:
-            raise OnlineStudioError(f"{name} 必须非空且不超过 8 MB。")
+            raise OnlineStudioError(f"{name} Must be non-empty and not exceed 8 MB.")
         try:
             text = content.decode("utf-8")
         except UnicodeDecodeError as exc:
-            raise OnlineStudioError(f"{name} 必须使用 UTF-8 编码。") from exc
+            raise OnlineStudioError(f"{name} UTF-8 encoding is required.") from exc
         decoded.append((name, text))
         seen.add(name.lower())
     return decoded
@@ -796,18 +797,18 @@ def _extract_document_text(name: str, content: bytes) -> str:
         try:
             return content.decode("utf-8-sig").strip()
         except UnicodeDecodeError as exc:
-            raise OnlineStudioError(f"{name} 必须使用 UTF-8 编码。") from exc
+            raise OnlineStudioError(f"{name} UTF-8 encoding is required.") from exc
     if suffix == ".json":
         try:
             value = json.loads(content.decode("utf-8-sig"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise OnlineStudioError(f"{name} 不是有效的 UTF-8 JSON 文件。") from exc
+            raise OnlineStudioError(f"{name} Not a valid UTF-8 JSON file.") from exc
         return json.dumps(value, ensure_ascii=False, indent=2)
     if suffix in {".html", ".htm"}:
         try:
             source = content.decode("utf-8-sig")
         except UnicodeDecodeError as exc:
-            raise OnlineStudioError(f"{name} 必须使用 UTF-8 编码。") from exc
+            raise OnlineStudioError(f"{name} UTF-8 encoding is required.") from exc
         parser = _VisibleHTMLText()
         parser.feed(source)
         parser.close()
@@ -829,11 +830,11 @@ def _extract_document_text(name: str, content: bytes) -> str:
                 contract = json.loads(contract_match.group(1))
             except json.JSONDecodeError as exc:
                 raise OnlineStudioError(
-                    f"{name} 的 experiment-plan-contract 不是有效 JSON。"
+                    f"{name} The experiment-plan-contract is not valid JSON."
                 ) from exc
             if not isinstance(contract, dict):
                 raise OnlineStudioError(
-                    f"{name} 的 experiment-plan-contract 必须是 JSON object。"
+                    f"{name} the experiment plan contract must be a JSON object."
                 )
             visible += (
                 "\n\n<experiment-plan-contract>\n"
@@ -865,7 +866,7 @@ def _extract_document_text(name: str, content: bytes) -> str:
                         blocks.append(text)
                 return "\n\n".join(blocks)
         except (zipfile.BadZipFile, KeyError, ET.ParseError) as exc:
-            raise OnlineStudioError(f"{name} 不是有效的 DOCX 文件。") from exc
+            raise OnlineStudioError(f"{name} Not a valid DOCX file.") from exc
     if suffix == ".pdf":
         return _extract_pdf_text_with_llm(name, content)
     command = None
@@ -876,12 +877,12 @@ def _extract_document_text(name: str, content: bytes) -> str:
             command = ["textutil", "-convert", "txt", "-stdout"]
         else:
             raise OnlineStudioError(
-                "服务器缺少读取 DOC 的工具 antiword（macOS 本地也可使用 textutil）。"
+                "Server lacks a tool to read DOC files such as antiword; textutil can be used locally on macOS."
             )
     if command:
         if shutil.which(command[0]) is None:
             raise OnlineStudioError(
-                f"服务器缺少读取 {suffix.upper().lstrip('.')} 的工具 {command[0]}。"
+                f"Server lacks read access. {suffix.upper().lstrip('.')} the tool {command[0]}."
             )
         with tempfile.NamedTemporaryFile(suffix=suffix) as handle:
             handle.write(content)
@@ -893,9 +894,9 @@ def _extract_document_text(name: str, content: bytes) -> str:
                 check=False,
             )
         if completed.returncode:
-            raise OnlineStudioError(f"无法从 {name} 提取文本。")
+            raise OnlineStudioError(f"Cannot be derived from {name} Extract text.")
         return completed.stdout.decode("utf-8", errors="replace").strip()
-    raise OnlineStudioError(f"不支持的文档格式：{name}。")
+    raise OnlineStudioError(f"Unsupported document format:{name}.")
 
 
 def _extract_pdf_text_with_llm(name: str, content: bytes) -> str:
@@ -903,11 +904,11 @@ def _extract_pdf_text_with_llm(name: str, content: bytes) -> str:
     api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
     if not api_key:
         raise OnlineStudioError(
-            "服务端缺少 DEEPSEEK_API_KEY，无法整理 PDF 文本。"
+            "Server side lacks DEEPSEEK_API_KEY, cannot parse PDF text."
         )
     pdftotext = shutil.which("pdftotext")
     if not pdftotext:
-        raise OnlineStudioError("服务器缺少 PDF 文本提取工具 pdftotext。")
+        raise OnlineStudioError("Server lacks PDF text extraction tool pdftotext.")
     with tempfile.NamedTemporaryFile(suffix=".pdf") as handle:
         handle.write(content)
         handle.flush()
@@ -919,18 +920,18 @@ def _extract_pdf_text_with_llm(name: str, content: bytes) -> str:
                 check=False,
             )
         except subprocess.TimeoutExpired as exc:
-            raise OnlineStudioError(f"提取 {name} 的页面文本时超时。") from exc
+            raise OnlineStudioError(f"extract {name} Timed out loading the page text.") from exc
     if completed.returncode:
         detail = completed.stderr.decode("utf-8", errors="replace").strip()
         raise OnlineStudioError(
-            f"无法从 {name} 提取页面文本：{detail[-300:] or 'pdftotext failed'}"
+            f"Cannot be derived from {name} Extract page text:{detail[-300:] or 'pdftotext failed'}"
         )
     layout_text = completed.stdout.decode("utf-8", errors="replace").strip()
     if len(layout_text) < 200:
-        raise OnlineStudioError(f"{name} 没有足够的可提取文本；当前不支持纯扫描 PDF。")
+        raise OnlineStudioError(f"{name} Not enough extractable text; current does not support pure scanned PDF.")
     if len(layout_text) > MAX_STRUCTURE_REFERENCE_CHARS:
         raise OnlineStudioError(
-            f"{name} 提取后超过 {MAX_STRUCTURE_REFERENCE_CHARS} 字符，请上传较短的参考论文。"
+            f"{name} Exceeds after extraction. {MAX_STRUCTURE_REFERENCE_CHARS} Character count too long; please upload a shorter reference paper."
         )
     model = os.environ.get(
         "DEEPSEEK_PDF_EXTRACTION_MODEL", PROVIDERS["deepseek"][1]
@@ -982,13 +983,13 @@ Requirements:
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise OnlineStudioError(
-            f"LLM 读取 {name} 时 API 返回 HTTP {exc.code}：{detail[:500]}"
+            f"LLM read {name} When API returns HTTP. {exc.code}:{detail[:500]}"
         ) from exc
     except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
         reason = getattr(exc, "reason", str(exc))
-        raise OnlineStudioError(f"LLM 读取 {name} 时 API 连接失败：{reason}") from exc
+        raise OnlineStudioError(f"LLM read {name} When API connection fails:{reason}") from exc
     except json.JSONDecodeError as exc:
-        raise OnlineStudioError(f"LLM 读取 {name} 时返回了无效 JSON。") from exc
+        raise OnlineStudioError(f"LLM read {name} Invalid JSON was returned.") from exc
     choices = body.get("choices") or []
     transcript = (
         str((choices[0].get("message") or {}).get("content") or "").strip()
@@ -996,7 +997,7 @@ Requirements:
     )
     if len(transcript) < 200:
         raise OnlineStudioError(
-            f"DeepSeek 未能完整整理 {name} 的文本。"
+            f"DeepSeek Failed to fully organize. {name} The text."
         )
     return transcript
 
@@ -1010,32 +1011,32 @@ def _decode_document_files(
 ) -> list[tuple[str, str]]:
     if raw_files in (None, []):
         if required:
-            raise OnlineStudioError(f"请上传{label}。")
+            raise OnlineStudioError(f"Please upload{label}.")
         return []
     if not isinstance(raw_files, list) or not raw_files:
-        raise OnlineStudioError(f"{label}上传格式无效。")
+        raise OnlineStudioError(f"{label}Invalid upload format.")
     if len(raw_files) > max_files:
-        raise OnlineStudioError(f"{label}一次最多上传 {max_files} 个文件。")
+        raise OnlineStudioError(f"{label}Up to one upload at a time. {max_files} Files.")
     decoded: list[tuple[str, str]] = []
     seen: set[str] = set()
     for item in raw_files:
         if not isinstance(item, dict):
-            raise OnlineStudioError(f"{label}上传格式无效。")
+            raise OnlineStudioError(f"{label}Invalid upload format.")
         name = Path(str(item.get("name") or "")).name
         suffix = Path(name).suffix.lower()
         if not name or name.lower() in seen or suffix not in DOCUMENT_SUFFIXES:
             raise OnlineStudioError(
-                f"{label}必须使用名称唯一的 DOC、DOCX、TXT、PDF、Markdown、JSON 或 HTML 文件。"
+                f"{label}Must use uniquely named DOC DOCX TXT PDF Markdown JSON or HTML files."
             )
         try:
             content = base64.b64decode(str(item.get("data") or ""), validate=True)
         except (ValueError, TypeError) as exc:
-            raise OnlineStudioError(f"{name} 不是有效的上传内容。") from exc
+            raise OnlineStudioError(f"{name} Not valid upload content.") from exc
         if not content or len(content) > MAX_FILE_BYTES:
-            raise OnlineStudioError(f"{name} 必须非空且不超过 8 MB。")
+            raise OnlineStudioError(f"{name} Must be non-empty and not exceed 8 MB.")
         text = _extract_document_text(name, content)
         if not text.strip():
-            raise OnlineStudioError(f"{name} 没有可用于写作的文本。")
+            raise OnlineStudioError(f"{name} No text available for writing.")
         decoded.append((name, text.strip()))
         seen.add(name.lower())
     return decoded
@@ -1057,11 +1058,11 @@ def _canonical_pipeline_sources(files: list[tuple[str, str]]) -> dict[str, str]:
     missing = [display for key, display in expected.items() if key not in sources]
     extras = [name for name, _source in files if name.lower() not in expected]
     if missing:
-        raise OnlineStudioError("缺少必需文件：" + "、".join(missing) + "。")
+        raise OnlineStudioError("Missing required file:" + ", ".join(missing) + ".")
     if extras:
         raise OnlineStudioError(
-            "HTML 上传区只接受 PROFILE、03 和 05；其他证据请放入 ZIP："
-            + "、".join(extras)
+            "HTML The upload area accepts only PROFILE, 03 and 05; place other evidence into ZIP:"
+            + ", ".join(extras)
         )
     return {display: sources[key] for key, display in expected.items()}
 
@@ -1073,28 +1074,28 @@ def _script_json(source: str, identifier: str) -> dict[str, Any]:
         re.IGNORECASE | re.DOTALL,
     )
     if match is None:
-        raise OnlineStudioError(f"上传文件缺少 {identifier} 数据契约。")
+        raise OnlineStudioError(f"Missing uploaded file {identifier} Data contract.")
     try:
         payload = json.loads(match.group(1))
     except json.JSONDecodeError as exc:
-        raise OnlineStudioError(f"{identifier} 数据契约不是有效 JSON。") from exc
+        raise OnlineStudioError(f"{identifier} Data contract is not valid JSON.") from exc
     if not isinstance(payload, dict):
-        raise OnlineStudioError(f"{identifier} 数据契约必须是 JSON object。")
+        raise OnlineStudioError(f"{identifier} The data contract must be a JSON object.")
     return payload
 
 
 def _decode_evidence_archive(raw_archive: Any) -> bytes:
     if not isinstance(raw_archive, dict):
-        raise OnlineStudioError("请上传研究证据 ZIP。")
+        raise OnlineStudioError("Please upload the research evidence ZIP.")
     name = Path(str(raw_archive.get("name") or "")).name
     if Path(name).suffix.lower() != ".zip":
-        raise OnlineStudioError("研究证据包必须是 .zip 文件。")
+        raise OnlineStudioError("Research evidence package must be a .zip file.")
     try:
         content = base64.b64decode(str(raw_archive.get("data") or ""), validate=True)
     except (ValueError, TypeError) as exc:
-        raise OnlineStudioError("研究证据 ZIP 内容无效。") from exc
+        raise OnlineStudioError("Research evidence ZIP content is invalid.") from exc
     if not content or len(content) > MAX_ARCHIVE_BYTES:
-        raise OnlineStudioError("研究证据 ZIP 必须非空且不超过 32 MB。")
+        raise OnlineStudioError("Research evidence ZIP must be non empty and not exceed 32 MB.")
     return content
 
 
@@ -1126,10 +1127,10 @@ def _extract_evidence_archive(content: bytes, root: Path) -> None:
     try:
         archive = zipfile.ZipFile(io.BytesIO(content))
     except zipfile.BadZipFile as exc:
-        raise OnlineStudioError("研究证据包不是有效 ZIP。") from exc
+        raise OnlineStudioError("Research evidence package is not a valid ZIP.") from exc
     infos = [item for item in archive.infolist() if not item.is_dir()]
     if not infos or len(infos) > MAX_ARCHIVE_FILES:
-        raise OnlineStudioError(f"研究证据 ZIP 必须包含 1–{MAX_ARCHIVE_FILES} 个文件。")
+        raise OnlineStudioError(f"Research evidence ZIP must include 1–{MAX_ARCHIVE_FILES} Files.")
     expanded = 0
     accepted: list[tuple[zipfile.ZipInfo, Path]] = []
     for info in infos:
@@ -1142,17 +1143,17 @@ def _extract_evidence_archive(content: bytes, root: Path) -> None:
             or mode == 0o120000
             or not _archive_path_allowed(candidate)
         ):
-            raise OnlineStudioError(f"研究证据 ZIP 包含不允许的路径：{info.filename}")
+            raise OnlineStudioError(f"Research evidence ZIP contains disallowed paths:{info.filename}")
         expanded += int(info.file_size)
         if expanded > MAX_ARCHIVE_EXPANDED_BYTES:
-            raise OnlineStudioError("研究证据 ZIP 解压后不得超过 128 MB。")
+            raise OnlineStudioError("Research evidence ZIP must not exceed 128 MB after extraction.")
         accepted.append((info, candidate))
     if not any(path.parts and path.parts[0] == "results" for _info, path in accepted):
-        raise OnlineStudioError("研究证据 ZIP 必须包含非空的 results/ 目录。")
+        raise OnlineStudioError("The research evidence ZIP must include a nonempty results/ directory.")
     if not any(path.as_posix() == "researcher-profile/publications.json" for _info, path in accepted):
-        raise OnlineStudioError("研究证据 ZIP 必须包含 researcher-profile/publications.json。")
+        raise OnlineStudioError("Research evidence ZIP must include researcher-profile/publications.json.")
     if not any(path.as_posix() == "references/logic-reference.txt" for _info, path in accepted):
-        raise OnlineStudioError("研究项目 ZIP 必须包含 03 选定的 references/logic-reference.txt。")
+        raise OnlineStudioError("The research ZIP must include 03 selected references/logic-reference.txt.")
     for info, relative in accepted:
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -1163,16 +1164,16 @@ def _extract_evidence_archive(content: bytes, root: Path) -> None:
 def _validate_project_package(root: Path) -> None:
     manifest_path = root / "project-package.json"
     if not manifest_path.is_file():
-        raise OnlineStudioError("研究项目 ZIP 缺少 project-package.json。")
+        raise OnlineStudioError("The research project ZIP is missing project-package.json.")
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise OnlineStudioError("project-package.json 不是有效 JSON。") from exc
+        raise OnlineStudioError("project-package.json Not valid JSON.") from exc
     if manifest.get("schema_version") != "2.0" or manifest.get("kind") != "research-avatar-paper-input":
-        raise OnlineStudioError("研究项目 ZIP 版本不受支持，请重新运行打包命令。")
+        raise OnlineStudioError("The ZIP version of the research project is not supported; please re run the packaging command.")
     hashes = manifest.get("files")
     if not isinstance(hashes, dict):
-        raise OnlineStudioError("project-package.json 缺少文件哈希。")
+        raise OnlineStudioError("project-package.json Missing file hash.")
     required = {
         "researcher-profile/PROFILE.html",
         "researcher-profile/publications.json",
@@ -1185,30 +1186,30 @@ def _validate_project_package(root: Path) -> None:
     }
     missing = sorted(required - set(hashes))
     if missing:
-        raise OnlineStudioError("研究项目 ZIP 缺少必需文件：" + "、".join(missing))
+        raise OnlineStudioError("Research project ZIP missing required files:" + ", ".join(missing))
     for name, expected in hashes.items():
         path = (root / str(name)).resolve()
         try:
             path.relative_to(root.resolve())
         except ValueError as exc:
-            raise OnlineStudioError("project-package.json 包含越界路径。") from exc
+            raise OnlineStudioError("project-package.json Contains out-of-bounds paths.") from exc
         if not path.is_file():
-            raise OnlineStudioError(f"研究项目 ZIP 清单文件不存在：{name}")
+            raise OnlineStudioError(f"Research project ZIP manifest file does not exist:{name}")
         actual = hashlib.sha256(path.read_bytes()).hexdigest()
         if not secrets.compare_digest(actual, str(expected)):
-            raise OnlineStudioError(f"研究项目 ZIP 文件哈希不匹配：{name}")
+            raise OnlineStudioError(f"Research project ZIP file hash does not match:{name}")
 
 
 def _validated_upstream_contract(root: Path, plan_source: str, result_source: str) -> dict[str, Any]:
     contract = _script_json(plan_source, "experiment-plan-contract")
     if str(contract.get("schema_version")) != "1.2":
-        raise OnlineStudioError("03 必须使用只含一篇作者自有逻辑参考的 schema 1.2 合同。")
+        raise OnlineStudioError("03 Must use a schema 1.2 contract containing only a single author self contained reference.")
     outline = contract.get("paper_outline")
     artifacts = contract.get("paper_artifacts")
     if not isinstance(outline, list) or not outline:
-        raise OnlineStudioError("03 的 paper_outline 为空，无法构建 Paper Studio。")
+        raise OnlineStudioError("03 The paper_outline is empty, cannot build Paper Studio.")
     if not isinstance(artifacts, list):
-        raise OnlineStudioError("03 的 paper_artifacts 格式无效。")
+        raise OnlineStudioError("03 The paper_artifacts format is invalid.")
     target = contract.get("target")
     references = contract.get("references")
     structural_reference = (
@@ -1217,11 +1218,11 @@ def _validated_upstream_contract(root: Path, plan_source: str, result_source: st
         else None
     )
     if not isinstance(target, dict) or not str(target.get("venue") or "").strip():
-        raise OnlineStudioError("03 缺少已确认的 target conference。")
+        raise OnlineStudioError("03 Missing confirmed target conference.")
     if not isinstance(structural_reference, dict) or not str(
         structural_reference.get("title") or ""
     ).strip():
-        raise OnlineStudioError("03 缺少已确认的作者自有逻辑 reference paper。")
+        raise OnlineStudioError("03 Missing a verified author specific logic reference paper.")
     result_parser = _ResultArtifactTables()
     result_parser.feed(result_source)
     result_parser.close()
@@ -1231,7 +1232,7 @@ def _validated_upstream_contract(root: Path, plan_source: str, result_source: st
         if result_parser.artifact_ids.count(artifact_id) > 1
     )
     if duplicates:
-        raise OnlineStudioError("05 中存在重复 artifact：" + "、".join(duplicates))
+        raise OnlineStudioError("05 There is a duplicate artifact in the batch." + ", ".join(duplicates))
     required_artifacts = {
         str(requirement.get("artifact_id"))
         for requirement in contract.get("result_requirements", [])
@@ -1239,7 +1240,7 @@ def _validated_upstream_contract(root: Path, plan_source: str, result_source: st
     }
     missing_artifacts = sorted(required_artifacts - set(result_parser.artifact_ids))
     if missing_artifacts:
-        raise OnlineStudioError("05 缺少结果 artifact：" + "、".join(missing_artifacts))
+        raise OnlineStudioError("05 Missing result artifact:" + ", ".join(missing_artifacts))
     required_targets = {
         str(target)
         for requirement in contract.get("result_requirements", [])
@@ -1250,7 +1251,7 @@ def _validated_upstream_contract(root: Path, plan_source: str, result_source: st
     missing_targets = sorted(required_targets - result_parser.target_ids)
     if missing_targets:
         raise OnlineStudioError(
-            "05 尚未填满 03 规定的结果目标：" + "、".join(missing_targets[:12])
+            "05 The results target specified by 03 has not yet been filled:" + ", ".join(missing_targets[:12])
         )
     validation_commands = [
         [
@@ -1288,7 +1289,7 @@ def _validated_upstream_contract(root: Path, plan_source: str, result_source: st
         if completed.returncode:
             detail = (completed.stderr or completed.stdout).strip().splitlines()
             raise OnlineStudioError(
-                "上传产物未通过科研契约校验：" + (detail[0] if detail else "validator failed")
+                "Uploaded artifact did not pass research contract validation:" + (detail[0] if detail else "validator failed")
             )
     contract["_result_tables"] = result_parser.rows
     return contract
@@ -1305,7 +1306,7 @@ def _source_text(files: list[tuple[str, str]]) -> str:
             blocks.append(f"SOURCE: {name}\n{text}")
     merged = "\n\n".join(blocks).strip()
     if not merged:
-        raise OnlineStudioError("上传的 HTML 没有可用于写作的文本。")
+        raise OnlineStudioError("The uploaded HTML contains no text suitable for writing.")
     if len(merged) > MAX_SOURCE_TEXT_CHARS:
         merged = (
             merged[:MAX_SOURCE_TEXT_CHARS].rstrip()
@@ -1351,27 +1352,27 @@ def _outline_sections(contract: dict[str, Any]) -> list[dict[str, Any]]:
     used: set[str] = set()
     for index, raw in enumerate(contract.get("paper_outline", []), 1):
         if not isinstance(raw, dict):
-            raise OnlineStudioError("03 paper_outline section 必须是 object。")
+            raise OnlineStudioError("03 paper_outline section Must be an object.")
         title = str(raw.get("title") or raw.get("name") or raw.get("id") or "").strip()
         if not title:
-            raise OnlineStudioError("03 paper_outline 存在无标题 section。")
+            raise OnlineStudioError("03 paper_outline There is an untitled section.")
         candidate = str(raw.get("id") or "").strip()
         section_id = _safe_slug(candidate or title, f"section-{index}").replace("-", "_")
         if title.lower() == "abstract" or section_id == "abstract":
             section_id = "abstract"
         if section_id in used:
-            raise OnlineStudioError(f"03 paper_outline section ID 重复：{section_id}")
+            raise OnlineStudioError(f"03 paper_outline section ID Duplicate:{section_id}")
         paragraphs = raw.get("paragraphs")
         if not isinstance(paragraphs, list) or not paragraphs:
-            raise OnlineStudioError(f"03 section {title} 没有 paragraph blueprint。")
+            raise OnlineStudioError(f"03 section {title} There is no paragraph blueprint.")
         normalized_paragraphs = []
         for paragraph_index, paragraph in enumerate(paragraphs, 1):
             if not isinstance(paragraph, dict):
-                raise OnlineStudioError(f"03 section {title} 的 paragraph 格式无效。")
+                raise OnlineStudioError(f"03 section {title} The paragraph format is invalid.")
             paragraph_id = str(paragraph.get("id") or f"{section_id}-P{paragraph_index}").strip()
             purpose = str(paragraph.get("plan_sentence") or paragraph.get("purpose") or "").strip()
             if not paragraph_id or not purpose:
-                raise OnlineStudioError(f"03 section {title} 存在缺少 ID 或规划句的 paragraph。")
+                raise OnlineStudioError(f"03 section {title} There exists a paragraph missing ID or planning sentence.")
             reference_mapping = paragraph.get("reference_mapping", [])
             reference_paragraph_ids = [
                 str(
@@ -1406,13 +1407,14 @@ def _outline_sections(contract: dict[str, Any]) -> list[dict[str, Any]]:
             )
             for field in ("rhetorical_role", "relation_to_previous", "relation_to_next"):
                 if not normalized_paragraphs[-1][field]:
-                    raise OnlineStudioError(f"03 paragraph {paragraph_id} 缺少已批准的 {field}。")
+                    raise OnlineStudioError(f"03 paragraph {paragraph_id} Missing approved items. {field}.")
         normalized.append(
             {
                 "id": section_id,
                 "source_id": candidate or section_id,
                 "title": title,
                 "render": "abstract" if section_id == "abstract" else "section",
+                "length_share": raw.get("length_share"),
                 "paragraphs": normalized_paragraphs,
                 "reference_context": raw.get("reference_context", {}),
             }
@@ -1451,7 +1453,7 @@ def _require_complete_reference_contexts(
         missing = ", ".join(sorted(expected - actual)) or "none"
         extra = ", ".join(sorted(actual - expected)) or "none"
         raise OnlineStudioError(
-            f"参考论文上下文与论文结构不一致（缺少：{missing}；多出：{extra}）。"
+            f"The context of referenced papers and the paper structure are inconsistent (missing:{missing}; Extra:{extra})."
         )
     for section_id in section_ids:
         context = contexts.get(section_id)
@@ -1468,7 +1470,7 @@ def _require_complete_reference_contexts(
                 for item in excerpts
             )
         ):
-            raise OnlineStudioError(f"{section_id} 的参考论文上下文不完整。")
+            raise OnlineStudioError(f"{section_id} The context of the reference paper is incomplete.")
     return contexts
 
 
@@ -1532,6 +1534,52 @@ def _artifact_rows(raw_rows: Any, labels: list[str]) -> tuple[list[dict[str, str
     ]
 
 
+def _panelized_artifact_rows(
+    raw_rows: Any, labels: list[str], shell: dict[str, Any]
+) -> tuple[Any, list[str]]:
+    """Preserve panel identity when 05 renders one source table per panel.
+
+    The HTML table extractor intentionally returns a flat row stream. Repeated
+    header rows delimit panel tables; without this normalization the second
+    header becomes bogus data and the two curves become one eight-point series.
+    The approved ``required_data`` contract supplies the panel names, so no
+    label is inferred from visual prose.
+    """
+    if labels or not isinstance(raw_rows, list) or not raw_rows:
+        return raw_rows, labels
+    required_data = shell.get("required_data")
+    if not isinstance(required_data, list) or len(required_data) < 2:
+        return raw_rows, labels
+    rows = [list(row) for row in raw_rows if isinstance(row, list) and row]
+    if not rows:
+        return raw_rows, labels
+    header = rows[0]
+    header_indices = [
+        index
+        for index, row in enumerate(rows)
+        if [cell.casefold() for cell in row] == [cell.casefold() for cell in header]
+    ]
+    if len(header_indices) != len(required_data):
+        return raw_rows, labels
+    panelized: list[list[str]] = []
+    for panel_index, start in enumerate(header_indices):
+        stop = (
+            header_indices[panel_index + 1]
+            if panel_index + 1 < len(header_indices)
+            else len(rows)
+        )
+        panel = required_data[panel_index]
+        if not isinstance(panel, dict):
+            return raw_rows, labels
+        panel_name = str(
+            panel.get("title") or panel.get("dataset") or panel.get("panel_id") or ""
+        ).strip()
+        if not panel_name:
+            return raw_rows, labels
+        panelized.extend([[panel_name, *row] for row in rows[start + 1 : stop]])
+    return panelized, ["Dataset", *header]
+
+
 def _artifact_definitions(
     contract: dict[str, Any], sections: list[dict[str, Any]],
     *, allow_empty_result_artifacts: bool = False,
@@ -1559,17 +1607,17 @@ def _artifact_definitions(
     }
     for raw in contract.get("paper_artifacts", []):
         if not isinstance(raw, dict):
-            raise OnlineStudioError("03 paper_artifacts entry 必须是 object。")
+            raise OnlineStudioError("03 paper_artifacts entry Must be an object.")
         artifact_id = str(raw.get("id") or "").strip()
         contract_kind = str(raw.get("kind") or "").strip().lower()
         if not artifact_id or contract_kind not in {"figure", "table"}:
-            raise OnlineStudioError("03 artifact 必须包含 ID，kind 必须是 figure 或 table。")
+            raise OnlineStudioError("03 artifact Must include ID, and kind must be figure or table.")
         section_id = section_aliases.get(str(raw.get("section_id") or "").strip(), "")
         if section_id not in section_ids:
             introduced = str(raw.get("introduced_after") or "").strip()
             section_id = paragraph_locations.get(introduced, section_id)
         if section_id not in section_ids:
-            raise OnlineStudioError(f"03 artifact {artifact_id} 引用了未知 section。")
+            raise OnlineStudioError(f"03 artifact {artifact_id} Cites an unknown section.")
         shell = raw.get("shell") if isinstance(raw.get("shell"), dict) else {}
         source_asset = str(
             raw.get("source_asset") or shell.get("source_asset") or ""
@@ -1598,9 +1646,10 @@ def _artifact_definitions(
             introduced = str(raw.get("introduced_after") or "").strip()
             bindings = [introduced] if introduced in paragraph_locations else []
         if not bindings:
-            raise OnlineStudioError(f"03 artifact {artifact_id} 没有 paragraph binding。")
+            raise OnlineStudioError(f"03 artifact {artifact_id} There is no paragraph binding.")
         rows = raw_tables.get(artifact_id, []) if isinstance(raw_tables, dict) else []
         labels = [str(item) for item in shell.get("column_labels", [])]
+        rows, labels = _panelized_artifact_rows(rows, labels, shell)
         records, columns = _artifact_rows(rows, labels)
         placeholder_table = bool(
             allow_empty_result_artifacts and contract_kind == "table" and not records
@@ -1618,7 +1667,7 @@ def _artifact_definitions(
             and not allow_empty_result_artifacts
         ):
             raise OnlineStudioError(
-                f"05 中的结果 artifact {artifact_id} 没有可读取的数据行；不会用占位值代替实验结果。"
+                f"05 Result artifact. {artifact_id} There are no readable data rows; placeholder values will not be used to substitute experimental results."
             )
         if records or (allow_empty_result_artifacts and contract_kind == "table"):
             metrics["artifacts"][artifact_id] = {
@@ -1644,11 +1693,21 @@ def _artifact_definitions(
             "visible_dimensions": [
                 str(item) for item in raw.get("visible_dimensions", [])
             ],
+            "symbol_ids": [str(item) for item in raw.get("symbol_ids", [])],
             "x_axis_label": str(
-                raw.get("x_axis_label") or shell.get("x_axis_label") or ""
+                raw.get("x_axis_label")
+                or shell.get("x_axis_label")
+                or (shell.get("axes", {}).get("x") if isinstance(shell.get("axes"), dict) else "")
+                or ""
             ).strip(),
             "y_axis_label": str(
-                raw.get("y_axis_label") or shell.get("y_axis_label") or ""
+                raw.get("y_axis_label")
+                or shell.get("y_axis_label")
+                or (shell.get("axes", {}).get("y") if isinstance(shell.get("axes"), dict) else "")
+                or ""
+            ).strip(),
+            "chart_type": str(
+                raw.get("chart_type") or shell.get("chart_type") or ""
             ).strip(),
             "source_asset": source_asset,
             "online_placeholder": placeholder_table,
@@ -1706,6 +1765,13 @@ def _artifact_definitions(
             "depends_on_paragraphs": {section_id: bindings},
             "deliverable_stem": _safe_slug(artifact_id),
         }
+        if (
+            data_driven
+            and not figure.get("chart_type")
+            and len(panels) > 1
+            and isinstance(shell.get("axes"), dict)
+        ):
+            figure["chart_type"] = "line"
         if data_driven and records and not source_asset:
             figure["data_grid"] = {
                 "type": "records",
@@ -1713,6 +1779,13 @@ def _artifact_definitions(
                 "columns": columns,
             }
         if not data_driven and not source_asset:
+            shell_figure_type = shell.get("figure_type")
+            if shell_figure_type not in MECHANISM_FIGURE_TYPES:
+                allowed = ", ".join(sorted(MECHANISM_FIGURE_TYPES))
+                raise OnlineStudioError(
+                    f"03 artifact {artifact_id} shell.figure_type Must be explicitly set to one of the following:{allowed}."
+                )
+            figure["figure_type"] = shell_figure_type
             figure["generation_requires_paragraphs"] = {section_id: bindings}
         figures[artifact_id] = figure
     return figures, tables, metrics
@@ -1788,12 +1861,12 @@ def _write_workspace(
         }
         missing = [name for name, path in packaged_sources.items() if not path.is_file()]
         if missing:
-            raise OnlineStudioError("研究项目 ZIP 缺少必需文件：" + "、".join(missing))
+            raise OnlineStudioError("Research project ZIP missing required files:" + ", ".join(missing))
         files = [(name, path.read_text(encoding="utf-8")) for name, path in packaged_sources.items()]
     sources = _canonical_pipeline_sources(files)
     profile = sources["PROFILE.html"]
     if "writing style" not in profile.lower():
-        raise OnlineStudioError("PROFILE.html 缺少完整的 Writing Style 部分，请先刷新 profileconstruct。")
+        raise OnlineStudioError("PROFILE.html Missing the full Writing Style section; please refresh profileconstruct first.")
     (profile_dir / "PROFILE.html").write_text(profile, encoding="utf-8")
     (reports_dir / "03_EXPERIMENT_PLAN.html").write_text(
         sources["03_EXPERIMENT_PLAN.html"], encoding="utf-8"
@@ -1811,15 +1884,15 @@ def _write_workspace(
     venue_template = _resolve_venue_template(venue)
     if venue_template is None:
         raise OnlineStudioError(
-            f"在线 Paper Studio 尚未内置目标会议“{venue}”的官方 LaTeX 模板，"
-            "不能用通用 article 模板顶替。请在 "
-            "research_avatar/online_studio/venue_templates/ 下添加该会议的官方 "
-            ".sty/.cls 与 template.json 后重新打包上传。"
+            f"Online Paper Studio has not yet integrated the target conference.{venue} The official LaTeX template,"
+            "Cannot substitute with a generic article template. Please use the proper one. "
+            "research_avatar/online_studio/venue_templates/ Add the official page for this conference below. "
+            ".sty/.cls Repackage and upload after template.json."
         )
     project_name, title = _project_identity(sources["03_EXPERIMENT_PLAN.html"], contract)
     if str(contract.get("schema_version")) != "1.2":
         raise OnlineStudioError(
-            "项目中的 03 仍是旧结构合同；请用新版 expplan 选择一篇作者自有逻辑参考并重新批准。"
+            "Item 03 in the project remains the old structure contract; please use the new expplan to choose an author owned logical reference and reapprove."
         )
     sections = _outline_sections(contract)
     figures, tables, metrics = _artifact_definitions(contract, sections)
@@ -1911,7 +1984,7 @@ def _write_workspace(
         asset_source = Path(venue_template["_dir"]) / asset_name
         if not asset_source.is_file():
             raise OnlineStudioError(
-                f"内置模板“{venue_template['family']}”缺少必需资源文件：{asset_name}。"
+                f"Built-in template.{venue_template['family']} Missing required resource files:{asset_name}."
             )
         shutil.copyfile(asset_source, paper / asset_name)
     bibliography_lines = (
@@ -2041,31 +2114,31 @@ def _decode_results_records(
     if raw_results is None:
         return "", [], []
     if not isinstance(raw_results, dict):
-        raise OnlineStudioError("实验结果数据格式无效。")
+        raise OnlineStudioError("Experiment results data format is invalid.")
     caption = str(raw_results.get("caption") or "").strip()
     if not caption or len(caption) > 400:
-        raise OnlineStudioError("实验结果数据必须包含 1-400 字符的 caption。")
+        raise OnlineStudioError("Experimental result data must include a caption between 1 and 400 characters.")
     columns = raw_results.get("columns")
     if not isinstance(columns, list) or not 2 <= len(columns) <= 8:
-        raise OnlineStudioError("实验结果数据必须包含 2-8 列（第一列为标识列）。")
+        raise OnlineStudioError("The experimental results data must include 2 to 8 columns, with the first column as the identifier column.")
     normalized_columns: list[dict[str, str]] = []
     seen_keys: set[str] = set()
     for item in columns:
         if not isinstance(item, dict):
-            raise OnlineStudioError("实验结果列定义格式无效。")
+            raise OnlineStudioError("Invalid format for experiment results column definition.")
         key = str(item.get("key") or "").strip()
         label = str(item.get("label") or "").strip()
         if not key or not label or key in seen_keys:
-            raise OnlineStudioError("实验结果列必须有唯一且非空的 key 与 label。")
+            raise OnlineStudioError("Experiment result columns must have unique and nonempty key and label.")
         seen_keys.add(key)
         normalized_columns.append({"key": key, "label": label})
     rows = raw_results.get("rows")
     if not isinstance(rows, list) or not 1 <= len(rows) <= 200:
-        raise OnlineStudioError("实验结果数据必须包含 1-200 行。")
+        raise OnlineStudioError("Experimental result data must contain 1 to 200 rows.")
     normalized_rows: list[dict[str, Any]] = []
     for row in rows:
         if not isinstance(row, dict):
-            raise OnlineStudioError("实验结果行格式无效。")
+            raise OnlineStudioError("The row format of the results is invalid.")
         normalized_rows.append(
             {column["key"]: row.get(column["key"]) for column in normalized_columns}
         )
@@ -2321,8 +2394,8 @@ def _acquire_author_fulltexts(
     )
     if len(selected) < 3:
         raise OnlineStudioError(
-            "无法从该作者的 Scholar paper list 中取得至少 3 篇可读全文；"
-            "当前只取得 " + str(len(selected)) + " 篇。请确认列表中的论文有公开 PDF 后重试。"
+            "Cannot obtain at least three readable full texts from the author's Scholar page."
+            "Currently only retrieved. " + str(len(selected)) + " Section. Please verify that the papers in the list have publicly available PDFs and retry."
         )
     return selected
 
@@ -2333,7 +2406,7 @@ def _summarize_author_writing_style(
 ) -> dict[str, Any]:
     """Read owned papers, select one logic reference, and summarize writing traits."""
     if not api_key:
-        raise OnlineStudioError("缺少线上写作模型凭证，不能阅读代表作并归纳写作特点。")
+        raise OnlineStudioError("Missing online writing model credentials; cannot read representative works and summarize writing characteristics.")
     full_papers: list[str] = []
     for index, paper in enumerate(papers, 1):
         path = root / str(paper["fulltext_txt"])
@@ -2390,22 +2463,22 @@ FULL PAPERS:
             body = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise OnlineStudioError(f"阅读代表作时模型 API 返回 HTTP {exc.code}：{detail[:500]}") from exc
+        raise OnlineStudioError(f"Model API returns HTTP when reading representative works. {exc.code}:{detail[:500]}") from exc
     except urllib.error.URLError as exc:
-        raise OnlineStudioError(f"阅读代表作时模型 API 连接失败：{exc.reason}") from exc
+        raise OnlineStudioError(f"Model API connection failed during reading representative works.{exc.reason}") from exc
     choices = body.get("choices") or []
     content = str((choices[0].get("message") or {}).get("content") or "").strip() if choices else ""
     try:
         decision = json.loads(content)
     except json.JSONDecodeError as exc:
-        raise OnlineStudioError("模型没有返回有效的作者论文选择 JSON，请重试。") from exc
+        raise OnlineStudioError("The model did not return a valid author paper selection JSON; please retry.") from exc
     selected_index = decision.get("selected_reference_index")
     style = str(decision.get("writing_style") or "").strip()
     reason = str(decision.get("selection_reason") or "").strip()
     if not isinstance(selected_index, int) or not 1 <= selected_index <= len(papers):
-        raise OnlineStudioError("模型选择的作者参考论文编号无效，请重试。")
+        raise OnlineStudioError("The author reference paper number selected by the model is invalid; please retry.")
     if len(style) < 200 or len(reason) < 20:
-        raise OnlineStudioError("模型没有返回可审计的参考选择理由与写作特点，请重试。")
+        raise OnlineStudioError("The model did not return auditable justifications for reference choices and writing characteristics; please retry.")
     normalized = {
         "id": body.get("id"),
         "model": body.get("model") or model,
@@ -2433,7 +2506,7 @@ def _analyze_target_project_online(
 ) -> dict[str, Any]:
     """Classify target-paper needs from the target brief alone."""
     if not api_key:
-        raise OnlineStudioError("缺少线上写作模型凭证，不能分析目标项目。")
+        raise OnlineStudioError("Missing online writing model credentials; cannot analyze the target project.")
     requested_model = os.environ.get("DEEPSEEK_ALIGNMENT_MODEL", model).strip() or model
     prompt = f"""Read only the TARGET PROJECT BRIEF below. Do not use any reference
 paper or outside source. Return one JSON object with exactly these fields:
@@ -2483,10 +2556,10 @@ not a possible reference paper. Target venue: {venue}.
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise OnlineStudioError(
-            f"分析目标项目时模型 API 返回 HTTP {exc.code}：{detail[:500]}"
+            f"When analyzing the target project, the model API returns HTTP. {exc.code}:{detail[:500]}"
         ) from exc
     except urllib.error.URLError as exc:
-        raise OnlineStudioError(f"分析目标项目时模型 API 连接失败：{exc.reason}") from exc
+        raise OnlineStudioError(f"Model API connection failed during analysis of the target project.{exc.reason}") from exc
     choices = body.get("choices") or []
     content = (
         str((choices[0].get("message") or {}).get("content") or "").strip()
@@ -2495,20 +2568,20 @@ not a possible reference paper. Target venue: {venue}.
     try:
         analysis = json.loads(content)
     except json.JSONDecodeError as exc:
-        raise OnlineStudioError("目标项目分析没有返回有效 JSON，请重试。") from exc
+        raise OnlineStudioError("The target project analysis did not return valid JSON; please retry.") from exc
     allowed_types = {
         "evaluation_study", "model_architecture", "method_non_architecture",
         "dataset", "analysis", "other",
     }
     if not isinstance(analysis, dict):
-        raise OnlineStudioError("目标项目分析必须是 JSON object。")
+        raise OnlineStudioError("The target project analysis must be a JSON object.")
     if analysis.get("contribution_type") not in allowed_types:
-        raise OnlineStudioError("目标项目分析返回了未知的 contribution_type。")
+        raise OnlineStudioError("The target project analysis returned an unknown contribution_type.")
     if not isinstance(analysis.get("proposes_model_architecture"), bool):
-        raise OnlineStudioError("目标项目分析缺少模型架构布尔判断。")
+        raise OnlineStudioError("Target project analysis lacks Boolean judgments for model architecture.")
     for field in ("target_title", "research_question", "model_figure_rationale"):
         if not str(analysis.get(field) or "").strip():
-            raise OnlineStudioError(f"目标项目分析缺少 {field}。")
+            raise OnlineStudioError(f"Missing target project analysis. {field}.")
     normalized = {
         "id": body.get("id"),
         "model": body.get("model") or requested_model,
@@ -2546,7 +2619,7 @@ def _design_lightweight_structure_online(
 ) -> dict[str, Any]:
     """One hosted call reads the full owned paper and designs the target outline."""
     if not api_key:
-        raise OnlineStudioError("缺少线上写作模型凭证，不能设计论文结构。")
+        raise OnlineStudioError("Lacking online writing model credentials; unable to design the paper structure.")
     requested_model = os.environ.get("DEEPSEEK_ALIGNMENT_MODEL", model).strip() or model
     prompt = structure_prompt(
         contract,
@@ -2585,9 +2658,9 @@ def _design_lightweight_structure_online(
             body = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
-        raise OnlineStudioError(f"设计论文结构时模型 API 返回 HTTP {exc.code}：{detail[:500]}") from exc
+        raise OnlineStudioError(f"Model API returns HTTP during paper structure design. {exc.code}:{detail[:500]}") from exc
     except urllib.error.URLError as exc:
-        raise OnlineStudioError(f"设计论文结构时模型 API 连接失败：{exc.reason}") from exc
+        raise OnlineStudioError(f"Model API connection failed during design of the paper structure.{exc.reason}") from exc
     choices = body.get("choices") or []
     content = str((choices[0].get("message") or {}).get("content") or "").strip() if choices else ""
     try:
@@ -2596,7 +2669,7 @@ def _design_lightweight_structure_online(
         normalize_structure_design(contract, result, paragraph_mapping=True)
         materialize_reference_contexts(reference_source, result)
     except PaperStructureError as exc:
-        raise OnlineStudioError("写作结构服务返回了无法读取的数据，请重试。") from exc
+        raise OnlineStudioError("The writing structure service returned unreadable data; please retry.") from exc
     normalized = {
         "id": body.get("id"), "model": body.get("model") or requested_model,
         "usage": body.get("usage") or {},
@@ -2625,7 +2698,7 @@ def _write_lightweight_researcher_profile(
     try:
         parsed = parse_html(scholar_html)
     except RuntimeError as exc:
-        raise OnlineStudioError("上传的 Scholar HTML 中没有可识别的作者 paper list。") from exc
+        raise OnlineStudioError("The uploaded Scholar HTML does not contain a recognizable author list.") from exc
 
     profile = parsed.get("profile") if isinstance(parsed.get("profile"), dict) else {}
     publications = (
@@ -2750,15 +2823,15 @@ def _approved_contract_from_project_text(project_text: str) -> dict[str, Any] | 
     try:
         contract = json.loads(match.group(1))
     except json.JSONDecodeError as exc:
-        raise OnlineStudioError("项目说明中的 experiment-plan-contract 不是有效 JSON。") from exc
+        raise OnlineStudioError("The experiment plan contract in the project description is not valid JSON.") from exc
     if not isinstance(contract, dict):
-        raise OnlineStudioError("项目说明中的 experiment-plan-contract 必须是 JSON object。")
+        raise OnlineStudioError("The experiment plan contract in the project description must be a JSON object.")
     if str(contract.get("schema_version")) != "1.2":
-        raise OnlineStudioError("项目说明中的实验计划必须使用 schema 1.2。")
+        raise OnlineStudioError("The experimental plan in the project description must use schema 1.2.")
     if not isinstance(contract.get("paper_outline"), list) or not contract["paper_outline"]:
-        raise OnlineStudioError("项目说明中的实验计划缺少 paper_outline。")
+        raise OnlineStudioError("The experimental plan in the project description is missing paper_outline.")
     if not isinstance(contract.get("paper_artifacts"), list):
-        raise OnlineStudioError("项目说明中的实验计划缺少 paper_artifacts。")
+        raise OnlineStudioError("The experimental plan in the project description is missing paper_artifacts.")
     # Reuse the full-package validators for section/paragraph and reference
     # shape, without requiring the 05 HTML that path 02 intentionally does not
     # ask the researcher to upload.
@@ -2766,7 +2839,7 @@ def _approved_contract_from_project_text(project_text: str) -> dict[str, Any] | 
     references = contract.get("references")
     owned = references.get("researcher_owned_logic") if isinstance(references, dict) else None
     if not isinstance(owned, dict) or not str(owned.get("title") or "").strip():
-        raise OnlineStudioError("项目说明中的实验计划缺少作者自有逻辑参考论文。")
+        raise OnlineStudioError("The experimental plan in the project description lacks author own logic reference papers.")
     return contract
 
 
@@ -2800,13 +2873,13 @@ def _lightweight_paper_title(
             ]
         )
     for pattern in (
-        r"(?im)^\s*(?:paper\s+title|manuscript\s+title|论文标题)\s*[:：]\s*(.+?)\s*$",
+        r"(?im)^\s*(?:paper\s+title|manuscript\s+title|Paper title)\s*[::]\s*(.+?)\s*$",
         r"(?m)^\s*#\s+(.+?)\s*$",
     ):
         match = re.search(pattern, project_text)
         if match:
             candidate = match.group(1).strip().strip("#")
-            if candidate.casefold() not in {"project", "project brief", "项目说明", "研究项目"}:
+            if candidate.casefold() not in {"project", "project brief", "Project description", "Research project"}:
                 candidates.append(candidate)
     candidates.append(Path(project_brief_name).stem.replace("_", " ").replace("-", " ").strip())
     title = next((item for item in candidates if 1 <= len(item) <= 300), "Research Paper Draft")
@@ -3033,21 +3106,21 @@ def _write_lightweight_workspace(
         if progress is not None:
             progress(stage, status, percent)
 
-    report("materials", "正在解析当前工作说明和结构参考论文…", 10)
+    report("materials", "Parsing the current work description and structure reference paper…", 10)
 
     venue_template = _resolve_venue_template(venue)
     if venue_template is None:
         raise OnlineStudioError(
-            f"在线 Paper Studio 尚未内置目标会议“{venue}”的官方 LaTeX 模板，"
-            "不能用通用 article 模板顶替。请在 "
-            "research_avatar/online_studio/venue_templates/ 下添加该会议的官方 "
-            ".sty/.cls 与 template.json 后重试。"
+            f"Online Paper Studio has not yet integrated the target conference.{venue} The official LaTeX template,"
+            "Cannot substitute with a generic article template. Please use the proper one. "
+            "research_avatar/online_studio/venue_templates/ Add the official page for this conference below. "
+            ".sty/.cls Retry after template.json."
         )
 
     if len(project_brief_files) != 1:
-        raise OnlineStudioError("请上传一个当前工作说明文档。")
+        raise OnlineStudioError("Please upload the current work specification document.")
     if not reference_paper_files or len(reference_paper_files) != 1:
-        raise OnlineStudioError("请上传一篇完整的结构参考论文。")
+        raise OnlineStudioError("Please upload a complete structure reference paper.")
     project_text = _plain_source_text(project_brief_files, "PROJECT BRIEF")
     approved_contract = _approved_contract_from_project_text(project_text)
     title_was_explicit = bool(title.strip())
@@ -3057,7 +3130,7 @@ def _write_lightweight_workspace(
         approved_contract,
         project_brief_files[0][0],
     )
-    report("target_analysis", "正在分析目标项目的研究类型与图表需求…", 18)
+    report("target_analysis", "Analyzing the research type and chart requirements of the target project.", 18)
     target_analysis = _analyze_target_project_online(
         root,
         project_text,
@@ -3133,7 +3206,7 @@ def _write_lightweight_workspace(
         source_blocks.insert(0, _source_text(scholar_files))
     if results_files:
         source_blocks.append(_plain_source_text(results_files, "EXPERIMENT EVIDENCE"))
-    report("writing_boundary", "正在建立实验部分仅规划的写作边界…", 24)
+    report("writing_boundary", "Establishing writing boundaries for the experimental section only…", 24)
     reference = "\n\n".join(source_blocks)
     if len(reference) > MAX_SOURCE_TEXT_CHARS:
         reference = (
@@ -3260,6 +3333,7 @@ def _write_lightweight_workspace(
         "title": "Problem motivation and evaluation question",
         "label": "fig:motivation",
         "kind": "mechanism",
+        "figure_type": "motivation_contrast",
         "phase": 1,
         "width": "single-column",
         "source_sections": ["introduction"],
@@ -3283,6 +3357,7 @@ def _write_lightweight_workspace(
             "title": "Proposed model architecture",
             "label": "fig:model-architecture",
             "kind": "mechanism",
+            "figure_type": "model_architecture",
             "phase": 1,
             "width": "single-column",
             "source_sections": ["method"],
@@ -3494,7 +3569,7 @@ def _write_lightweight_workspace(
     structure_contract["target_project_analysis"] = target_analysis
     report(
         "reference_analysis",
-        "正在分析 ref paper，并为目标论文逐段匹配写作结构…",
+        "Analyzing the reference paper and matching the writing structure paragraph by paragraph for the target paper.",
         38,
     )
     structure_design = _design_lightweight_structure_online(
@@ -3502,7 +3577,7 @@ def _write_lightweight_workspace(
         {key: main_reference.get(key) for key in ("title", "authors", "venue", "year", "url", "bibtex_key")},
         api_key=api_key, model=model,
     )
-    report("workspace", "逐段映射已完成，正在生成 Paper Studio 项目…", 82)
+    report("workspace", "Paragraph by paragraph mapping is complete; generating Paper Studio project.", 82)
     if approved_contract is not None:
         designed_sections = []
         for index, designed in enumerate(structure_design["paper_outline"], 1):
@@ -3644,7 +3719,7 @@ def _write_lightweight_workspace(
         asset_source = Path(venue_template["_dir"]) / asset_name
         if not asset_source.is_file():
             raise OnlineStudioError(
-                f"内置模板“{venue_template['family']}”缺少必需资源文件：{asset_name}。"
+                f"Built-in template.{venue_template['family']} Missing required resource files:{asset_name}."
             )
         shutil.copyfile(asset_source, paper / asset_name)
     bibliography_lines = (
@@ -3768,7 +3843,7 @@ def _write_lightweight_workspace(
             ),
             "eyebrow": "ONLINE PAPER STUDIO",
             "studio_title": "Paper Studio",
-            "subtitle": "从科研项目主旨与指定参考论文开始写作",
+            "subtitle": "Start writing from the research project aims and specified reference papers.",
         },
         "sections": section_specs,
         "batch_writing_order": [item["id"] for item in section_specs],
@@ -3784,7 +3859,7 @@ def _write_lightweight_workspace(
     (paper / "paper_studio.json").write_text(
         json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
-    report("worker", "项目文件已生成，正在启动 Paper Studio 服务…", 94)
+    report("worker", "Project files generated; starting Paper Studio service.", 94)
 
 
 def _available_port() -> int:
@@ -3986,8 +4061,8 @@ def _start_worker(
                 # endpoint.  The final lines contain the raised validation
                 # error and are the useful part for both users and operators.
                 detail = "\n".join(detail.splitlines()[-8:])[-1600:]
-                raise OnlineStudioError(f"Paper Studio 写作进程启动失败：\n{detail}")
-            raise OnlineStudioError("Paper Studio 写作进程启动失败，请检查服务端依赖。")
+                raise OnlineStudioError(f"Paper Studio Writing process failed to start:\n{detail}")
+            raise OnlineStudioError("Paper Studio Writing process startup failed; please check server dependencies.")
         try:
             with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/health", timeout=0.5):
                 if process.stderr is not None:
@@ -4012,15 +4087,15 @@ def _start_worker(
     detail = stderr.decode("utf-8", errors="replace").strip()
     if detail:
         detail = "\n".join(detail.splitlines()[-8:])[-1600:]
-        raise OnlineStudioError(f"Paper Studio 写作进程启动超时：\n{detail}")
-    raise OnlineStudioError("Paper Studio 写作进程启动超时。")
+        raise OnlineStudioError(f"Paper Studio Writing process startup timeout:\n{detail}")
+    raise OnlineStudioError("Paper Studio Writing process startup timed out.")
 
 
 def shared_deepseek_api_key() -> str:
     """The one server-held DeepSeek key every online session uses."""
     api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
     if not api_key:
-        raise OnlineStudioError("服务端尚未配置共享 DeepSeek API key，请联系管理员。")
+        raise OnlineStudioError("Server side has not configured the shared DeepSeek API key; please contact the administrator.")
     return api_key
 
 
@@ -4050,8 +4125,8 @@ def require_under_spend_cap(user_id: str) -> None:
     spent_rmb = user_cumulative_cost_usd(user_id) * USD_TO_RMB_RATE
     if spent_rmb >= USER_SPEND_CAP_RMB:
         raise OnlineStudioError(
-            f"当前账户共享额度已用满（上限 {USER_SPEND_CAP_RMB:.0f} 元），"
-            "暂时无法创建或继续写作会话。"
+            f"Current account sharing limit has been reached. {USER_SPEND_CAP_RMB:.0f} Units),"
+            "Temporarily unable to create or continue writing sessions."
         )
 
 
@@ -4064,7 +4139,7 @@ def create_session(
             session.process.poll() is None for session in SESSIONS.values()
         )
     if active_sessions >= MAX_ACTIVE_SESSIONS:
-        raise OnlineStudioError("当前在线写作会话已满，请稍后重试。")
+        raise OnlineStudioError("Current online writing session is full; please try again later.")
     require_under_spend_cap(user_id)
     api_key = shared_deepseek_api_key()
     provider = SHARED_PROVIDER
@@ -4073,24 +4148,24 @@ def create_session(
     root = user_project_root(user_id) / hashlib.sha256(session_id.encode("utf-8")).hexdigest()
     mode = str(payload.get("mode") or "package").strip().lower()
     if progress is not None:
-        progress("validation", "正在校验上传文件…", 5)
+        progress("validation", "Validating uploaded file…", 5)
     try:
         if mode in {"materials", "lightweight"}:
             project_brief_files = _decode_document_files(
                 payload.get("project_brief_files"),
-                label="当前工作说明",
+                label="Current work description",
                 required=True,
                 max_files=1,
             )
             if progress is not None:
                 progress(
                     "reference_pdf",
-                    "正在提取并由 DeepSeek 整理结构参考论文 PDF…",
+                    "Extracting and organizing the structure reference paper PDFs with DeepSeek.",
                     8,
                 )
             reference_paper_files = _decode_document_files(
                 payload.get("reference_paper_files"),
-                label="结构参考论文",
+                label="Structure reference paper",
                 required=True,
                 max_files=1,
             )
@@ -4120,7 +4195,7 @@ def create_session(
                 model=model,
             )
         if progress is not None:
-            progress("worker", "正在启动 Paper Studio 服务…", 96)
+            progress("worker", "Starting Paper Studio service…", 96)
         process, port = _start_worker(root, provider, model, api_key)
     except Exception:
         if root.exists():
@@ -4176,7 +4251,7 @@ def start_onboarding_job(payload: dict[str, Any], *, user_id: str) -> Onboarding
                 if current is not None:
                     current.status = "failed"
                     current.error = str(exc)
-                    current.message = "初始化失败。"
+                    current.message = "Initialization failed."
                     current.updated_at = time.time()
             return
         except Exception:
@@ -4184,8 +4259,8 @@ def start_onboarding_job(payload: dict[str, Any], *, user_id: str) -> Onboarding
                 current = ONBOARDING_JOBS.get(job.job_id)
                 if current is not None:
                     current.status = "failed"
-                    current.error = "初始化发生内部错误，请重试。"
-                    current.message = "初始化失败。"
+                    current.error = "An internal error occurred during initialization. Please retry."
+                    current.message = "Initialization failed."
                     current.updated_at = time.time()
             return
         with ONBOARDING_JOBS_LOCK:
@@ -4193,7 +4268,7 @@ def start_onboarding_job(payload: dict[str, Any], *, user_id: str) -> Onboarding
             if current is not None:
                 current.status = "completed"
                 current.stage = "ready"
-                current.message = "Paper Studio 已就绪，正在打开…"
+                current.message = "Paper Studio Ready, opening now…"
                 current.progress = 100
                 current.session_id = session.session_id
                 current.updated_at = time.time()
@@ -4220,11 +4295,11 @@ def demo_session() -> Session:
             DEMO_SESSION.last_access = time.time()
             return DEMO_SESSION
         if not (DEMO_PROJECT / "paper/paper_studio.json").is_file():
-            raise OnlineStudioError("完成态 Demo 论文项目尚未安装。")
+            raise OnlineStudioError("Completed-state Demo paper project is not installed yet.")
         session_id = "demo-" + secrets.token_urlsafe(12)
         root = DATA_ROOT / "demo" / hashlib.sha256(session_id.encode("utf-8")).hexdigest()
         if root.exists():
-            raise OnlineStudioError("Demo 工作目录冲突，请重试。")
+            raise OnlineStudioError("Demo Working directory conflict, please retry.")
         root.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(DEMO_PROJECT, root)
         try:
@@ -4638,15 +4713,15 @@ class Handler(BaseHTTPRequestHandler):
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError as exc:
-            raise OnlineStudioError("请求长度无效。") from exc
+            raise OnlineStudioError("Invalid request length.") from exc
         if length <= 0 or length > MAX_BODY_BYTES:
-            raise OnlineStudioError("请求为空或超过 24 MB。")
+            raise OnlineStudioError("Request is empty or exceeds 24 MB.")
         try:
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise OnlineStudioError("请求必须是有效 JSON。") from exc
+            raise OnlineStudioError("Request must be valid JSON.") from exc
         if not isinstance(payload, dict):
-            raise OnlineStudioError("请求必须是 JSON 对象。")
+            raise OnlineStudioError("Request must be a JSON object.")
         return payload
 
     def _current_user(self) -> dict[str, str] | None:
@@ -4666,7 +4741,7 @@ class Handler(BaseHTTPRequestHandler):
     def _require_user(self) -> dict[str, str] | None:
         user = self._current_user()
         if user is None:
-            self._json({"ok": False, "error": "请先登录。"}, 401)
+            self._json({"ok": False, "error": "Please log in first."}, 401)
         return user
 
     def _require_session(self, user: dict[str, str]) -> Session | None:
@@ -4674,7 +4749,7 @@ class Handler(BaseHTTPRequestHandler):
             self.headers.get("Cookie"), user_id=user["id"]
         )
         if session is None:
-            self._json({"ok": False, "error": "会话不存在或已过期，请重新上传资料。"}, 401)
+            self._json({"ok": False, "error": "Session does not exist or has expired; please reupload materials."}, 401)
         return session
 
     def _clear_paper_session_cookie(self) -> str:
@@ -4774,14 +4849,14 @@ class Handler(BaseHTTPRequestHandler):
                 job_id = str((query.get("job_id") or [""])[0]).strip()
                 job = onboarding_job(job_id, user_id=user["id"])
                 if job is None:
-                    self._json({"ok": False, "error": "初始化任务不存在或已过期。"}, 404)
+                    self._json({"ok": False, "error": "Initialization task does not exist or has expired."}, 404)
                 elif job.status == "failed":
                     self._json({"ok": False, "error": job.error}, 400)
                 elif job.status == "completed":
                     with SESSIONS_LOCK:
                         session = SESSIONS.get(job.session_id)
                     if session is None:
-                        self._json({"ok": False, "error": "写作会话启动后意外丢失，请重试。"}, 500)
+                        self._json({"ok": False, "error": "Writing session was unexpectedly lost after startup; please retry."}, 500)
                     else:
                         cookie = (
                             f"{COOKIE_NAME}={session.session_id}; Path=/; HttpOnly; SameSite=Strict"
@@ -4852,7 +4927,7 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if session is None:
                     self._json(
-                        {"ok": False, "error": "会话不存在或已过期，请重新上传资料。"},
+                        {"ok": False, "error": "Session does not exist or has expired; please reupload materials."},
                         401,
                     )
                     return
@@ -4934,7 +5009,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             upstream = "/" + path[len("/demo-studio/") :]
             if upstream not in DEMO_SAFE_WRITE_PATHS:
-                self._json({"ok": False, "error": "完成态 Demo 为只读展示。"}, 405)
+                self._json({"ok": False, "error": "Completion state demo is a read only display."}, 405)
                 return
             try:
                 session = demo_session()
@@ -4950,7 +5025,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _google_start(self) -> None:
         if not google_login_configured():
-            self._json({"ok": False, "error": "管理员尚未配置 Google 登录。"}, 503)
+            self._json({"ok": False, "error": "Administrator has not configured Google login."}, 503)
             return
         state = secrets.token_urlsafe(32)
         nonce = secrets.token_urlsafe(32)
@@ -4992,7 +5067,7 @@ class Handler(BaseHTTPRequestHandler):
         )
         try:
             if not google_login_configured():
-                raise OnlineStudioError("管理员尚未配置 Google 登录。")
+                raise OnlineStudioError("Administrator has not configured Google login.")
             query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             state = str((query.get("state") or [""])[0])
             code = str((query.get("code") or [""])[0])
@@ -5003,23 +5078,23 @@ class Handler(BaseHTTPRequestHandler):
                 or not cookie_state
                 or not secrets.compare_digest(state, cookie_state)
             ):
-                raise OnlineStudioError("Google 登录 state 校验失败。")
+                raise OnlineStudioError("Google Login state validation failed.")
             with OAUTH_STATES_LOCK:
                 stored = OAUTH_STATES.pop(state, None)
             if stored is None or stored[1] <= time.time():
-                raise OnlineStudioError("Google 登录请求已过期，请重试。")
+                raise OnlineStudioError("Google Login request has expired, please try again.")
             nonce = stored[0]
             public_url = os.environ["ONLINE_STUDIO_PUBLIC_URL"].rstrip("/")
             redirect_uri = public_url + "/auth/google/callback"
             encoded_id_token = exchange_google_code(code, redirect_uri)
             claims = verify_google_id_token(encoded_id_token)
             if not secrets.compare_digest(str(claims.get("nonce") or ""), nonce):
-                raise OnlineStudioError("Google 登录 nonce 校验失败。")
+                raise OnlineStudioError("Google Login nonce validation failed.")
             if claims.get("email_verified") is not True:
-                raise OnlineStudioError("Google 账户邮箱尚未验证。")
+                raise OnlineStudioError("Google Account email not verified.")
             subject = str(claims.get("sub") or "")
             if not subject:
-                raise OnlineStudioError("Google 账户缺少稳定 subject。")
+                raise OnlineStudioError("Google Account lacks a stable subject.")
             user = google_user(subject, claims.get("email"))
             auth_token = create_auth_session(user["id"])
             self._redirect(
@@ -5035,7 +5110,7 @@ class Handler(BaseHTTPRequestHandler):
             and self.command not in {"GET", "HEAD"}
             and path.split("?", 1)[0] not in DEMO_SAFE_WRITE_PATHS
         ):
-            self._json({"ok": False, "error": "完成态 Demo 为只读展示。"}, 405)
+            self._json({"ok": False, "error": "Completion state demo is a read only display."}, 405)
             return
         if (
             session.kind == "user"
@@ -5045,8 +5120,8 @@ class Handler(BaseHTTPRequestHandler):
             self._json(
                 {
                     "ok": False,
-                    "error": f"当前账户共享额度已用满（上限 {USER_SPEND_CAP_RMB:.0f} 元），"
-                    "写作会话已切换为只读。",
+                    "error": f"Current account sharing limit has been reached. {USER_SPEND_CAP_RMB:.0f} Units),"
+                    "Writing session has been switched to read-only.",
                 },
                 402,
             )
@@ -5056,7 +5131,7 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             length = 0
         if length > 2_000_000:
-            self._json({"ok": False, "error": "Paper Studio 请求过大。"}, 413)
+            self._json({"ok": False, "error": "Paper Studio Request too large."}, 413)
             return
         body = self.rfile.read(length) if length else None
         headers = {}
@@ -5083,7 +5158,7 @@ class Handler(BaseHTTPRequestHandler):
             if response_started:
                 self.close_connection = True
             else:
-                self._json({"ok": False, "error": "写作进程暂时不可用。"}, 502)
+                self._json({"ok": False, "error": "Writing process temporarily unavailable."}, 502)
         finally:
             connection.close()
 

@@ -52,13 +52,14 @@ REPORT_STRUCTURES = {
             ("implementation-sources", "2. Implementation Sources"),
             ("artifact-coverage", "3. Figure/Table Coverage"),
             ("parts-and-goals", "4. Parts and Goals"),
+            ("reideation-checkpoint", "5. Post-baseline Idea Checkpoint"),
         ],
     },
     "results": {
         "sections": [
             ("artifact-completion", "1. Artifact Completion"),
             ("paper-artifacts", "2. Paper Tables and Figures"),
-            ("generation-process", "3. 生成过程"),
+            ("generation-process", "3. generation process"),
         ],
     },
 }
@@ -68,10 +69,10 @@ REPORT_STRUCTURES = {
 # titles are equivalent labels, not a structural change.
 LOCALIZED_TITLE_ALIASES = {
     "literature": {
-        "problem": {"1. 问题"},
-        "approaches": {"2. 方法"},
-        "evaluation": {"3. 评估"},
-        "gaps": {"4. 差距"},
+        "problem": {"1. issue"},
+        "approaches": {"2. method"},
+        "evaluation": {"3. evaluation"},
+        "gaps": {"4. gap"},
     },
     "results": {
         "generation-process": {"3. Acquisition Process"},

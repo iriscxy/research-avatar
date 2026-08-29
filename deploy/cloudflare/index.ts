@@ -232,7 +232,7 @@ function normalizeEmail(value: unknown): string {
     !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ||
     [...email].some((character) => character.charCodeAt(0) < 32)
   ) {
-    throw new Error("请输入有效的邮箱地址。");
+    throw new Error("Enter a valid email address.");
   }
   return email;
 }
@@ -281,7 +281,7 @@ function safeEqual(left: Uint8Array, right: Uint8Array): boolean {
 
 async function readBody(request: Request): Promise<Record<string, unknown>> {
   const length = Number(request.headers.get("content-length") || "0");
-  if (length > 16_384) throw new Error("登录请求过大。");
+  if (length > 16_384) throw new Error("The authentication request is too large.");
   let body: unknown;
   try {
     body = await request.json();
@@ -292,10 +292,10 @@ async function readBody(request: Request): Promise<Record<string, unknown>> {
     // the client, so without this it was the one place in signup/login that
     // leaked an internal parser string instead of the file's normal clean
     // Chinese error text.
-    throw new Error("请求必须是有效 JSON。");
+    throw new Error("The request must contain valid JSON.");
   }
   if (!body || typeof body !== "object" || Array.isArray(body)) {
-    throw new Error("请求必须是 JSON 对象。");
+    throw new Error("The request body must be a JSON object.");
   }
   return body as Record<string, unknown>;
 }
@@ -450,14 +450,14 @@ async function googleCallback(request: Request, env: Env): Promise<Response> {
 
 async function signup(request: Request, env: Env): Promise<Response> {
   if (!(await rateLimit(request, env))) {
-    return json({ ok: false, error: "请求过于频繁，请一分钟后重试。" }, 429);
+    return json({ ok: false, error: "Too many requests. Try again in one minute." }, 429);
   }
   try {
     const body = await readBody(request);
     const email = normalizeEmail(body.email);
     const password = String(body.password || "");
     if (password.length < 6 || password.length > 1024) {
-      throw new Error("密码必须为 6–1024 个字符。");
+      throw new Error("The password must contain 6–1024 characters.");
     }
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const digest = await passwordDigest(password, salt);
@@ -478,15 +478,15 @@ async function signup(request: Request, env: Env): Promise<Response> {
     return json({ ok: true, user: { email, provider: "local" } }, 200, authCookie(token));
   } catch (error) {
     const message = String(error).includes("UNIQUE constraint failed")
-      ? "该邮箱已经注册，请直接登录。"
-      : error instanceof Error ? error.message : "注册失败。";
+      ? "This email is already registered. Sign in instead."
+      : error instanceof Error ? error.message : "Registration failed.";
     return json({ ok: false, error: message }, 400);
   }
 }
 
 async function login(request: Request, env: Env): Promise<Response> {
   if (!(await rateLimit(request, env))) {
-    return json({ ok: false, error: "请求过于频繁，请一分钟后重试。" }, 429);
+    return json({ ok: false, error: "Too many requests. Try again in one minute." }, 429);
   }
   try {
     const body = await readBody(request);
@@ -500,7 +500,7 @@ async function login(request: Request, env: Env): Promise<Response> {
     const expected = row ? base64ToBytes(row.password_hash) : new Uint8Array(32);
     const actual = await passwordDigest(password, salt);
     if (!row || !safeEqual(actual, expected)) {
-      throw new Error("邮箱或密码不正确。");
+      throw new Error("Incorrect email or password.");
     }
     const token = await createSession(env, row.id);
     return json(
@@ -510,7 +510,7 @@ async function login(request: Request, env: Env): Promise<Response> {
     );
   } catch (error) {
     return json(
-      { ok: false, error: error instanceof Error ? error.message : "登录失败。" },
+      { ok: false, error: error instanceof Error ? error.message : "Sign-in failed." },
       400,
     );
   }
@@ -622,7 +622,7 @@ export default {
       return proxy(request, env, user);
     } catch (error) {
       console.error(error);
-      return json({ ok: false, error: "在线服务暂时不可用，请稍后重试。" }, 500);
+      return json({ ok: false, error: "The online service is temporarily unavailable. Try again later." }, 500);
     }
   },
 };

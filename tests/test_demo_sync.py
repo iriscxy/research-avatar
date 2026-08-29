@@ -46,9 +46,9 @@ class DemoSyncTests(unittest.TestCase):
         app = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         self.assertIn("artifact-manifest.json", app)
         self.assertNotIn("canonical-artifact iframe", app)
-        self.assertIn("<span>内容总结</span>", app)
-        self.assertNotIn("功能展示", app)
-        self.assertNotIn("调研范围与分类", app)
+        self.assertIn("<span>Content summary</span>", app)
+        self.assertNotIn("Feature demonstration", app)
+        self.assertNotIn("Research scope and classification", app)
 
     def test_committed_paper_demo_matches_the_option_order_project(self):
         project = ROOT / "research_avatar/online_studio/demo_project"
@@ -112,20 +112,20 @@ class DemoSyncTests(unittest.TestCase):
             'iframe src="/demo-studio/?lang=${encodeURIComponent(uiLanguage)}&embedded=research-studio"',
             source,
         )
-        self.assertIn("本地当前状态快照 · 只读，输入与写入操作均已锁定", source)
-        self.assertNotIn("建议在新页面打开", source)
+        self.assertIn("Local status snapshot is read only; input and write operations are locked.", source)
+        self.assertNotIn("Recommended to open in a new page.", source)
         self.assertNotIn('class="paper-studio-open-callout"', source)
         self.assertNotIn('href="/demo-studio/"', source)
-        self.assertIn("正文调用 LLM API（不是 Code Agent）逐段生成", source)
+        self.assertIn("LLM API (not Code Agent) to generate content paragraph by paragraph", source)
         self.assertNotIn("paper-studio-demo-api-key-required", source)
         self.assertIn(
             'window.parent.postMessage({type: "research-avatar-language", language}',
             source,
         )
         self.assertEqual(source.count("window.parent.postMessage"), 1)
-        self.assertNotIn("这就是完成论文后的真实 Paper Studio", source)
-        self.assertNotIn("下面加载固定应用本身", source)
-        self.assertNotIn("不会产生 API 费用", source)
+        self.assertNotIn("This is the real Paper Studio after completing the paper", source)
+        self.assertNotIn("The following loads the fixed application itself.", source)
+        self.assertNotIn("API fees will not be incurred.", source)
         self.assertNotIn("?v=20260814-reader-copy", source)
         self.assertNotIn("writing.png", source)
         self.assertIn('document.body.classList.toggle("paper-focus", stage.id === "paper")', source)
@@ -173,15 +173,15 @@ class DemoSyncTests(unittest.TestCase):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         self.assertIn('document.execCommand("copy")', source)
         self.assertIn("representativeGoalIds = runPlanDemoState.goals.map", source)
-        self.assertNotIn("执行当前唯一 Goal", source)
-        self.assertNotIn("命令与真实 Run Plan 的 Current Goal 完全一致", source)
-        self.assertNotIn("完整计划没有丢失", source)
+        self.assertNotIn("Execute the current single Goal.", source)
+        self.assertNotIn("The command is fully aligned with the Current Goal in the real Run Plan.", source)
+        self.assertNotIn("The complete plan has not been lost.", source)
 
     def test_demo_headings_use_reader_facing_copy(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         for internal_copy in (
-            "执行进度和已完成图表都在 04 Run Plan",
-            "直接展示真实 Paper Studio 截图",
+            "Execution progress and completed charts are in 04 Run Plan.",
+            "Directly display real Paper Studio screenshots.",
             "REAL SCREENSHOTS",
             "FIXED HTML STRUCTURE",
             "reports/03_EXPERIMENT_PLAN.html",
@@ -189,36 +189,36 @@ class DemoSyncTests(unittest.TestCase):
         ):
             self.assertNotIn(internal_copy, source)
         for reader_copy in (
-            "从论文主张反推实验和证据",
-            "按证据依赖执行实验",
-            "一次确认全部任务",
-            "逐项确认",
-            "撰写正文并制作图表",
+            "Infer experiments and evidence from the paper claims.",
+            "Execute experiments according to evidence dependencies",
+            "Confirm all tasks at once",
+            "Itemized confirmation",
+            "Drafting the main text and creating charts",
         ):
             self.assertIn(reader_copy, source)
-        self.assertIn("先确定论文要证明什么，再为每个主张安排图表、指标和失败条件", source)
+        self.assertIn("First determine what the paper must prove, then assign charts, metrics, and failure conditions for each claim.", source)
 
     def test_experiment_demo_pairs_one_projected_shell_with_one_filled_result(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         style = (ROOT / "research_avatar/web/demo/style.css").read_text(encoding="utf-8")
         summary = (ROOT / "research_avatar/web/demo/report-structures.json").read_text(encoding="utf-8")
         self.assertIn('data-demo-example="projected-f2"', source)
-        self.assertIn("结构参考 · Ref Paper", source)
+        self.assertIn("Structure reference · Ref Paper", source)
         self.assertIn("loadExpPlanParagraphMappings", source)
         self.assertIn("artifactManifest.expplan", source)
-        self.assertIn("参考论文各部分均对应到 Rough Paper", source)
-        self.assertIn("先显示全部 Section 的覆盖关系，再展开两个段落示例", source)
+        self.assertIn("All parts of the reference paper map to Rough Paper.", source)
+        self.assertIn("First display the coverage relationships of all sections, then expand two paragraph examples.", source)
         self.assertIn('class="section-coverage-map"', source)
         self.assertIn('class="paragraph-map-grid example-paragraph-map"', source)
         self.assertNotIn("Ref Paper · §1 P3", source)
         self.assertNotIn("Ref Paper · §3.1", source)
         self.assertNotIn("MORE", source)
         self.assertNotIn("MORE", summary)
-        self.assertIn("等待左侧四个坐标点完成后自动绘图", source)
-        self.assertNotIn("等待右侧合同", source)
-        self.assertIn("F2 待填坐标表", source)
-        self.assertIn("横坐标 x · 纳入的随机排列数量", source)
-        self.assertIn("纵坐标 y · 答案始终一致的题目比例", source)
+        self.assertIn("Wait for the four coordinates on the left to complete before automatic plotting.", source)
+        self.assertNotIn("Waiting for the contract on the right.", source)
+        self.assertIn("F2 Pending coordinate table.", source)
+        self.assertIn("X axis x · number of included random permutations.", source)
+        self.assertIn("Proportion of questions where the answer on the Y axis is always the same.", source)
         self.assertIn(".projected-example-pair .table-scroll{overflow:visible}", style)
         self.assertIn(".projected-f2-table{width:100%;min-width:0;table-layout:fixed}", style)
         self.assertIn('data-demo-example="completed-f2"', source)
@@ -226,13 +226,13 @@ class DemoSyncTests(unittest.TestCase):
         self.assertIn("88.0%", source)
         self.assertIn('points="70,127 220,163 370,187 520,199"', source)
         self.assertIn('data-provenance-target="demo-f2-provenance"', source)
-        self.assertIn("点击查看完整实验过程", source)
+        self.assertIn("Click to view the full experimental process.", source)
         self.assertIn("target.open = true", source)
         self.assertIn("code/run_option_permutations.py", source)
         self.assertIn("results/option_order/run_manifest.json", source)
         self.assertIn("goalHierarchy()", source)
-        self.assertNotIn("G2.1 · 组件消融", source)
-        self.assertNotIn("G3.1 · 效率约束", source)
+        self.assertNotIn("G2.1 · Component ablation", source)
+        self.assertNotIn("G3.1 · Efficiency constraints", source)
         expplan_stage = source.index('id: "expplan"')
         self.assertLess(
             source.index('${canonicalArtifact("expplan")}', expplan_stage),
@@ -265,9 +265,9 @@ class DemoSyncTests(unittest.TestCase):
 
     def test_paper_tab_omits_redundant_entry_strip(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
-        self.assertNotIn("论文写作入口", source)
-        self.assertNotIn("Research Studio · 论文写作阶段", source)
-        self.assertNotIn("逐段调用 LLM API；不依赖 Skill。", source)
+        self.assertNotIn("Paper writing portal", source)
+        self.assertNotIn("Research Studio · Paper writing phase.", source)
+        self.assertNotIn("Call LLM API per paragraph; do not rely on Skill.", source)
 
 
 if __name__ == "__main__":

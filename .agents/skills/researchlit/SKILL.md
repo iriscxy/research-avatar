@@ -13,8 +13,20 @@ python3 -m research_avatar.research_studio.server --ensure
 
 Default output: `reports/01_LIT_SURVEY.html`.
 
-The merged verified paper records and synthesis model are authoritative;
-`01_LIT_SURVEY.html` is rendered output. A correction or translation must build
+The merged verified paper records and synthesis model at
+`reports/.build/01_LIT_SURVEY.source.json` are authoritative;
+`01_LIT_SURVEY.html` is rendered output. Create or update that structured source,
+then render it with:
+
+```bash
+python3 research_avatar/tools/render_literature_report.py \
+  --source reports/.build/01_LIT_SURVEY.source.json \
+  --output reports/01_LIT_SURVEY.html
+```
+
+The renderer derives paper cards, family membership, and all visible counts
+from the same records and refuses invalid output before atomic replacement.
+Never handwrite those elements in the delivered HTML. A correction or translation must build
 the complete report at a temporary path, validate all four stages and protected
 metadata, then atomically replace the canonical file. Never migrate, translate,
 or repair the delivered HTML through local DOM/string edits.
@@ -41,13 +53,28 @@ page title, stable identifier, and verification date. Render every link and all
 paper/family counts from these records; never type a count separately in prose.
 Before delivery, reopen every rendered paper URL and reject redirects to an
 unrelated work, title/identifier mismatches, placeholder hosts, and dead links.
-Embed those canonical records once as `literature-verification` JSON. Render
+Record 4–6 structured search angles, each angle's normal and current/previous-
+year queries, and the gap-falsification queries and closest collision in the
+canonical source. Embed those canonical records once as `literature-verification` JSON. Render
 paper cards and families with matching `data-paper-id` and `data-family-id`;
 derive the visible counts from the arrays.
 
 Merge by stable ID or normalized title, preserve disagreements, and synthesize
 5–7 themes, live debates, recent trends, and structural gaps. Prefer verified
 published evidence where comparable while retaining materially new preprints.
+
+For every method family, record one concrete `failure_boundary`: an input,
+transition, deployment condition, or evaluation regime under which the
+family's shared design may cease to support its intended claim. This is an
+evidence-bounded synthesis, not an invented failure result. Cite the papers
+that motivate the boundary and mark uncertainty when it has not been tested.
+IdeaGen consumes these boundaries together with Gaps and Live Debates.
+
+Render an evidence-maturity summary derived from the paper records, never from
+typed prose counts. Separate established peer-reviewed evidence, current
+peer-reviewed evidence, and current/previous-year frontier preprints. A survey
+with recent papers but no visible distinction between verified publication and
+frontier preprint evidence is incomplete.
 
 Every angle includes a separately recorded current/previous-year recency lane.
 Before describing a gap, run mechanism-level counterevidence queries whose
@@ -98,8 +125,15 @@ The selected LLM API translates visible text and must produce a complete
 venues, numbers, IDs, acronyms, and claim strength. The Code Agent must not
 translate the Survey itself. Missing key, API error, protected-token change,
 partial coverage, or missing receipt is a hard stop; never switch providers or
-claim success. When the researcher does not explicitly request translation, do
-not call any translation API.
+claim success. Translation is resumable: retain the generated checkpoint under
+`reports/.build/`, rerun the same command after an interruption, and reuse only
+nodes whose normalized source meaning, protected metadata, provider, model, and
+glossary identity still match. Use the built-in academic glossary or pass a
+project JSON glossary with `--glossary`; never repair a partial translation by
+editing rendered DOM nodes. The translator writes each checkpoint batch and the
+completed HTML atomically, so the validated English staging file remains intact
+on failure. When the researcher does not explicitly request translation, do not
+call any translation API.
 
 ## Validation and handoff
 

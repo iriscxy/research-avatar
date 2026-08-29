@@ -1,6 +1,10 @@
 ## A3 — Render the HTML deliverable
-Write ONE **self-contained** HTML file to the `— out:` path (default
-`reports/01_LIT_SURVEY.html`) — inline `<style>`, no external assets. **Address the researcher in the second person**
+Build the complete evidence and synthesis model in
+`reports/.build/01_LIT_SURVEY.source.json`, then use
+`research_avatar/tools/render_literature_report.py` to write ONE
+**self-contained** HTML file to the `— out:` path (default
+`reports/01_LIT_SURVEY.html`) — inline `<style>`, no external assets. Do not
+hand-edit rendered paper cards, family blocks, or counts. **Address the researcher in the second person**
 where the text speaks to her. **Every paper is a direct `<a href>`** to its
 official venue or DOI page when published, with its arXiv URL retained as a
 secondary preprint link; arXiv is the primary link only for arXiv-only
@@ -40,10 +44,15 @@ secondary `preprint` link. For preprints, link directly to arXiv and label them
 `arXiv preprint`. Never replace a verified accessible arXiv link with a guessed
 publisher URL.
 
+The structured source must contain 4–6 search angles with ordinary and recency
+query lanes, plus the explicit counterevidence queries, closest verified
+collision, and bounded difference used for gap falsification. These fields are
+part of the embedded evidence contract and are validated before delivery.
+
 ### Explicit target-language translation — LLM API only
 
 The canonical Survey is English. Translate it **only** when the researcher
-explicitly requests a target language (for example, `用中文`, `translate to
+explicitly requests a target language (for example, `translate to Chinese`, `translate to
 Spanish`, or `— language: Japanese`). The language of the surrounding chat is
 not, by itself, a translation request.
 
@@ -54,8 +63,18 @@ disposable staging path used by the translation stage, then run:
 ```bash
 python3 research_avatar/tools/translate_report_html.py reports/.build/01_LIT_SURVEY.html \
   --target-language "<requested language>" \
-  --provider "<openai-or-deepseek-chosen-by-researcher>"
+  --provider "<openai-or-deepseek-chosen-by-researcher>" \
+  --checkpoint reports/.build/01_LIT_SURVEY.translation.json
 ```
+
+The translator persists each completed batch. If the API or terminal process is
+interrupted, rerun the identical command: translations are reused by normalized
+semantic node identity, not by raw DOM position or byte hash, so whitespace and
+unrelated markup changes do not discard valid work. Provider, model, target
+language, protected metadata, or glossary changes invalidate only the affected
+reuse contract. The built-in academic glossary is fixed for Chinese; add a
+project-specific JSON string-to-string glossary with `--glossary <path>` when
+the field needs additional canonical terminology.
 
 Provider setup:
 
@@ -77,12 +96,14 @@ and claim strength, and embed a complete
 search, source verification, synthesis, HTML structure, and validation; it must
 not translate the Survey itself.
 
+The translator updates checkpoints and the completed staging HTML atomically.
 After translation, validate the complete staging report and receipt, then
 atomically replace `reports/01_LIT_SURVEY.html`. Never run the translator on the
 delivered canonical file. If translation was explicitly requested but the selected provider's key or
 required configuration is absent, show the exact local `export` commands and
 stop. An API error, protected-token change, partial coverage, or missing receipt
-is also a hard stop. Never silently switch providers, retain the English file,
+is also a hard stop: keep the checkpoint for retry and leave the validated
+English staging file intact. Never silently switch providers, retain the English file,
 translate with the Code Agent, or claim that translation succeeded. If no target
 language was explicitly requested, do not call any translation API and do not
 add a translation receipt.

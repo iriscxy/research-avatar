@@ -77,6 +77,7 @@ def scientific_contract() -> dict:
                 "claim_mappings": [{
                     "claim_id": "C1",
                     "measurement_role": "DIRECT",
+                    "construct_definition": "select evidence valid at query time",
                     "cannot_establish": "performance outside update events",
                     "companion_requirements": [],
                 }],
@@ -92,6 +93,7 @@ def scientific_contract() -> dict:
                 "claim_mappings": [{
                     "claim_id": "C1",
                     "measurement_role": "PROXY",
+                    "construct_definition": "select evidence valid at query time",
                     "cannot_establish": "selection of the newest evidence",
                     "companion_requirements": ["M-current"],
                 }],

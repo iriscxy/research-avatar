@@ -113,6 +113,24 @@ file, rubric, blinded item/annotator IDs, and label fields; an LLM judge cannot
 fill it. `LLM_JUDGE` instead preserves its model, prompt file, raw judgments,
 and calibration record.
 
+After every baseline implementation or reproduction goal, persist a
+`reideation_checkpoint`. It records whether conformance passed, whether a
+scientifically relevant mismatch remained after adapter repair, and the exact
+command/raw artifact that demonstrates the mismatch. If a verified anomaly
+remains, also record `observed_mismatch` and the baseline's intended
+`baseline_contract`, then run:
+
+```bash
+python3 research_avatar/tools/prepare_reideation_handoff.py
+```
+
+This atomically refreshes `reports/.build/reideation_input.json`, so the next
+IdeaGen pass receives the verified failure without manual copying. `04` shows a
+user decision card offering `$ideagen`; it does not silently replace the
+researcher's selected project. If no anomaly remains, render a compact "not
+triggered" checkpoint and still refresh the handoff file so a stale anomaly
+cannot be reused.
+
 Automatic mode advances only on `continue`. Stop on `refine`, `pivot`,
 `stopped`, `blocked`, validation failure, exhausted budget, or a new
 researcher-controlled decision. Manual mode proposes the next goal and stops.

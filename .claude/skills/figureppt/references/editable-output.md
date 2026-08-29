@@ -40,4 +40,4 @@ composition brief, visual grammar, and archived revisions in `paper/figsrc/`.
 Do not leave PNG drafts or disposable build files in `paper/fig/`.
 
 Dependencies: `python-pptx` and the configured unattended PowerPoint/PDF
-exporter. No image-generation API key is required.
+exporter.

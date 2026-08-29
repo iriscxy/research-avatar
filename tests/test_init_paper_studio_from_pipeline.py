@@ -2,6 +2,9 @@ import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+from research_avatar.tools import init_paper_studio_from_pipeline as initializer
 
 from research_avatar.tools.init_paper_studio_from_pipeline import (
     artifact_binding_contract,
@@ -10,12 +13,67 @@ from research_avatar.tools.init_paper_studio_from_pipeline import (
     reference_contexts,
     repair_reference_context,
     require_report_html,
+    result_evidence,
     selected_idea_from_report,
     validate_report_only_contract,
 )
 
 
 class InitPaperStudioFromPipelineTests(unittest.TestCase):
+    def test_initialize_refreshes_instead_of_overwriting_accepted_browser_work(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = root / "reports"
+            state_dir = root / "paper/.paper_studio"
+            reports.mkdir()
+            state_dir.mkdir(parents=True)
+            plan = reports / "03_EXPERIMENT_PLAN.html"
+            results = reports / "05_EXP_RESULT.html"
+            plan.write_text("<html>plan</html>", encoding="utf-8")
+            results.write_text("<html>results</html>", encoding="utf-8")
+            (state_dir / "state.json").write_text(json.dumps({
+                "sections": {"introduction": {"paragraphs": [{
+                    "id": "I-P1", "accepted_text": "Accepted manuscript text."
+                }]}}
+            }), encoding="utf-8")
+            with patch.object(
+                initializer,
+                "repair_reference_context",
+                return_value={"manuscript_reset": False},
+            ) as repair:
+                summary = initializer.initialize(root, plan, results)
+
+            self.assertFalse(summary["manuscript_reset"])
+            repair.assert_called_once_with(root, plan.resolve())
+
+    def test_result_evidence_reads_only_the_embedded_structured_payload(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "05_EXP_RESULT.html"
+            payload = {
+                "execution_summary": {"saved_final_call_count": 640},
+                "claim_dispositions": {"C2": {"status": "inconclusive"}},
+            }
+            path.write_text(
+                "<p>Unstructured prose must not be parsed.</p>"
+                '<script type="application/json" id="experiment-evidence">'
+                + json.dumps(payload)
+                + "</script>",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(result_evidence(path), payload)
+
+    def test_result_evidence_rejects_a_non_object_payload(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "05_EXP_RESULT.html"
+            path.write_text(
+                '<script type="application/json" id="experiment-evidence">[]</script>',
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "must be a JSON object"):
+                result_evidence(path)
+
     def test_canonical_reference_mapping_survives_abstracted_external_mode(self):
         contract = {
             "references": {
@@ -58,7 +116,7 @@ class InitPaperStudioFromPipelineTests(unittest.TestCase):
         )
         self.assertEqual(
             contexts["introduction"]["logic_summary_zh"],
-            "I-P1（problem framing）：Frame the problem.",
+            "I-P1(problem framing):Frame the problem.",
         )
 
     def test_legacy_source_mappings_remain_compatible(self):
@@ -115,7 +173,7 @@ class InitPaperStudioFromPipelineTests(unittest.TestCase):
         self.assertEqual(contexts["abstract"]["excerpts"], [])
         self.assertEqual(
             contexts["abstract"]["logic_summary_zh"],
-            "A-P1（summary）：Summarize.",
+            "A-P1(summary):Summarize.",
         )
         self.assertEqual(sections[0]["paragraphs"][0]["reference_paragraph_ids"], ["REF-A1"])
 
@@ -141,9 +199,9 @@ class InitPaperStudioFromPipelineTests(unittest.TestCase):
 
         self.assertEqual(
             contexts["method"]["logic_summary_zh"],
-            "M-P1（setup）：Define the input. → "
-            "M-P2（mechanism）：Derive the operator. → "
-            "M-P3（criterion）：State the output criterion.",
+            "M-P1(setup):Define the input. → "
+            "M-P2(mechanism):Derive the operator. → "
+            "M-P3(criterion):State the output criterion.",
         )
 
     def test_reference_repair_preserves_manuscript_and_history(self):
@@ -218,6 +276,69 @@ class InitPaperStudioFromPipelineTests(unittest.TestCase):
         self.assertTrue(summary["model_design_synced"])
         self.assertFalse(summary["manuscript_reset"])
 
+    def test_reference_repair_is_transactional_when_artifact_refresh_fails(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = root / "reports"
+            paper = root / "paper"
+            reports.mkdir()
+            paper.mkdir()
+            contract = {
+                "approval_status": "approved",
+                "grounding": {"model_design": {"data_flow": "x -> y"}},
+                "references": {"researcher_owned_logic": {"title": "Reference"}},
+                "paper_outline": [{
+                    "id": "introduction",
+                    "paragraphs": [{
+                        "id": "I-P1",
+                        "reference_mapping": [{
+                            "source_paragraph_id": "REF-I1",
+                            "source_text": "A complete structural paragraph.",
+                        }],
+                    }],
+                }],
+            }
+            plan = reports / "03_EXPERIMENT_PLAN.html"
+            plan.write_text(
+                '<script id="experiment-plan-contract" type="application/json">'
+                + json.dumps(contract)
+                + "</script>",
+                encoding="utf-8",
+            )
+            (reports / "05_EXP_RESULT.html").write_text(
+                "<html><body>Executed results</body></html>", encoding="utf-8"
+            )
+            config_path = paper / "paper_studio.json"
+            metrics_path = paper / "metrics.json"
+            reference_path = paper / "reference_context.json"
+            config_path.write_text(json.dumps({
+                "project": {"name": "Existing"},
+                "paths": {"metrics": "paper/metrics.json"},
+                "sections": [{
+                    "id": "introduction", "title": "Introduction",
+                    "paragraphs": [{"id": "I-P1", "reference_paragraph_ids": []}],
+                }],
+            }), encoding="utf-8")
+            metrics_path.write_text('{"keep": true}', encoding="utf-8")
+            reference_path.write_text('{"keep": true}', encoding="utf-8")
+            before = {
+                path: path.read_bytes()
+                for path in (config_path, metrics_path, reference_path)
+            }
+
+            with patch.object(
+                initializer,
+                "_artifact_definitions",
+                side_effect=ValueError("incompatible artifact bindings"),
+            ):
+                with self.assertRaisesRegex(ValueError, "incompatible artifact"):
+                    repair_reference_context(root, plan)
+
+            self.assertEqual(
+                {path: path.read_bytes() for path in before},
+                before,
+            )
+
     def test_artifact_dependencies_do_not_become_mandatory_citations(self):
         sections = [
             {
@@ -276,8 +397,39 @@ class InitPaperStudioFromPipelineTests(unittest.TestCase):
             ]
         }
 
-        with self.assertRaisesRegex(ValueError, "must be cited only by method/M-P1"):
+        with self.assertRaisesRegex(ValueError, "cited before its owning float"):
             artifact_binding_contract(contract, sections)
+
+    def test_discussion_may_reference_an_existing_experiment_artifact(self):
+        sections = [
+            {
+                "id": "experiments",
+                "source_id": "experiments",
+                "title": "Experiments",
+                "paragraphs": [{"id": "E-P2", "artifacts": ["T1"]}],
+            },
+            {
+                "id": "discussion",
+                "source_id": "discussion",
+                "title": "Discussion",
+                "paragraphs": [{"id": "D-P1", "artifacts": ["T1"]}],
+            },
+        ]
+        contract = {
+            "paper_artifacts": [{
+                "id": "T1",
+                "section_id": "experiments",
+                "introduced_after": "E-P2",
+            }]
+        }
+
+        citations, dependencies = artifact_binding_contract(contract, sections)
+
+        self.assertEqual(
+            citations,
+            {"T1": {"experiments": ["E-P2"], "discussion": ["D-P1"]}},
+        )
+        self.assertEqual(dependencies, {"T1": {"experiments": ["E-P2"]}})
 
     def test_report_input_must_be_html_directly_inside_reports(self):
         with TemporaryDirectory() as directory:
@@ -365,6 +517,27 @@ class InitPaperStudioFromPipelineTests(unittest.TestCase):
             }
             with self.assertRaisesRegex(ValueError, "exactly one"):
                 validate_report_only_contract(root, contract)
+
+    def test_legacy_approved_plan_can_initialize_from_the_five_canonical_reports(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = root / "reports"
+            reports.mkdir()
+            for name in (
+                "01_LIT_SURVEY.html",
+                "02_IDEA_REPORT.html",
+                "03_EXPERIMENT_PLAN.html",
+                "04_RUN_PLAN.html",
+                "05_EXP_RESULT.html",
+            ):
+                (reports / name).write_text("<p>report</p>", encoding="utf-8")
+            contract = {
+                "references": {
+                    "researcher_owned_logic": {"title": "Structural Reference"}
+                }
+            }
+
+            validate_report_only_contract(root, contract)
 
     def test_appendix_promises_become_headed_deliverable_contracts(self):
         sections = [{

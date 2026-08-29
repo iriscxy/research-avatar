@@ -265,7 +265,7 @@ Return JSON only, once, with this shape:
     "relation_to_next": "...", "length_share": 0.15,
     "reference_context": {{
       "source_heading": "1 Introduction",
-      "logic_summary_zh": "参考论文先说明问题的重要性，再收窄到尚未解决的矛盾。",
+      "logic_summary_zh": "The reference paper first explains the importance of the issue, then narrows to unresolved contradictions.",
       "reference_paragraph_ids": ["REF-I-P1", "REF-I-P2"]
     }},
     "paragraphs": [{{
@@ -326,10 +326,10 @@ def _parse_json(response: str) -> dict[str, Any]:
             payload = json.loads("".join(repaired))
         except json.JSONDecodeError as exc:
             raise PaperStructureError(
-                "结构设计 Agent 没有返回有效 JSON：" + str(first_error)
+                "Structure Design Agent did not return valid JSON." + str(first_error)
             ) from exc
     if not isinstance(payload, dict):
-        raise PaperStructureError("结构设计 Agent 返回值必须是 JSON object。")
+        raise PaperStructureError("Structure Design Agent return value must be a JSON object.")
     return payload
 
 
@@ -752,7 +752,7 @@ def validate_structure_design(
     errors: list[str] = []
     analysis = payload.get("structure_reference_analysis")
     if not isinstance(analysis, dict) or not str(analysis.get("global_argument_arc") or "").strip():
-        errors.append("缺少 structure_reference_analysis.global_argument_arc。")
+        errors.append("structure_reference_analysis.global_argument_arc is missing.")
     source_lines = reference_source.splitlines()
     reference_paragraphs: list[dict[str, Any]] = []
     reference_abstract_ids: set[str] = set()
@@ -765,20 +765,20 @@ def validate_structure_design(
     if isinstance(analysis, dict):
         sections = analysis.get("body_sections")
         if not isinstance(sections, list) or not sections:
-            errors.append("结构参考缺少 body_sections。")
+            errors.append("The structure reference is missing body_sections.")
         else:
             for section in sections:
                 if not isinstance(section, dict):
-                    errors.append("结构参考 section 必须是 object。")
+                    errors.append("Structure reference section must be an object.")
                     continue
                 for field in (
                     "heading", "section_role", "relation_to_previous", "relation_to_next"
                 ):
                     if not str(section.get(field) or "").strip():
-                        errors.append(f"结构参考 section 缺少 {field}。")
+                        errors.append(f"Structure reference section missing. {field}.")
                 paragraphs = section.get("paragraphs")
                 if not isinstance(paragraphs, list):
-                    errors.append(f"结构参考 section {section.get('heading')} 的 paragraphs 必须是列表。")
+                    errors.append(f"Structure reference section. {section.get('heading')} The paragraphs must be a list.")
                     continue
                 reference_paragraphs.extend(
                     paragraph for paragraph in paragraphs if isinstance(paragraph, dict)
@@ -795,25 +795,25 @@ def validate_structure_design(
                 if heading == "abstract":
                     reference_abstract_ids.update(section_ids)
     if not reference_paragraphs:
-        errors.append("结构参考分析没有任何自然段。")
+        errors.append("Structure reference analysis has no natural paragraphs.")
     if not reference_abstract_ids:
-        errors.append("结构参考分析缺少真实 Abstract 段落。")
+        errors.append("The structure reference analysis is missing a real Abstract paragraph.")
     reference_ids: set[str] = set()
     for paragraph in reference_paragraphs:
         paragraph_id = str(paragraph.get("id") or "").strip()
         if not paragraph_id or paragraph_id in reference_ids:
-            errors.append(f"结构参考 paragraph ID 无效或重复：{paragraph_id or '[empty]'}。")
+            errors.append(f"Structure reference paragraph ID invalid or duplicate.{paragraph_id or '[empty]'}.")
         reference_ids.add(paragraph_id)
         for field in ("gist", "rhetorical_role", "relation_to_previous", "relation_to_next"):
             if not str(paragraph.get(field) or "").strip():
-                errors.append(f"结构参考 paragraph {paragraph_id} 缺少 {field}。")
+                errors.append(f"Structure reference paragraph. {paragraph_id} missing {field}.")
         start, end = paragraph.get("start_line"), paragraph.get("end_line")
         if (
             not isinstance(start, int) or isinstance(start, bool)
             or not isinstance(end, int) or isinstance(end, bool)
             or start < 1 or end < start or end > len(source_lines)
         ):
-            errors.append(f"结构参考 paragraph {paragraph_id} 行号无效。")
+            errors.append(f"Structure reference paragraph. {paragraph_id} Line number invalid.")
         else:
             # Paragraph boundaries come from the structure-analysis agent, not
             # from English punctuation. A real reference paragraph may end in
@@ -827,11 +827,11 @@ def validate_structure_design(
                 line.strip() for line in source_lines[start - 1:end] if line.strip()
             )
             if not excerpt:
-                errors.append(f"结构参考 paragraph {paragraph_id} 没有定位到文字内容。")
+                errors.append(f"Structure reference paragraph. {paragraph_id} No text content located.")
 
     outline = payload.get("paper_outline")
     if not isinstance(outline, list) or not outline:
-        errors.append("缺少目标 paper_outline。")
+        errors.append("Missing target paper_outline.")
         outline = []
     required = _scientific_requirements(contract)
     obligation_ids = {
@@ -853,25 +853,25 @@ def validate_structure_design(
     shares = 0.0
     for section in outline:
         if not isinstance(section, dict):
-            errors.append("目标 paper_outline section 必须是 object。")
+            errors.append("The target paper_outline section must be an object.")
             continue
         # Only fields consumed as program coordinates are required here.
         # Rhetorical roles and transitions are generated writing guidance, not
         # user input to approve or content that application code should judge.
         for field in ("section_id", "title"):
             if not str(section.get(field) or "").strip():
-                errors.append(f"目标 section 缺少 {field}。")
+                errors.append(f"Target section is missing. {field}.")
         reference_context = section.get("reference_context")
         target_is_abstract = str(
             section.get("section_id") or section.get("title") or ""
         ).strip().casefold() == "abstract"
         if not isinstance(reference_context, dict):
-            errors.append(f"目标 section {section.get('section_id')} 缺少 reference_context。")
+            errors.append(f"Target section {section.get('section_id')} Missing reference_context.")
         else:
             for field in ("source_heading", "logic_summary_zh"):
                 if not str(reference_context.get(field) or "").strip():
                     errors.append(
-                        f"目标 section {section.get('section_id')} 的 reference_context 缺少 {field}。"
+                        f"Target section {section.get('section_id')} The reference_context is missing. {field}."
                     )
             selected = reference_context.get("reference_paragraph_ids")
             source_heading_key = normalized_heading(
@@ -880,47 +880,47 @@ def validate_structure_design(
             source_section_ids = reference_ids_by_heading.get(source_heading_key)
             if not isinstance(selected, list) or not selected:
                 errors.append(
-                    f"目标 section {section.get('section_id')} 必须选择参考段落。"
+                    f"Target section {section.get('section_id')} Must select reference paragraph."
                 )
             elif len(selected) != len(set(map(str, selected))) or not set(
                 map(str, selected)
             ).issubset(reference_ids):
                 errors.append(
-                    f"目标 section {section.get('section_id')} 选择了无效或重复的参考段落。"
+                    f"Target section {section.get('section_id')} Selected an invalid or duplicate reference paragraph."
                 )
             elif not source_section_ids:
                 errors.append(
-                    f"目标 section {section.get('section_id')} 的 source_heading "
-                    "没有对应到结构参考论文中的真实 section。"
+                    f"Target section {section.get('section_id')} source_heading "
+                    "No corresponding real section in the structure reference paper."
                 )
             elif not set(map(str, selected)).issubset(source_section_ids):
                 errors.append(
-                    f"目标 section {section.get('section_id')} 选择的参考段落不属于 "
-                    "source_heading 指定的 section。"
+                    f"Target section {section.get('section_id')} The selected reference paragraph does not belong to. "
+                    "source_heading The specified section."
                 )
             elif target_is_abstract and not set(map(str, selected)).issubset(
                 reference_abstract_ids
             ):
-                errors.append("目标 Abstract 只能选择结构参考论文的真实 Abstract 段落。")
+                errors.append("The target Abstract must only select the real Abstract paragraph from the reference paper.")
         try:
             shares += float(section.get("length_share"))
         except (TypeError, ValueError):
-            errors.append(f"目标 section {section.get('section_id')} 缺少 length_share。")
+            errors.append(f"Target section {section.get('section_id')} Missing length_share.")
         paragraphs = section.get("paragraphs")
         if not isinstance(paragraphs, list) or not paragraphs:
-            errors.append(f"目标 section {section.get('section_id')} 没有 paragraphs。")
+            errors.append(f"Target section {section.get('section_id')} No paragraphs.")
             continue
         for paragraph in paragraphs:
             if not isinstance(paragraph, dict):
-                errors.append("目标 paragraph 必须是 object。")
+                errors.append("Target paragraph must be an object.")
                 continue
             paragraph_id = str(paragraph.get("id") or "").strip()
             if not paragraph_id or paragraph_id in seen_paragraphs:
-                errors.append(f"目标 paragraph ID 无效或重复：{paragraph_id or '[empty]'}。")
+                errors.append(f"The target paragraph ID is invalid or duplicated:{paragraph_id or '[empty]'}.")
             seen_paragraphs.add(paragraph_id)
             for field in ("plan_sentence",):
                 if not str(paragraph.get(field) or "").strip():
-                    errors.append(f"目标 paragraph {paragraph_id} 缺少 {field}。")
+                    errors.append(f"Target paragraph. {paragraph_id} missing {field}.")
             covers = paragraph.get("covers")
             artifacts = paragraph.get("artifact_refs", [])
             supports = paragraph.get("supports", [])
@@ -932,35 +932,35 @@ def validate_structure_design(
                     or str(mapped[0]) not in reference_ids
                 ):
                     errors.append(
-                        f"目标 paragraph {paragraph_id} 必须对应一个有效参考段落。"
+                        f"Target paragraph. {paragraph_id} Must correspond to a valid reference paragraph."
                     )
                 elif target_is_abstract and str(mapped[0]) not in reference_abstract_ids:
                     errors.append(
-                        f"目标 Abstract paragraph {paragraph_id} 必须对应参考 Abstract。"
+                        f"Target Abstract paragraph. {paragraph_id} Must correspond to the reference Abstract."
                     )
                 elif source_section_ids and str(mapped[0]) not in source_section_ids:
                     errors.append(
-                        f"目标 paragraph {paragraph_id} 的参考段落不属于 section 的 "
-                        "source_heading。"
+                        f"Target paragraph. {paragraph_id} The reference paragraph does not belong to the section. "
+                        "source_heading."
                     )
             if not isinstance(covers, list):
-                errors.append(f"目标 paragraph {paragraph_id}.covers 必须是列表。")
+                errors.append(f"Target paragraph. {paragraph_id}.covers Must be a list.")
             else:
                 covered.extend(map(str, covers))
             if not isinstance(artifacts, list):
-                errors.append(f"目标 paragraph {paragraph_id}.artifact_refs 必须是列表。")
+                errors.append(f"Target paragraph. {paragraph_id}.artifact_refs Must be a list.")
             else:
                 used_artifacts.extend(map(str, artifacts))
             if isinstance(supports, list):
                 supported.update(map(str, supports))
     if abs(shares - 1.0) > 0.001:
-        errors.append(f"目标 section length_share 总和必须为 1，当前为 {shares:.4f}。")
+        errors.append(f"The sum of target section length_share must be 1; currently is {shares:.4f}.")
     if set(covered) != obligation_ids or len(covered) != len(set(covered)):
-        errors.append("目标段落必须恰好覆盖每个输入 content obligation 一次。")
+        errors.append("The target paragraph must exactly cover each input content obligation once.")
     if set(used_artifacts) != artifact_ids or len(used_artifacts) != len(set(used_artifacts)):
-        errors.append("目标段落必须恰好放置每个 paper artifact 一次。")
+        errors.append("Each target paragraph must be placed exactly once for every paper artifact.")
     if not claim_ids.issubset(supported):
-        errors.append("目标 paper_outline 没有覆盖全部 claim IDs。")
+        errors.append("The target paper_outline does not cover all claim IDs.")
     if errors:
         raise PaperStructureError("\n".join(errors))
 
@@ -1014,11 +1014,11 @@ def codex_structure_invoker(root: Path, reference_pdf: Path) -> Callable[[str], 
     """Give one complete PDF-backed Experiment Planning task to one Code Agent."""
     codex = shutil.which("codex")
     if not codex:
-        raise PaperStructureError("未找到本机 codex CLI，无法设计论文结构。")
+        raise PaperStructureError("The local Codex CLI was not found; unable to design the paper structure.")
     try:
         pdf_label = reference_pdf.resolve().relative_to(root.resolve())
     except ValueError as exc:
-        raise PaperStructureError("结构参考论文 PDF 必须位于项目目录内。") from exc
+        raise PaperStructureError("The structure reference paper PDF must reside in the project directory.") from exc
 
     def invoke(prompt: str) -> str:
         environment = dict(os.environ)
@@ -1043,14 +1043,14 @@ def codex_structure_invoker(root: Path, reference_pdf: Path) -> Callable[[str], 
                     timeout=1200, env=environment, check=False,
                 )
             except subprocess.TimeoutExpired as exc:
-                raise PaperStructureError("论文结构设计 Agent 超时。") from exc
+                raise PaperStructureError("Paper structure design Agent timed out.") from exc
             if completed.returncode:
                 detail = (completed.stdout + "\n" + completed.stderr).strip()
                 raise PaperStructureError(
-                    "论文结构设计 Agent 失败：" + (detail[-2400:] or "codex exec failed")
+                    "Paper structure design Agent failed:" + (detail[-2400:] or "codex exec failed")
                 )
             if not output.is_file():
-                raise PaperStructureError("论文结构设计 Agent 没有返回 JSON。")
+                raise PaperStructureError("The paper structure design agent did not return JSON.")
             return output.read_text(encoding="utf-8", errors="replace")
 
     return invoke

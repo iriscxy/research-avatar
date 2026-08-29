@@ -122,8 +122,8 @@ def sync(root: Path = ROOT, destination: Path = DESTINATION) -> dict[str, object
         figure = state.get("figures", {}).get(figure_id, {})
         if figure.get("status") != "approved":
             raise SystemExit(f"Refusing to publish incomplete {figure_id} state")
-    if not str(state.get("figures", {}).get("F1", {}).get("draw_prompt") or "").strip():
-        raise SystemExit("Refusing to publish F1 without its archived drawing prompt")
+    if not (root / "paper/figsrc/motivation_shapes.json").is_file():
+        raise SystemExit("Refusing to publish F1 without its native shape specification")
 
     parent = destination.parent
     parent.mkdir(parents=True, exist_ok=True)
@@ -145,24 +145,6 @@ def sync(root: Path = ROOT, destination: Path = DESTINATION) -> dict[str, object
             target = staging / "paper/sources" / source.name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
-        mechanism_rounds = sorted(
-            (root / "paper/figsrc/iterations/F1_motivation").glob(
-                "round_*.png"
-            )
-        )
-        if not mechanism_rounds:
-            raise SystemExit(
-                "Cannot sync demo without the archived GPT Image reference"
-            )
-        # Paper Studio keys the archived raster reference by the configured
-        # LaTeX label slug, while the editable deliverable may use a different
-        # nested stem.
-        label = str(config["figures"]["F1"]["label"])
-        label_slug = label.split(":", 1)[-1].replace("-", "_")
-        gpt_reference = staging / f"paper/figsrc/{label_slug}.bg.png"
-        gpt_reference.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(mechanism_rounds[-1], gpt_reference)
-
         backup = destination.with_name(destination.name + ".previous")
         if backup.exists():
             shutil.rmtree(backup)

@@ -12,12 +12,24 @@ import os
 from pathlib import Path
 import re
 import sys
+import tempfile
 from typing import Any
 import urllib.error
 import urllib.request
 
 
 RECEIPT_ID = "researchlit-llm-translation"
+CHECKPOINT_SCHEMA_VERSION = "1.0"
+DEFAULT_GLOSSARY = {
+    "Problem": "\u95ee\u9898",
+    "Approaches": "\u65b9\u6cd5",
+    "Evaluation": "\u8bc4\u4f30",
+    "Gaps": "\u7814\u7a76\u7a7a\u767d",
+    "preprint": "\u9884\u5370\u672c",
+    "peer-reviewed": "\u540c\u884c\u8bc4\u5ba1",
+    "baseline": "\u57fa\u7ebf",
+    "benchmark": "\u57fa\u51c6",
+}
 EXCLUDED_TAGS = {"code", "pre", "script", "style", "svg", "math"}
 EXCLUDED_CLASSES = {"who", "doi", "arxiv", "paper-meta", "citation-key", "external-link"}
 PROTECTED_RE = re.compile(
@@ -227,6 +239,138 @@ def extract_output_text(response: dict[str, Any]) -> str:
     return "\n".join(piece for piece in pieces if piece).strip()
 
 
+def semantic_node_keys(items: list[dict[str, Any]]) -> None:
+    """Attach stable keys that survive whitespace and unrelated DOM changes."""
+    occurrences: dict[str, int] = {}
+    for item in items:
+        semantic = json.dumps(
+            {
+                "context": str(item.get("context") or ""),
+                "text": normalize(str(item.get("text") or "")),
+                "protected_tokens": item.get("protected_tokens") or [],
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        digest = hashlib.sha256(semantic.encode("utf-8")).hexdigest()
+        occurrence = occurrences.get(digest, 0) + 1
+        occurrences[digest] = occurrence
+        item["resume_key"] = f"{digest}:{occurrence}"
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=path.name + ".", suffix=".tmp", dir=path.parent
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        os.replace(temporary_name, path)
+    except Exception:
+        try:
+            os.unlink(temporary_name)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def glossary_from_path(path: Path | None, target_language: str) -> dict[str, str]:
+    glossary = dict(DEFAULT_GLOSSARY) if "chinese" in target_language.casefold() else {}
+    if path is None:
+        return glossary
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or any(
+        not isinstance(key, str) or not isinstance(value, str)
+        for key, value in payload.items()
+    ):
+        raise ValueError("translation glossary must be a JSON object of string pairs")
+    glossary.update({key.strip(): value.strip() for key, value in payload.items() if key.strip()})
+    return glossary
+
+
+def checkpoint_identity(
+    target_language: str, config: dict[str, str], glossary: dict[str, str]
+) -> dict[str, str]:
+    glossary_json = json.dumps(
+        glossary, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    return {
+        "target_language": normalize(target_language).casefold(),
+        "provider": config["receipt_provider"],
+        "model": config["model"],
+        "glossary_sha256": hashlib.sha256(glossary_json.encode("utf-8")).hexdigest(),
+    }
+
+
+def load_reusable_translations(
+    checkpoint_path: Path | None,
+    identity: dict[str, str],
+    items: list[dict[str, Any]],
+) -> tuple[dict[str, str], list[str]]:
+    if checkpoint_path is None or not checkpoint_path.is_file():
+        return {}, []
+    try:
+        checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}, []
+    if checkpoint.get("schema_version") != CHECKPOINT_SCHEMA_VERSION:
+        return {}, []
+    if any(checkpoint.get(key) != value for key, value in identity.items()):
+        return {}, []
+    saved = checkpoint.get("translations")
+    if not isinstance(saved, dict):
+        return {}, []
+    translations: dict[str, str] = {}
+    for item in items:
+        record = saved.get(item["resume_key"])
+        if not isinstance(record, dict):
+            continue
+        if normalize(str(record.get("source_text") or "")) != item["text"]:
+            continue
+        translated = normalize(str(record.get("translated_text") or ""))
+        if translated and protected_tokens(translated) == item["protected_tokens"]:
+            translations[item["id"]] = translated
+    response_ids = [
+        str(value) for value in checkpoint.get("api_response_ids", []) if str(value)
+    ]
+    return translations, response_ids
+
+
+def save_translation_checkpoint(
+    checkpoint_path: Path | None,
+    identity: dict[str, str],
+    items: list[dict[str, Any]],
+    translations: dict[str, str],
+    response_ids: list[str],
+) -> None:
+    if checkpoint_path is None:
+        return
+    records = {
+        item["resume_key"]: {
+            "source_text": item["text"],
+            "translated_text": translations[item["id"]],
+        }
+        for item in items
+        if item["id"] in translations
+    }
+    atomic_write_text(
+        checkpoint_path,
+        json.dumps(
+            {
+                "schema_version": CHECKPOINT_SCHEMA_VERSION,
+                **identity,
+                "translations": records,
+                "api_response_ids": response_ids,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+    )
+
+
 def post_json(url: str, payload: dict[str, Any], api_key: str) -> dict[str, Any]:
     request = urllib.request.Request(
         url,
@@ -275,6 +419,14 @@ def translate_batch(
         "Do not add, remove, summarize, explain, or invent evidence. Do not output HTML or Markdown. "
         "Return JSON with one items array. Return every item exactly once, in input order."
     )
+    glossary = config.get("_glossary") or {}
+    if glossary:
+        instructions += (
+            " Apply this fixed project glossary whenever the source term occurs with the same "
+            "meaning; do not create alternative translations: "
+            + json.dumps(glossary, ensure_ascii=False, sort_keys=True)
+            + "."
+        )
     request_input = json.dumps(
         {"target_language": target_language, "items": [
             {"id": item["id"], "text": item["text"], "context": item["context"],
@@ -338,8 +490,16 @@ def translate_batch(
 
 
 def translate_html(
-    source: str, target_language: str, config: dict[str, str], batch_size: int
+    source: str,
+    target_language: str,
+    config: dict[str, str],
+    batch_size: int,
+    *,
+    checkpoint_path: Path | None = None,
+    glossary: dict[str, str] | None = None,
 ) -> tuple[str, dict[str, Any]]:
+    if batch_size <= 0:
+        raise ValueError("batch_size must be greater than zero")
     source = re.sub(
         rf'<script\b[^>]*\bid=["\']{re.escape(RECEIPT_ID)}["\'][^>]*>.*?</script>',
         "",
@@ -351,17 +511,26 @@ def translate_html(
     parser.close()
     if not parser.items:
         raise RuntimeError("no translatable visible text was found")
-    translations: dict[str, str] = {
+    semantic_node_keys(parser.items)
+    glossary = dict(glossary or {})
+    config = {**config, "_glossary": glossary}
+    identity = checkpoint_identity(target_language, config, glossary)
+    translations, response_ids = load_reusable_translations(
+        checkpoint_path, identity, parser.items
+    )
+    translations.update({
         item["id"]: item["text"] for item in parser.items if protected_only_fragment(item)
-    }
+    })
     api_items = [item for item in parser.items if item["id"] not in translations]
-    response_ids: list[str] = []
     for start in range(0, len(api_items), batch_size):
         response_id, translated = translate_batch(
             api_items[start : start + batch_size], target_language, config
         )
         response_ids.append(response_id)
         translations.update(translated)
+        save_translation_checkpoint(
+            checkpoint_path, identity, parser.items, translations, response_ids
+        )
     rendered = parser.render(translations)
     receipt = {
         "schema_version": "1.0",
@@ -370,6 +539,7 @@ def translate_html(
         "model": config["model"],
         "target_language": target_language,
         "translated_nodes": len(translations),
+        "resumed_nodes": len(parser.items) - len(api_items),
         "api_response_ids": response_ids,
         "source_sha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
         "translated_sha256": hashlib.sha256(rendered.encode("utf-8")).hexdigest(),
@@ -397,17 +567,41 @@ def main() -> int:
     )
     argument_parser.add_argument("--model")
     argument_parser.add_argument("--batch-size", type=int, default=24)
+    argument_parser.add_argument(
+        "--glossary",
+        type=Path,
+        help="optional JSON glossary merged over the built-in target-language glossary",
+    )
+    argument_parser.add_argument(
+        "--checkpoint",
+        type=Path,
+        help="optional resumable checkpoint path; defaults to reports/.build/",
+    )
     args = argument_parser.parse_args()
     try:
         config = provider_config(args.provider, args.model)
     except ValueError as exc:
         argument_parser.error(str(exc))
     source = args.html.read_text(encoding="utf-8")
+    target_language = args.target_language.strip()
+    glossary = glossary_from_path(args.glossary, target_language)
+    checkpoint_path = args.checkpoint
+    if checkpoint_path is None:
+        checkpoint_path = (
+            args.html.parent
+            / ".build"
+            / f"{args.html.name}.translation-{re.sub(r'[^a-z0-9]+', '-', target_language.casefold()).strip('-') or 'target'}.json"
+        )
     translated, receipt = translate_html(
-        source, args.target_language.strip(), config, args.batch_size
+        source,
+        target_language,
+        config,
+        args.batch_size,
+        checkpoint_path=checkpoint_path,
+        glossary=glossary,
     )
-    args.html.write_text(translated, encoding="utf-8")
-    print(json.dumps({"status": "PASS", "file": str(args.html), **receipt}, ensure_ascii=False))
+    atomic_write_text(args.html, translated)
+    print(json.dumps({"status": "PASS", "file": str(args.html), "checkpoint": str(checkpoint_path), **receipt}, ensure_ascii=False))
     return 0
 
 

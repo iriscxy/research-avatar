@@ -1,230 +1,93 @@
 #!/usr/bin/env python3
-"""figure_ppt.py — model-figure pipeline: paper → drawing prompt → gpt-image → editable PPT → PDF.
+"""Build Codex-authored native PowerPoint figures and matching vector PDFs.
 
-The mechanism (per the researcher):
-  1. GENPROMPT  the fixed "expert scientific-figure designer" META_PROMPT (system) + the paper
-                (user), nothing appended, via GPT chat → a publication-ready drawing prompt written
-                into spec.draw_prompt. The draw prompt is GENERATED from the paper, not hand-written.
-  2. DRAW       that prompt drives an image model VERBATIM (nothing appended):
-                --provider openai (gpt-image-1, OPENAI_API_KEY). Every draw is
-                ARCHIVED to iterations/<id>/round_NN.png + round_NN.prompt.txt (no overwrite).
-  3. REFINE     AGENT-DRIVEN, no CLI command: the calling agent READS the drawn image, decides
-                what is wrong, rewrites spec.draw_prompt itself, re-runs draw. Loop. (First-draft
-                failures can't be enumerated in a fixed instruction, so there is no scripted refine.)
-  4. BUILD+PDF  two paths — `buildshapes` renders a shape-spec into NATIVE editable PPT shapes
-                (every element editable, crisp text); `build` lays the image as a background +
-                editable label text boxes. `pdfshapes` renders the SAME shape spec to unattended
-                vector PDF with headless Chrome. `pdf` converts arbitrary PPTX with a verified
-                headless LibreOffice binary when one is installed.
-
-Subcommands:
-  genprompt --paper <file> --spec spec.json [--model gpt-4o]   -> writes spec.draw_prompt
-  draw        spec.json  [--provider openai]                   -> <fig>.bg.png (+ iterations/)
-  build       spec.json  [--img <png>]                         -> <fig>.pptx  (image bg + labels)
-  buildshapes shapes.json [--out <fig>.pptx]                   -> <fig>.pptx  (fully editable shapes)
-  pdfshapes   shapes.json [--out <fig>.pdf]                    -> <fig>.pdf   (unattended vector PDF)
-  pdfimage    spec.json --img <png> [--out <fig>.pdf]           -> image-backed PDF
-  pdf         <fig>.pptx                                        -> <fig>.pdf (LibreOffice fallback)
-  all         spec.json  --paper <file>                        -> genprompt→draw→build→pdf
-  emit-example                                                 -> starter spec
-  (refine is agent-driven: read <fig>.bg.png, edit spec.draw_prompt, re-run draw.)
+The authoritative input is a JSON shape specification and every rendered
+paper-figure element is a native editable object.
 """
 import argparse
-import base64
 import html
 import json
 import os
-import re
 import shutil
 import signal
 import subprocess
 import sys
 import tempfile
 import time
-import urllib.request
 from pathlib import Path
 
-# ---------- the fixed prompt-generation meta-prompt (verbatim, per the researcher) ----------
-META_PROMPT = (
-    "You are an expert designer of figures for ACL-family NLP papers. Read the supplied manuscript "
-    "and optional reference-figure visual grammar. The manuscript is the only source of scientific content; "
-    "the visual grammar is an abstraction from several peer papers and may guide composition, iconography, "
-    "visual density, and operation-bearing geometry, but its paper-specific content must never be copied. "
-    "Return only one complete, production-ready GPT Image prompt for a restrained academic "
-    "diagram. First identify the figure's single scientific message and the minimum visual structure "
-    "needed to communicate it. Make that message independently decodable by an unfamiliar reader: the "
-    "visual must explicitly encode the source or input, the mechanism or decision criterion, and the "
-    "resulting output or contrast whenever those roles exist. If two branches perform different operations, "
-    "give them different operation-bearing geometry, ordering, markers, or direct labels; never express the "
-    "scientific difference only by color or by naming otherwise identical paths. Preserve the manuscript's "
-    "causal and temporal boundaries: training-only objects must remain in training, inference-only objects "
-    "must remain in inference, and a downstream object must never be drawn before the operation that produces "
-    "it. Do not introduce an acronym, "
-    "symbol, or glyph unless its meaning is defined next to it or visually demonstrated. Before returning the "
-    "prompt, perform a cold-reader check: without the manuscript or caption, the intended one-sentence reading "
-    "must follow from the requested visual encodings. Reject a composition that is attractive but only shows "
-    "component names, equal boxes, or unexplained arrows instead of the load-bearing mechanism. Follow common "
-    "ACL figure conventions: pure white background, flat vector "
-    "geometry, thin consistent strokes, compact alignment, generous whitespace, precise typography, "
-    "two to four clearly related regions, and a muted colorblind-safe palette of three to five colors. "
-    "Use tokens, small semantic glyphs, arrows, brackets, paths, matrices, or modules only when they "
-    "encode the mechanism. Prefer a clean academic schematic over decorative poster art. "
-    "Do not add people, scenery, mascots, photorealistic objects, gradients, glow, glass, 3D depth, glossy "
-    "buttons, heavy shadows, or marketing-style visual drama unless the manuscript explicitly requires "
-    "them. Do not default to oversized text cards or a generic box-and-arrow flowchart. A collection of "
-    "rectangles whose only content is text is not a scientific mechanism figure. Use recognizable semantic "
-    "pictograms, miniature records or profiles, token groups, ranked strips, masks, checks, contrasting paths, "
-    "or other manuscript-grounded visual objects so operations are shown rather than merely named. Small "
-    "boxes and panels are acceptable only when they organize a subsystem or precisely encode tokens, states, "
-    "or modules. Keep labels short and "
-    "print-readable. Specify exact spatial composition, visual encoding, minimal verbatim labels, aspect "
-    "ratio, safe crop band, and column-size readability. Stay faithful to the evidence, do not invent "
-    "results, and never put result charts in a method figure. Return the image-generation prompt only, "
-    "without commentary or Markdown fences."
-)
-def _openai_chat_raw(model, messages):
-    key = os.environ.get("OPENAI_API_KEY") or sys.exit("OPENAI_API_KEY not set")
-    body = json.dumps({"model": model, "messages": messages}).encode()
-    req = urllib.request.Request(
-        "https://api.openai.com/v1/chat/completions", data=body,
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=180) as r:
-        return json.load(r)["choices"][0]["message"]["content"].strip()
-
-
-def _openai_chat(model, system, user):
-    return _openai_chat_raw(model, [{"role": "system", "content": system},
-                                    {"role": "user", "content": user}])
-
-
-# NOTE: there is deliberately NO scripted "refine" step. First-draft figures fail in ways that
-# cannot be enumerated in a fixed instruction, so REFINEMENT IS AGENT-DRIVEN: the calling agent
-# READS the drawn image, decides what is actually wrong, rewrites `spec.draw_prompt` itself
-# (Write/Edit the spec), and re-runs `draw`. See SKILL.md Stage 3.
-
-
-def cmd_genprompt(args):
-    paper = Path(args.paper).read_text(encoding="utf-8", errors="replace")
-    grammar_path = getattr(args, "visual_grammar", None)
-    visual_grammar = ""
-    if grammar_path:
-        visual_grammar = Path(grammar_path).read_text(
-            encoding="utf-8", errors="replace"
-        ).strip()
-    user_payload = "MANUSCRIPT EVIDENCE\n" + paper
-    if visual_grammar:
-        user_payload += (
-            "\n\nREFERENCE-FIGURE VISUAL GRAMMAR\n"
-            + visual_grammar
-            + "\n\nUse this only as an abstract visual prior. Do not copy any referenced "
-            "paper's scientific content, labels, layout identity, or artwork."
-        )
-    prompt = _openai_chat(args.model, META_PROMPT, user_payload)
-    if args.spec and os.path.exists(args.spec):
-        spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
-        spec["draw_prompt"] = prompt
-        Path(args.spec).write_text(
-            json.dumps(spec, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-        print(json.dumps({"genprompt": "written to spec.draw_prompt", "spec": args.spec,
-                          "chars": len(prompt)}, ensure_ascii=False))
-    print(prompt)
-
-
-# ---------- 2. DRAW (swappable image model) ----------
-def draw_openai(prompt, size, out_png, quality="high"):
-    key = os.environ.get("OPENAI_API_KEY") or sys.exit("OPENAI_API_KEY not set")
-    body = json.dumps({"model": "gpt-image-1", "prompt": prompt, "size": size,
-                       "quality": quality, "n": 1}).encode()
-    req = urllib.request.Request(
-        "https://api.openai.com/v1/images/generations", data=body,
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=300) as r:
-        data = json.load(r)
-    with open(out_png, "wb") as f:
-        f.write(base64.b64decode(data["data"][0]["b64_json"]))
-    return out_png
-
-
-DRAWERS = {"openai": draw_openai}
-
-
-def _archive_iteration(spec_path, fid, img, prompt):
-    """Save every iteration (image + the exact prompt used) so nothing is overwritten."""
-    d = os.path.join(os.path.dirname(os.path.abspath(spec_path)) or ".", "iterations", fid)
-    os.makedirs(d, exist_ok=True)
-    nums = [int(m.group(1)) for f in os.listdir(d) if (m := re.match(r"round_(\d+)\.png$", f))]
-    n = max(nums, default=0) + 1
-    shutil.copy(img, os.path.join(d, f"round_{n:02d}.png"))
-    with open(os.path.join(d, f"round_{n:02d}.prompt.txt"), "w", encoding="utf-8") as f:
-        f.write(prompt)
-    return n, f"iterations/{fid}/round_{n:02d}"
-
-
-def cmd_draw(args):
-    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
-    if not spec.get("draw_prompt"):
-        sys.exit("spec.draw_prompt is empty — run `genprompt --paper <file> --spec <spec>` first")
-    out = args.out or f"{spec['figure_id']}.bg.png"
-    # draw with the generated prompt VERBATIM — nothing appended.
-    DRAWERS[args.provider](spec["draw_prompt"], spec.get("image_size", "1536x1024"),
-                           out, spec.get("quality", "high"))
-    n, saved = _archive_iteration(args.spec, spec["figure_id"], out, spec["draw_prompt"])
-    print(json.dumps({"drew": out, "provider": args.provider, "iteration": n,
-                      "saved": saved + ".png (+ .prompt.txt)"}))
-
-
-# ---------- 3. BUILD editable PPTX ----------
-def cmd_build(args):
-    from pptx import Presentation
-    from pptx.util import Inches, Pt
-    from pptx.dml.color import RGBColor
-    from pptx.enum.text import PP_ALIGN
-    from PIL import Image
-    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
-    W, H = spec["canvas_in"]
-    img = getattr(args, "img", None) or f"{spec['figure_id']}.bg.png"
-    out = args.out or f"{spec['figure_id']}.pptx"
-    prs = Presentation()
-    prs.slide_width, prs.slide_height = Inches(W), Inches(H)
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    if os.path.exists(img):
-        with Image.open(img) as image:
-            image_ratio = image.width / image.height
-        target_ratio = W / H
-        picture = slide.shapes.add_picture(
-            img, 0, 0, width=Inches(W), height=Inches(H)
-        )
-        # Fill the requested paper slot without stretching the GPT Image draft.
-        # Prompt generation keeps critical content inside the matching safe band.
-        if image_ratio > target_ratio:
-            crop = (1 - target_ratio / image_ratio) / 2
-            picture.crop_left = crop
-            picture.crop_right = crop
-        elif image_ratio < target_ratio:
-            crop = (1 - image_ratio / target_ratio) / 2
-            picture.crop_top = crop
-            picture.crop_bottom = crop
-    align = {"left": PP_ALIGN.LEFT, "center": PP_ALIGN.CENTER, "right": PP_ALIGN.RIGHT}
-    for lb in spec.get("labels", []):
-        tb = slide.shapes.add_textbox(Inches(lb["x"] * W), Inches(lb["y"] * H),
-                                      Inches(lb.get("w", 0.2) * W), Inches(0.3))
-        tb.text_frame.word_wrap = True
-        p = tb.text_frame.paragraphs[0]
-        p.alignment = align.get(lb.get("align", "center"), PP_ALIGN.CENTER)
-        run = p.add_run(); run.text = lb["text"]
-        run.font.size = Pt(lb.get("size", 11)); run.font.bold = lb.get("bold", False)
-        run.font.name = lb.get("font", "Times New Roman")
-        if lb.get("color"):
-            run.font.color.rgb = RGBColor.from_string(lb["color"])
-    prs.save(out)
-    print(json.dumps({"built": out, "labels": len(spec.get("labels", [])),
-                      "note": "open in PowerPoint to edit label text/position by hand"}))
-
-
-# ---------- 3b. BUILD as fully-editable NATIVE PPT SHAPES (all elements editable) ----------
+# ---------- BUILD as fully-editable NATIVE PPT SHAPES ----------
 def _hx(c):
     return c.lstrip("#")
+
+
+SEMANTIC_SHAPE_ROLES = {"input", "operation", "output", "annotation"}
+REQUIRED_SEMANTIC_SHAPE_ROLES = {"input", "operation", "output"}
+
+
+def validate_native_shape_spec(spec):
+    """Reject final native figures that contradict their readability contract."""
+    if not isinstance(spec, dict) or not isinstance(spec.get("shapes"), list):
+        raise ValueError("Native shape spec requires a shapes array.")
+    if spec.get("no_text") is True:
+        raise ValueError(
+            "Native paper figures cannot set no_text=true; final figures require "
+            "print-readable semantic labels."
+        )
+    try:
+        contract_version = int(spec.get("semantic_contract_version") or 0)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("semantic_contract_version must be an integer.") from exc
+    if contract_version < 2:
+        return spec
+
+    text_shapes = [
+        item for item in spec["shapes"]
+        if isinstance(item, dict) and str(item.get("text") or "").strip()
+    ]
+    if len(text_shapes) < 3:
+        raise ValueError(
+            "Semantic figure contract requires at least three labels covering "
+            "input, operation, and output."
+        )
+    observed_roles = set()
+    observed_labels = set()
+    for item in text_shapes:
+        role = str(item.get("semantic_role") or "").strip()
+        if role not in SEMANTIC_SHAPE_ROLES:
+            raise ValueError(
+                "Every text-bearing shape must declare semantic_role as input, "
+                "operation, output, or annotation."
+            )
+        observed_roles.add(role)
+        observed_labels.add(str(item["text"]).strip())
+        if float(item.get("font_size", 0)) < 7:
+            raise ValueError("Final paper-figure labels must be at least 7 pt.")
+    required_roles = {
+        str(item).strip()
+        for item in spec.get(
+            "required_semantic_roles", sorted(REQUIRED_SEMANTIC_SHAPE_ROLES)
+        )
+        if str(item).strip()
+    }
+    missing_roles = required_roles - observed_roles
+    if missing_roles:
+        raise ValueError(
+            "Semantic figure contract is missing roles: "
+            + ", ".join(sorted(missing_roles))
+        )
+    required_labels = {
+        str(item).strip()
+        for item in spec.get("required_labels", [])
+        if str(item).strip()
+    }
+    missing_labels = required_labels - observed_labels
+    if missing_labels:
+        raise ValueError(
+            "Native figure is missing required labels: "
+            + ", ".join(sorted(missing_labels))
+        )
+    return spec
 
 
 def cmd_buildshapes(args):
@@ -238,7 +101,9 @@ def cmd_buildshapes(args):
     from pptx.enum.text import PP_ALIGN
     from pptx.enum.shapes import MSO_SHAPE, MSO_CONNECTOR
     from pptx.oxml.ns import qn
-    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
+    spec = validate_native_shape_spec(
+        json.loads(Path(args.spec).read_text(encoding="utf-8"))
+    )
     W, H = spec["canvas_in"]
     out = args.out or f"{spec['figure_id']}.pptx"
     prs = Presentation(); prs.slide_width, prs.slide_height = Inches(W), Inches(H)
@@ -399,43 +264,10 @@ def shape_spec_html(spec):
     return "".join(parts)
 
 
-def image_spec_html(spec, image_path):
-    """Render the exact GPT image plus the same editable-label coordinates as the PPT."""
-    W, H = map(float, spec["canvas_in"])
-    encoded = base64.b64encode(Path(image_path).read_bytes()).decode("ascii")
-    labels = []
-    for label in spec.get("labels", []):
-        text = html.escape(str(label.get("text", "")))
-        align = html.escape(str(label.get("align", "center")), quote=True)
-        color = "#" + str(label.get("color", "222222")).lstrip("#")
-        weight = "700" if label.get("bold", False) else "400"
-        labels.append(
-            f'<div class="label" style="left:{float(label["x"])*100:.4f}%;'
-            f'top:{float(label["y"])*100:.4f}%;width:{float(label.get("w",.2))*100:.4f}%;'
-            f'font-size:{float(label.get("size",11))}pt;text-align:{align};'
-            f'color:{color};font-weight:{weight}">{text}</div>'
-        )
-    return "".join(
-        [
-            "<!doctype html><html><head><meta charset='utf-8'><style>",
-            f"@page{{size:{W}in {H}in;margin:0}}",
-            f"html,body{{margin:0;width:{W}in;height:{H}in;overflow:hidden;background:white}}",
-            ".canvas{position:relative;width:100%;height:100%;overflow:hidden}",
-            ".canvas img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}",
-            ".label{position:absolute;height:.3in;display:flex;align-items:center;justify-content:center;",
-            "box-sizing:border-box;font-family:'Times New Roman';line-height:1.05}",
-            "</style></head><body><div class='canvas'>",
-            f"<img src='data:image/png;base64,{encoded}'/>",
-            *labels,
-            "</div></body></html>",
-        ]
-    )
-
-
 def _write_html_pdf(source_html, out, error_message):
     chrome = _chrome_executable()
     if not chrome:
-        sys.exit("找不到可用的无界面 Chrome/Chromium，无法自动导出机制图 PDF。")
+        sys.exit("Cannot find a usable headless Chrome or Chromium, cannot automatically export mechanism diagram PDF.")
     out = os.path.abspath(out)
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="figure-pdf-") as temp_dir:
@@ -487,28 +319,16 @@ def _write_html_pdf(source_html, out, error_message):
             shutil.copyfileobj(source_pdf, target_pdf)
         os.replace(temporary_target, out)
     if not os.path.exists(out) or os.path.getsize(out) < 1000:
-        sys.exit("机制图 PDF 写入失败。")
+        sys.exit("Failed to write mechanism diagram PDF.")
 
 
 def cmd_pdfshapes(args):
-    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
-    out = os.path.abspath(args.out or f"{spec['figure_id']}.pdf")
-    _write_html_pdf(shape_spec_html(spec), out, "无界面 Chrome 导出机制图 PDF 失败。")
-    print(json.dumps({"pdf": out, "renderer": "headless-chrome-shape-spec", "ok": True}))
-
-
-def cmd_pdfimage(args):
-    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
-    image_path = args.img or f"{spec['figure_id']}.bg.png"
-    if not os.path.exists(image_path):
-        sys.exit("GPT Image 草图不存在，无法导出同视觉 PDF。")
-    out = os.path.abspath(args.out or f"{spec['figure_id']}.pdf")
-    _write_html_pdf(
-        image_spec_html(spec, image_path),
-        out,
-        "无界面 Chrome 导出 GPT Image PDF 失败。",
+    spec = validate_native_shape_spec(
+        json.loads(Path(args.spec).read_text(encoding="utf-8"))
     )
-    print(json.dumps({"pdf": out, "renderer": "headless-chrome-gpt-image", "ok": True}))
+    out = os.path.abspath(args.out or f"{spec['figure_id']}.pdf")
+    _write_html_pdf(shape_spec_html(spec), out, "Chrome export of the mechanism diagram PDF failed without UI.")
+    print(json.dumps({"pdf": out, "renderer": "headless-chrome-shape-spec", "ok": True}))
 
 
 def cmd_pdf(args):
@@ -527,7 +347,7 @@ def cmd_pdf(args):
             soffice = candidate
             break
     if not soffice:
-        sys.exit("找不到可运行的 LibreOffice；机制图请使用 pdfshapes 进行无人值守矢量导出。")
+        sys.exit("Cannot find a runnable LibreOffice; mechanism diagrams should be exported as unattended vectors using pdfshapes.")
     with tempfile.TemporaryDirectory(prefix="figure-soffice-") as temporary:
         profile = os.path.join(temporary, "profile")
         converted_dir = os.path.join(temporary, "converted")
@@ -542,7 +362,7 @@ def cmd_pdf(args):
             os.path.splitext(os.path.basename(args.pptx))[0] + ".pdf",
         )
         if not os.path.exists(converted_pdf) or os.path.getsize(converted_pdf) < 1000:
-            sys.exit("LibreOffice 未生成有效机制图 PDF。")
+            sys.exit("LibreOffice No valid mechanism diagram PDF generated.")
         temporary_target = final_pdf + ".tmp"
         with open(converted_pdf, "rb") as source_pdf, open(temporary_target, "wb") as target_pdf:
             shutil.copyfileobj(source_pdf, target_pdf)
@@ -550,27 +370,20 @@ def cmd_pdf(args):
     print(json.dumps({"pdf": final_pdf, "ok": os.path.exists(final_pdf)}))
 
 
-def cmd_all(args):
-    # genprompt → draw → build → pdf. The REFINE step (read image → rewrite spec.draw_prompt →
-    # redraw) is agent-driven and lives BETWEEN draw and build — do it by hand, not here.
-    args.out = None
-    cmd_genprompt(args)
-    cmd_draw(args)
-    cmd_build(args)
-    spec = json.loads(Path(args.spec).read_text(encoding="utf-8"))
-    args.pptx = f"{spec['figure_id']}.pptx"
-    cmd_pdf(args)
-
-
 EXAMPLE = {
     "figure_id": "rts_fig1",
     "canvas_in": [6.5, 3.0],
-    "image_size": "1536x1024",
-    "quality": "high",
-    "draw_prompt": "",
-    "_draw_prompt_note": "leave empty — filled by `genprompt --paper <method> --spec this.json`",
-    "labels": [
-        {"text": "example label", "x": 0.05, "y": 0.05, "w": 0.2, "size": 10, "align": "left"}
+    "shapes": [
+        {"kind": "rounded_rect", "x": 0.08, "y": 0.25, "w": 0.22, "h": 0.3,
+         "fill": "EAF4F8", "line": "203746", "line_w": 1,
+         "text": "Input", "font_size": 9, "bold": True,
+         "font_color": "203746", "align": "center"},
+        {"kind": "arrow", "x1": 0.32, "y1": 0.4, "x2": 0.52, "y2": 0.4,
+         "color": "203746", "weight": 1.5},
+        {"kind": "hexagon", "x": 0.55, "y": 0.22, "w": 0.3, "h": 0.36,
+         "fill": "EAF7F5", "line": "087F74", "line_w": 1,
+         "text": "Operation", "font_size": 9, "bold": True,
+         "font_color": "087F74", "align": "center"}
     ]
 }
 
@@ -579,28 +392,15 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    gp = sub.add_parser("genprompt"); gp.add_argument("--paper", required=True)
-    gp.add_argument("--spec"); gp.add_argument("--model", default="gpt-4o")
-    gp.add_argument("--visual-grammar")
-    for name in ("draw", "build", "buildshapes", "all"):
-        p = sub.add_parser(name); p.add_argument("spec"); p.add_argument("--out")
-        if name in ("draw", "all"):
-            p.add_argument("--provider", choices=list(DRAWERS), default="openai")
-        if name == "build":
-            p.add_argument("--img")
-        if name == "all":
-            p.add_argument("--paper", required=True); p.add_argument("--model", default="gpt-4o")
+    bs = sub.add_parser("buildshapes"); bs.add_argument("spec"); bs.add_argument("--out")
     pp = sub.add_parser("pdf"); pp.add_argument("pptx")
     ps = sub.add_parser("pdfshapes"); ps.add_argument("spec"); ps.add_argument("--out")
-    pi = sub.add_parser("pdfimage"); pi.add_argument("spec"); pi.add_argument("--img"); pi.add_argument("--out")
     sub.add_parser("emit-example")
     args = ap.parse_args()
     if args.cmd == "emit-example":
         print(json.dumps(EXAMPLE, ensure_ascii=False, indent=2)); return
-    {"genprompt": cmd_genprompt, "draw": cmd_draw, "build": cmd_build,
-     "buildshapes": cmd_buildshapes, "pdf": cmd_pdf, "pdfshapes": cmd_pdfshapes,
-     "pdfimage": cmd_pdfimage,
-     "all": cmd_all}[args.cmd](args)
+    {"buildshapes": cmd_buildshapes, "pdf": cmd_pdf,
+     "pdfshapes": cmd_pdfshapes}[args.cmd](args)
 
 
 if __name__ == "__main__":

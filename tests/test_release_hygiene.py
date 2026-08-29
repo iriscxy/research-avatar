@@ -9,30 +9,11 @@ import tokenize
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest import mock
-
-from bs4 import BeautifulSoup
-
-from research_avatar.tools.rewrite_ideagen_html import provider_settings, reference_graph
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleaseHygieneTests(unittest.TestCase):
-    def test_ideagen_rewrite_reference_graph_covers_footnotes_and_links(self):
-        soup = BeautifulSoup(
-            '<p>Claim<a href="#fn-1">1</a></p>'
-            '<aside id="fn-1" role="doc-footnote">Evidence</aside>'
-            '<a href="https://example.edu/paper">Paper</a>',
-            "html.parser",
-        )
-        before = reference_graph(soup)
-        soup.find("p").contents[0].replace_with("Rewritten claim")
-        after = reference_graph(soup)
-        self.assertEqual(before, after)
-        self.assertEqual(before["footnote_count"], 1)
-
     def test_studios_use_launch_directory_as_project_root(self):
         with TemporaryDirectory() as directory:
             environment = os.environ.copy()
@@ -59,38 +40,6 @@ class ReleaseHygieneTests(unittest.TestCase):
             self.assertEqual(Path(observed["research"]).resolve(), expected_root)
             self.assertTrue(observed["figure_tool"])
             self.assertTrue(observed["demo"])
-
-    def test_ideagen_provider_settings_do_not_cross_read_keys(self):
-        with mock.patch.dict(
-            "os.environ",
-            {
-                "OPENAI_BASE_URL": "https://openai.example/v1/",
-                "DEEPSEEK_BASE_URL": "https://deepseek.example/",
-                "IDEAGEN_REWRITE_MODEL": "openai-model",
-                "DEEPSEEK_IDEAGEN_REWRITE_MODEL": "deepseek-model",
-            },
-            clear=True,
-        ):
-            self.assertEqual(
-                provider_settings("openai"),
-                {
-                    "provider": "openai",
-                    "receipt_provider": "openai-api",
-                    "key_environment_variable": "OPENAI_API_KEY",
-                    "base_url": "https://openai.example/v1",
-                    "model": "openai-model",
-                },
-            )
-            self.assertEqual(
-                provider_settings("deepseek"),
-                {
-                    "provider": "deepseek",
-                    "receipt_provider": "deepseek-api",
-                    "key_environment_variable": "DEEPSEEK_API_KEY",
-                    "base_url": "https://deepseek.example",
-                    "model": "deepseek-model",
-                },
-            )
 
     def test_shipped_instructions_have_no_personal_absolute_paths(self):
         candidates = [ROOT / "README.md", ROOT / "Makefile"]

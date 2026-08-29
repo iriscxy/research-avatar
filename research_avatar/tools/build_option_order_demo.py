@@ -61,13 +61,13 @@ REFERENCE_MOVES = {
 }
 
 REFERENCE_LOGIC = {
-    "abstract": "参考摘要先提出问题和局限，再给出解释、证据与审慎结论。",
-    "introduction": "参考引言从重要性收窄到缺口，再提出方案与可验证边界。",
-    "related_work": "参考论文先分类方法与理论，再定位自身贡献。",
-    "method": "参考方法部分先概述思路，再定义过程和实现细节。",
-    "experiments": "参考实验部分依次说明设置、数据、比较方法与指标。",
-    "discussion": "参考讨论区分可观察结论、不可确定部分与适用边界。",
-    "conclusion": "参考结论总结贡献、证据边界和未来方向。",
+    "abstract": "The abstract first presents the problem and limitations, then gives explanations, evidence, and prudent conclusions.",
+    "introduction": "The Introduction narrows from importance to the gap, then proposes a plan and verifiable boundaries.",
+    "related_work": "The reference paper first categorizes methods and theory, then situates its own contribution.",
+    "method": "Reference Methods section first outlines the idea, then defines the process and implementation details.",
+    "experiments": "Reference experiment section explains settings, data, comparison methods and metrics.",
+    "discussion": "Discussion area distinguishes observable conclusions, indeterminate parts and applicable boundaries.",
+    "conclusion": "Reference conclusions summarize contributions, evidence boundaries, and future directions.",
 }
 
 

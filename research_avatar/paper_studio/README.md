@@ -14,10 +14,10 @@ or API-key settings panel:
 
 ```bash
 # OpenAI
-export OPENAI_API_KEY="粘贴你的 API key"
+export OPENAI_API_KEY="your API key"
 
 # DeepSeek
-export DEEPSEEK_API_KEY="粘贴你的 API key"
+export DEEPSEEK_API_KEY="your API key"
 
 python3 -m research_avatar.research_studio.server --ensure-studios
 ```
@@ -28,7 +28,8 @@ process and are never sent to the browser. Enter them in the local terminal,
 not in chat, a repository file, or a browser field. If the writer was already
 running without the selected key, stop it and restart it after exporting the
 project. Changing the writer provider resets incompatible conversation IDs.
-GPT Image remains OpenAI-only.
+Mechanism figures are rendered locally as editable native shapes by Codex and
+do not require a separate image-provider key.
 
 The application under `research_avatar/paper_studio/` is a reusable engine. Project-specific
 identity, section order and LaTeX filenames, result bindings, Figure/Table
@@ -61,8 +62,8 @@ pending or candidate paragraphs may be edited in any order, accepted paragraphs
 remain selectable revision bases, and accepted prose is always assembled into
 LaTeX in the approved plan order.
 
-After the outline is approved, **直接生成全文初稿** provides an optional batch
-path inside the existing **正文** workspace. It uses the same LLM API, paragraph
+After the outline is approved, **Generate full first draft** provides an optional batch
+path inside the existing **Prose** workspace. It uses the same LLM API, paragraph
 plan, citation verification, result bindings, transactional LaTeX writes, and
 compile checks as interactive drafting. It processes only unaccepted paragraphs,
 in the `batch_writing_order` declared by `paper/paper_studio.json`; accepted prose
@@ -101,13 +102,13 @@ keeps the same obligations as literal `\cite{}` placeholders and never selects k
 citation keys; writes only the section's fixed file under `paper/sections/`;
 compiles immediately; and restores the previous file if compilation fails.
 
-The writing panel also offers `一键生成当前 Section`. It uses the same
+The writing panel also offers `Generate current Section`. It uses the same
 paragraph generator, acceptance checks, citation constraints, transactional
 LaTeX writes, and compilation path as ordinary paragraph writing, but limits
 the task to unfinished paragraphs and bound figures/tables in the selected
 Section. It has its own `/api/section-draft/start` endpoint and
 `section_draft_job` state; it never creates, updates, or displays the
-`full_draft_job` used by **直接生成全文初稿**. Accepted paragraphs and every
+`full_draft_job` used by **Generate full first draft**. Accepted paragraphs and every
 other Section remain unchanged.
 
 The **Figures** workspace is section-aware: it uses each configured figure's
@@ -121,11 +122,10 @@ a concrete instruction (for example, simplify the composition or make it
 single-column); GPT receives the current Prompt plus that instruction and rewrites
 the complete Prompt. Each mechanism figure owns a separate persistent Responses
 API chain (`figure:F1`, `figure:F3`, and so on); it never reuses the manuscript
-section's writing conversation. Only **Confirm Prompt → GPT Image** starts drawing.
-Prompt generation and image drawing run as background jobs with persisted stage
-and progress messages in the browser. The resulting raster is a composition
-draft, then the confirmed composition is rebuilt internally as editable PowerPoint shapes
-and exported to PDF. Result-driven data figures use the installed local Codex
+section's writing conversation. Only **Confirm Prompt → Codex drawing** starts drawing.
+Prompt generation and native-shape composition run as background jobs with persisted
+stage and progress messages in the browser. The composition is emitted directly as
+editable PowerPoint shapes and exported to PDF. Result-driven data figures use the installed local Codex
 agent to author a dedicated Python plotting program, then run that archived
 program locally against `results/` to produce matching PDF and PNG candidates.
 Each data panel is generated separately when the researcher requests it, and every
@@ -147,8 +147,8 @@ Codex agent using traceable result context. The browser preview is a PNG rasteri
 from the table's real LaTeX-compiled PDF, not a separately styled HTML table. The
 generated LaTeX remains directly editable before approval.
 
-For free-form revisions, the table workspace also exposes **给本地 Agent 的修改
-Prompt**. That action launches the installed `codex exec` CLI in an ephemeral,
+For free-form revisions, the table workspace also exposes **Revision prompt for the local Agent**.
+That action launches the installed `codex exec` CLI in an ephemeral,
 read-only sandbox, with the current LaTeX and traceable result matrix. Paper Studio
 removes all supported LLM API keys from that subprocess and does not call a text LLM API.
 The returned table must retain its fixed label and caption and compile successfully

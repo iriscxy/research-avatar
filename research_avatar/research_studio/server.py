@@ -104,6 +104,14 @@ ARTIFACTS = {
     "paper_tex": ("paper/main.tex", "text/plain; charset=utf-8"),
 }
 
+STAGE_GENERATION_COMMANDS = {
+    "profile": "$profileconstruct /absolute/path/to/google-scholar-export.html",
+    "literature": "$researchlit",
+    "ideas": "$ideagen",
+    "expplan": "$expplan",
+    "runplan": "$runplan",
+}
+
 
 SCRIPT_PATTERN = re.compile(
     r"<script\b[^>]*\bid=[\"']{identifier}[\"'][^>]*>(.*?)</script>",
@@ -234,7 +242,7 @@ def idea_report_state(path: Path) -> dict[str, Any]:
             re.IGNORECASE | re.DOTALL,
         )
         heading = plain_html(heading_match.group(1)) if heading_match else idea_id
-        title = re.sub(rf"^{re.escape(idea_id)}\s*[·:：-]\s*", "", heading).strip()
+        title = re.sub(rf"^{re.escape(idea_id)}\s*[·::-]\s*", "", heading).strip()
         candidates.append({
             "id": idea_id,
             "title": title or heading,
@@ -597,7 +605,10 @@ def profile_stage(root: Path) -> dict[str, Any]:
         "id": "profile",
         "title": "Research Profile",
         "status": status_for(profile.exists()),
-        "command": "Upload a complete Google Scholar HTML export",
+        "command": (
+            "Research Profile is ready"
+            if profile.exists() else STAGE_GENERATION_COMMANDS["profile"]
+        ),
         "metrics": [
             {"label": "Researcher", "value": name or "Pending"},
             {"label": "Publications", "value": str(count) if count else "—"},
@@ -613,7 +624,10 @@ def literature_stage(root: Path) -> dict[str, Any]:
         "id": "literature",
         "title": "Literature Survey",
         "status": status_for(literature["exists"]),
-        "command": "Waiting for the literature survey",
+        "command": (
+            "Literature Survey is ready"
+            if literature["exists"] else STAGE_GENERATION_COMMANDS["literature"]
+        ),
         "metrics": [
             {"label": "Survey", "value": "Ready" if literature["exists"] else "Pending"},
         ],
@@ -629,7 +643,10 @@ def ideas_stage(root: Path) -> dict[str, Any]:
         "id": "ideas",
         "title": "Idea Selection",
         "status": status_for(ideas["exists"], approved=bool(idea_selection["selected_id"]) if ideas["exists"] else None),
-        "command": "Waiting for the idea report and researcher selection",
+        "command": (
+            "Idea Selection is ready"
+            if ideas["exists"] else STAGE_GENERATION_COMMANDS["ideas"]
+        ),
         "metrics": [
             {"label": "Idea report", "value": "Ready" if ideas["exists"] else "Pending"},
             {"label": "Human pick", "value": idea_selection["selected_id"] or "Pending"},
@@ -650,7 +667,10 @@ def expplan_stage(root: Path) -> dict[str, Any]:
         "id": "expplan",
         "title": "Experiment Plan",
         "status": status_for(artifact["exists"], approved=approved),
-        "command": "Waiting for the experiment plan and approval",
+        "command": (
+            "Experiment Plan is ready"
+            if artifact["exists"] else STAGE_GENERATION_COMMANDS["expplan"]
+        ),
         "metrics": [
             {"label": "Approval", "value": contract.get("approval_status", "Pending")},
             {"label": "Venue", "value": target.get("venue", "—")},
@@ -681,7 +701,10 @@ def runplan_stage(root: Path) -> dict[str, Any]:
         "status": "in_progress" if artifact["exists"] and len(completed) < len(goals) else status_for(artifact["exists"]),
         "command": (
             f"Execute {proposed_id}: {proposed.get('title', '')}"
-            if proposed_id else "Waiting for the run plan"
+            if proposed_id else (
+                "Experiment Execution is ready"
+                if artifact["exists"] else STAGE_GENERATION_COMMANDS["runplan"]
+            )
         ),
         "metrics": [
             {"label": "Goals", "value": f"{len(completed)} / {len(goals)}"},
@@ -863,14 +886,36 @@ def build_state(
     paper_config = load_json(paper_root / "paper/paper_studio.json")
     paper_project = paper_config.get("project", {}) if isinstance(paper_config.get("project"), dict) else {}
     exp_contract = extract_script_json(root / ARTIFACTS["expplan"][0], "experiment-plan-contract")
+    artifact_versions = [
+        f"{artifact.get('path')}:{artifact.get('modified_ns', 0)}:{artifact.get('size', 0)}"
+        for stage in stages
+        for artifact in stage.get("artifacts", [])
+        if isinstance(artifact, dict) and artifact.get("exists")
+    ]
+    latest_modified_ns = max(
+        (
+            int(artifact.get("modified_ns") or 0)
+            for stage in stages
+            for artifact in stage.get("artifacts", [])
+            if isinstance(artifact, dict) and artifact.get("exists")
+        ),
+        default=0,
+    )
+    project_id = str(paper_project.get("id") or root.name).strip()
     return {
         "schema_version": "1.0",
         "project": {
+            "id": project_id,
             "name": paper_project.get("name") or exp_contract.get("selected_idea") or root.name,
             "root": str(root),
             "paper_root": str(paper_root),
             "mode": "project",
         },
+        "report_version": hashlib.sha256(
+            "\n".join(sorted(artifact_versions)).encode("utf-8")
+        ).hexdigest()[:12],
+        "reports_updated_at": int(latest_modified_ns / 1_000_000_000) if latest_modified_ns else 0,
+        "connection": {"status": "connected", "transport": "local-http"},
         "stages": stages,
         "updated_at": int(time.time()),
         "privacy": {"stores_ip": False, "note": "Research Studio does not persist visitor IP addresses."},
@@ -1042,6 +1087,7 @@ def ensure_project_studios(
     port: int = 8780,
     *,
     open_browser: bool = True,
+    new_tab: bool = False,
 ) -> dict[str, Any]:
     """Idempotently make both project Studio applications available."""
     research = ensure_research_studio(host, port)
@@ -1049,7 +1095,7 @@ def ensure_project_studios(
     if not paper.get("ok"):
         raise RuntimeError(str(paper.get("error") or "Paper Studio failed to start"))
     urls = [str(research["url"])]
-    if open_browser:
+    if open_browser and (new_tab or bool(research.get("started"))):
         webbrowser.open(urls[0])
     return {"research_studio": research, "paper_studio": paper, "urls": urls}
 
@@ -1290,6 +1336,11 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8780)
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument(
+        "--new-tab",
+        action="store_true",
+        help="explicitly open another browser tab even when this project server is already running",
+    )
+    parser.add_argument(
         "--paper-root",
         help=(
             "optional overlay project for Literature/Experiment/Paper stages; "
@@ -1316,6 +1367,7 @@ def main() -> None:
             args.host,
             args.port,
             open_browser=not args.no_browser,
+            new_tab=args.new_tab,
         )
         print(f"Research Studio ready: {result['research_studio']['url']}")
         print(

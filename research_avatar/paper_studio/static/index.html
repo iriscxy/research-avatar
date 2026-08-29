@@ -1,34 +1,37 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Paper Studio</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="static/style.css?v=20260823.5-mobile-overflow">
+  <link rel="stylesheet" href="static/style.css?v=20260829.1-feedback-status-budget">
 </head>
 <body>
-  <label class="studio-language-control" for="studio-language-select"><span id="studio-language-label">界面语言</span>
-    <select id="studio-language-select" aria-label="Language"><option value="zh">中文</option><option value="en">English</option></select>
-  </label>
   <div class="app">
     <aside class="sidebar">
       <div class="brand">
         <h1 id="studio-title">Paper Studio</h1>
         <p id="project-reference-paper" class="project-reference-paper" hidden></p>
+        <dl id="project-runtime-status" class="project-runtime-status">
+          <div><dt>Project</dt><dd id="runtime-project-id">—</dd></div>
+          <div><dt>Reports</dt><dd id="runtime-report-version">—</dd></div>
+          <div><dt>Updated</dt><dd id="runtime-reports-updated">—</dd></div>
+          <div><dt>Connection</dt><dd id="runtime-connection">Connecting…</dd></div>
+        </dl>
       </div>
       <div id="sections" class="sections"></div>
       <div class="sidebar-foot">
         <div id="model-runtime-config" class="model-runtime-config">
-          <label for="model">写作模型</label>
+          <label for="model">Writing model</label>
           <div class="model-input-row">
             <input id="model" list="model-suggestions" value="gpt-5-nano" autocomplete="off" spellcheck="false" disabled>
             <datalist id="model-suggestions"></datalist>
-            <button id="model-apply" class="secondary compact" disabled>应用</button>
+            <button id="model-apply" class="secondary compact" disabled>application</button>
           </div>
         </div>
-        <button id="runtime-key-open" class="ghost" disabled>安全更换 API Key</button>
-        <p class="terminal-help-hint">网页未提供的功能或其他需求，请在本地终端运行 Code Agent。</p>
+        <button id="runtime-key-open" class="ghost" disabled>Safe API key rotation.</button>
+        <p class="terminal-help-hint">Features not provided by the webpage or other requests should be run with Code Agent in the local terminal.</p>
       </div>
     </aside>
 
@@ -40,24 +43,24 @@
         </div>
         <div class="status-row">
           <div class="view-switch" aria-label="Workspace">
-            <button id="writing-view" class="active" disabled>正文</button>
-            <button id="figures-view" disabled>图</button>
-            <button id="tables-view" disabled>表</button>
+            <button id="writing-view" class="active" disabled>body text</button>
+            <button id="figures-view" disabled>figure</button>
+            <button id="tables-view" disabled>table</button>
           </div>
-          <button id="compile" class="secondary" disabled>编译 PDF</button>
-          <button id="reset-generated" class="reset-generated-trigger" disabled>清空生成内容</button>
-          <a id="project-export" class="secondary project-export" href="/api/online/export" download="paper-studio-project.zip" hidden>下载项目 ZIP</a>
+          <button id="compile" class="secondary" disabled>Compile PDF.</button>
+          <button id="reset-generated" class="reset-generated-trigger" disabled>Clear generated content</button>
+          <a id="project-export" class="secondary project-export" href="/api/online/export" download="paper-studio-project.zip" hidden>Download project ZIP</a>
         </div>
       </header>
 
       <section id="api-key-setup" class="api-key-setup" role="alert" hidden>
         <div>
-          <strong>写论文需要 LLM API</strong>
-          <span id="api-key-setup-description">请为当前选择的正文写作 API 在启动 Paper Studio 的本机终端配置；不要把真实 key 输入聊天、提交到仓库或保存在浏览器中。GPT Image 仍单独使用 OpenAI。</span>
+          <strong>Writing a paper requires an LLM API.</strong>
+          <span id="api-key-setup-description">Configure the writing API for the current selected text in the local terminal to start Paper Studio; do not input real keys into chat, submit to repositories, or store in the browser.</span>
         </div>
         <div class="api-key-commands">
-          <code id="api-key-setup-command">export OPENAI_API_KEY="粘贴你的 API key"</code>
-          <span>然后停止当前服务并重新运行</span>
+          <code id="api-key-setup-command">export OPENAI_API_KEY="Paste your API key."</code>
+          <span>Then stop the current service and restart.</span>
           <code id="api-key-restart-command">python3 -m research_avatar.paper_studio.server</code>
         </div>
       </section>
@@ -65,16 +68,16 @@
       <section id="empty-project" class="empty-project" hidden>
         <div>
           <span class="eyebrow dark">EMPTY STUDIO</span>
-          <h3>Paper Studio 已启动，尚未载入论文</h3>
-          <p>将项目配置、段落计划、LaTeX 与图表数据写入 <code>paper/</code> 后，固定网页会自动读取这些内容。</p>
-          <p class="empty-command">空壳启动命令：<code>python3 -m research_avatar.paper_studio.server --empty</code></p>
+          <h3>Paper Studio Started, the paper has not yet loaded.</h3>
+          <p>Write project configuration, paragraph plan, LaTeX and chart data. <code>paper/</code> Thereafter, the static webpage will automatically read these contents.</p>
+          <p class="empty-command">Bare-bones startup command:<code>python3 -m research_avatar.paper_studio.server --empty</code></p>
         </div>
       </section>
 
       <section id="load-error" class="empty-project" hidden>
         <div>
           <span class="eyebrow dark">LOAD ERROR</span>
-          <h3>Paper Studio 状态加载失败</h3>
+          <h3>Paper Studio Status load failed</h3>
           <pre id="load-error-message" class="message error"></pre>
         </div>
       </section>
@@ -83,12 +86,12 @@
         <section class="editor">
           <section id="full-draft-card" class="full-draft-card" aria-labelledby="full-draft-title">
             <div class="full-draft-copy">
-              <strong id="full-draft-title">直接生成全文初稿</strong>
-              <span id="full-draft-summary">复用已批准的段落结构、结果与逐段校验，只补齐尚未写入的段落。</span>
+              <strong id="full-draft-title">Directly generate the full draft.</strong>
+              <span id="full-draft-summary">Reuse approved paragraph structure, results, and per paragraph validation, filling only the sections not yet written.</span>
             </div>
             <div class="full-draft-actions">
-              <button id="full-draft-start" class="primary" type="button" disabled>直接生成全文初稿</button>
-              <button id="full-draft-cancel" class="danger" type="button" hidden disabled>⏸ 停止</button>
+              <button id="full-draft-start" class="primary" type="button" disabled>Directly generate the full draft.</button>
+              <button id="full-draft-cancel" class="danger" type="button" hidden disabled>⏸ stop</button>
             </div>
             <div id="full-draft-progress-row" class="full-draft-progress" hidden>
               <progress id="full-draft-progress" max="100" value="0"></progress>
@@ -97,17 +100,17 @@
           </section>
           <details id="title-editor" class="title-editor" open hidden>
             <summary>
-              <span>论文标题</span>
+              <span>Paper title</span>
               <strong id="title-current-summary">—</strong>
             </summary>
             <div class="title-editor-body">
-              <label for="paper-title">当前标题 / 可编辑候选标题</label>
-              <textarea id="paper-title" rows="2" placeholder="输入论文标题"></textarea>
+              <label for="paper-title">Current title / editable candidate titles.</label>
+              <textarea id="paper-title" rows="2" placeholder="Enter paper title"></textarea>
               <label for="title-gpt-prompt">Title GPT Prompt</label>
-              <textarea id="title-gpt-prompt" rows="3" placeholder="例如：更突出 representation contraction，保持审慎，不增加未验证 claim。"></textarea>
+              <textarea id="title-gpt-prompt" rows="3" placeholder="For example, emphasize representation contraction, remain cautious, do not add unverified claims."></textarea>
               <div class="title-actions">
-                <button id="title-generate" class="primary">GPT 生成候选标题</button>
-                <button id="title-save" class="accept">确认写入 LaTeX</button>
+                <button id="title-generate" class="primary">GPT Generate candidate titles</button>
+                <button id="title-save" class="accept">Confirm writing to LaTeX</button>
               </div>
               <span id="title-status" class="title-status"></span>
             </div>
@@ -119,8 +122,8 @@
           </div>
           <div>
             <div class="paragraph-selector-head">
-              <label>选择当前编辑的自然段</label>
-              <button id="section-draft-start" class="secondary" type="button">一键生成当前 Section</button>
+              <label>Select the currently edited paragraph.</label>
+              <button id="section-draft-start" class="secondary" type="button">One-click generation of the current section.</button>
             </div>
             <div id="section-draft-progress-row" class="section-draft-progress" hidden>
               <progress id="section-draft-progress" max="100" value="0"></progress>
@@ -129,28 +132,28 @@
             <div id="paragraph-nav" class="paragraph-nav"></div>
           </div>
           <details id="reference-context-card" class="reference-context-card" open hidden>
-            <summary id="reference-context-title">参考论文中对应的写法</summary>
+            <summary id="reference-context-title">The corresponding formulation in the reference papers.</summary>
             <div class="reference-context-body">
               <p id="reference-context-summary"></p>
               <section class="structure-card">
-                <strong id="structure-title">目标段落规划（写作约束）</strong>
+                <strong id="structure-title">Target paragraph planning (writing constraints).</strong>
                 <div id="structure-blueprint"></div>
               </section>
               <details id="reference-excerpts-toggle" class="reference-excerpts-toggle">
-                <summary id="reference-excerpts-title">查看参考原文</summary>
+                <summary id="reference-excerpts-title">View referenced original text.</summary>
                 <div id="reference-context-excerpts"></div>
               </details>
             </div>
           </details>
 
-          <label id="candidate-label" for="candidate">当前候选段落</label>
-          <textarea id="candidate" rows="15" placeholder="系统正在结合已批准的段落结构、working abstract 和实验结果生成当前段落…"></textarea>
+          <label id="candidate-label" for="candidate">Current candidate paragraph.</label>
+          <textarea id="candidate" rows="15" placeholder="The system is combining approved paragraph structure working abstract and experimental results to generate the current paragraph."></textarea>
 
-          <label for="comment">给 GPT 的修改意见</label>
-          <textarea id="comment" rows="4" placeholder="例如：motivation 太泛；把三个 confound 说清楚，缩短最后一句。"></textarea>
+          <label for="comment">Feedback to GPT.</label>
+          <textarea id="comment" rows="4" placeholder="For example, motivation is too generic; clarify three confounds and shorten the last sentence."></textarea>
 
           <div class="actions">
-            <button id="generate" class="primary">根据 comment 修改</button>
+            <button id="generate" class="primary">Modify according to comment.</button>
             <button id="accept" class="accept" disabled>Accept → LaTeX</button>
           </div>
           <pre id="message" class="message"></pre>
@@ -163,19 +166,19 @@
               <strong>LaTeX PDF</strong>
             </div>
             <div class="preview-tools">
-              <span id="pdf-page-indicator" aria-live="polite">第 — / — 页</span>
-              <a id="pdf-download" class="secondary download-link" href="/paper.pdf" download="paper.pdf" hidden>下载 PDF</a>
-              <button id="pdf-navigation-toggle" class="secondary" type="button">显示导航栏</button>
+              <span id="pdf-page-indicator" aria-live="polite">Page — / —</span>
+              <a id="pdf-download" class="secondary download-link" href="/paper.pdf" download="paper.pdf" hidden>Download PDF</a>
+              <button id="pdf-navigation-toggle" class="secondary" type="button">Show navigation bar.</button>
               <span id="compile-status" class="status">not compiled</span>
             </div>
           </div>
           <div id="pdf-empty" class="pdf-empty">
-            <b>还没有可预览的 PDF</b>
-            <span>outline 确认并生成 LaTeX scaffold 后，这里会随每次 Accept 自动刷新。</span>
+            <b>No PDF available for preview yet.</b>
+            <span>outline After confirming and generating the LaTeX scaffold, this will automatically refresh with every Accept.</span>
           </div>
           <div id="pdf-viewer" class="pdf-viewer" aria-label="Compiled paper PDF">
-            <aside id="pdf-navigation" class="pdf-navigation" aria-label="PDF 页面导航"></aside>
-            <main id="pdf-pages" class="pdf-pages" aria-label="双击正文或图表可返回编辑"></main>
+            <aside id="pdf-navigation" class="pdf-navigation" aria-label="PDF Page navigation"></aside>
+            <main id="pdf-pages" class="pdf-pages" aria-label="Double click the main text or charts to return to editing."></main>
           </div>
         </section>
       </div>
@@ -185,9 +188,9 @@
           <div class="figure-sequence-head">
             <div>
               <span class="eyebrow dark">CLAIM → FIGURE / TABLE → PROSE</span>
-              <h3>按论证依赖推进图表</h3>
+              <h3>Advance charts according to argument dependencies</h3>
             </div>
-            <p id="artifact-workflow-summary">机制图单独设计；数据图和表格都从 results/ 生成，确认后插入对应自然段。</p>
+            <p id="artifact-workflow-summary">Mechanism diagrams designed separately; data plots and tables are generated from results/ and inserted into the corresponding paragraph after confirmation.</p>
           </div>
           <div id="figure-cards" class="figure-cards"></div>
         </section>
@@ -196,7 +199,7 @@
           <div class="figure-detail-head">
             <div>
               <span id="figure-phase">PHASE</span>
-              <h3 id="figure-title">选择一张图</h3>
+              <h3 id="figure-title">Select a figure.</h3>
             </div>
           </div>
           <div id="figure-gate" class="gate"></div>
@@ -205,21 +208,21 @@
             <p id="online-figure-placeholder-message"></p>
           </section>
           <div id="table-agent-controls" class="local-agent-box" hidden>
-            <label for="table-agent-prompt">修改命令</label>
-            <textarea id="table-agent-prompt" rows="5" placeholder="例如：把两个 benchmark 做成分组表头；我们的方法放最后并加粗；在 caption 中说明 ASR 和 StrongREJECT 都是跨模型平均值。不要改变任何数值。"></textarea>
-            <button id="table-agent-edit" class="agent-action">调用本地 Agent</button>
+            <label for="table-agent-prompt">Modify command</label>
+            <textarea id="table-agent-prompt" rows="5" placeholder="Example: arrange the two benchmarks as grouped headers; place our method last and bold it; in the caption note that ASR and StrongREJECT are cross model averages. Do not modify any values."></textarea>
+            <button id="table-agent-edit" class="agent-action">Invoke local Agent</button>
           </div>
           <div id="figure-progress" class="figure-progress" hidden>
             <div class="figure-progress-main">
               <progress id="figure-progress-bar" class="figure-progress-track" max="100" value="0"></progress>
               <strong id="figure-progress-message"></strong>
             </div>
-            <button id="figure-cancel" class="danger" hidden>⏸ 停止调用</button>
+            <button id="figure-cancel" class="danger" hidden>⏸ Stop calling</button>
           </div>
 
           <div id="mechanism-controls" class="figure-controls mechanism-controls">
             <div id="mechanism-generation-prerequisite" class="mechanism-generation-prerequisite" hidden>
-              <strong>绘图前置步骤</strong>
+              <strong>Drawing prerequisites</strong>
               <span id="mechanism-generation-prerequisite-text"></span>
             </div>
             <div class="mechanism-prompt-workbench">
@@ -227,25 +230,25 @@
                 <header class="mechanism-card-head">
                   <span class="mechanism-step-number">1</span>
                   <div>
-                    <strong>画图 Prompt</strong>
-                    <small>GPT Image 将按这里的完整描述绘制</small>
+                    <strong>Plotting prompt</strong>
+                    <small>Codex Will render native editable graphics according to this complete description.</small>
                   </div>
                 </header>
-                <label for="draw-prompt">GPT 生成的画图 Prompt</label>
-                <textarea id="draw-prompt" rows="11" placeholder="先生成画图 Prompt；可以直接修改左侧完整 Prompt，也可以在右侧输入修改指令。"></textarea>
+                <label for="draw-prompt">GPT Generated drawing prompt.</label>
+                <textarea id="draw-prompt" rows="11" placeholder="First generate the drawing prompt; you can directly modify the complete prompt on the left or enter modification commands on the right."></textarea>
               </section>
 
               <section class="mechanism-editor-card mechanism-revision-card">
                 <header class="mechanism-card-head">
                   <span class="mechanism-step-number">2</span>
                   <div>
-                    <strong>修改 Prompt</strong>
-                    <small>描述希望 GPT 怎样调整左侧 Prompt</small>
+                    <strong>Modify prompt</strong>
+                    <small>Describe how you want GPT to adjust the left side Prompt.</small>
                   </div>
                 </header>
-                <label for="prompt-instruction">给 GPT 的 Prompt 修改指令</label>
-                <textarea id="prompt-instruction" rows="7" placeholder="例如：当前内容太多；改成适合单栏的简单图，只保留两个核心模块，减少文字。"></textarea>
-                <button id="figure-prompt" class="secondary mechanism-revise-action">GPT 生成画图 Prompt</button>
+                <label for="prompt-instruction">Prompt modification instructions for GPT.</label>
+                <textarea id="prompt-instruction" rows="7" placeholder="For example the current content is too long; replace with a simple single column graphic, keep only two core modules, reduce text."></textarea>
+                <button id="figure-prompt" class="secondary mechanism-revise-action">GPT Generate drawing prompt.</button>
               </section>
             </div>
 
@@ -253,51 +256,51 @@
               <header class="mechanism-card-head">
                 <span class="mechanism-step-number">3</span>
                 <div>
-                  <strong>确认 Prompt 后绘图</strong>
-                  <small>确认后依次完成 GPT Image 绘制和可编辑 PowerPoint 重建</small>
+                  <strong>Plot after confirming the Prompt.</strong>
+                  <small>Upon confirmation, Codex directly generates editable PowerPoint and the paper PDF.</small>
                 </div>
               </header>
-              <div class="mechanism-draw-flow" aria-label="机制图生成流程">
+              <div class="mechanism-draw-flow" aria-label="Mechanism diagram generation process">
                 <div id="mechanism-flow-prompt" class="mechanism-flow-step">
-                  <strong>画图 Prompt</strong>
-                  <span id="mechanism-flow-prompt-status">待生成</span>
+                  <strong>Plotting prompt</strong>
+                  <span id="mechanism-flow-prompt-status">To be generated</span>
                 </div>
                 <span class="mechanism-flow-arrow" aria-hidden="true">→</span>
                 <div id="mechanism-flow-image" class="mechanism-flow-step">
-                  <strong>GPT Image</strong>
-                  <span id="mechanism-flow-image-status">等待 Prompt</span>
+                  <strong>Codex Native graphics</strong>
+                  <span id="mechanism-flow-image-status">Waiting for Prompt</span>
                 </div>
                 <span class="mechanism-flow-arrow" aria-hidden="true">→</span>
                 <div id="mechanism-flow-paper" class="mechanism-flow-step">
-                  <strong>可编辑 PPT/PDF</strong>
-                  <span id="mechanism-flow-paper-status">随后自动重建</span>
+                  <strong>Editable PPT/PDF.</strong>
+                  <span id="mechanism-flow-paper-status">Then automatically rebuild.</span>
                 </div>
               </div>
               <div class="figure-actions mechanism-draw-actions">
-                <button id="figure-draw" class="primary">确认 Prompt → GPT Image</button>
-                <button id="figure-build" class="secondary" hidden>重试可编辑 PPT/PDF 重建</button>
+                <button id="figure-draw" class="primary">Confirm prompt → Codex plotting</button>
+                <button id="figure-build" class="secondary" hidden>Retry editable PPT/PDF reconstruction.</button>
               </div>
             </section>
           </div>
           <div id="data-controls" class="figure-controls">
-            <p id="data-workflow-note" class="data-note">请分别生成并检查每张 PDF candidate。全部满意后，再手动点击“合成图”生成 PPTX 与矢量 PDF candidate。</p>
+            <p id="data-workflow-note" class="data-note">Please generate and review each PDF candidate separately. When all are satisfactory, manually click Synthesize Figure to generate PPTX and vector PDF candidates.</p>
             <div id="single-data-controls" hidden>
-              <label for="single-data-prompt">这张图的修改 Prompt</label>
-              <textarea id="single-data-prompt" rows="3" placeholder="例如：缩短标题，把图例移到右上角；只调整这张图，不改变数据。"></textarea>
+              <label for="single-data-prompt">Modification prompt for this figure.</label>
+              <textarea id="single-data-prompt" rows="3" placeholder="For example shorten the title and move the legend to the upper right corner; only adjust this figure and do not change the data."></textarea>
               <div class="figure-actions">
-                <button id="single-data-generate" class="primary">本地 Agent 生成这张图</button>
+                <button id="single-data-generate" class="primary">Local agent generated this figure.</button>
               </div>
             </div>
             <div id="data-panels" class="data-panels"></div>
             <section id="data-composition-editor" class="data-composition-editor">
-              <strong>合成设置</strong>
-              <label id="data-layout-prompt-label" for="data-layout-prompt">论文组合 Prompt</label>
+              <strong>Synthesis settings</strong>
+              <label id="data-layout-prompt-label" for="data-layout-prompt">Paper composition prompt.</label>
               <textarea id="data-layout-prompt" rows="4" placeholder=""></textarea>
               <div id="data-compose-actions" class="figure-actions">
-                <button id="data-compose" class="primary">合成图</button>
+                <button id="data-compose" class="primary">Composite figure</button>
               </div>
               <details id="data-layout-plan-wrap" class="layout-plan" hidden>
-                <summary>Agent 解析的布局计划</summary>
+                <summary>Agent Parsed layout plan</summary>
                 <pre id="data-layout-plan"></pre>
               </details>
             </section>
@@ -305,7 +308,7 @@
 
           <div id="mechanism-build-status" class="data-note" hidden></div>
           <div id="mechanism-preview-switch" class="figure-actions" hidden>
-            <button id="mechanism-preview-toggle" class="secondary">显示 GPT 原图</button>
+            <button id="mechanism-preview-toggle" class="secondary">Show composition draft</button>
             <span id="mechanism-preview-note"></span>
           </div>
 
@@ -314,50 +317,50 @@
           <div id="table-preview" class="table-preview" hidden></div>
 
           <section id="figure-caption-box" class="figure-caption-box">
-            <label for="figure-caption">图片 Caption</label>
-            <textarea id="figure-caption" rows="3" placeholder="描述这张图所展示的内容和必要的实验条件。"></textarea>
-            <label for="figure-caption-prompt">给 GPT 的 Caption 修改 Prompt</label>
-            <textarea id="figure-caption-prompt" rows="2" placeholder="例如：解释三条曲线分别对应什么；压缩为一句短句；保留 synthetic 声明。"></textarea>
-            <button id="figure-caption-generate" class="primary">GPT 生成 Caption candidate</button>
+            <label for="figure-caption">Image caption</label>
+            <textarea id="figure-caption" rows="3" placeholder="Describe what this figure shows and the required experimental conditions."></textarea>
+            <label for="figure-caption-prompt">Caption modification Prompt for GPT.</label>
+            <textarea id="figure-caption-prompt" rows="2" placeholder="For example, explain what each of three curves represents; compress to one sentence; retain the synthetic declaration."></textarea>
+            <button id="figure-caption-generate" class="primary">GPT Generate caption candidate.</button>
             <div class="figure-caption-actions">
-              <span id="figure-caption-status">当前正文将使用此 Caption</span>
-              <button id="figure-caption-save" class="secondary">保存 Caption</button>
+              <span id="figure-caption-status">The current main text will use this caption.</span>
+              <button id="figure-caption-save" class="secondary">Save caption</button>
             </div>
           </section>
 
           <div id="figure-placement-row" class="figure-placement-row">
             <div class="figure-placement">
-              <label for="figure-placement">插入正文位置</label>
+              <label for="figure-placement">Body text insertion point</label>
               <select id="figure-placement"></select>
             </div>
             <div id="figure-layout-control" class="figure-placement">
-              <label for="figure-layout-mode">排版方式</label>
+              <label for="figure-layout-mode">Typesetting method</label>
               <select id="figure-layout-mode">
-                <option value="single-column">单栏</option>
-                <option value="two-column">双栏</option>
-                <option value="wrapfigure" disabled>Wrapfigure（AAAI 禁用）</option>
+                <option value="single-column">single-column</option>
+                <option value="two-column">two-column</option>
+                <option value="wrapfigure" disabled>Wrapfigure(AAAI Disable)</option>
               </select>
             </div>
           </div>
           <div id="data-approve-after-placement" class="figure-actions" hidden>
-            <button id="data-approve" class="accept">确认并插入正文</button>
+            <button id="data-approve" class="accept">Confirm and insert the body text</button>
           </div>
           <div id="mechanism-approve-after-placement" class="figure-actions">
-            <button id="figure-approve" class="accept">确认并插入正文</button>
+            <button id="figure-approve" class="accept">Confirm and insert the body text</button>
           </div>
           <div id="table-controls" class="figure-controls" hidden>
-            <p id="table-workflow-note" class="data-note">上方图片由当前 LaTeX 真实编译。初稿与实验结果相关修改均由本地 Agent 完成。</p>
+            <p id="table-workflow-note" class="data-note">The top image is compiled by the current LaTeX; initial draft and experiment result related edits are performed by the local Agent.</p>
             <details class="table-advanced">
-              <summary>高级：生成新的表格初稿</summary>
-              <label for="table-prompt">初始表格规格</label>
-              <textarea id="table-prompt" rows="7" spellcheck="false" placeholder="列: Method | Dataset A metric | Dataset B metric&#10;行: source&#10;Caption: Main comparison.&#10;字号: small&#10;最优值: max"></textarea>
-              <button id="table-generate" class="primary">本地 Agent 生成初稿</button>
+              <summary>Advanced: generate a new table draft</summary>
+              <label for="table-prompt">Initial table specification</label>
+              <textarea id="table-prompt" rows="7" spellcheck="false" placeholder="Column: Method | Dataset A metric | Dataset B metric&#10;Line: source&#10;Caption: Main comparison.&#10;Font size: small&#10;Best value: max."></textarea>
+              <button id="table-generate" class="primary">Local agent generated the first draft.</button>
             </details>
-            <label for="table-latex">可编辑 Table LaTeX</label>
+            <label for="table-latex">Editable Table LaTeX.</label>
             <textarea id="table-latex" rows="14" spellcheck="false"></textarea>
             <div class="figure-actions">
-              <button id="table-save" class="secondary">保存修改</button>
-              <button id="table-approve" class="accept">确认并插入正文</button>
+              <button id="table-save" class="secondary">Save changes</button>
+              <button id="table-approve" class="accept">Confirm and insert the body text</button>
             </div>
           </div>
           <div id="figure-downloads" class="figure-downloads"></div>
@@ -370,31 +373,31 @@
     <div class="reset-generated-head">
       <div>
         <span class="eyebrow dark">DANGER ZONE</span>
-        <h3>清空生成内容</h3>
+        <h3>Clear generated content</h3>
       </div>
-      <button id="reset-generated-close" class="agent-chat-close" aria-label="关闭清空确认">×</button>
+      <button id="reset-generated-close" class="agent-chat-close" aria-label="Close and clear confirmation.">×</button>
     </div>
-    <p>这会删除当前项目的生成正文、候选、对话和图表产物，但保留配置、输入与实验结果。</p>
-    <label for="reset-project-id">当前项目 ID（可选择复制）</label>
+    <p>This will delete the generated main text content candidates dialogues and chart artifacts for the current project, while preserving configuration inputs and experimental results.</p>
+    <label for="reset-project-id">Current project ID (copyable).</label>
     <div class="reset-project-id-row">
       <input id="reset-project-id" readonly spellcheck="false">
-      <button id="reset-project-copy" class="secondary" type="button">复制 ID</button>
+      <button id="reset-project-copy" class="secondary" type="button">Copy ID.</button>
     </div>
     <span id="reset-project-copy-status" class="reset-copy-status" aria-live="polite"></span>
-    <label for="reset-project-confirm">粘贴或输入项目 ID 以确认</label>
+    <label for="reset-project-confirm">Paste or enter the project ID to confirm.</label>
     <input id="reset-project-confirm" spellcheck="false" autocomplete="off">
     <div class="reset-generated-actions">
-      <button id="reset-generated-cancel" class="secondary" type="button">取消</button>
-      <button id="reset-generated-confirm" class="danger" type="button">确认清空</button>
+      <button id="reset-generated-cancel" class="secondary" type="button">cancel</button>
+      <button id="reset-generated-confirm" class="danger" type="button">Confirm clear</button>
     </div>
   </dialog>
   <dialog id="runtime-key-dialog" class="runtime-key-dialog">
     <form id="runtime-key-form">
-      <button id="runtime-key-close" class="agent-chat-close" type="button" aria-label="关闭安全密钥输入">×</button>
+      <button id="runtime-key-close" class="agent-chat-close" type="button" aria-label="Disable security key input">×</button>
       <span class="eyebrow dark">SECURE RUNTIME KEY</span>
-      <h3>安全更换 API Key</h3>
-      <p>密钥只写入当前 Paper Studio 进程内存，不进入聊天记录、浏览器存储或项目文件。</p>
-      <label for="runtime-key-provider">服务商</label>
+      <h3>Safe API key rotation.</h3>
+      <p>Keys are written only to the current Paper Studio process memory and are not stored in chat history browser storage or project files.</p>
+      <label for="runtime-key-provider">Service provider</label>
       <select id="runtime-key-provider" name="provider">
         <option value="openai">OpenAI</option>
         <option value="deepseek">DeepSeek</option>
@@ -403,11 +406,11 @@
       <input id="runtime-key-input" name="api_key" type="password" required minlength="8" maxlength="512" autocomplete="off" spellcheck="false">
       <p id="runtime-key-message" class="message" role="status" aria-live="polite"></p>
       <div class="runtime-key-actions">
-        <button id="runtime-key-cancel" class="secondary" type="button">取消</button>
-        <button id="runtime-key-submit" class="primary" type="submit">安全更新</button>
+        <button id="runtime-key-cancel" class="secondary" type="button">cancel</button>
+        <button id="runtime-key-submit" class="primary" type="submit">Security update</button>
       </div>
     </form>
   </dialog>
-  <script src="static/app.js?v=20260823.14-table-layout"></script>
+  <script src="static/app.js?v=20260829.1-feedback-status-budget"></script>
 </body>
 </html>

@@ -254,7 +254,7 @@ class PaperStudioTests(unittest.TestCase):
                     "sections": {
                         item["id"]: {
                             "source_heading": item["title"],
-                            "logic_summary_zh": f"用于测试 {item['title']} 的节级参考上下文。",
+                            "logic_summary_zh": f"For testing {item['title']} Section-level reference context.",
                             "excerpts": [{"text": f"Reference context for {item['title']}."}],
                         }
                         for item in section_specs
@@ -319,7 +319,7 @@ class PaperStudioTests(unittest.TestCase):
     def test_api_key_setup_is_actionable_without_exposing_secret(self):
         with patch.dict(studio.os.environ, {}, clear=True):
             missing = public_state(_default_state())
-            with self.assertRaisesRegex(StudioError, "启动 Paper Studio 的本机终端"):
+            with self.assertRaisesRegex(StudioError, "local terminal that runs Paper Studio"):
                 studio.post_openai({"model": "deepseek-v4-flash", "input": "test"})
         self.assertFalse(missing["api_key_configured"])
         self.assertEqual(
@@ -338,7 +338,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('id="model-runtime-config"', html)
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('id="api-key-setup"', html)
-        self.assertIn("写论文需要 LLM API", html)
+        self.assertIn("Writing a paper requires an LLM API.", html)
         self.assertNotIn('value="compatible"', html)
         self.assertEqual(
             [item["id"] for item in configured["llm_provider_options"]],
@@ -420,7 +420,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertEqual(state["model"], studio.PROVIDER_DEFAULT_MODELS["deepseek"])
         self.assertIsNone(state["title_editor"]["previous_response_id"])
         self.assertIsNone(first_section["previous_response_id"])
-        with self.assertRaisesRegex(StudioError, "不支持的 LLM API"):
+        with self.assertRaisesRegex(StudioError, "Unsupported LLM API."):
             studio.select_llm_provider(state, "compatible")
 
     def test_model_selection_accepts_researcher_input_and_resets_all_llm_chains(self):
@@ -437,7 +437,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIsNone(first_figure["previous_response_id"])
         self.assertTrue(studio.select_llm_model(state, "gpt-5.9-research-preview"))
         self.assertEqual(state["model"], "gpt-5.9-research-preview")
-        with self.assertRaisesRegex(StudioError, "不含空格"):
+        with self.assertRaisesRegex(StudioError, "without spaces"):
             studio.select_llm_model(state, "invalid model")
 
         state["llm_provider"] = "deepseek"
@@ -511,7 +511,6 @@ class PaperStudioTests(unittest.TestCase):
             "full-draft-start", "full-draft-cancel",
             "runtime-key-open", "runtime-key-close", "runtime-key-provider",
             "runtime-key-input", "runtime-key-cancel", "runtime-key-submit",
-            "studio-language-select",
         }
         self.assertEqual(set(parser.control_ids), expected_controls)
         self.assertEqual(len(parser.control_ids), len(expected_controls))
@@ -608,6 +607,16 @@ class PaperStudioTests(unittest.TestCase):
                 r"\begin{equation}e_i(r)=E_i(r)/L_i\end{equation}"
             ),
             [],
+        )
+
+    def test_latex_preflight_checks_each_row_of_multiline_display(self):
+        source = (
+            r"\[z(v)=\begin{cases}"
+            r"1 & \text{if a very long condition with every registered support set and all valid members remains satisfied},\\"
+            r"0 & \text{otherwise}.\end{cases}\]"
+        )
+        self.assertTrue(
+            any("row too long" in issue for issue in latex_prose_issues(source))
         )
 
     def test_latex_prose_preflight_flags_set_notation_glyphs_not_in_old_fixed_list(self):
@@ -792,7 +801,7 @@ class PaperStudioTests(unittest.TestCase):
                     "Keep this researcher-approved prompt.",
                 )
                 self.assertIsNone(recovered["job_token"])
-                self.assertIn("上一版草图", recovered["last_message"])
+                self.assertIn("previous version of the candidate", recovered["last_message"])
                 self.assertIsNotNone(process.returncode)
             finally:
                 if process.poll() is None:
@@ -806,7 +815,7 @@ class PaperStudioTests(unittest.TestCase):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="figure-cancel" class="danger" hidden', html)
-        self.assertIn("⏸ 停止调用", html)
+        self.assertIn("⏸ Stop calling", html)
         progress_start = html.index('id="figure-progress"')
         progress_end = html.index('id="mechanism-controls"')
         self.assertTrue(progress_start < html.index('id="figure-cancel"') < progress_end)
@@ -821,7 +830,7 @@ class PaperStudioTests(unittest.TestCase):
         )
         self.assertIn('request("/api/figure/cancel"', source)
 
-    def test_completed_gpt_image_automatically_builds_pptx_and_pdf(self):
+    def test_completed_native_shape_draft_automatically_builds_pptx_and_pdf(self):
         with TemporaryDirectory() as directory:
             state_dir = Path(directory)
             state_file = state_dir / "state.json"
@@ -851,7 +860,7 @@ class PaperStudioTests(unittest.TestCase):
             build.assert_called_once_with("F1", job_token=token)
             self.assertEqual(finished["status"], "built")
             self.assertIsNone(finished["job_token"])
-            self.assertIn("直接确认插入正文", finished["last_message"])
+            self.assertIn("confirm to insert into the body", finished["last_message"])
 
     def test_manual_editable_build_button_only_appears_after_failure(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
@@ -946,14 +955,23 @@ class PaperStudioTests(unittest.TestCase):
             ):
                 paths = studio.figure_paths("F1")
                 paths["spec"].parent.mkdir(parents=True)
-                paths["draft"].write_bytes(b"completed image")
                 paths["spec"].write_text(
-                    json.dumps({"figure_id": "recovery-test"}), encoding="utf-8"
+                    json.dumps(
+                        {
+                            "figure_id": "recovery-test",
+                            "draw_prompt": "the approved prompt",
+                        }
+                    ),
+                    encoding="utf-8",
                 )
-                iterations = source_dir / "iterations" / "recovery-test"
-                iterations.mkdir(parents=True)
-                (iterations / "round_01.prompt.txt").write_text(
-                    "the approved prompt", encoding="utf-8"
+                paths["shapes"].write_text(
+                    json.dumps(
+                        {
+                            "shapes": [],
+                            "source_provenance": studio.mechanism_shape_provenance("F1"),
+                        }
+                    ),
+                    encoding="utf-8",
                 )
                 state = _default_state()
                 figure = state["figures"]["F1"]
@@ -971,7 +989,7 @@ class PaperStudioTests(unittest.TestCase):
 
         self.assertEqual(recovered["status"], "draft")
         self.assertEqual(recovered["progress"], 100)
-        self.assertIn("恢复", recovered["last_message"])
+        self.assertIn("restore", recovered["last_message"])
         self.assertIsNone(recovered["job_token"])
 
     def test_json_double_escaped_latex_commands_are_normalized(self):
@@ -1023,6 +1041,81 @@ class PaperStudioTests(unittest.TestCase):
                 },
             )
 
+    def test_initial_mechanism_spec_requires_semantic_labels(self):
+        spec = studio.initial_mechanism_spec("F1")
+        self.assertFalse(spec["no_text"])
+        self.assertEqual(spec["semantic_contract_version"], 2)
+        self.assertEqual(
+            spec["required_semantic_roles"], ["input", "operation", "output"]
+        )
+
+    def test_mechanism_shape_spec_rejects_missing_semantic_output(self):
+        shapes = [
+            {"kind": "rounded_rect", "x": 0.05 + i * 0.15, "y": 0.2, "w": 0.12, "h": 0.2}
+            for i in range(4)
+        ]
+        shapes += [
+            {"kind": "arrow", "x1": 0.17, "y1": 0.3, "x2": 0.2, "y2": 0.3},
+            {"kind": "arrow", "x1": 0.32, "y1": 0.3, "x2": 0.35, "y2": 0.3},
+        ]
+        shapes += [
+            {"kind": "textbox", "x": 0.05, "y": 0.55, "w": 0.25, "h": 0.1,
+             "text": "Evidence", "semantic_role": "input", "font_size": 8},
+            {"kind": "textbox", "x": 0.35, "y": 0.55, "w": 0.25, "h": 0.1,
+             "text": "Revoke", "semantic_role": "operation", "font_size": 8},
+            {"kind": "textbox", "x": 0.65, "y": 0.55, "w": 0.25, "h": 0.1,
+             "text": "State", "semantic_role": "annotation", "font_size": 8},
+        ]
+        shapes += [
+            {"kind": "line", "x1": 0.1, "y1": 0.8, "x2": 0.2, "y2": 0.8}
+            for _ in range(3)
+        ]
+        with self.assertRaisesRegex(StudioError, "missing semantic roles: output"):
+            validate_mechanism_shape_spec(
+                "F1",
+                {
+                    "semantic_contract_version": 2,
+                    "required_semantic_roles": ["input", "operation", "output"],
+                    "shapes": shapes,
+                },
+            )
+
+    def test_mechanism_shape_spec_rejects_centered_text_in_large_container(self):
+        shapes = [
+            {
+                "kind": "rounded_rect",
+                "x": 0.05,
+                "y": 0.1,
+                "w": 0.3,
+                "h": 0.5,
+                "text": "Memory store",
+                "semantic_role": "input",
+                "font_size": 8,
+            },
+            {"kind": "rect", "x": 0.42, "y": 0.2, "w": 0.12, "h": 0.12},
+            {"kind": "oval", "x": 0.62, "y": 0.2, "w": 0.12, "h": 0.12},
+            {"kind": "hexagon", "x": 0.8, "y": 0.2, "w": 0.12, "h": 0.12},
+            {"kind": "arrow", "x1": 0.35, "y1": 0.3, "x2": 0.42, "y2": 0.3},
+            {"kind": "arrow", "x1": 0.54, "y1": 0.3, "x2": 0.62, "y2": 0.3},
+            {"kind": "textbox", "x": 0.4, "y": 0.5, "w": 0.15, "h": 0.08,
+             "text": "Revoke", "semantic_role": "operation", "font_size": 8},
+            {"kind": "textbox", "x": 0.62, "y": 0.5, "w": 0.15, "h": 0.08,
+             "text": "Result", "semantic_role": "output", "font_size": 8},
+        ]
+        shapes.extend(
+            {"kind": "line", "x1": 0.1, "y1": 0.7 + i * 0.02, "x2": 0.2, "y2": 0.7 + i * 0.02}
+            for i in range(4)
+        )
+        with self.assertRaisesRegex(StudioError, "large visual container"):
+            validate_mechanism_shape_spec(
+                "F1",
+                {
+                    "semantic_contract_version": 2,
+                    "required_semantic_roles": ["input", "operation", "output"],
+                    "shapes": shapes,
+                },
+            )
+
     def test_mechanism_shape_spec_accepts_rich_editable_rebuild(self):
         shapes = [
             {"kind": "rounded_rect", "x": 0.05 + i * 0.15, "y": 0.2, "w": 0.12, "h": 0.2}
@@ -1042,6 +1135,55 @@ class PaperStudioTests(unittest.TestCase):
         self.assertEqual(result["figure_id"], "overview_gpt")
         self.assertEqual(result["canvas_in"], studio.initial_mechanism_spec("F1")["canvas_in"])
         self.assertEqual(len(result["shapes"]), 12)
+
+    def test_mechanism_shape_spec_rejects_shapes_extending_past_canvas(self):
+        shapes = [
+            {"kind": "rounded_rect", "x": 0.05 + i * 0.15, "y": 0.2, "w": 0.12, "h": 0.2}
+            for i in range(4)
+        ]
+        shapes[0].update(x=0.95, w=0.12)
+        shapes += [
+            {"kind": "arrow", "x1": 0.17, "y1": 0.3, "x2": 0.2, "y2": 0.3},
+            {"kind": "arrow", "x1": 0.32, "y1": 0.3, "x2": 0.35, "y2": 0.3},
+        ]
+        shapes += [
+            {"kind": "textbox", "x": 0.05, "y": 0.5 + i * 0.04, "w": 0.8, "h": 0.03}
+            for i in range(6)
+        ]
+        with self.assertRaisesRegex(StudioError, "extends beyond the canvas"):
+            validate_mechanism_shape_spec("F1", {"shapes": shapes})
+
+    def test_mechanism_shape_spec_rejects_textbox_overlapping_icon(self):
+        shapes = [
+            {"kind": "rounded_rect", "x": 0.05 + i * 0.15, "y": 0.2, "w": 0.12, "h": 0.2}
+            for i in range(4)
+        ]
+        shapes += [
+            {"kind": "arrow", "x1": 0.17, "y1": 0.3, "x2": 0.2, "y2": 0.3},
+            {"kind": "arrow", "x1": 0.32, "y1": 0.3, "x2": 0.35, "y2": 0.3},
+        ]
+        shapes += [
+            {
+                "kind": "textbox",
+                "x": 0.06 if i == 0 else 0.05,
+                "y": 0.23 if i == 0 else 0.5 + i * 0.04,
+                "w": 0.1 if i == 0 else 0.8,
+                "h": 0.1 if i == 0 else 0.03,
+                "text": "Check" if i == 0 else "",
+                "font_size": 8,
+            }
+            for i in range(6)
+        ]
+        with self.assertRaisesRegex(StudioError, "overlaps graphical module"):
+            validate_mechanism_shape_spec("F1", {"shapes": shapes})
+
+    def test_mechanism_agent_retries_with_validator_feedback(self):
+        source = Path(studio.__file__).read_text(encoding="utf-8")
+        worker = source.split(
+            "def create_mechanism_shape_spec_with_local_agent(", 1
+        )[1].split("\ndef generate_mechanism_prompt", 1)[0]
+        self.assertIn("for attempt in range(3)", worker)
+        self.assertIn("The validator rejected your previous shape spec", worker)
 
     def test_mechanism_shape_spec_rejects_unreadable_text(self):
         shapes = [
@@ -1067,7 +1209,7 @@ class PaperStudioTests(unittest.TestCase):
                 "font_size": 6,
             }
         )
-        with self.assertRaisesRegex(StudioError, "小于 7pt"):
+        with self.assertRaisesRegex(StudioError, "smaller than 7pt"):
             validate_mechanism_shape_spec(
                 "F1", {"canvas_in": [3.32, 2.35], "shapes": shapes}
             )
@@ -1099,7 +1241,7 @@ class PaperStudioTests(unittest.TestCase):
             stderr="",
         )
         with patch.object(studio.subprocess, "run", return_value=failed):
-            with self.assertRaisesRegex(StudioError, "外部绘图工具执行失败：RuntimeError: concise") as caught:
+            with self.assertRaisesRegex(StudioError, "External plotting tool execution failed:RuntimeError: concise") as caught:
                 studio.run_checked(["figure-tool"], cwd=Path("."))
         self.assertNotIn("Traceback", str(caught.exception))
 
@@ -1139,9 +1281,9 @@ class PaperStudioTests(unittest.TestCase):
 
     def test_browser_preserves_manual_text_against_automatic_generation(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
-        self.assertIn('|| $("candidate").dataset.dirty === "true"', source)
+        self.assertIn('proseEditor.dataset.dirty !== "true"', source)
         self.assertIn('automatic && $("candidate").dataset.dirty === "true"', source)
-        self.assertIn("已保留你正在编辑的正文", source)
+        self.assertIn("the text you are editing remains", source)
 
     def test_direct_edit_rejects_a_stale_accepted_base(self):
         paragraph = {
@@ -1150,7 +1292,7 @@ class PaperStudioTests(unittest.TestCase):
             "accepted_text": "New server version.",
             "candidate": None,
         }
-        with self.assertRaisesRegex(StudioError, "已在别处更新"):
+        with self.assertRaisesRegex(StudioError, "updated elsewhere"):
             candidate_for_accept(
                 paragraph,
                 candidate_id="",
@@ -1185,7 +1327,7 @@ class PaperStudioTests(unittest.TestCase):
         handler.require_section = lambda body: "introduction"
 
         with patch.object(studio, "load_state", return_value=state):
-            with self.assertRaisesRegex(StudioError, r"缺少 Figure~\\ref\{fig:overview\}"):
+            with self.assertRaisesRegex(StudioError, r"missing Figure~\\ref\{fig:overview\}"):
                 handler.handle_accept(
                     {
                         "section": "introduction",
@@ -1203,9 +1345,9 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('id="title-save"', html)
         self.assertIn('"/api/title/generate"', source)
         self.assertIn('"/api/title/save"', source)
-        self.assertIn("GPT candidate 尚未保存", source)
+        self.assertIn("GPT candidate Not saved yet", source)
         self.assertIn("function updateTitleSaveButton()", source)
-        self.assertIn('changed ? "确认写入 LaTeX" : "已写入 PDF"', source)
+        self.assertIn('changed ? "Confirm writing to LaTeX" : "Written to PDF"', source)
         self.assertIn("currentTitle", source)
         self.assertIn('$("title-editor").hidden = activeSection !== "abstract"', source)
         self.assertIn('if (activeSection === "abstract") renderTitleEditor()', source)
@@ -1223,21 +1365,20 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('return "abstract";', source)
         self.assertNotIn("paper-studio.active-section", source)
         self.assertNotIn("paper-studio.active-view", source)
-        self.assertIn("static/app.js?v=20260823.14-table-layout", index)
+        self.assertIn("static/app.js?v=20260829.1-feedback-status-budget", index)
 
     def test_full_draft_click_queues_behind_an_inflight_paragraph_generation(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn("let queuedFullDraftStart = false", source)
         self.assertIn("if (proseRequestBusy) {\n    queuedFullDraftStart = true;", source)
-        self.assertIn("当前段落生成完成后将自动启动全文初稿任务", source)
+        self.assertIn("automatically start the full manuscript draft task", source)
         self.assertIn(
             "if (queuedFullDraftStart) {\n      queuedFullDraftStart = false;\n"
             "      void startFullDraftFromBrowser();",
             source,
         )
         self.assertIn(
-            'fullDraftRequestBusy\n          || queuedFullDraftStart\n'
-            '          || (job && job.status === "running")',
+            "start.disabled = fullDraftRequestBusy || queuedFullDraftStart || running",
             source,
         )
 
@@ -1297,7 +1438,7 @@ class PaperStudioTests(unittest.TestCase):
         immediate_render = accept.index("state = payload.state;")
         next_generation = accept.index('request("/api/generate"', immediate_render)
         self.assertLess(accept.index("render();", immediate_render), next_generation)
-        self.assertIn("正在后台准备", accept)
+        self.assertIn("preparing in the background", accept)
 
     def test_refresh_labels_an_accepted_paragraph_as_already_written(self):
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
@@ -1305,9 +1446,9 @@ class PaperStudioTests(unittest.TestCase):
         candidate_tag = html[html.index('<textarea id="candidate"') : html.index("></textarea>", html.index('<textarea id="candidate"'))]
         self.assertNotIn("readonly", candidate_tag)
         self.assertIn("function updateAcceptButton()", source)
-        self.assertIn('? "已写入 LaTeX"', source)
+        self.assertIn('? "LaTeX has been written."', source)
         self.assertIn('$("candidate").addEventListener("input"', source)
-        self.assertIn("可直接修改正文", source)
+        self.assertIn("Accepted version (may still be modified).", source)
         self.assertIn("base_text: visibleBaseText", source)
 
     def test_manuscript_entrypoint_requires_every_configured_section(self):
@@ -1477,7 +1618,7 @@ class PaperStudioTests(unittest.TestCase):
             for section, paragraphs in studio.paragraph_plan()["sections"].items()
         }
         with patch.object(studio, "reference_contexts", return_value=contexts):
-            with self.assertRaisesRegex(StudioError, "禁止携带原文片段"):
+            with self.assertRaisesRegex(StudioError, "Do not carry original excerpts"):
                 studio.validate_project_workspace()
 
     def test_project_workspace_rejects_an_artifact_without_any_paragraph_binding(self):
@@ -1491,7 +1632,7 @@ class PaperStudioTests(unittest.TestCase):
         for section in section_specs:
             section["paragraphs"] = plan["sections"][section["id"]]
         with patch.object(studio, "SECTION_SPECS", section_specs):
-            with self.assertRaisesRegex(StudioError, "当前未绑定：F1"):
+            with self.assertRaisesRegex(StudioError, "currently unbound:F1"):
                 studio.validate_project_workspace()
 
     def test_fixed_web_application_contains_no_fixture_identity(self):
@@ -1602,6 +1743,14 @@ class PaperStudioTests(unittest.TestCase):
             loaded["sections"]["introduction"]["accepted_text"], "old manuscript"
         )
 
+    def test_opening_writing_view_never_starts_paragraph_generation(self):
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        render_body = source.split("function render()", 1)[1].split(
+            "function renderFullDraft()", 1
+        )[0]
+        self.assertNotIn("generateCurrent(true)", render_body)
+        self.assertNotIn("setTimeout(() =>", render_body)
+
     def test_data_panels_auto_generate_sequentially_but_composition_stays_manual(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('"agent_generating"', source)
@@ -1609,7 +1758,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn("autoDataPanelAttempted.delete(attemptKey)", source)
         self.assertIn('"/api/figure/compose"', source)
         self.assertIn("renderDataPanels", source)
-        self.assertNotIn("绘图代码", source)
+        self.assertNotIn("plotting code", source)
         self.assertNotIn("panel.code", source)
         panel_renderer = source.split("function renderDataPanels", 1)[1].split(
             "function renderLayoutPrompt", 1
@@ -1621,14 +1770,14 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn("scheduleAutomaticDataPanel(figure)", source)
         self.assertIn('figure.kind !== "data"', source)
         self.assertIn('panel.status === "pending" && !panel.preview_url', source)
-        self.assertIn("正在自动生成 ${current.id} 最终单图 candidate", source)
-        self.assertIn("完成后继续下一张", source)
+        self.assertIn("Auto-generating. ${current.id} Final single figure candidate", source)
+        self.assertIn("Continue to the next figure after completion", source)
         self.assertIn('panel.status !== "agent_generating"', source)
         self.assertIn("panel.progress_message", source)
         self.assertIn('panel.preview_type === "pdf"', source)
         self.assertIn("data-panel-pdf", source)
         self.assertNotIn("data-panel-download", source)
-        self.assertNotIn("下载该子图 PDF", source)
+        self.assertNotIn("Download this subfigure PDF", source)
         self.assertIn("#toolbar=0&navpanes=0&view=FitH", source)
         self.assertNotIn("replaceOnInput", source)
         self.assertNotIn("captureLayoutPromptRightClick", source)
@@ -1643,8 +1792,8 @@ class PaperStudioTests(unittest.TestCase):
             html.index('id="data-compose"'),
         )
         self.assertIn('id="data-composition-editor"', html)
-        self.assertIn("全部满意后，再手动点击“合成图”", html)
-        self.assertIn('<button id="data-compose" class="primary">合成图</button>', html)
+        self.assertIn("When all are satisfactory, manually click Synthesize Figure", html)
+        self.assertIn('<button id="data-compose" class="primary">Composite figure</button>', html)
         self.assertIn('id="data-compose-actions"', html)
         self.assertIn('id="data-layout-prompt-label"', html)
         self.assertIn('id="single-data-controls"', html)
@@ -1655,7 +1804,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260823.14-table-layout"', html)
+        self.assertIn('src="static/app.js?v=20260829.1-feedback-status-budget"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1669,12 +1818,12 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('project.name ? `${project.name} · Paper Studio`', source)
         self.assertNotIn('(figure.placement_options || []).filter(', source)
         self.assertIn('item.disabled = !option.accepted', source)
-        self.assertIn('? "重新解析 Prompt 并生成合成图"', source)
+        self.assertIn('? "Reparse the Prompt and generate a composite image."', source)
         self.assertIn('id="figure-layout-mode"', html)
-        self.assertIn('<option value="single-column">单栏</option>', html)
-        self.assertIn('<option value="two-column">双栏</option>', html)
+        self.assertIn('<option value="single-column">single-column</option>', html)
+        self.assertIn('<option value="two-column">two-column</option>', html)
         self.assertIn(
-            '<option value="wrapfigure" disabled>Wrapfigure（AAAI 禁用）</option>',
+            '<option value="wrapfigure" disabled>Wrapfigure(AAAI Disable)</option>',
             html,
         )
         self.assertIn('layout_mode: $("figure-layout-mode").value', source)
@@ -1697,8 +1846,8 @@ class PaperStudioTests(unittest.TestCase):
             html.index('id="figure-preview-pdf"'),
             html.index('id="data-approve-after-placement"'),
         )
-        self.assertIn('? "补生成 Caption → PDF"', source)
-        self.assertIn(': "重新插入"', source)
+        self.assertIn('? "Generate additional caption. → PDF"', source)
+        self.assertIn(': "Reinsert"', source)
         self.assertIn('pdf.onload = () =>', source)
         self.assertIn('id="figure-caption-box"', html)
         self.assertIn('id="figure-caption"', html)
@@ -1715,15 +1864,15 @@ class PaperStudioTests(unittest.TestCase):
         )
         self.assertIn('"/api/figure/caption"', source)
         self.assertIn('"/api/figure/caption/generate"', source)
-        self.assertIn('GPT candidate 尚未保存', source)
-        self.assertIn('Caption 已修改，尚未更新到正文与 PDF', source)
+        self.assertIn('GPT candidate Not saved yet', source)
+        self.assertIn('Caption Modified, not yet updated in the main text and PDF.', source)
         self.assertIn('function approveFigureOrSaveCaption()', source)
         self.assertIn('$("data-approve").onclick = approveFigureOrSaveCaption', source)
         self.assertIn(
             '(figure.status === "approved" && !captionDirty && !captionNeedsBackfill)',
             source,
         )
-        self.assertIn('"补生成 Caption → PDF"', source)
+        self.assertIn('"Generate additional caption. → PDF"', source)
         self.assertIn('const captionDrafts = new Map()', source)
         self.assertIn('function rememberCaptionDraft(figureId, caption)', source)
         self.assertIn('function forgetCaptionDraft(figureId)', source)
@@ -1760,7 +1909,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('let pdfLocateRequestId = 0', source)
         self.assertIn('const submittedPrompt = $("draw-prompt").value.trim()', source)
         self.assertIn('const visibleTableLatex = $("table-latex").value.trim()', source)
-        self.assertIn('tableLatexDirty ? "更新表格 → PDF" : "已插入正文"', source)
+        self.assertIn('tableLatexDirty ? "Update table → PDF" : "Body text has been inserted."', source)
         self.assertIn('$("candidate").disabled = busy', source)
         self.assertIn('$("paper-title").disabled = busy', source)
         self.assertIn('control.disabled = running || !figure.ready', source)
@@ -1788,14 +1937,14 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260823.14-table-layout"', html)
-        self.assertNotIn("系统确定的段落任务", html)
+        self.assertIn('src="static/app.js?v=20260829.1-feedback-status-budget"', html)
+        self.assertNotIn("System-defined paragraph task", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
         self.assertIn('id="pdf-page-indicator"', html)
         self.assertIn("function updatePdfPageIndicator()", source)
         self.assertIn("pages.onscroll = updatePdfPageIndicator", source)
-        self.assertIn('href="static/style.css?v=20260823.5-mobile-overflow"', html)
+        self.assertIn('href="static/style.css?v=20260829.1-feedback-status-budget"', html)
         self.assertLess(
             html.index('id="compile"'),
             html.index('id="reset-generated"'),
@@ -1818,7 +1967,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn("candidate_text: visibleCandidateText", source)
         self.assertNotIn("This candidate is stale", source)
         self.assertIn("&& !nextParagraph.accepted_text", source)
-        self.assertNotIn("等待确认", source)
+        self.assertNotIn("Awaiting confirmation", source)
         self.assertIn('id="pdf-viewer"', html)
         self.assertIn('id="pdf-pages"', html)
         self.assertNotIn('id="pdf"', html)
@@ -1834,7 +1983,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('id="project-export"', html)
         self.assertNotIn('id="paper-contract"', html)
         self.assertNotIn("INHERITED FROM APPROVED PLAN", html)
-        self.assertNotIn("写作阶段无需重新选择", source)
+        self.assertNotIn("Writing stage does not require reselecting.", source)
         self.assertNotIn('id="api-usage"', html)
         self.assertNotIn('id="api-status"', html)
         self.assertNotIn('id="conversation-status"', html)
@@ -1843,7 +1992,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('download.hidden = false', source)
         self.assertIn('download.href = studioPath(state.pdf.url || "/paper.pdf")', source)
         self.assertIn('paper-studio.pdf-navigation-visible', source)
-        self.assertIn('pdfNavigationVisible ? "隐藏导航栏" : "显示导航栏"', source)
+        self.assertIn('pdfNavigationVisible ? "Hide navigation bar." : "Show navigation bar."', source)
         self.assertIn('function uniqueArtifacts(artifacts = [])', source)
         self.assertIn('uniqueArtifacts(paragraph.artifacts || [])', source)
         self.assertNotIn('id="artifact-marker"', html)
@@ -2012,6 +2161,31 @@ First accepted paragraph.
         self.assertEqual(state["tables"]["T2"]["latex"], table_latex)
         self.assertEqual(public_table["latex"], table_latex)
 
+    def test_invalid_recovered_table_stays_pending_without_crashing_studio(self):
+        state = _default_state()
+        table_id = "T2"
+        definition = studio.TABLES[table_id]
+        section = definition["source_sections"][0]
+        invalid = (
+            r"\begin{table}[t]\centering"
+            r"\resizebox{\textwidth}{!}{\begin{tabular}{lc}A&B\end{tabular}}"
+            rf"\caption{{Cost}}\label{{{definition['label']}}}\end{{table}}"
+        )
+        with TemporaryDirectory() as temporary:
+            paper = Path(temporary)
+            section_dir = paper / "sections"
+            section_dir.mkdir(parents=True)
+            (section_dir / studio.SECTION_MAP[section]["file"]).write_text(
+                invalid, encoding="utf-8"
+            )
+            with patch.object(studio, "PAPER", paper):
+                changed = studio.synchronize_artifact_workbenches_from_manuscript(
+                    state, artifact_ids={table_id}, build_table_previews=False
+                )
+        self.assertTrue(changed)
+        self.assertEqual(state["tables"][table_id]["status"], "pending")
+        self.assertIn("linewidth", state["tables"][table_id]["last_message"])
+
     def test_custom_figure_caption_is_public_and_used_in_latex(self):
         state = _default_state()
         state["figures"]["F6"]["caption"] = "Researcher-edited caption."
@@ -2066,15 +2240,15 @@ First accepted paragraph.
             "",
         )
         missing = studio.artifact_reference_error("No figure reference.", context)
-        self.assertIn(r"缺少 Figure~\ref{fig:overview}", missing)
+        self.assertIn(r"missing Figure~\ref{fig:overview}", missing)
         repeated = studio.artifact_reference_error(
             r"Figure~\ref{fig:overview}; again Figure~\ref{fig:overview}.", context
         )
-        self.assertIn("同段重复", repeated)
+        self.assertIn("Repeated in the same paragraph", repeated)
         unexpected = studio.artifact_reference_error(
             r"Figure~\ref{fig:method} is not bound here.", context
         )
-        self.assertIn(r"本段未绑定 Figure~\ref{fig:method}", unexpected)
+        self.assertIn(r"This paragraph is not bound. Figure~\ref{fig:method}", unexpected)
 
     def test_gpt_caption_candidate_is_grounded_and_preserves_synthetic_marker(self):
         state = _default_state()
@@ -2205,6 +2379,18 @@ First accepted paragraph.
         )
         self.assertNotIn("dash punctuation", " ".join(studio.figure_caption_issues(normalized)))
 
+    def test_caption_word_bound_never_cuts_inside_confidence_interval(self):
+        source = (
+            "Affected-node F1 for direct-key deletion declines from 77.778 "
+            "[72.222, 83.333] at depth 1 to 55.556 [44.444, 66.667] at depth 4, "
+            "for any-parent invalidation from 88.889 [83.333, 94.444] at depth 1 "
+            "to 77.778 [66.667, 88.889] at depth 4."
+        )
+        bounded = studio.enforce_figure_caption_bounds(source)
+        self.assertEqual(bounded.count("["), bounded.count("]"))
+        self.assertEqual(studio.figure_caption_issues(bounded), [])
+        self.assertNotIn("[83.333.", bounded)
+
     def test_accepting_a_figure_bound_paragraph_generates_its_caption(self):
         state = _default_state()
         paragraph = {
@@ -2242,7 +2428,7 @@ First accepted paragraph.
             ),
             self.assertRaisesRegex(
                 studio.StudioError,
-                r"I-P3.*F1 Caption 自动生成失败.*本段未接受",
+                r"I-P3.*F1 Caption Auto generation failed.*not accepted",
             ),
         ):
             studio.auto_generate_bound_figure_captions(
@@ -2345,7 +2531,7 @@ First accepted paragraph.
         composer.assert_not_called()
         self.assertEqual(updates[-1]["status"], "panels_ready")
         self.assertIsNone(updates[-1]["composed_at"])
-        self.assertIn("手动点击“合成图”", updates[-1]["progress_message"])
+        self.assertIn("click Synthesize Figure", updates[-1]["progress_message"])
 
     def test_single_panel_figure_directly_builds_final_without_panel_label(self):
         state = _default_state()
@@ -2386,16 +2572,16 @@ First accepted paragraph.
         self.assertEqual(layout["gap_pt"], 0.0)
         self.assertEqual(updates[-1]["status"], "built")
         self.assertIsNotNone(updates[-1]["composed_at"])
-        self.assertIn("最终单图", updates[-1]["progress_message"])
+        self.assertIn("final single-figure", updates[-1]["progress_message"])
 
     def test_data_figure_layout_prompt_controls_local_composition(self):
         horizontal = data_figure_layout(
-            "两张图横向单栏，裁掉上下左右空白，左上角加 (a)/(b)"
+            "Two images arranged side by side; crop margins on all sides; add at the top left corner. (a)/(b)"
         )
         self.assertEqual(horizontal["orientation"], "horizontal")
         self.assertEqual(horizontal["width"], "single-column")
         self.assertTrue(horizontal["labels"])
-        vertical = data_figure_layout("上下排列，双栏，不要角标")
+        vertical = data_figure_layout("Arrange in vertical order, two columns, no superscripts.")
         self.assertEqual(vertical["orientation"], "vertical")
         self.assertEqual(vertical["width"], "two-column")
         self.assertFalse(vertical["labels"])
@@ -2428,15 +2614,15 @@ First accepted paragraph.
             patch.dict(studio.os.environ, {"OPENAI_API_KEY": "must-not-leak"}),
         ):
             plan = create_data_figure_layout_with_local_agent(
-                "F4", "把 b 放左边、a 放右边，横向单栏且零间距"
+                "F4", "Place b on the left and a on the right, horizontal single column with zero spacing."
             )
 
         self.assertEqual(plan["panel_order"], ["b", "a"])
         self.assertEqual(plan["output_format"], "pptx-and-vector-pdf")
         self.assertEqual(plan["labels"][0]["font_size_pt"], 8)
         self.assertNotIn("OPENAI_API_KEY", captured["env"])
-        self.assertIn("严格 schema", captured["prompt"])
-        self.assertIn("作为可编辑文本框", captured["prompt"])
+        self.assertIn("Strict schema", captured["prompt"])
+        self.assertIn("editable text box", captured["prompt"])
 
     def test_agent_layout_rejects_missing_or_duplicate_panels(self):
         raw = extract_agent_layout_json(
@@ -2513,7 +2699,7 @@ First accepted paragraph.
                 )
                 message = compose_data_figure(
                     "F4",
-                    "两张图横向单栏，裁掉上下左右空白，左上角加 (a)/(b)，中间不留空白",
+                    "Two images arranged side by side; crop margins on all sides; add at the top left corner. (a)/(b), Do not leave blanks in the middle.",
                     layout,
                 )
 
@@ -2527,7 +2713,7 @@ First accepted paragraph.
             layout = final_paths["layout_source"].read_text(encoding="utf-8")
             self.assertIn('"gap_pt": 0', layout)
             self.assertIn('"(a)"', layout)
-            self.assertIn("无需 PowerPoint 权限确认", message)
+            self.assertIn("PowerPoint permission confirmation not required.", message)
 
     def test_data_figure_code_comes_from_codex_without_api_key(self):
         captured = {}
@@ -2565,9 +2751,9 @@ args = parser.parse_args()
     def test_local_agent_table_prompt_is_not_html_hidden(self):
         source = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="table-agent-prompt"', source)
-        self.assertIn('for="table-agent-prompt">修改命令</label>', source)
-        self.assertIn("调用本地 Agent</button>", source)
-        self.assertNotIn("（非 API）", source)
+        self.assertIn('for="table-agent-prompt">Modify command</label>', source)
+        self.assertIn("Invoke local Agent</button>", source)
+        self.assertNotIn("(Non API)", source)
         # CSP-safe markup starts dynamic controls hidden; renderFigures removes
         # the native hidden attribute for local table editing.
         self.assertRegex(
@@ -2690,7 +2876,7 @@ args = parser.parse_args()
             patch.object(studio, "ONLINE_PROJECT_MODE", False),
             patch.object(studio, "survey_bibliography_keys", return_value={"surveyKey"}),
         ):
-            with self.assertRaisesRegex(StudioError, r"未解决的 \\cite\{\}"):
+            with self.assertRaisesRegex(StudioError, r"Still unresolved. \\cite\{\}"):
                 studio.validate_citations_for_accept(r"Prior work \cite{}.")
             with self.assertRaisesRegex(StudioError, "notInSurvey"):
                 studio.validate_citations_for_accept(r"Prior work \cite{notInSurvey}.")
@@ -2971,6 +3157,34 @@ args = parser.parse_args()
         self.assertIn("reports/01_LIT_SURVEY.html", captured["instructions"])
         self.assertNotIn("tools", captured)
 
+    def test_writer_receives_section_logic_but_not_reference_paper_prose(self):
+        captured = []
+
+        def fake_post(payload):
+            captured.append(payload)
+            return {"id": "resp-draft", "output_text": "Target-project paragraph."}
+
+        with patch.object(studio, "post_openai", side_effect=fake_post):
+            response_id, text, added = call_openai(
+                section="introduction",
+                model="gpt-5",
+                previous_response_id=None,
+                purpose="Establish the target problem.",
+                required_heading=None,
+                comment="",
+                current_text="",
+                architecture={"purpose": "Target-only purpose"},
+                reference_context={
+                    "excerpts": [{"text": "UNIQUE_REFERENCE_PAPER_SUBJECT"}]
+                },
+            )
+
+        self.assertEqual((response_id, text, added), ("resp-draft", "Target-project paragraph.", []))
+        writer_input = captured[0]["input"]
+        self.assertNotIn("UNIQUE_REFERENCE_PAPER_SUBJECT", writer_input)
+        self.assertIn('"content_authority": "target project evidence only"', writer_input)
+        self.assertIn('"paragraphs": [', writer_input)
+
     def test_abstract_prompt_and_postprocessing_remove_citations(self):
         captured = {}
 
@@ -3173,9 +3387,9 @@ args = parser.parse_args()
         ).read_text(encoding="utf-8")
         self.assertNotIn("RHETORICAL_ROLE_LABELS", app_js)
         self.assertNotIn("architectureRelationLabel", app_js)
-        self.assertNotIn("段落作用：", app_js)
-        self.assertNotIn("与前文：", app_js)
-        self.assertNotIn("下一步：", app_js)
+        self.assertNotIn("Paragraph role:", app_js)
+        self.assertNotIn("As above:", app_js)
+        self.assertNotIn("Next step:", app_js)
 
     def test_related_work_heading_is_explicit_plan_metadata(self):
         state = _default_state()
@@ -3609,7 +3823,7 @@ args = parser.parse_args()
                     {"id": "resp-audit", "output_text": "Current prose."},
                 ],
             ),
-            self.assertRaisesRegex(StudioError, "连续两次返回与当前版本相同"),
+            self.assertRaisesRegex(StudioError, "Two consecutive outputs identical to the current version"),
         ):
             call_openai(
                 section="introduction",
@@ -3714,7 +3928,7 @@ args = parser.parse_args()
                 purpose="Report local linear separability.",
                 required_heading=None,
                 reference_paragraph="Reference prose.",
-                comment="没有引用 F2",
+                comment="No F2 reference.",
                 current_text="Probe accuracy drops.",
                 artifacts=["F2"],
             )
@@ -3746,7 +3960,7 @@ args = parser.parse_args()
                 purpose="State a contribution without another figure mention.",
                 required_heading=None,
                 reference_paragraph="Reference prose.",
-                comment="不要重复引用图1",
+                comment="Do not cite Figure 1 more than once.",
                 current_text="",
                 artifacts=[],
             )
@@ -3788,6 +4002,66 @@ args = parser.parse_args()
         self.assertNotIn("resolve_citations(", accept_source)
         self.assertNotIn("web_search", accept_source)
 
+    def test_generation_validates_latex_after_final_citation_transforms(self):
+        source = Path(studio.__file__).read_text(encoding="utf-8")
+        generation_source = source.split("def call_openai(", 1)[1].split(
+            "\ndef manuscript_title_span", 1
+        )[0]
+        final_citation_transform = generation_source.rfind("local_survey_citations(text)")
+        final_normalization = generation_source.find(
+            "text = normalize_latex_ready_text(text)", final_citation_transform
+        )
+        final_latex_gate = generation_source.rfind(
+            "prose_issues = latex_prose_issues(text)"
+        )
+        self.assertGreater(final_citation_transform, -1)
+        self.assertGreater(final_normalization, final_citation_transform)
+        self.assertGreater(final_latex_gate, final_citation_transform)
+        self.assertIn("for _completion_attempt in range(3)", generation_source)
+
+    def test_paragraph_budget_reserves_room_for_later_sections_and_floats(self):
+        section_map = {
+            "introduction": {
+                "length_share": 0.2,
+                "paragraphs": [{}, {}, {}, {}],
+                "render": "section",
+            },
+            "abstract": {
+                "length_share": 0.05,
+                "paragraphs": [{}],
+                "render": "abstract",
+            },
+            "experiments": {
+                "length_share": 0.25,
+                "paragraphs": [{}, {}, {}, {}],
+                "render": "section",
+            },
+        }
+        with (
+            patch.object(
+                studio,
+                "PROJECT_METADATA",
+                {"target": {"submission_content_pages": 4}},
+            ),
+            patch.object(studio, "SECTION_MAP", section_map),
+            patch.object(
+                studio,
+                "SECTION_SPECS",
+                [
+                    {"id": "introduction", "paragraphs": [{}, {}, {}, {}]},
+                    {"id": "abstract", "paragraphs": [{}]},
+                    {"id": "experiments", "paragraphs": [{}, {}, {}, {}]},
+                ],
+            ),
+            patch.object(studio, "FIGURES", {"F1": {}, "F2": {}}),
+            patch.object(studio, "TABLES", {"T1": {}, "T2": {}}),
+        ):
+            self.assertEqual(studio.paragraph_word_limit("introduction"), 70)
+            self.assertEqual(studio.paragraph_word_limit("abstract"), 100)
+            self.assertEqual(studio.paragraph_word_limit("experiments"), 120)
+            guidance = studio.section_budget_guidance("introduction")
+            self.assertIn("no more than 70 readable words", guidance)
+
     def test_citation_resolver_starts_a_new_chain_when_previous_id_is_absent(self):
         captured = {}
 
@@ -3816,7 +4090,7 @@ args = parser.parse_args()
         with patch.object(
             studio, "reset_generated_paper", side_effect=AssertionError("must not run")
         ):
-            with self.assertRaisesRegex(StudioError, "项目 ID 不匹配"):
+            with self.assertRaisesRegex(StudioError, "Project ID mismatch"):
                 handler.handle_reset_generated_paper(
                     {"project_id": "wrong-project", "model": "gpt-5.6"}
                 )
@@ -3905,10 +4179,30 @@ args = parser.parse_args()
             r"\begin{table}\caption{Main}\label{tab:main}"
             r"\begin{tabular}{l}x\end{tabular}\end{table}"
         )
-        with self.assertRaisesRegex(StudioError, r"要求使用 table\*"):
+        with self.assertRaisesRegex(StudioError, r"requires use of table\*"):
             studio.validate_table_latex_source("T1", source)
         corrected = source.replace("{table}", "{table*}")
         self.assertEqual(studio.validate_table_latex_source("T1", corrected), corrected)
+
+    def test_single_column_table_cannot_resize_to_page_textwidth(self):
+        source = (
+            r"\begin{table}\caption{Cost}\label{tab:main}"
+            r"\resizebox{\textwidth}{!}{\begin{tabular}{lc}A&B\end{tabular}}"
+            r"\end{table}"
+        )
+        with self.assertRaisesRegex(StudioError, r"Single-column.*linewidth"):
+            studio.validate_table_latex_source("T1", source, layout_mode="single-column")
+
+    def test_table_layout_conversion_updates_resize_width(self):
+        wide = (
+            r"\begin{table*}\caption{Main}\label{tab:main}"
+            r"\resizebox{\textwidth}{!}{\begin{tabular}{lc}A&B\end{tabular}}"
+            r"\end{table*}"
+        )
+        narrow = studio.convert_table_latex_layout("T1", wide, "single-column")
+        self.assertIn(r"\resizebox{\linewidth}{!}", narrow)
+        restored = studio.convert_table_latex_layout("T1", narrow, "two-column")
+        self.assertIn(r"\resizebox{\textwidth}{!}", restored)
 
     def test_table_layout_conversion_preserves_cells_and_supports_both_spans(self):
         wide = (
@@ -4176,7 +4470,7 @@ args = parser.parse_args()
             latex = generate_table_latex(
                 "T2",
                 {"rows": [{f"c{index}": index for index in range(len(labels))}]},
-                "行: source\nCaption: Wide table.\n字号: small\n最优值: none",
+                "Line: source\nCaption: Wide table.\nFont size: small\nOptimal value: none",
             )
         finally:
             definition["width"] = previous_width
@@ -4211,32 +4505,6 @@ args = parser.parse_args()
         )
         self.assertIn(r"\begin{tabular}", latex)
         self.assertFalse(preserved)
-
-    def test_numeric_comparison_gate_rejects_inverted_values(self):
-        issues = studio.numeric_comparison_issues(
-            r"Prompt-all exceeds last-prompt (\(5.48\times10^{-6}\) versus "
-            r"\(5.61\times10^{-6}\))."
-        )
-        self.assertTrue(issues)
-        self.assertFalse(
-            studio.numeric_comparison_issues(
-                r"Last-prompt exceeds prompt-all (\(5.61\times10^{-6}\) versus "
-                r"\(5.48\times10^{-6}\))."
-            )
-        )
-        self.assertFalse(
-            studio.numeric_comparison_issues(
-                r"The error is lower than the tolerance (\(10^{-10}\) versus \(10^{-8}\))."
-            )
-        )
-        self.assertFalse(
-            studio.numeric_comparison_issues(
-                "The score fell below 5.34, reaching 4.42 after steering."
-            )
-        )
-        self.assertTrue(
-            studio.numeric_comparison_issues("The score 5.34 is below 4.42.")
-        )
 
     def test_appendix_gate_rejects_roadmap_but_accepts_content(self):
         appendix = next(
@@ -4288,12 +4556,12 @@ args = parser.parse_args()
         }
         prompt = "\n".join(
             [
-                "数据源: results/",
-                "列: Method | TrustLLM ASR | AdvBench ASR",
-                "行: B | A",
+                "Data source: results/",
+                "Column: Method | TrustLLM ASR | AdvBench ASR",
+                "Line: B | A",
                 "Caption: Prompt-authored local table.",
-                "字号: footnotesize",
-                "最优值: max",
+                "Font size: footnotesize.",
+                "Best value: max.",
             ]
         )
         with patch.object(studio, "call_openai", side_effect=AssertionError("API called")):
@@ -4314,12 +4582,12 @@ args = parser.parse_args()
         }
         prompt = "\n".join(
             [
-                "数据源: results/",
-                "列: Defense | Residual ASR | Benign utility",
-                "行: source",
+                "Data source: results/",
+                "Column: Defense | Residual ASR | Benign utility",
+                "Line: source",
                 "Caption: Safety comparison, lower ASR is better.",
-                "字号: small",
-                "最优值: none",
+                "Font size: small",
+                "Optimal value: none",
             ]
         )
         with patch.dict(
@@ -4338,12 +4606,12 @@ args = parser.parse_args()
             "T1",
             "\n".join(
                 [
-                    "数据源: results/",
-                    "列: Method | Error | recall=1 (%) | Accuracy",
-                    "行: source",
+                    "Data source: results/",
+                    "Column: Method | Error | recall=1 (%) | Accuracy",
+                    "Line: source",
                     "Caption: Conditional result.",
-                    "字号: small",
-                    "最优值: none",
+                    "Font size: small",
+                    "Optimal value: none",
                 ]
             ),
             ["Method", "Error | recall=1 (%)", "Accuracy"],
@@ -4358,7 +4626,7 @@ args = parser.parse_args()
         # "best" in natural English ("highest accuracy", "highest accuracy
         # and lowest count") instead of the grammar's literal none/max/min
         # tokens. Before this fix, generating T1 or T2 with their untouched
-        # default prompt always 400'd with "最优值仅支持 none、max 或 min。"
+        # default prompt always 400'd with "The optimal value supports none, max, or min only."
         # -- reachable by any fresh project that never customizes the table
         # prompt.
         metrics = {
@@ -4381,20 +4649,20 @@ args = parser.parse_args()
         }
         uniform_prompt = "\n".join(
             [
-                "数据源: results/",
-                "列: Method | TrustLLM ASR | AdvBench ASR",
-                "行: B | A",
+                "Data source: results/",
+                "Column: Method | TrustLLM ASR | AdvBench ASR",
+                "Line: B | A",
                 "Caption: Uniform best direction.",
-                "字号: footnotesize",
-                "最优值: highest accuracy",
+                "Font size: footnotesize.",
+                "Best value: highest accuracy.",
             ]
         )
         latex = generate_table_latex("T1", metrics, uniform_prompt)
         self.assertIn(r"B & \textbf{15.0}", latex)
 
         mixed_prompt = uniform_prompt.replace(
-            "最优值: highest accuracy",
-            "最优值: highest accuracy and lowest count",
+            "Best value: highest accuracy.",
+            "Optimal value: highest accuracy and lowest count.",
         )
         mixed_latex = generate_table_latex("T1", metrics, mixed_prompt)
         self.assertNotIn(r"\textbf", mixed_latex)
@@ -4433,10 +4701,10 @@ args = parser.parse_args()
             }
         }
         with self.assertRaises(StudioError):
-            generate_table_latex("T2", metrics, "请随意发挥: yes")
+            generate_table_latex("T2", metrics, "Please feel free to elaborate: yes.")
 
     def test_compile_skips_force_rebuild_on_a_genuinely_fresh_checkout(self):
-        # Regression: reported live -- a real project's very first "编译
+        # Regression: reported live -- a real project's very first "compile
         # PDF" click failed with "I found no \citation commands---while
         # reading file main.aux". compile_paper() added -g (force everyone
         # remade, ignoring timestamps) whenever main.synctex.gz was
@@ -4741,11 +5009,11 @@ args = parser.parse_args()
             ]
         )
         revised = current.replace("Current.", "More traceable results.")
-        with self.assertRaisesRegex(StudioError, "没有增加"):
+        with self.assertRaisesRegex(StudioError, "did not add any"):
             require_substantive_table_revision(
                 current,
                 revised,
-                "PDF 里的实验结果不止这么多，还有更多数字",
+                "PDF There are more experimental results beyond these, with additional numbers.",
             )
 
     @unittest.skip("table editing no longer reads reference-paper results")
@@ -4858,7 +5126,7 @@ args = parser.parse_args()
                 "layout_source": root / "layout.json",
                 "layout_prompt": root / "layout_prompt.txt",
             }
-            paths["draft"].write_bytes(b"real gpt image")
+            paths["draft"].write_bytes(b"real composition draft")
             paths["spec"].write_text(
                 json.dumps({"draw_prompt": "approved prompt"}), encoding="utf-8"
             )
@@ -4879,9 +5147,9 @@ args = parser.parse_args()
         self.assertNotIn("--img", commands[0])
         self.assertEqual(commands[1][2], "pdfshapes")
         validate.assert_called_once_with(shape_spec, paths["pptx"], paths["pdf"])
-        self.assertIn("12 个独立 PowerPoint 原生对象", message)
+        self.assertIn("12 A standalone PowerPoint native object.", message)
 
-    def test_unchanged_prompt_reuses_existing_gpt_image_without_starting_job(self):
+    def test_unchanged_prompt_reuses_existing_native_draft_without_starting_job(self):
         state = _default_state()
         figure = state["figures"]["F1"]
         figure.update(
@@ -4917,7 +5185,7 @@ args = parser.parse_args()
         self.assertTrue(response["payload"]["reused"])
         self.assertEqual(figure["status"], "approved")
         self.assertEqual(figure["approved_at"], 123)
-        self.assertIn("未调用 GPT Image", figure["last_message"])
+        self.assertIn("no new drawing job was invoked.", figure["last_message"])
         save.assert_called_once_with(state)
         thread.assert_not_called()
 
@@ -4987,6 +5255,46 @@ args = parser.parse_args()
             headers, rows = studio.figure_records_grid("F5", metrics)
         self.assertEqual(headers, ["Setting", "Random", "Ours"])
         self.assertEqual(rows[1], ["hard", "0.72", "0.79"])
+
+    def test_deterministic_data_figure_renders_two_panel_numeric_curves(self):
+        definition = {
+            "title": "Permutation invariance",
+            "kind": "data",
+            "panels": [
+                {"id": "ARC-Challenge", "title": "ARC-Challenge"},
+                {"id": "MMLU", "title": "MMLU"},
+            ],
+            "data_grid": {
+                "type": "records",
+                "path": "artifacts.F2.rows",
+                "columns": [
+                    {"key": "dataset", "label": "Dataset"},
+                    {"key": "included_permutations", "label": "Included permutations"},
+                    {"key": "label_first", "label": "Label-first"},
+                    {"key": "content_first", "label": "Content-first"},
+                ],
+            },
+            "x_axis_label": "Number of included permutations",
+            "y_axis_label": "Exact semantic invariance",
+        }
+        metrics = {
+            "artifacts": {"F2": {"rows": [
+                {"dataset": dataset, "included_permutations": str(count),
+                 "label_first": label, "content_first": content}
+                for dataset, values in (
+                    ("ARC-Challenge", [(1, "1.000", "1.000"), (2, "0.950", "0.900")]),
+                    ("MMLU", [(1, "1.000", "1.000"), (2, "0.692", "0.667")]),
+                )
+                for count, label, content in values
+            ]}}
+        }
+        with TemporaryDirectory() as directory:
+            pdf = Path(directory) / "figure.pdf"
+            png = Path(directory) / "figure.png"
+            with patch.dict(studio.FIGURES, {"F2": definition}):
+                studio.render_data_figure_deterministic("F2", metrics, pdf, png)
+            self.assertGreater(pdf.stat().st_size, 0)
+            self.assertGreater(png.stat().st_size, 0)
 
     def test_data_figure_axis_label_never_uses_last_series_name(self):
         definition = {
@@ -5064,8 +5372,8 @@ args = parser.parse_args()
         self.assertFalse(ready)
         self.assertEqual(
             reason,
-            "请先生成并写入 Style Jailbreak section 的 Two-Turn Execution subsection，"
-            "然后再画图。",
+            "Please generate and write it first. Style Jailbreak section of Two-Turn "
+            "Execution subsection, Then plot again.",
         )
         method[-1]["accepted_text"] = "Accepted final method subsection."
         ready, reason = figure_generation_gate("F3", state, {})
@@ -5242,31 +5550,22 @@ args = parser.parse_args()
         self.assertIn("gpt_preview_url", figure)
         self.assertIn("paper_preview_url", figure)
 
-    def test_mechanism_preview_can_toggle_gpt_and_paper_versions(self):
+    def test_mechanism_preview_uses_the_native_paper_version(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="mechanism-preview-switch"', html)
-        self.assertIn('id="mechanism-preview-toggle"', html)
-        self.assertLess(
-            html.index('id="mechanism-preview-toggle"'),
-            html.index('id="figure-preview-image"'),
-        )
         self.assertNotIn('id="figure-preview-empty"', html)
-        self.assertNotIn('生成后在这里检查构图或数据图', html)
-        self.assertIn("const mechanismPreviewModes = new Map()", source)
-        self.assertIn('mechanismPreviewMode === "gpt"', source)
-        self.assertIn('"显示 GPT 原图"', source)
-        self.assertIn('"显示 GPT 构图底图（无文字）"', source)
-        self.assertIn('"显示可编辑 PPT/PDF 完整版"', source)
-        self.assertIn('id="mechanism-preview-note"', html)
+        self.assertNotIn('Check composition or data charts here after generation.', html)
+        self.assertIn("const hasMechanismVersions = false", source)
+        self.assertIn("figure.paper_preview_url || figure.preview_url", source)
+        self.assertIn("Codex Native graphics", html)
 
     def test_approved_figure_preview_is_locked_to_inserted_paper_pdf(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('figure.status === "approved"', source)
         self.assertIn("paperVersionInserted", source)
-        self.assertIn("? figure.paper_preview_url", source)
-        self.assertIn('figure.status === "approved"\n    || !figure.gpt_preview_url', source)
-        self.assertIn("当前预览与正文 PDF 使用同一个图文件。", source)
+        self.assertIn("figure.paper_preview_url || figure.preview_url", source)
+        self.assertIn("The current preview and the main PDF use the same image file.", source)
 
     def test_mechanism_prompt_editor_has_two_columns_and_adjacent_draw_flow(self):
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
@@ -5280,8 +5579,8 @@ args = parser.parse_args()
         self.assertIn('id="mechanism-generation-prerequisite-text"', html)
         self.assertIn('id="mechanism-build-status"', html)
         self.assertIn("mechanismPrerequisiteBlocked", source)
-        self.assertIn("可编辑 PPT/PDF 正在后台重建", source)
-        self.assertIn("可编辑 PPT/PDF 重建失败", source)
+        self.assertIn("Codex Generating editable PPT PDF in the background.", source)
+        self.assertIn("Editable PPT/PDF reconstruction failed.", source)
         self.assertLess(html.index('id="draw-prompt"'), html.index('id="prompt-instruction"'))
         self.assertLess(html.index('id="prompt-instruction"'), html.index('id="mechanism-draw-stage"'))
         self.assertLess(html.index('id="mechanism-draw-stage"'), html.index('id="figure-preview-image"'))
@@ -5289,7 +5588,7 @@ args = parser.parse_args()
         self.assertIn('id="mechanism-flow-image"', html)
         self.assertIn('id="mechanism-flow-paper"', html)
         self.assertIn("function updateMechanismFlow(figure)", source)
-        self.assertIn('"按右侧指令更新 Prompt"', source)
+        self.assertIn('"Update Prompt per the right side instructions."', source)
         self.assertIn('$("mechanism-controls").hidden = !mechanism;', source)
         self.assertIn("grid-template-columns:minmax(0,1.35fr) minmax(240px,.8fr)", style)
 
@@ -5359,7 +5658,7 @@ args = parser.parse_args()
                 iteration = relocated_spec.parent / "iterations" / "archived-f1"
                 iteration.mkdir(parents=True)
                 archived = iteration / "round_03.png"
-                archived.write_bytes(b"archived gpt image")
+                archived.write_bytes(b"archived composition draft")
                 archived.with_suffix(".prompt.txt").write_text(
                     "approved prompt", encoding="utf-8"
                 )
@@ -5374,7 +5673,7 @@ args = parser.parse_args()
         self.assertEqual(resolved, archived)
         self.assertIn("/figure-file/F1/draft?", figure["gpt_preview_url"])
         self.assertIn("/figure-file/F1/pdf?", figure["paper_preview_url"])
-        self.assertFalse(figure["gpt_preview_no_text"])
+        self.assertFalse(figure["draft_preview_no_text"])
 
     def test_f6_requires_explicitly_marked_synthetic_layerwise_curves(self):
         state = _default_state()
@@ -5492,6 +5791,11 @@ args = parser.parse_args()
         metrics = {
             "result_source": "reports/05_EXP_RESULT.html",
             "evidence_grade": "smoke-only",
+            "executed_metric_definitions": {"flip_rate": "adjacent transitions"},
+            "executed_prompt_conditions": {
+                "label_first": {"response_fields": ["label"]},
+                "content_first": {"response_fields": ["answer_text", "label"]},
+            },
             "artifacts": {
                 "T1": {"rows": [{"score": "0.1"}]},
                 "T2": {"rows": [{"score": "0.2"}]},
@@ -5513,6 +5817,14 @@ args = parser.parse_args()
 
         self.assertEqual(evidence["result_source"], "reports/05_EXP_RESULT.html")
         self.assertEqual(evidence["experiment_setup_contract"]["baseline_count"], 2)
+        self.assertEqual(
+            evidence["executed_metric_definitions"]["flip_rate"],
+            "adjacent transitions",
+        )
+        self.assertEqual(
+            evidence["executed_prompt_conditions"]["label_first"]["response_fields"],
+            ["label"],
+        )
         self.assertIn("artifacts.T1.rows", evidence)
         self.assertNotIn("artifacts.T2.rows", evidence)
 
@@ -5530,13 +5842,67 @@ args = parser.parse_args()
             patch.object(studio, "RESULT_KEYS", {"m": [], "i": []}),
             patch.object(studio, "FIGURES", {}),
             patch.object(studio, "TABLES", {}),
-            patch.object(studio, "metrics_bundle", return_value={"model_design": design}),
+            patch.object(
+                studio,
+                "metrics_bundle",
+                return_value={
+                    "model_design": design,
+                    "metric_contract": [{"id": "M1"}],
+                    "executed_metric_definitions": {"flip_rate": "adjacent transitions"},
+                    "executed_prompt_conditions": {
+                        "label_first": {"response_fields": ["label"]}
+                    },
+                },
+            ),
         ):
             method = json.loads(studio.section_evidence("m", []))
             introduction = json.loads(studio.section_evidence("i", []))
 
         self.assertEqual(method["approved_model_design"], design)
+        self.assertEqual(method["metric_contract"], [{"id": "M1"}])
+        self.assertEqual(
+            method["executed_metric_definitions"],
+            {"flip_rate": "adjacent transitions"},
+        )
+        self.assertEqual(
+            method["executed_prompt_conditions"],
+            {"label_first": {"response_fields": ["label"]}},
+        )
         self.assertNotIn("approved_model_design", introduction)
+
+    def test_executed_summary_and_claim_disposition_reach_relevant_sections(self):
+        metrics = {
+            "execution_summary": {"final_question_count": 80},
+            "claim_dispositions": {"C2": {"status": "inconclusive"}},
+            "qualitative_cases": {"unstable": {"question_id": "q1"}},
+            "qualitative_evidence_scope": "Representative records only.",
+        }
+        with (
+            patch.object(
+                studio,
+                "SECTION_MAP",
+                {
+                    "e": {"title": "Experiments", "render": "section"},
+                    "d": {"title": "Discussion", "render": "section"},
+                    "l": {"title": "Limitations", "render": "section"},
+                },
+            ),
+            patch.object(studio, "RESULT_KEYS", {"e": [], "d": [], "l": []}),
+            patch.object(studio, "FIGURES", {}),
+            patch.object(studio, "TABLES", {}),
+            patch.object(studio, "metrics_bundle", return_value=metrics),
+            patch.object(studio, "experiment_setup_context", return_value={}),
+            patch.object(studio, "execution_record_context", return_value={}),
+            patch.object(studio, "primary_comparison_outcome", return_value={}),
+        ):
+            experiment = json.loads(studio.section_evidence("e", []))
+            discussion = json.loads(studio.section_evidence("d", []))
+            limitation = json.loads(studio.section_evidence("l", []))
+
+        self.assertEqual(experiment["execution_summary"]["final_question_count"], 80)
+        self.assertEqual(experiment["qualitative_cases"]["unstable"]["question_id"], "q1")
+        self.assertEqual(discussion["claim_dispositions"]["C2"]["status"], "inconclusive")
+        self.assertEqual(limitation["execution_summary"]["final_question_count"], 80)
 
     def test_setup_without_declared_external_items_does_not_require_three_citations(self):
         with (
@@ -5703,6 +6069,72 @@ args = parser.parse_args()
 
         self.assertEqual(issues, [])
 
+    def test_bound_artifact_row_gate_accepts_confidence_interval_values(self):
+        evidence = json.dumps({
+            "artifacts.T1.rows": [{
+                "method": "Label-first",
+                "accuracy": "0.950 95% CI [0.894, 1.000]",
+            }]
+        })
+
+        issues = studio.bound_artifact_row_value_issues(
+            "Label-first reached \\(0.950\\) with a 95\\% CI of "
+            "\\([0.894, 1.000]\\).",
+            evidence,
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_bound_artifact_row_gate_ignores_numeric_curve_x_values_as_labels(self):
+        evidence = json.dumps({
+            "artifacts.F2.rows": [
+                {"permutation_count": "1", "invariance": "1.000"},
+                {"permutation_count": "2", "invariance": "0.950"},
+            ]
+        })
+
+        issues = studio.bound_artifact_row_value_issues(
+            "Across 1 and 2 permutations, invariance changed from "
+            "\\(1.000\\) to \\(0.950\\).",
+            evidence,
+        )
+
+        self.assertEqual(issues, [])
+
+    def test_discussion_gate_rejects_raw_result_schema_fields(self):
+        evidence = json.dumps({
+            "artifacts.T1.rows": [{
+                "method": "Label-first",
+                "arc_accuracy": 0.95,
+                "mmlu_invariance": 0.487,
+            }],
+            "f2_rows": [{"permutation_count": 4}],
+        })
+        with patch.object(
+            studio,
+            "SECTION_MAP",
+            {"discussion": {"title": "Discussion", "render": "section"}},
+        ):
+            issues = studio.manuscript_machine_field_issues(
+                "discussion",
+                "The f2\\_rows report arc\\_accuracy of 0.95.",
+                evidence,
+            )
+            method_issues = studio.manuscript_machine_field_issues(
+                "method",
+                "The parser stores arc\\_accuracy.",
+                evidence,
+            )
+
+        self.assertEqual(
+            issues,
+            [
+                "raw result-schema field in manuscript prose: arc_accuracy",
+                "raw result-schema field in manuscript prose: f2_rows",
+            ],
+        )
+        self.assertEqual(method_issues, [])
+
     def test_latex_numeric_values_preserves_leading_decimal_scale(self):
         self.assertEqual(
             studio._latex_numeric_values(
@@ -5825,11 +6257,11 @@ args = parser.parse_args()
     def test_artifact_card_labels_data_figures_by_kind_not_phase(self):
         app = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn(
-            'figure.kind === "mechanism" ? "机制图 · 先完成" : "数据图 · results/ 驱动"',
+            'figure.kind === "mechanism" ? "Mechanism diagram · finish first" : "Data figure · results/ driver."',
             app,
         )
         self.assertNotIn(
-            'figure.phase === 1 ? "机制图 · 先完成" : "数据图 · results/ 驱动"',
+            'figure.phase === 1 ? "Mechanism diagram · finish first" : "Data figure · results/ driver."',
             app,
         )
 
@@ -5858,9 +6290,9 @@ args = parser.parse_args()
         mechanism = studio.recovered_mechanism_prompt("F1")
         data = studio.recovered_data_panel_prompt("F2", "a")
 
-        self.assertIn("原始生成 Prompt 未归档", mechanism)
+        self.assertIn("Original generation Prompt not archived.", mechanism)
         self.assertIn(studio.FIGURES["F1"]["title"], mechanism)
-        self.assertIn("原始 Agent Prompt 未归档", data)
+        self.assertIn("Original Agent Prompt is not archived.", data)
         self.assertIn(studio.FIGURES["F2"]["panels"][0]["goal"], data)
 
     def test_outline_confirmation_recovers_from_canonical_approval_record(self):
@@ -5876,15 +6308,15 @@ args = parser.parse_args()
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('id="project-reference-paper"', html)
-        self.assertIn("网页未提供的功能或其他需求，请在本地终端运行 Code Agent。", html)
+        self.assertIn("Features not provided by the webpage or other requests should be run with Code Agent in the local terminal.", html)
         self.assertNotIn('id="project-subtitle"', html)
-        self.assertNotIn("逐段对话、确认后写入 LaTeX", html + source)
+        self.assertNotIn("Paragraph by paragraph discussion, write to LaTeX after confirmation.", html + source)
         self.assertIn('$("project-reference-paper")', source)
         self.assertIn("project.reference_paper", source)
         self.assertNotIn("referencePaper.authors", source)
         # A project with no reference_paper.title (e.g. the lightweight
         # onboarding path with no single structural reference) must hide
-        # the line rather than show an empty "参考论文：".
+        # the line rather than show an empty "Reference paper:".
         self.assertIn("referenceEl.hidden = true", source)
 
     def test_online_project_flag_hides_provider_and_key_controls(self):
@@ -5930,11 +6362,11 @@ args = parser.parse_args()
                 if item["id"] == data["id"]
             )
             self.assertTrue(hosted_data["placeholder_only"])
-            with self.assertRaisesRegex(StudioError, "线上版以带 Caption"):
+            with self.assertRaisesRegex(StudioError, "placeholder with caption and label"):
                 handler.reject_online_placeholder_figure(data["id"])
 
         with patch.object(studio, "ONLINE_PROJECT_MODE", True):
-            with self.assertRaisesRegex(StudioError, "线上版以带 Caption"):
+            with self.assertRaisesRegex(StudioError, "placeholder with caption and label"):
                 handler.reject_online_placeholder_figure(mechanism["id"])
             handler.reject_online_placeholder_figure(data["id"])
 
@@ -6031,14 +6463,11 @@ args = parser.parse_args()
         # control, fail, and get redirected into a "bring your own key"
         # dialog that no longer exists. The demo is view-only now -- no
         # API-key postMessage escape hatch, no redirect, just a disabled control
-        # surface and a plain blocked-request fallback. The sole parent message
-        # synchronizes the non-sensitive interface-language preference.
+        # surface and a plain blocked-request fallback. Paper Studio is fixed
+        # to English and sends no parent-window language messages.
         self.assertNotIn("paper-studio-demo-api-key-required", source)
-        self.assertIn(
-            'window.parent.postMessage({type: "research-avatar-language", language}',
-            source,
-        )
-        self.assertEqual(source.count("window.parent.postMessage"), 1)
+        self.assertNotIn("research-avatar-language", source)
+        self.assertEqual(source.count("window.parent.postMessage"), 0)
         self.assertNotIn('demo_key_required: "1"', source)
         self.assertIn("function applyReadOnlyDemoRestrictions()", source)
         self.assertIn('if (!state || !state.demo_mode) return;', source)
@@ -6160,6 +6589,19 @@ args = parser.parse_args()
         )
         self.assertEqual(studio.mechanism_prompt_contract_issues("F1", valid), [])
 
+    def test_mechanism_prompt_must_preserve_registered_symbol_glyphs(self):
+        with (
+            patch.dict(studio.FIGURES["F1"], {"symbol_ids": ["SYM-S"]}),
+            patch.object(
+                studio, "metrics_bundle",
+                return_value={"symbol_registry": [{"id": "SYM-S", "latex": "S(v)", "meaning": "support sets"}]},
+            ),
+        ):
+            missing = "Show the mechanism. Use no more than 8 text labels."
+            self.assertTrue(any("SYM-S" in issue for issue in studio.mechanism_prompt_contract_issues("F1", missing)))
+            exact = "Show S(v) in the mechanism. Use no more than 8 text labels."
+            self.assertEqual(studio.mechanism_prompt_contract_issues("F1", exact), [])
+
     def test_full_draft_worker_fills_only_pending_paragraph_and_finishes(self):
         with TemporaryDirectory() as directory:
             state_dir = Path(directory)
@@ -6212,6 +6654,7 @@ args = parser.parse_args()
                     return_value=[],
                 ),
                 patch.object(studio, "completed_manuscript_issues", return_value=[]),
+                patch.object(studio, "generate_full_draft_title") as generate_title,
             ):
                 studio.save_state(state)
                 studio.full_draft_worker(token, "gpt-5-nano")
@@ -6224,6 +6667,7 @@ args = parser.parse_args()
             )
             self.assertEqual(accepted["accepted_text"], "Batch draft.")
             self.assertEqual(generate.call_count, 1)
+            generate_title.assert_called_once_with("gpt-5-nano")
             materialize.assert_called_once()
 
     def test_section_draft_targets_only_the_selected_section(self):
@@ -6358,8 +6802,11 @@ args = parser.parse_args()
         status_ready = lambda current, figure_id: (
             current["figures"][figure_id]["status"] == "approved"
         )
-        with patch.object(
-            studio, "batch_figure_has_real_deliverables", side_effect=status_ready
+        with (
+            patch.object(
+                studio, "batch_figure_has_real_deliverables", side_effect=status_ready
+            ),
+            patch.object(studio, "completed_manuscript_issues", return_value=[]),
         ):
             studio.refresh_full_draft_artifact_status(state)
 
@@ -6410,7 +6857,7 @@ args = parser.parse_args()
                 patch.object(studio, "section_source_fingerprint", return_value="source"),
             ):
                 studio.save_state(state)
-                with self.assertRaisesRegex(StudioError, "过时候选"):
+                with self.assertRaisesRegex(StudioError, "past candidate"):
                     handler.handle_generate({
                         "section": section,
                         "paragraph_id": paragraph["id"],
@@ -6439,8 +6886,11 @@ args = parser.parse_args()
         status_ready = lambda current, figure_id: (
             current["figures"][figure_id]["status"] == "approved"
         )
-        with patch.object(
-            studio, "batch_figure_has_real_deliverables", side_effect=status_ready
+        with (
+            patch.object(
+                studio, "batch_figure_has_real_deliverables", side_effect=status_ready
+            ),
+            patch.object(studio, "completed_manuscript_issues", return_value=[]),
         ):
             self.assertEqual(studio.pending_batch_artifacts(state), ["F1"])
             state["full_draft_job"] = {"status": "artifacts_pending"}
@@ -6572,7 +7022,7 @@ args = parser.parse_args()
         # "running" job's server_instance token doesn't match the current
         # process (a fresh SERVER_INSTANCE_TOKEN each process start), the
         # very next load_state() call anywhere must turn it into a clean,
-        # actionable "服务已重启" failure instead of leaving it stuck at
+        # actionable "Service has restarted" failure instead of leaving it stuck at
         # "running" forever with no way for the researcher to tell.
         with TemporaryDirectory() as directory:
             state_dir = Path(directory)
@@ -6589,7 +7039,7 @@ args = parser.parse_args()
                     "total": 19,
                     "completed": 13,
                     "progress": 68,
-                    "progress_message": "正在生成 Experiments · E-P5",
+                    "progress_message": "Generating Experiments · E-P5",
                 }
                 studio.save_state(stuck)
 
@@ -6598,8 +7048,8 @@ args = parser.parse_args()
             job = recovered["full_draft_job"]
             self.assertEqual(job["status"], "failed")
             self.assertIsNone(job["token"])
-            self.assertIn("服务已重启", job["progress_message"])
-            self.assertIn("可从未完成段落继续", job["progress_message"])
+            self.assertIn("Service has restarted", job["progress_message"])
+            self.assertIn("resume from the unfinished paragraph", job["progress_message"])
             # The 13 already-completed paragraphs are real accepted LaTeX
             # (persisted per-paragraph as they land), not job-state --
             # recovery must not touch or reset that count/progress.
@@ -6645,6 +7095,7 @@ args = parser.parse_args()
                     "batch_figure_has_real_deliverables",
                     return_value=True,
                 ),
+                patch.object(studio, "completed_manuscript_issues", return_value=[]),
                 patch.dict(studio.os.environ, {studio.API_KEY_ENVIRONMENT_VARIABLE: "secret"}),
                 patch("builtins.print"),
             ):
@@ -6704,11 +7155,140 @@ args = parser.parse_args()
             any("too long" in item for item in studio.latex_prose_issues(source))
         )
 
+    def test_integrity_guard_covers_reference_aliases_and_registered_mutant_roles(self):
+        fixture = {"scientific_integrity_version": 2, "execution_records": {}}
+        with patch.object(studio, "metrics_bundle", return_value=fixture):
+            self.assertEqual(
+                studio.execution_record_contradiction_issues(
+                    "The reference implementation maintained 100.000 agreement as a required conformance check."
+                ),
+                [],
+            )
+            self.assertIn(
+                "frames oracle-conformance agreement as method superiority",
+                studio.execution_record_contradiction_issues(
+                    "The reference implementation outperformed every registered mutant."
+                ),
+            )
+            contrast_issues = studio.execution_record_contradiction_issues(
+                "Removing support sets caused under-propagation. "
+                "Removing cascade propagation caused over-propagation."
+            )
+        self.assertNotIn(
+            "assigns under-propagation to the no-support-sets mutant",
+            contrast_issues,
+        )
+        self.assertNotIn(
+            "assigns over-propagation to the no-cascade mutant",
+            contrast_issues,
+        )
+
     def test_normalizer_removes_standalone_latex_fences(self):
         self.assertEqual(
             studio.normalize_latex_ready_text("```latex\nA paragraph.\n```"),
             "A paragraph.",
         )
+
+    def test_normalizer_canonicalizes_provider_typographic_dashes(self):
+        normalized = studio.normalize_latex_ready_text(
+            "Evidence—rather than position—controls the decision."
+        )
+        self.assertNotIn("—", normalized)
+        self.assertNotIn("–", normalized)
+        self.assertEqual(studio.latex_prose_issues(normalized), [])
+
+    def test_normalizer_maps_biblatex_citations_to_acl_natbib(self):
+        normalized = studio.normalize_latex_ready_text(
+            r"\textcite{smith2025} compare this with \parencite{lee2026}."
+        )
+        self.assertEqual(
+            normalized,
+            r"\cite{smith2025} compare this with \cite{lee2026}.",
+        )
+
+    def test_body_page_budget_uses_latex_marker_before_references(self):
+        with TemporaryDirectory(dir=studio.ROOT / "tests") as directory:
+            paper = Path(directory)
+            (paper / "main.tex").write_text(
+                "\\begin{document}\nBody\n\\FloatBarrier\n"
+                "\\input{sections/bibliography}\n\\end{document}\n",
+                encoding="utf-8",
+            )
+            (paper / "main.aux").write_text(
+                r"\newlabel{paper:body-end}{{}{8}{}{Doc-Start}{}}" + "\n",
+                encoding="utf-8",
+            )
+            with (
+                patch.object(studio, "PAPER", paper),
+                patch.dict(
+                    studio.PROJECT_METADATA,
+                    {"target": {"submission_content_pages": 8}},
+                    clear=True,
+                ),
+            ):
+                studio.ensure_body_end_label()
+                status = studio.page_budget_status()
+            source = (paper / "main.tex").read_text(encoding="utf-8")
+            self.assertLess(
+                source.index(r"\label{paper:body-end}"),
+                source.index(r"\input{sections/bibliography}"),
+            )
+            self.assertEqual(status["content_pages"], 8)
+            self.assertEqual(status["status"], "within")
+            self.assertTrue(status["excludes_references"])
+
+    def test_page_budget_rejects_crossing_or_worsening_but_allows_reduction(self):
+        with patch.dict(
+            studio.PROJECT_METADATA,
+            {"target": {"submission_content_pages": 8}},
+            clear=True,
+        ):
+            self.assertTrue(studio.page_budget_worsened(8, 9))
+            self.assertTrue(studio.page_budget_worsened(9, 10))
+            self.assertFalse(studio.page_budget_worsened(10, 9))
+            self.assertFalse(studio.page_budget_worsened(9, 8))
+
+    def test_completed_manuscript_gate_rejects_an_over_budget_body(self):
+        with (
+            patch.object(
+                studio,
+                "page_budget_status",
+                return_value={
+                    "status": "over",
+                    "content_pages": 10,
+                    "limit": 8,
+                },
+            ),
+            patch.object(studio, "metrics_bundle", return_value={"synthetic": True}),
+            patch.object(studio, "batch_figure_has_real_deliverables", return_value=True),
+            patch.object(studio, "read_text", return_value=""),
+        ):
+            issues = studio.completed_manuscript_issues({"sections": {}, "figures": {}, "tables": {}})
+        self.assertTrue(any("10 pages for a 8-page limit" in item for item in issues))
+
+    def test_public_state_discloses_native_codex_drawing_capability(self):
+        visible = public_state(_default_state())
+        self.assertEqual(
+            visible["figure_capabilities"]["mechanism_renderer"],
+            "codex-native-shapes",
+        )
+        self.assertFalse(visible["figure_capabilities"]["requires_image_api"])
+
+    def test_paper_studio_exposes_project_report_and_connection_status(self):
+        visible = public_state(_default_state())
+        self.assertIn("report_version", visible["project"])
+        self.assertIn("reports_updated_at", visible["project"])
+        html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
+        script = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        for element_id in (
+            "runtime-project-id",
+            "runtime-report-version",
+            "runtime-reports-updated",
+            "runtime-connection",
+        ):
+            self.assertIn(f'id="{element_id}"', html)
+        self.assertIn('$("runtime-connection").textContent = "Connected"', script)
+        self.assertIn('$("runtime-connection").textContent = "Disconnected"', script)
 
 
 if __name__ == "__main__":

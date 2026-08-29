@@ -101,12 +101,12 @@ ONLINE_DISABLED_ARTIFACT_AGENT_PATHS = {
     "/api/table/agent-edit",
 }
 ONLINE_PLACEHOLDER_FIGURE_MESSAGE = (
-    "线上版以带 Caption 和 label 的 placeholder 保留该图位，不提供正式绘图。"
-    "完整功能请下载项目 ZIP 后在本地版使用。"
+    "Online version retains that figure position as a placeholder with caption and label, not providing formal plotting."
+    "For full functionality, download the project ZIP and use it in the local version."
 )
 ONLINE_PLACEHOLDER_TABLE_MESSAGE = (
-    "线上版以带 Caption 和 label 的 placeholder 保留该表位，不提供表格生成。"
-    "完整功能请下载项目 ZIP 后在本地版使用。"
+    "Online version retains that table position as a placeholder with caption and label, not providing table generation."
+    "For full functionality, download the project ZIP and use it in the local version."
 )
 DEMO_MODE = os.environ.get("PAPER_STUDIO_DEMO_MODE", "").lower() in {
     "1",
@@ -137,8 +137,8 @@ MECHANISM_AGENT_TIMEOUT_SECONDS = 300
 API_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
 API_URL += "/responses"
 API_KEY_ENVIRONMENT_VARIABLE = "OPENAI_API_KEY"
-API_KEY_SETUP_LOCATION = "启动 Paper Studio 的本机终端"
-API_KEY_SETUP_COMMAND = 'export OPENAI_API_KEY="粘贴你的 API key"'
+API_KEY_SETUP_LOCATION = "Launch Paper Studio native terminal."
+API_KEY_SETUP_COMMAND = 'export OPENAI_API_KEY="Paste your API key."'
 API_KEY_RESTART_COMMAND = "python3 -m research_avatar.paper_studio.server"
 CHAT_HISTORY_LOCK = threading.RLock()
 CHAT_RESPONSE_HISTORIES: dict[str, list[dict[str, str]]] = {}
@@ -465,7 +465,7 @@ def empty_project_config() -> dict[str, Any]:
             "name": "",
             "eyebrow": "PAPER STUDIO",
             "studio_title": "Paper Studio",
-            "subtitle": "等待载入论文项目数据",
+            "subtitle": "Waiting for loading paper project data",
         },
         "sections": [],
         "batch_writing_order": [],
@@ -494,6 +494,7 @@ SECTION_MAP = {
         "start_label": str(item.get("start_label", "")),
         "end_label": str(item.get("end_label", "")),
         "writing_mode": str(item.get("writing_mode", "draft")),
+        "length_share": item.get("length_share"),
     }
     for item in SECTION_SPECS
 }
@@ -574,12 +575,12 @@ def default_table_prompt(table_id: str) -> str:
     prompt = definition.get("prompt", {})
     return "\n".join(
         [
-            f"数据源: {PROJECT_CONFIG['paths']['metrics']}",
-            f"列: {prompt.get('columns', '')}",
-            f"行: {prompt.get('rows', 'source')}",
+            f"Data source: {PROJECT_CONFIG['paths']['metrics']}",
+            f"Column: {prompt.get('columns', '')}",
+            f"Row: {prompt.get('rows', 'source')}",
             f"Caption: {definition['caption']}",
-            f"字号: {prompt.get('font_size', 'small')}",
-            f"最优值: {prompt.get('best_values', 'none')}",
+            f"Font size: {prompt.get('font_size', 'small')}",
+            f"Optimal value: {prompt.get('best_values', 'none')}",
         ]
     )
 
@@ -594,7 +595,7 @@ def recovered_mechanism_prompt(figure_id: str) -> str:
     canvas_text = " × ".join(str(value) for value in canvas) + " in" if canvas else "project-configured"
     return "\n".join(
         [
-            "[恢复的设计说明｜原始生成 Prompt 未归档]",
+            "[Restored design specification｜Original generation Prompt not archived.]",
             f"Create an editable academic mechanism figure titled: {definition['title']}.",
             f"Required content: {definition['description']}",
             f"Rhetorical role: {definition.get('rhetorical_role', 'mechanism')}.",
@@ -616,7 +617,7 @@ def recovered_data_panel_prompt(figure_id: str, panel_id: str) -> str:
     result_keys = ", ".join(str(key) for key in panel.get("result_keys", [])) or "none"
     return "\n".join(
         [
-            "[恢复的绘图说明｜原始 Agent Prompt 未归档]",
+            "[Restored drawing description｜Original Agent Prompt is not archived.]",
             f"Create the data panel '{panel['title']}' for figure {figure_id}: {definition['title']}.",
             f"Goal: {panel['goal']}",
             f"Use only traceable result keys: {result_keys}.",
@@ -758,28 +759,28 @@ def artifact_reference_error(
     details: list[str] = []
     if issues["missing"]:
         details.append(
-            "缺少 " + ", ".join(item["required_reference"] for item in issues["missing"])
+            "missing " + ", ".join(item["required_reference"] for item in issues["missing"])
         )
     if issues["repeated"]:
         details.append(
-            "同段重复 "
+            "Repeated in the same paragraph "
             + ", ".join(
-                f"{item['required_reference']}（{item['count']} 次）"
+                f"{item['required_reference']}({item['count']} times)"
                 for item in issues["repeated"]
             )
         )
     if issues["unexpected"]:
         details.append(
-            "本段未绑定 "
+            "This paragraph is not bound. "
             + ", ".join(item["required_reference"] for item in issues["unexpected"])
         )
     if not details:
         return ""
     return (
-        "图表引用不符合已批准的段落结构："
-        + "；".join(details)
-        + "。每个绑定图表在该段必须且只能引用一次；需要在其他段落再次引用时，"
-        "先在实验计划的目标段落中显式绑定。"
+        "Chart references do not conform to the approved paragraph structure."
+        + "; ".join(details)
+        + ".Each bound figure must be cited exactly once in this section; when citing again in other sections,"
+        "First explicitly bind in the target paragraph of the experimental plan."
     )
 
 
@@ -818,6 +819,8 @@ Treat the profile's visual_signature as a hard art-direction constraint. Read <c
 Match recurring ACL conventions: pure white background; publication-ready editable-vector appearance; flat fills; thin dark strokes; compact alignment; generous whitespace; precise sans-serif labels; restrained colorblind-safe accents; repeated shapes for repeated scientific entities; solid arrows for primary flow and dashed arrows only for a different, explicitly named relation. Use color to reinforce meaning, never as the only distinction. Avoid decorative poster art, photorealism, people, scenery, mascots, gradients, glow, glass, 3D depth, heavy shadows, marketing graphics, large title cards, and empirical result plots.
 
 Apply a cold-reader gate. From the figure and one-sentence caption alone, a researcher must identify the input or compared states, the proposed operation, the output, and the paper-specific difference. Every arrow and visual object must correspond to the supplied evidence. Do not invent modules, claims, outcomes, numerical results, or causal relations. Keep labels short and print-readable at the target column width; put explanations in the caption, not inside the figure. When the evidence contains a symbol_registry, copy its glyphs and meanings exactly: do not introduce aliases, rename a threshold, or use a different owner/source symbol in the figure than in the manuscript.
+
+Audit the internal logic of the visual before returning. Outcomes that differ must not be labeled equal or identical; a wrong outcome must not be counted as correct. A non-data figure may not contain a percentage, score, sample count, or aggregate result, even as a hypothetical decoration. Preserve identity consistently: unchanged objects may move or be relabeled, but do not describe two distinct outputs as the same semantic object. If the supplied prose is internally inconsistent, omit the inconsistent claim and visualize only the smallest supported contrast.
 
 The supplied format and type profiles are mandatory. Restate the canvas, column target, composition, object inventory, reading order, label budget, palette roles, line semantics, and prohibited content in the final image-generation prompt. On revision turns, preserve correct prior decisions while applying the latest instruction. Do not mention named drawing software; describe the visible result rather than a tool-specific style."""
 
@@ -964,6 +967,11 @@ def generate_figure_caption(
             "\\(...\\), use ASCII LaTeX commands instead of Unicode math glyphs or "
             "superscripts, and escape percent signs. Preserve the "
             "literal [SYNTHETIC] marker whenever the context contains synthetic data. "
+            "Audit logical consistency before returning: outcomes that differ cannot be "
+            "called identical, a wrong outcome cannot be called correct, and an average "
+            "cannot contradict the outcomes being averaged. For a non-data figure, do "
+            "not introduce a percentage, score, count, or empirical aggregate absent "
+            "from traceable results. "
             f"For this figure, synthetic marker required is {str(synthetic).lower()}; "
             "include [SYNTHETIC] if and only if that value is true. "
             + MANUSCRIPT_DASH_RULE
@@ -973,7 +981,7 @@ def generate_figure_caption(
     response = post_openai(payload)
     caption = normalize_figure_caption_text(extract_output_text(response))
     if not caption:
-        raise StudioError("GPT 没有返回可用的 Caption。")
+        raise StudioError("GPT No usable caption returned.")
     if not synthetic:
         caption = caption.replace("[SYNTHETIC]", "").strip()
     if synthetic and "[SYNTHETIC]" not in caption:
@@ -1008,8 +1016,8 @@ def generate_figure_caption(
     remaining_issues = figure_caption_issues(caption)
     if remaining_issues:
         raise StudioError(
-            "GPT Caption 自动压缩后仍不符合长度或标点约束："
-            + "；".join(remaining_issues)
+            "GPT Caption Automatic compression still violates length or punctuation constraints."
+            + "; ".join(remaining_issues)
         )
     return caption
 
@@ -1053,13 +1061,22 @@ def enforce_figure_caption_bounds(caption: str) -> str:
         candidate = bounded[:cutoff].rstrip(" ,;:")
         # Prefer a complete leading clause to a word-count slice that can end
         # midway through a range or comparison (for example, "from ... to.").
-        clause_break = max(candidate.rfind(";"), candidate.rfind(","))
+        bracket_depth = 0
+        clause_break = -1
+        for index, character in enumerate(candidate):
+            if character == "[":
+                bracket_depth += 1
+            elif character == "]" and bracket_depth:
+                bracket_depth -= 1
+            elif character in ",;" and bracket_depth == 0:
+                clause_break = index
         if clause_break >= max(24, len(candidate) // 3):
             candidate = candidate[:clause_break].rstrip(" ,;:")
         # Never keep a mechanically truncated suffix that breaks math or braces.
         while candidate and (
             candidate.count(r"\(") != candidate.count(r"\)")
             or candidate.count("{") != candidate.count("}")
+            or candidate.count("[") != candidate.count("]")
         ):
             candidate = candidate.rsplit(" ", 1)[0].rstrip(" ,;:")
         if candidate:
@@ -1089,6 +1106,8 @@ def figure_caption_issues(caption: str) -> list[str]:
         issues.append("contains forbidden dash punctuation")
     if re.search(r"\b(?:to|from|and|or|versus|with|of)\.$", caption, re.I):
         issues.append("ends with an incomplete clause")
+    if caption.count("[") != caption.count("]"):
+        issues.append("contains unbalanced square brackets")
     # Caption rendering escapes ordinary TeX specials such as %, _, &, #, and
     # ^ via ``latex_escape_title``.  Reject only hazards that escaping cannot
     # repair without understanding the intended mathematics.
@@ -1144,8 +1163,8 @@ def auto_generate_bound_figure_captions(
         except StudioError as exc:
             figure_state["caption_last_error"] = str(exc)
             raise StudioError(
-                f"{paragraph_id} 绑定的 {figure_id} Caption 自动生成失败；"
-                "本段未接受，请重试。" + str(exc)
+                f"{paragraph_id} Bound to {figure_id} Caption Auto generation failed."
+                "This section was not accepted, please retry." + str(exc)
             ) from exc
         figure_state.update(
             {
@@ -1190,19 +1209,19 @@ def ensure_figure_caption_before_approval(
         figure_state["caption_generated_from_sha256"] = ""
     binding = first_artifact_binding(figure_id)
     if binding is None:
-        raise StudioError(f"{figure_id} 没有绑定引用段落，无法生成 Caption。")
+        raise StudioError(f"{figure_id} There is no bound reference paragraph; unable to generate a caption.")
     section, paragraph_id = binding
     paragraph, _ = paragraph_by_id(state, section, paragraph_id)
     accepted_text = str(paragraph.get("accepted_text") or "").strip()
     if not accepted_text:
         raise StudioError(
-            f"请先接受引用 {figure_id} 的段落 {paragraph_id}，再确认插图。"
+            f"Please accept the citation first {figure_id} the paragraph {paragraph_id}, Reconfirm figure."
         )
     generated = auto_generate_bound_figure_captions(
         state, section, paragraph, accepted_text
     )
     if figure_id not in generated and figure_state.get("caption_source") != "paragraph_accept":
-        raise StudioError(f"{figure_id} Caption 未生成，插图未确认。")
+        raise StudioError(f"{figure_id} Caption Not generated; illustration not confirmed.")
 
 
 def figure_latex(
@@ -1583,18 +1602,18 @@ def _approved_contract() -> dict[str, Any]:
         return {}
     source = _project_path(ROOT, decision_source, "project.decision_source")
     if not source.is_file():
-        raise StudioError("已批准的实验计划不存在。")
+        raise StudioError("The approved experimental plan does not exist.")
     match = re.search(
         r"<script\b[^>]*\bid=[\"']experiment-plan-contract[\"'][^>]*>(.*?)</script>",
         source.read_text(encoding="utf-8", errors="replace"),
         flags=re.IGNORECASE | re.DOTALL,
     )
     if not match:
-        raise StudioError("实验计划缺少可读取的写作契约。")
+        raise StudioError("The experimental plan lacks a readable writing contract.")
     try:
         contract = json.loads(match.group(1))
     except json.JSONDecodeError as exc:
-        raise StudioError("实验计划中的写作契约不是有效 JSON。") from exc
+        raise StudioError("The writing contract in the experimental plan is not valid JSON.") from exc
     return contract if isinstance(contract, dict) else {}
 
 
@@ -1618,7 +1637,7 @@ def paragraph_plan() -> dict[str, Any]:
         try:
             demo_state = json.loads(STATE_FILE.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
-            raise StudioError("只读 Demo 的段落结构不是有效 JSON。") from exc
+            raise StudioError("Read only Demo paragraph structure is not valid JSON.") from exc
         demo_sections = demo_state.get("sections")
         if isinstance(demo_sections, dict):
             sections = {
@@ -1636,7 +1655,7 @@ def paragraph_plan() -> dict[str, Any]:
     contract = _approved_contract()
     outline = contract.get("paper_outline")
     if not isinstance(outline, list):
-        raise StudioError("项目配置和实验计划均缺少已批准的段落结构。")
+        raise StudioError("Project configuration and experimental plan both lack the approved paragraph structure.")
     sections: dict[str, list[dict[str, Any]]] = {}
     for section in outline:
         if not isinstance(section, dict):
@@ -1719,15 +1738,15 @@ def reference_contexts() -> dict[str, Any]:
     try:
         payload = json.loads(REFERENCE_CONTEXT_FILE.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise StudioError("paper/reference_context.json 不是有效 JSON。") from exc
+        raise StudioError("paper/reference_context.json Not valid JSON.") from exc
     sections = payload.get("sections") if isinstance(payload, dict) else None
     if not isinstance(sections, dict):
-        raise StudioError("paper/reference_context.json sections 必须是 object。")
+        raise StudioError("paper/reference_context.json sections Must be an object.")
     source_value = str(payload.get("reference_source") or "").strip()
     if source_value:
         source_path = _project_path(ROOT, source_value, "reference_context.reference_source")
         if not source_path.is_file():
-            raise StudioError("reference_context.reference_source 不存在。")
+            raise StudioError("reference_context.reference_source Does not exist.")
         source_lines = source_path.read_text(encoding="utf-8", errors="replace").splitlines()
         for context in sections.values():
             if not isinstance(context, dict):
@@ -1741,7 +1760,7 @@ def reference_contexts() -> dict[str, Any]:
                     or not isinstance(end, int) or isinstance(end, bool)
                     or start < 1 or end < start or end > len(source_lines)
                 ):
-                    raise StudioError("reference_context 中存在无效原文行号。")
+                    raise StudioError("reference_context There exist invalid original line numbers.")
                 excerpt["text"] = normalize_reference_excerpt(source_lines[start - 1:end])
     return sections
 
@@ -1877,7 +1896,7 @@ def mechanism_generation_prerequisite_message(
     grouped: dict[str, list[str]] = {}
     for section, paragraph_id in missing:
         item = paragraph_plan_item(section, paragraph_id) or {}
-        label = str(item.get("heading") or f"{paragraph_id} 段落")
+        label = str(item.get("heading") or f"{paragraph_id} paragraph")
         grouped.setdefault(section, []).append(label)
     groups = []
     for section, labels in grouped.items():
@@ -1886,9 +1905,9 @@ def mechanism_generation_prerequisite_message(
             or SECTION_MAP.get(section, {}).get("title")
             or section
         )
-        suffix = " subsection" if all(not label.endswith("段落") for label in labels) else ""
-        groups.append(f"{section_name} section 的 {'、'.join(labels)}{suffix}")
-    return f"请先生成并写入 {'；'.join(groups)}，然后再画图。"
+        suffix = " subsection" if all(not label.endswith("paragraph") for label in labels) else ""
+        groups.append(f"{section_name} section of {', '.join(labels)}{suffix}")
+    return f"Please generate and write it first. {'; '.join(groups)}, Then plot again."
 
 
 def validate_project_workspace() -> None:
@@ -1898,72 +1917,72 @@ def validate_project_workspace() -> None:
     plan = paragraph_plan()
     planned_sections = plan.get("sections")
     if not isinstance(planned_sections, dict):
-        raise StudioError("已批准的段落结构必须按 section 组织。")
+        raise StudioError("The approved paragraph structure must be organized by section.")
     configured_sections = set(SECTION_MAP)
     missing_sections = configured_sections - set(planned_sections)
     extra_sections = set(planned_sections) - configured_sections
     if missing_sections or extra_sections:
         details = []
         if missing_sections:
-            details.append("缺少 " + ", ".join(sorted(missing_sections)))
+            details.append("missing " + ", ".join(sorted(missing_sections)))
         if extra_sections:
-            details.append("多出 " + ", ".join(sorted(extra_sections)))
-        raise StudioError("段落结构与 paper_studio.json 的 section 不一致：" + "；".join(details))
+            details.append("extra " + ", ".join(sorted(extra_sections)))
+        raise StudioError("The paragraph structure is inconsistent with the section in paper_studio.json:" + "; ".join(details))
     contexts = reference_contexts()
     if contexts:
         if set(contexts) != configured_sections:
-            raise StudioError("reference_context.json 必须覆盖每个已配置 section，且不能包含额外 section。")
+            raise StudioError("reference_context.json Must cover every configured section and must not include extra sections.")
         for section, context in contexts.items():
             if not isinstance(context, dict):
-                raise StudioError(f"参考论文对应内容 {section} 必须是 object。")
+                raise StudioError(f"Corresponding content of the reference paper {section} Must be an object.")
             for field in ("source_heading", "logic_summary_zh"):
                 if not str(context.get(field) or "").strip():
-                    raise StudioError(f"参考论文对应内容 {section} 缺少 {field}。")
+                    raise StudioError(f"Corresponding content of the reference paper {section} missing {field}.")
             excerpts = context.get("excerpts")
             if context.get("mode") == "abstracted":
                 constraints = context.get("writing_constraints")
                 if excerpts not in ([], None):
-                    raise StudioError(f"抽象参考模式 {section} 禁止携带原文片段。")
+                    raise StudioError(f"Abstract reference mode. {section} Do not carry original excerpts.")
                 if not isinstance(constraints, list) or not 1 <= len(constraints) <= 50:
-                    raise StudioError(f"抽象参考模式 {section} 必须含 1--50 个写作约束。")
+                    raise StudioError(f"Abstract reference mode. {section} Must contain 1--50 writing constraints.")
                 if any(
                     not isinstance(item, dict)
                     or not str(item.get("id") or "").strip()
                     or not str(item.get("purpose") or "").strip()
                     for item in constraints
                 ):
-                    raise StudioError(f"抽象参考模式 {section} 存在无效写作约束。")
+                    raise StudioError(f"Abstract reference mode. {section} Invalid writing constraints exist.")
             else:
                 if not isinstance(excerpts, list) or not 1 <= len(excerpts) <= 50:
-                    raise StudioError(f"参考论文对应内容 {section} 必须含 1--50 个原文片段。")
+                    raise StudioError(f"Corresponding content of the reference paper {section} Must contain 1-50 original fragments.")
                 if any(
                     not isinstance(item, dict) or not str(item.get("text") or "").strip()
                     for item in excerpts
                 ):
-                    raise StudioError(f"参考论文对应内容 {section} 存在空原文片段。")
+                    raise StudioError(f"Corresponding content of the reference paper {section} There are empty original passages.")
     artifact_ids = set(FIGURES) | set(TABLES)
     artifact_bindings = {artifact_id: [] for artifact_id in artifact_ids}
     paragraph_ids: dict[str, set[str]] = {}
     for section, paragraphs in planned_sections.items():
         if not isinstance(paragraphs, list):
-            raise StudioError(f"段落结构中的 section {section} 必须是列表。")
+            raise StudioError(f"Section in paragraph structure. {section} Must be a list.")
         ids = [str(item.get("id", "")) for item in paragraphs]
         if any(not item for item in ids) or len(ids) != len(set(ids)):
-            raise StudioError(f"段落结构中的 section {section} 含无效段落 ID。")
+            raise StudioError(f"Section in paragraph structure. {section} Contains invalid paragraph IDs.")
         paragraph_ids[section] = set(ids)
         for paragraph in paragraphs:
             for field in ("purpose", "rhetorical_role", "relation_to_previous", "relation_to_next"):
                 if not str(paragraph.get(field, "")).strip():
-                    raise StudioError(f"段落 {paragraph['id']} 缺少已批准的 {field}。")
+                    raise StudioError(f"paragraph {paragraph['id']} Missing approved items. {field}.")
             bound = paragraph.get("artifacts", [])
             if not isinstance(bound, list) or len(bound) != len(set(bound)):
                 raise StudioError(
-                    f"段落 {paragraph['id']} 的 artifacts 必须是无重复 ID 的列表。"
+                    f"paragraph {paragraph['id']} The artifacts must be a list of unique IDs."
                 )
             unknown = set(bound) - artifact_ids
             if unknown:
                 raise StudioError(
-                    f"段落 {paragraph['id']} 绑定了未知图表：{', '.join(sorted(unknown))}"
+                    f"paragraph {paragraph['id']} Bound to unknown chart:{', '.join(sorted(unknown))}"
                 )
             for artifact_id in bound:
                 artifact_bindings[artifact_id].append(f"{section}/{paragraph['id']}")
@@ -1972,20 +1991,20 @@ def validate_project_workspace() -> None:
     )
     if unbound:
         raise StudioError(
-            "每个图表至少要绑定一个负责引用它的段落；当前未绑定："
+            "Each figure must be bound to at least one paragraph that cites it; currently unbound:"
             + ", ".join(unbound)
         )
     for figure_id, definition in FIGURES.items():
         unknown_figures = set(definition.get("depends_on_figures", [])) - set(FIGURES)
         if unknown_figures:
             raise StudioError(
-                f"{figure_id} 依赖未知 Figure：{', '.join(sorted(unknown_figures))}"
+                f"{figure_id} Dependency on unknown Figure:{', '.join(sorted(unknown_figures))}"
             )
         for section, ids in definition.get("depends_on_paragraphs", {}).items():
             unknown = set(ids) - paragraph_ids.get(section, set())
             if unknown:
                 raise StudioError(
-                    f"{figure_id} 依赖未知段落：{section} / {', '.join(sorted(unknown))}"
+                    f"{figure_id} Unknown paragraph dependencies:{section} / {', '.join(sorted(unknown))}"
                 )
         generation_requirements = definition.get("generation_requires_paragraphs")
         if generation_requirements is not None:
@@ -1993,17 +2012,17 @@ def validate_project_workspace() -> None:
                 generation_requirements, dict
             ):
                 raise StudioError(
-                    f"{figure_id}.generation_requires_paragraphs 只能用于机制图且必须是对象。"
+                    f"{figure_id}.generation_requires_paragraphs Only usable for mechanism diagrams and must be an object."
                 )
             for section, ids in generation_requirements.items():
                 if not isinstance(ids, list) or not ids:
                     raise StudioError(
-                        f"{figure_id} 的绘图前置段落必须是非空列表：{section}"
+                        f"{figure_id} The plotting preface paragraph must be a non empty list:{section}"
                     )
                 unknown = set(ids) - paragraph_ids.get(section, set())
                 if unknown:
                     raise StudioError(
-                        f"{figure_id} 的绘图前置段落不存在："
+                        f"{figure_id} The drawing preface paragraph does not exist:"
                         f"{section} / {', '.join(sorted(unknown))}"
                     )
     for artifact_id, definition in {**FIGURES, **TABLES}.items():
@@ -2011,7 +2030,7 @@ def validate_project_workspace() -> None:
         if shape_spec:
             path = _project_path(ROOT, shape_spec, f"{artifact_id}.shape_spec")
             if not path.exists():
-                raise StudioError(f"{artifact_id} 的 shape_spec 不存在：{shape_spec}")
+                raise StudioError(f"{artifact_id} The shape_spec does not exist:{shape_spec}")
 
 
 def planned_paragraphs(section: str) -> list[dict[str, Any]]:
@@ -2124,6 +2143,91 @@ def paragraph_architecture(paragraph: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def has_executed_real_results() -> bool:
+    """Return whether the metrics registry contains real populated artifacts."""
+    metrics = metrics_bundle()
+    if bool(metrics.get("synthetic", False)):
+        return False
+    artifacts = metrics.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        return False
+    return any(
+        isinstance(record, dict)
+        and not bool(record.get("synthetic", False))
+        and isinstance(record.get("rows"), (int, float))
+        and float(record["rows"]) > 0
+        for record in artifacts.values()
+    )
+
+
+def section_writing_logic_chain(section: str) -> dict[str, Any]:
+    """Expose the section-wide rhetorical chain without source-paper prose."""
+    return {
+        "section": section,
+        "paragraphs": [
+            {"id": str(item.get("id") or ""), **paragraph_architecture(item)}
+            for item in planned_paragraphs(section)
+        ],
+        "content_authority": "target project evidence only",
+    }
+
+
+def effective_working_abstract_context() -> str:
+    """Replace a stale plan-only abstract once real result artifacts exist."""
+    if has_executed_real_results():
+        return (
+            "The experiment has been executed. Draft the "
+            "abstract from the exact measurements in section_evidence. Report only "
+            "supported findings, retain every scope qualification supplied by the "
+            "execution evidence, and include no citation commands."
+        )
+    return read_text(PAPER / "working_abstract.txt", 10000)
+
+
+def effective_writing_architecture(
+    section: str,
+    architecture: dict[str, str] | None,
+    bound_artifacts: list[dict[str, Any]],
+) -> dict[str, str]:
+    """Overlay current execution state on an older approved writing plan."""
+    effective = dict(architecture or {})
+    if not has_executed_real_results():
+        return effective
+    has_bound_results = any(
+        isinstance(item, dict) and bool(item.get("traceable_results"))
+        for item in bound_artifacts
+    )
+    if SECTION_MAP.get(section, {}).get("render") == "abstract":
+        status = (
+            "Summarize the executed study using exact supplied measurements and its "
+            "evidence-defined scope; do not describe it as planned or pending."
+        )
+    elif _is_experiment_section(section) and has_bound_results:
+        status = (
+            "Report and interpret the executed measurements in the bound artifacts; "
+            "the older plan-only wording is obsolete."
+        )
+    elif _is_experiment_section(section):
+        status = (
+            "No executed artifact is bound to this paragraph. State the evidence gap "
+            "or supported protocol boundary; do not invent an ablation or robustness result."
+        )
+    elif _is_synthesis_section(section) and has_bound_results:
+        status = (
+            "Interpret the executed bound measurements and their limitations; do not "
+            "call populated artifacts placeholders or future tests."
+        )
+    elif section == "conclusion":
+        status = (
+            "Close with the exact supported pilot findings and limitations, not the "
+            "pre-execution plan."
+        )
+    else:
+        status = "Use current target-project evidence; ignore obsolete plan-only status."
+    effective["current_evidence_status"] = status
+    return effective
+
+
 def online_citation_placeholder_minimum(section: str, paragraph_index: int) -> int:
     """Reserve fillable citation slots in literature-facing hosted prose."""
     if section == "introduction":
@@ -2144,6 +2248,7 @@ def _default_state() -> dict[str, Any]:
             "candidate": "",
             "previous_response_id": None,
             "last_message": "",
+            "status": "placeholder",
         },
         "full_draft_job": None,
         "section_draft_job": None,
@@ -2358,7 +2463,7 @@ def load_state() -> dict[str, Any]:
                 **draft_job,
                 "status": "failed",
                 "token": None,
-                "progress_message": "服务已重启；全文生成任务已停止，可从未完成段落继续。",
+                "progress_message": "Service has restarted; the full text generation task has stopped, you can resume from the unfinished paragraph.",
                 "finished_at": int(time.time()),
             }
         section_job = state.setdefault("section_draft_job", None)
@@ -2372,13 +2477,19 @@ def load_state() -> dict[str, Any]:
                 **section_job,
                 "status": "failed",
                 "token": None,
-                "progress_message": "服务已重启；Section 生成任务已停止，可重新继续。",
+                "progress_message": "Service has been restarted; Section generation tasks have stopped, you may resume.",
                 "finished_at": int(time.time()),
             }
         state.setdefault("compile", default["compile"])
         stored_figures = state.get("figures", {})
+        if not isinstance(stored_figures, dict):
+            stored_figures = {}
         state["figures"] = {
-            figure_id: stored_figures.get(figure_id, figure_state)
+            figure_id: (
+                stored_figures.get(figure_id, figure_state)
+                if isinstance(stored_figures.get(figure_id, figure_state), dict)
+                else figure_state
+            )
             for figure_id, figure_state in default["figures"].items()
         }
         for figure_id, figure_state in default["figures"].items():
@@ -2387,6 +2498,8 @@ def load_state() -> dict[str, Any]:
             )
             for field, value in figure_state.items():
                 current_figure.setdefault(field, value)
+            if not isinstance(current_figure.get("panels"), dict):
+                current_figure["panels"] = dict(figure_state.get("panels", {}))
             if (
                 ONLINE_PROJECT_MODE
                 and FIGURES[figure_id].get("kind") == "mechanism"
@@ -2601,8 +2714,8 @@ def mechanism_draft_path(figure_id: str) -> Path:
     return paths["draft"]
 
 
-def mechanism_gpt_preview_no_text(figure_id: str) -> bool:
-    """Expose whether the archived GPT image was intentionally text-free."""
+def mechanism_draft_preview_no_text(figure_id: str) -> bool:
+    """Expose whether the archived composition draft was intentionally text-free."""
     if FIGURES[figure_id]["kind"] != "mechanism":
         return False
     spec_path = mechanism_spec_path(figure_id)
@@ -2660,7 +2773,7 @@ def traceable_result_payload(
     metrics = metrics if metrics is not None else metrics_bundle()
     missing = [key for key in result_keys if not has_result_path(metrics, key)]
     if missing:
-        raise StudioError("缺少结果数据：" + ", ".join(missing))
+        raise StudioError("Missing result data:" + ", ".join(missing))
     fixture = metrics.get("fixture", {})
     traceable_results: dict[str, Any] = {}
     for key in result_keys:
@@ -2694,11 +2807,11 @@ def figure_generation_gate(
         key for key in definition.get("result_keys", []) if not has_result_path(metrics, key)
     ]
     if missing_results:
-        return False, "缺少结果数据：" + ", ".join(missing_results)
+        return False, "Missing result data:" + ", ".join(missing_results)
     if definition.get("kind") == "mechanism":
         requirements = figure_generation_prerequisites(figure_id)
         if not requirements:
-            return False, f"{figure_id} 尚未配置绘图所需的正文段落。"
+            return False, f"{figure_id} The body paragraphs required for plotting have not been configured."
         missing = [
             (section, paragraph_id)
             for section, paragraph_id in requirements
@@ -2716,13 +2829,13 @@ def figure_insertion_gate(
     definition = FIGURES[figure_id]
     binding = first_artifact_binding(figure_id)
     if binding is None:
-        return False, f"{figure_id} 尚未绑定负责首次引用它的段落。"
+        return False, f"{figure_id} Not yet bound to the paragraph that first cites it."
     section, paragraph_id = binding
     if paragraph_id not in accepted_paragraph_ids(state["sections"][section]):
-        return False, f"插入前请先写入首个引用段落 {paragraph_id}。"
+        return False, f"Please write the first reference paragraph before inserting. {paragraph_id}."
     for dependency in definition.get("depends_on_figures", []):
         if state["figures"][dependency].get("status") != "approved":
-            return False, f"图候选可以先生成；插入正文前请先确认 {dependency}"
+            return False, f"Figure candidate can be generated first; please confirm before inserting into the main text. {dependency}"
     return figure_generation_gate(figure_id, state, metrics)
 
 
@@ -2739,6 +2852,16 @@ def figure_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
     for figure_id in FIGURE_ORDER:
         definition = FIGURES[figure_id]
         stored = state["figures"][figure_id]
+        if (
+            stored.get("status") == "pending"
+            and str(stored.get("progress_message") or "").startswith(
+                "Artifact contract changed"
+            )
+        ):
+            # The manuscript still contains the previous approved float.  It is
+            # stale by definition and must not undo contract invalidation during
+            # process startup.
+            continue
         section = definition["source_sections"][0]
         paragraphs = state["sections"][section]["paragraphs"]
         dependency_ids = definition.get("depends_on_paragraphs", {}).get(section, [])
@@ -2916,7 +3039,7 @@ def figure_public_state(state: dict[str, Any]) -> list[dict[str, Any]]:
                     )
                     else None
                 ),
-                "gpt_preview_no_text": mechanism_gpt_preview_no_text(figure_id),
+                "draft_preview_no_text": mechanism_draft_preview_no_text(figure_id),
                 "paper_preview_url": (
                     f"/figure-file/{figure_id}/pdf"
                     f"?v={int(paths['pdf'].stat().st_mtime)}"
@@ -2948,7 +3071,7 @@ def table_gate(
         key for key in definition.get("result_keys", []) if not has_result_path(metrics, key)
     ]
     if missing_results:
-        return False, "缺少结果数据：" + ", ".join(missing_results)
+        return False, "Missing result data:" + ", ".join(missing_results)
     return True, ""
 
 
@@ -3026,34 +3149,36 @@ def parse_table_prompt(
     source = prompt.strip() or default_table_prompt(table_id)
     directives: dict[str, str] = {}
     aliases = {
-        "数据源": "source",
+        "data source": "source",
         "source": "source",
-        "列": "columns",
+        "column": "columns",
         "columns": "columns",
-        "行": "rows",
+        "row": "rows",
+        "line": "rows",
         "rows": "rows",
         "caption": "caption",
-        "标题": "caption",
-        "字号": "size",
+        "title": "caption",
+        "font size": "size",
         "size": "size",
-        "最优值": "best",
+        "optimal value": "best",
+        "best value": "best",
         "best": "best",
     }
     for raw_line in source.splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
-        match = re.match(r"^([^:：]+)[:：]\s*(.*)$", line)
+        match = re.match(r"^([^::]+)[::]\s*(.*)$", line)
         if not match:
             raise StudioError(
-                f"无法解析表格 Prompt 行：{line}。请使用“键: 值”格式。"
+                f"Cannot parse table Prompt rows:{line}.Please use key: value format."
             )
         raw_key, value = match.groups()
         key = aliases.get(raw_key.strip().lower())
         if key is None:
             raise StudioError(
-                f"不支持的表格 Prompt 指令：{raw_key.strip()}。"
-                "支持：数据源、列、行、Caption、字号、最优值。"
+                f"Unsupported table Prompt instruction.{raw_key.strip()}."
+                "Support: data source, columns, rows, Caption, font size, optimal value."
             )
         directives[key] = value.strip()
 
@@ -3061,7 +3186,7 @@ def parse_table_prompt(
     requested_source = directives.get("source", configured_source).rstrip("/")
     if requested_source not in {"results", configured_source}:
         raise StudioError(
-            f"表格数据源固定为 {configured_source}，不能改用非追溯数据。"
+            f"Table data source fixed to {configured_source}, Cannot use non-reproducible data."
         )
 
     columns = list(available_columns)
@@ -3088,7 +3213,7 @@ def parse_table_prompt(
             if count:
                 protected_columns = updated
                 protected_labels[marker.casefold()] = label
-        separator = r"\s*\|\s*" if "|" in protected_columns else r"\s*[,，]\s*"
+        separator = r"\s*\|\s*" if "|" in protected_columns else r"\s*[,, ]\s*"
         names = [
             protected_labels.get(item.strip().casefold(), item.strip())
             for item in re.split(separator, protected_columns)
@@ -3097,41 +3222,45 @@ def parse_table_prompt(
         lookup = {name.casefold(): name for name in available_columns}
         unknown = [name for name in names if name.casefold() not in lookup]
         if unknown:
-            raise StudioError("表格 Prompt 含未知列：" + ", ".join(unknown))
+            raise StudioError("Table Prompt contains unknown columns:" + ", ".join(unknown))
         columns = [lookup[name.casefold()] for name in names]
     identifier = available_columns[0]
     if identifier not in columns:
-        raise StudioError(f"表格必须保留标识列 {identifier}。")
+        raise StudioError(f"The table must preserve the identifier column {identifier}.")
 
     row_lookup = {str(row[0]).casefold(): row for row in available_rows}
     row_directive = directives.get("rows", "source").strip()
     if row_directive.casefold() in {
         "source",
         "all",
-        "保持 results/ 顺序",
-        "全部",
+        "maintain results order.",
     }:
         selected_rows = list(available_rows)
     else:
         requested_rows = [
             item.strip()
-            for item in re.split(r"\s*[|,，]\s*", row_directive)
+            for item in re.split(r"\s*[|,, ]\s*", row_directive)
             if item.strip()
         ]
         unknown_rows = [
             name for name in requested_rows if name.casefold() not in row_lookup
         ]
         if unknown_rows:
-            raise StudioError("表格 Prompt 含未知行：" + ", ".join(unknown_rows))
+            raise StudioError("Table Prompt contains unknown columns:" + ", ".join(unknown_rows))
         selected_rows = [row_lookup[name.casefold()] for name in requested_rows]
 
     column_indices = [available_columns.index(name) for name in columns]
     rows = [[str(row[index]) for index in column_indices] for row in selected_rows]
-    size = directives.get("size", "small").lstrip("\\").casefold()
+    size = directives.get("size", "small").lstrip("\\").strip().rstrip(".").casefold()
     if size not in {"small", "footnotesize", "scriptsize"}:
-        raise StudioError("字号仅支持 small、footnotesize 或 scriptsize。")
+        raise StudioError("Font size only supports small, footnotesize, or scriptsize.")
     best = directives.get("best", "none").casefold()
-    best_aliases = {"无": "none", "不加粗": "none", "最大": "max", "最小": "min"}
+    best_aliases = {
+        "none": "none",
+        "not bold": "none",
+        "maximum": "max",
+        "minimum": "min",
+    }
     best = best_aliases.get(best, best)
     if best not in {"none", "max", "min"}:
         # The demo project's own default table briefs describe intent in
@@ -3153,10 +3282,10 @@ def parse_table_prompt(
         elif wants_low:
             best = "min"
     if best not in {"none", "max", "min"}:
-        raise StudioError("最优值仅支持 none、max 或 min。")
+        raise StudioError("The optimal value supports none, max, or min only.")
     caption = directives.get("caption", TABLES[table_id]["caption"]).strip()
     if not caption:
-        raise StudioError("Caption 不能为空。")
+        raise StudioError("Caption Cannot be empty.")
     return {
         "columns": columns,
         "rows": rows,
@@ -3230,8 +3359,8 @@ def figure_records_grid(figure_id: str, metrics: dict[str, Any]) -> tuple[list[s
                 break
         if source is None:
             raise StudioError(
-                f"{figure_id} 缺少可用于线上 Python 绘图的 records data_grid；"
-                "请配置 data_grid，或让 result_keys 指向非空对象列表。"
+                f"{figure_id} Missing records data_grid suitable for online Python plotting."
+                "Please configure data_grid, or have result_keys point to a nonempty object list."
             )
         keys = list(source[0].keys())
         label_key = next(
@@ -3250,7 +3379,7 @@ def figure_records_grid(figure_id: str, metrics: dict[str, Any]) -> tuple[list[s
         ]
         if not label_key or not numeric_keys:
             raise StudioError(
-                f"{figure_id} 的 {source_path} 至少需要一个标识列和一个数值列。"
+                f"{figure_id} of {source_path} At least one identifier column and one numeric column."
             )
         columns = [
             {"key": label_key, "label": str(label_key).replace("_", " ").strip().title()},
@@ -3261,7 +3390,7 @@ def figure_records_grid(figure_id: str, metrics: dict[str, Any]) -> tuple[list[s
         ]
         grid = {"type": "records", "path": source_path, "columns": columns}
     if str(grid.get("type", "")) != "records":
-        raise StudioError(f"{figure_id} 的确定性绘图仅支持 records 类型 data_grid。")
+        raise StudioError(f"{figure_id} Deterministic plotting supports only data_grid of type records.")
     source = result_path_value(metrics, str(grid.get("path", "")))
     if not isinstance(source, list):
         raise StudioError(f"{figure_id} data_grid records path must resolve to a list")
@@ -3318,10 +3447,84 @@ def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pd
     """
     headers, rows = figure_records_grid(figure_id, metrics)
     if not rows:
-        raise StudioError(f"{figure_id} 没有可绘图的数据行。")
+        raise StudioError(f"{figure_id} No data rows available for plotting.")
+    definition = FIGURES[figure_id]
+    configured_panels = [
+        str(panel.get("title") or panel.get("id") or "").strip()
+        for panel in definition.get("panels", [])
+        if isinstance(panel, dict)
+    ]
+    observed_panels = {row[0].strip() for row in rows if row}
+    if (
+        len(headers) >= 4
+        and len(configured_panels) >= 2
+        and observed_panels
+        and observed_panels.issubset(set(configured_panels))
+    ):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        series_headers = headers[2:]
+        figure, panel_axes = plt.subplots(
+            1,
+            len(configured_panels),
+            figsize=(7.0, 2.45),
+            sharey=True,
+            squeeze=False,
+        )
+        for axis, panel_name in zip(panel_axes[0], configured_panels):
+            panel_rows = [row for row in rows if row and row[0].strip() == panel_name]
+            if not panel_rows:
+                raise StudioError(f"{figure_id} panel {panel_name} has no data rows.")
+            x_values = [numeric_cell(row[1]) for row in panel_rows]
+            if any(value is None for value in x_values):
+                raise StudioError(f"{figure_id} panel {panel_name} has a non-numeric x value.")
+            for column_index, series_name in enumerate(series_headers, start=2):
+                y_values = [numeric_cell(row[column_index]) for row in panel_rows]
+                if any(value is None for value in y_values):
+                    raise StudioError(
+                        f"{figure_id} panel {panel_name} column {series_name} contains non-numeric content."
+                    )
+                axis.plot(
+                    x_values,
+                    y_values,
+                    marker="o",
+                    linewidth=1.35,
+                    markersize=3.5,
+                    label=series_name,
+                )
+            axis.set_title(panel_name, fontsize=8, fontweight="bold")
+            axis.set_xticks(x_values)
+            axis.tick_params(axis="both", labelsize=7)
+            axis.grid(axis="y", linewidth=0.35, alpha=0.35)
+            axis.set_xlabel(
+                str(definition.get("x_axis_label") or headers[1]), fontsize=7
+            )
+        panel_axes[0][0].set_ylabel(
+            str(definition.get("y_axis_label") or "Value"), fontsize=7
+        )
+        handles, legend_labels = panel_axes[0][0].get_legend_handles_labels()
+        figure.legend(
+            handles,
+            legend_labels,
+            fontsize=6.5,
+            frameon=False,
+            loc="upper center",
+            ncol=max(1, len(legend_labels)),
+            bbox_to_anchor=(0.5, 1.02),
+        )
+        figure.tight_layout(rect=(0, 0, 1, 0.91))
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        png_path.parent.mkdir(parents=True, exist_ok=True)
+        figure.savefig(pdf_path, format="pdf")
+        figure.savefig(png_path, format="png", dpi=150)
+        plt.close(figure)
+        return
     numeric_headers = headers[1:]
     if not numeric_headers:
-        raise StudioError(f"{figure_id} 至少需要一个标识列和一个数值列才能绘图。")
+        raise StudioError(f"{figure_id} At least one identifier column and one numeric column are required to plot.")
     labels = [row[0].replace("_", " ").strip().title() for row in rows]
     raw_series: dict[str, list[float]] = {}
     for column_index, label in enumerate(numeric_headers, start=1):
@@ -3329,7 +3532,7 @@ def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pd
         for row in rows:
             value = numeric_cell(row[column_index])
             if value is None:
-                raise StudioError(f"{figure_id} 的列“{label}”包含非数值内容，无法绘图。")
+                raise StudioError(f"{figure_id} the column{label} contains non-numeric content; cannot plot.")
             values.append(value)
         raw_series[label] = values
 
@@ -3348,7 +3551,7 @@ def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pd
         else:
             series.append((label, values))
     if not series:
-        raise StudioError(f"{figure_id} 没有估计值列可供绘图。")
+        raise StudioError(f"{figure_id} No estimated value column available for plotting.")
 
     import matplotlib
 
@@ -3356,7 +3559,6 @@ def render_data_figure_deterministic(figure_id: str, metrics: dict[str, Any], pd
     import matplotlib.pyplot as plt
     import numpy as np
 
-    definition = FIGURES[figure_id]
     if len(series) == 1 and {
         "cohen kappa", "llm-human spearman rho", "latency old cot (s/item)",
         "latency more (s/item)", "output old cot (tokens)", "output more (tokens)",
@@ -3581,7 +3783,7 @@ def compile_table_preview(
     """Compile the actual table LaTeX and rasterize that PDF for the browser."""
     for command in ("pdflatex", "pdfcrop", "pdftoppm"):
         if not shutil_which(command):
-            raise StudioError(f"无法生成 LaTeX 表格预览：缺少 {command}。")
+            raise StudioError(f"Cannot generate LaTeX table preview: missing {command}.")
     destination = output_dir or TABLE_PREVIEW_DIR
     destination.mkdir(parents=True, exist_ok=True)
     paths = table_preview_paths(table_id, destination)
@@ -3637,11 +3839,11 @@ def compile_table_preview(
                 timeout=120,
             )
         except StudioError as exc:
-            raise StudioError("LaTeX 表格预览编译失败。\n" + str(exc)) from exc
+            raise StudioError("LaTeX Table preview failed to compile.\n" + str(exc)) from exc
         temporary_pdf = build_dir / "cropped.pdf"
         temporary_png = build_dir / "preview.png"
         if not temporary_pdf.exists() or not temporary_png.exists():
-            raise StudioError("LaTeX 表格预览工具未产生 PDF/PNG。")
+            raise StudioError("LaTeX The table preview tool did not generate PDF or PNG.")
         pdf_target = paths["pdf"].with_suffix(".pdf.tmp")
         png_target = paths["preview"].with_suffix(".png.tmp")
         pdf_target.write_bytes(temporary_pdf.read_bytes())
@@ -3687,6 +3889,48 @@ def latex_command_content(source: str, command: str) -> str:
                 return source[body_start:cursor].strip()
         cursor += 1
     return ""
+
+
+def repair_artifact_reference_contract(
+    *,
+    model: str,
+    response_id: str,
+    text: str,
+    bound_artifacts: list[dict[str, Any]],
+) -> tuple[str, str]:
+    """Restore mandatory artifact references after any model post-processing."""
+    reference_error = artifact_reference_error(text, bound_artifacts)
+    if not reference_error:
+        return text, response_id
+    allowed = [item["required_reference"] for item in bound_artifacts]
+    correction = post_openai(
+        {
+            "model": model,
+            "store": True,
+            "previous_response_id": response_id,
+            "instructions": (
+                "Return only the complete corrected LaTeX-ready paragraph. Preserve "
+                "all claims, numbers, citations, heading, and wording. Include each "
+                "allowed configured artifact cross-reference exactly once and remove "
+                "every other configured figure or table cross-reference. Do not "
+                "explain the correction."
+            ),
+            "input": (
+                f"Reference contract violation: {reference_error}\n"
+                f"<required_references>{json.dumps(allowed, ensure_ascii=False)}</required_references>\n"
+                f"<paragraph_to_correct>{text}</paragraph_to_correct>"
+            ),
+            "text": {"verbosity": "low"},
+        }
+    )
+    repaired = normalize_latex_ready_text(extract_output_text(correction))
+    repaired_id = str(correction.get("id") or "")
+    if not repaired or not repaired_id:
+        raise StudioError("Chart reference repair did not return a valid paragraph.")
+    remaining = artifact_reference_error(repaired, bound_artifacts)
+    if remaining:
+        raise StudioError("GPT Still after correction." + remaining)
+    return repaired, repaired_id
 
 
 def artifact_anchor_before_offset(
@@ -3990,7 +4234,7 @@ def synchronize_artifact_workbenches_from_manuscript(
                 or definition["caption"]
             ),
             "progress": 100,
-            "progress_message": "已从论文源码恢复图片工作台。",
+            "progress_message": "Restored image workbench from the paper source code.",
         }
         if "\\begin{figure*}" in latex:
             updates.update(layout_mode="two-column", requested_layout_width="two-column")
@@ -4003,7 +4247,7 @@ def synchronize_artifact_workbenches_from_manuscript(
                     panel.update(
                         status="built",
                         progress=100,
-                        progress_message="已从论文中的最终数据图恢复。",
+                        progress_message="Restored from the final data figure in the paper.",
                     )
                     changed = True
         for field, value in updates.items():
@@ -4018,6 +4262,13 @@ def synchronize_artifact_workbenches_from_manuscript(
         if is_hosted_placeholder_artifact(table_id):
             continue
         stored = state["tables"][table_id]
+        if (
+            stored.get("status") == "pending"
+            and str(stored.get("progress_message") or "").startswith(
+                "Artifact contract changed"
+            )
+        ):
+            continue
         recovered = None
         for section in definition.get("source_sections", []):
             source_path, source = section_source(section)
@@ -4033,9 +4284,24 @@ def synchronize_artifact_workbenches_from_manuscript(
             # compilation transactional.  It is not an editable result table.
             continue
         recovered_layout_mode = table_layout_mode_from_latex(latex)
-        latex = validate_table_latex_source(
-            table_id, latex, layout_mode=recovered_layout_mode
-        )
+        try:
+            latex = validate_table_latex_source(
+                table_id, latex, layout_mode=recovered_layout_mode
+            )
+        except StudioError as exc:
+            # A stale or manually edited float must not make the entire editor
+            # unavailable. Keep the manuscript untouched for recovery, but make
+            # the workbench explicitly pending so the invalid table cannot be
+            # mistaken for an approved deliverable.
+            stored.update(
+                status="pending",
+                approved_at=None,
+                progress=0,
+                progress_message="Recovered table failed validation; regenerate it.",
+                last_message=str(exc),
+            )
+            changed = True
+            continue
         recovered_at = int(source_path.stat().st_mtime)
         updates = {
             "latex": latex,
@@ -4047,7 +4313,7 @@ def synchronize_artifact_workbenches_from_manuscript(
             or stored.get("placement_after")
             or (definition.get("related_paragraphs", {}).get(section, []) or [None])[-1],
             "progress": 100,
-            "progress_message": "已从论文源码恢复表格工作台。",
+            "progress_message": "Restored table workbench from the paper source code.",
             "layout_mode": recovered_layout_mode,
         }
         latex_changed = stored.get("latex", "").strip() != latex
@@ -4061,10 +4327,10 @@ def synchronize_artifact_workbenches_from_manuscript(
                 compile_table_preview(table_id, latex)
             except StudioError as exc:
                 stored["last_message"] = (
-                    "表格 LaTeX 已恢复，但浏览器预览生成失败：" + str(exc)
+                    "Table LaTeX restored but browser preview generation failed" + str(exc)
                 )
             else:
-                stored["last_message"] = "已从论文源码恢复可编辑表格与预览。"
+                stored["last_message"] = "Restored editable tables and preview from the paper source."
             changed = True
     return changed
 
@@ -4175,7 +4441,7 @@ def materialize_batch_artifacts(
             "approved_at": int(paths["pdf"].stat().st_mtime),
             "placement_after": stored.get("placement_after") or paragraph_id,
             "progress": 100,
-            "progress_message": "已从批量写作的配置产物恢复图片工作台。",
+            "progress_message": "Recovered image workspace from the batch writing configuration artifact.",
         }
         if definition.get("kind") == "data":
             updates["composed_at"] = int(paths["pdf"].stat().st_mtime)
@@ -4183,7 +4449,7 @@ def materialize_batch_artifacts(
                 panel.update(
                     status="built",
                     progress=100,
-                    progress_message="已从验证结果图恢复。",
+                    progress_message="Recovered from the validation results figure.",
                 )
         for field, value in updates.items():
             if stored.get(field) != value:
@@ -4223,14 +4489,14 @@ def materialize_batch_artifacts(
             "placement_after": stored.get("placement_after") or paragraph_id,
             "progress": 100,
             "progress_message": (
-                "已保留研究者确认的表格并刷新预览。"
+                "Retained researcher confirmed tables and refreshed preview."
                 if preserved_approved
-                else "已从验证 metrics 恢复可编辑表格与预览。"
+                else "Editable tables and previews restored from validated metrics."
             ),
             "last_message": (
-                stored.get("last_message") or "已保留研究者确认的表格。"
+                stored.get("last_message") or "The table confirmed by the researcher has been retained."
                 if preserved_approved
-                else "表格数字由 paper/metrics.json 确定性生成。"
+                else "Table numbers are deterministically generated from paper/metrics.json."
             ),
             "generation_prompt": prompt,
         }
@@ -4255,7 +4521,7 @@ def materialize_batch_artifacts(
     compile_result = compile_paper()
     if not compile_result.ok:
         raise StudioError(
-            "批量写作图表物化后 LaTeX 编译失败。\n" + compile_result.message
+            "LaTeX compilation failed after batch writing charts were materialized.\n" + compile_result.message
         )
     state["compile"] = {
         "status": "ok",
@@ -4358,27 +4624,37 @@ def refresh_full_draft_artifact_status(state: dict[str, Any]) -> None:
             job["status"] = "artifacts_pending"
             job["progress_message"] = (
                 (
-                    "当前 Section 正文已写入 LaTeX；正在完成并确认绑定图表："
+                    "The current Section body has been written in LaTeX; completing and confirming binding charts."
                     if section_scope
-                    else "正文已全部写入 LaTeX；请在图表工作台完成并确认："
+                    else "The body text has been fully written in LaTeX; please complete and confirm at the figure workbench."
                 )
-                + "、".join(pending)
+                + ", ".join(pending)
             )
         else:
+            if not section_scope:
+                quality_issues = completed_manuscript_issues(state)
+                if quality_issues:
+                    job["status"] = "failed"
+                    job["finished_at"] = int(time.time())
+                    job["progress_message"] = (
+                        "Deterministic quality check after full text generation failed."
+                        + "; ".join(quality_issues)
+                    )
+                    continue
             job["status"] = "completed"
             job["progress_message"] = (
                 (
-                    f"{SECTION_MAP[str(job.get('section'))]['title']} 的正文已写入 LaTeX 和 PDF，"
-                    "计划图表已以 placeholder 保留。"
+                    f"{SECTION_MAP[str(job.get('section'))]['title']} The main text has been written into LaTeX and PDF."
+                    "The planned chart is retained as placeholder."
                     if section_scope
-                    else "全文初稿已写入 LaTeX 并完成 PDF 编译，计划图表已以 placeholder 保留。"
+                    else "The full first draft has been written in LaTeX and PDF compilation completed; planned charts are kept as placeholders."
                 )
                 if ONLINE_PROJECT_MODE
                 else (
-                    f"{SECTION_MAP[str(job.get('section'))]['title']} 的正文与绑定图表均已完成，"
-                    "并已写入 LaTeX 和 PDF。"
+                    f"{SECTION_MAP[str(job.get('section'))]['title']} The body text and bound charts have all been completed."
+                    "Written into LaTeX and PDF."
                     if section_scope
-                    else "全文初稿与全部图表已写入 LaTeX，并完成 PDF 编译。"
+                    else "The full first draft and all figures have been written into LaTeX and PDF compilation completed."
                 )
             )
 
@@ -4412,14 +4688,6 @@ def completed_manuscript_issues(state: dict[str, Any]) -> list[str]:
             issues.extend(
                 f"{section}/{paragraph.get('id')}: {item}"
                 for item in appendix_content_issues(section, accepted)
-            )
-            issues.extend(
-                f"{section}/{paragraph.get('id')}: {item}"
-                for item in numeric_comparison_issues(accepted)
-            )
-            issues.extend(
-                f"{section}/{paragraph.get('id')}: {item}"
-                for item in synthesis_comparison_issues(section, accepted)
             )
             issues.extend(
                 f"{section}/{paragraph.get('id')}: {item}"
@@ -4506,6 +4774,13 @@ def completed_manuscript_issues(state: dict[str, Any]) -> list[str]:
             "PDF contains overfull boxes wider than 1pt: "
             + ", ".join(f"{value:.1f}pt" for value in overfull_points if value > 1.0)
         )
+    budget = page_budget_status()
+    if budget["status"] == "over":
+        issues.append(
+            "submission body exceeds the configured page budget: "
+            f"{budget['content_pages']} pages for a {budget['limit']}-page limit "
+            "(references excluded)"
+        )
     return issues
 
 
@@ -4525,7 +4800,7 @@ def extract_agent_table_latex(text: str) -> str:
         flags=re.DOTALL,
     )
     if not match:
-        raise StudioError("本地 Agent 没有返回完整的 table/table* LaTeX。")
+        raise StudioError("Local Agent did not return a complete table.* LaTeX.")
     return match.group(1).strip()
 
 
@@ -4544,13 +4819,13 @@ def table_layout_mode_from_latex(latex: str) -> str:
         return "two-column"
     if re.search(r"\\begin\{table\}", latex):
         return "single-column"
-    raise StudioError("表格 LaTeX 缺少 table/table* 环境。")
+    raise StudioError("Table LaTeX missing table/table.* Environment.")
 
 
 def convert_table_latex_layout(table_id: str, latex: str, layout_mode: str) -> str:
     """Convert only the outer float environment, preserving every table cell."""
     if layout_mode not in {"single-column", "two-column"}:
-        raise StudioError("表格排版方式仅支持 single-column 或 two-column。")
+        raise StudioError("Table layout supports only single-column or two-column.")
     source = latex.strip()
     current_mode = table_layout_mode_from_latex(source)
     if current_mode == layout_mode:
@@ -4569,6 +4844,15 @@ def convert_table_latex_layout(table_id: str, latex: str, layout_mode: str) -> s
         source,
         count=1,
     )
+    # Resize against the active float, not the whole page.  Keeping textwidth
+    # when converting table* to table makes a nominally single-column table
+    # protrude by an entire column.
+    target_width = r"\textwidth" if layout_mode == "two-column" else r"\linewidth"
+    source = re.sub(
+        r"(\\resizebox\{)\\(?:textwidth|columnwidth|linewidth)(\}\{!\}\{)",
+        lambda match: match.group(1) + target_width + match.group(2),
+        source,
+    )
     return validate_table_latex_source(table_id, source, layout_mode=layout_mode)
 
 
@@ -4578,11 +4862,11 @@ def validate_table_latex_source(
     source = latex.strip()
     definition = TABLES[table_id]
     if not source:
-        raise StudioError("表格 LaTeX 不能为空。")
+        raise StudioError("Table LaTeX cannot be empty.")
     if not re.search(r"\\begin\{table\*?\}", source):
-        raise StudioError("表格 LaTeX 缺少 table/table* 环境。")
+        raise StudioError("Table LaTeX missing table/table.* Environment.")
     if layout_mode is not None and layout_mode not in {"single-column", "two-column"}:
-        raise StudioError("表格排版方式仅支持 single-column 或 two-column。")
+        raise StudioError("Table layout supports only single-column or two-column.")
     expected_wide = (
         layout_mode == "two-column"
         if layout_mode is not None
@@ -4596,14 +4880,20 @@ def validate_table_latex_source(
         flags=re.DOTALL,
     ):
         raise StudioError(
-            f"表格宽度配置要求使用 {expected_environment} 环境；"
-            "请不要把双栏表退化为单栏表或反之。"
+            f"Table width configuration requires use of {expected_environment} Environment;"
+            "Do not degrade a two column table to a single column or vice versa."
         )
     expected_label = f"\\label{{{definition['label']}}}"
     if expected_label not in source:
-        raise StudioError(f"表格必须保留固定标签 {expected_label}。")
+        raise StudioError(f"Tables must retain fixed labels. {expected_label}.")
     if "\\caption{" not in source:
-        raise StudioError("表格 LaTeX 缺少 caption。")
+        raise StudioError("LaTeX table missing caption.")
+    if not expected_wide and re.search(
+        r"\\resizebox\{\\textwidth\}\{!\}", source
+    ):
+        raise StudioError(
+            "Single-column tables must resize to \\linewidth or \\columnwidth, not \\textwidth."
+        )
     return source
 
 
@@ -4640,11 +4930,12 @@ def table_numeric_cells(latex: str) -> tuple[str, ...]:
 def requests_reference_expansion(instruction: str) -> bool:
     lowered = instruction.casefold()
     markers = (
-        "更多数字",
-        "不止这么多",
-        "别的数字",
-        "更多实验",
         "more numbers",
+        "more than this",
+        "other numbers",
+        "more experiments",
+        "more experimental results",
+        "additional numbers",
         "additional results",
     )
     return any(marker in lowered for marker in markers)
@@ -4659,7 +4950,7 @@ def local_agent_environment(provider: str = "codex") -> dict[str, str]:
     environment["PAPER_STUDIO_AGENT_CHILD"] = "1"
     if ONLINE_PROJECT_MODE and provider == "codex":
         if not online_codex_key:
-            raise StudioError("线上 Agent 需要当前写作会话的 OpenAI API Key。")
+            raise StudioError("Online agent requires the OpenAI API Key for the current writing session.")
         environment["CODEX_API_KEY"] = online_codex_key
         codex_home = STATE_DIR / "codex-runtime"
         codex_home.mkdir(parents=True, exist_ok=True)
@@ -4717,14 +5008,14 @@ def require_substantive_table_revision(
     current: str, revised: str, instruction: str
 ) -> None:
     if re.sub(r"\s+", "", current) == re.sub(r"\s+", "", revised):
-        raise StudioError("本地 Agent 返回的表格与当前版本完全相同。")
+        raise StudioError("Local Agent returns a table identical to the current version.")
     if requests_reference_expansion(instruction):
         before = table_numeric_cells(current)
         after = table_numeric_cells(revised)
         if len(after) <= len(before) and set(after).issubset(set(before)):
             raise StudioError(
-                "你要求补充更多实验数字，但本地 Agent 没有增加任何来自可追溯结果的"
-                "任何可追溯数值。当前草稿未被覆盖。"
+                "You request more experimental numbers, but the local Agent did not add any from traceable results."
+                "Any traceable values; the current draft has not been overwritten."
             )
 
 
@@ -4739,13 +5030,13 @@ def edit_table_with_local_agent(
     """Ask the installed Codex CLI—not the Responses API—to revise one table."""
     codex = shutil_which("codex")
     if not codex:
-        raise StudioError("未找到本机 codex CLI，无法调用本地 Agent。")
+        raise StudioError("Local codex CLI not found; cannot invoke the local Agent.")
     instruction = instruction.strip()
     if not instruction:
-        raise StudioError("请填写希望本地 Agent 如何修改表格。")
+        raise StudioError("Please specify how the local Agent should modify the table.")
     definition = TABLES[table_id]
     if layout_mode not in {None, "single-column", "two-column"}:
-        raise StudioError("表格排版方式仅支持 single-column 或 two-column。")
+        raise StudioError("Table layout supports only single-column or two-column.")
     layout_mode = layout_mode or (
         table_layout_mode_from_latex(latex)
         if latex.strip()
@@ -4756,32 +5047,34 @@ def edit_table_with_local_agent(
         )
     )
     required_environment = "table*" if layout_mode == "two-column" else "table"
+    resize_width = r"\textwidth" if layout_mode == "two-column" else r"\linewidth"
     columns, rows = table_grid(table_id, metrics or metrics_bundle())
     evidence = json.dumps(
         {"columns": columns, "rows": rows},
         ensure_ascii=False,
         indent=2,
     )
-    action = "重写当前 LaTeX 表格" if latex.strip() else "从零生成 LaTeX 表格初稿"
-    prompt = f"""你是 Paper Studio 的本地表格 agent。根据研究者的自由文本要求，
-{action}。只返回一个完整的 table/table* 环境，不要 Markdown fence，不要解释，
-也不要修改仓库文件。
+    action = "Rewrite the current LaTeX table." if latex.strip() else "Generate LaTeX table draft from scratch."
+    prompt = f"""You are the Paper Studio local table agent. Based on the researchers free text requirements,
+{action}.Return only a single complete table.* Environment: do not use Markdown fences; do not explain.
+Do not modify repository files either.
 
-硬约束：
-1. 只能使用 <traceable_results> 中明确出现的实验数值；不得创造、推断或改写
-   任何数值。参考论文不是本项目实验结果来源。
-2. 必须保留固定标签 \\label{{{definition['label']}}}，并保留 caption。
-3. 保持 booktabs 学术表格风格；caption 位于 tabular 之后。
-4. 可以按要求修改分组表头、列/行顺序、对齐、字号、加粗、caption 措辞和注释。
-5. 当前数据为测试 fixture 时，所有现有 [SYNTHETIC] 标记必须原样保留。
-6. 只能使用标准 LaTeX 与 booktabs 已提供的命令。不要使用 \\multirow、\\makecell、
-   tabularx、adjustbox 或任何需要新增 package 的命令；分组表头使用 \\multicolumn
-   与 \\cmidrule 实现。宽表可使用 graphicx 已提供的
-   \\resizebox{{\\textwidth}}{{!}}{{...}}。
-7. 所有小数指标统一显示到小数点后三位；这是展示精度，不得改变行列对应关系或
-   使用不可追溯的新数值。
-8. 必须使用 {required_environment} 浮动环境；这是研究者当前选择的
-   {layout_mode} 排版，不得自行切换。
+Hard constraints:
+1. Can only use <traceable_results> Experiment values explicitly appearing must not be created, inferred, or rewritten.
+   Any numbers; the reference paper is not the source of experimental results for this project.
+2. Must preserve fixed tags. \\label{{{definition['label']}}}, Preserve the caption.
+3. Maintain booktabs academic table style; captions appear after the tabular.
+4. You can modify grouping headers column and row order alignment font size bold caption wording and annotations as required.
+5. When the current data is a test fixture, all existing [SYNTHETIC] Markers must be preserved as is.
+6. Only use standard LaTeX and the commands provided by booktabs. Do not use \\multirow, \\makecell,
+   tabularx, adjustbox Or any commands that require additional packages; group header uses \\multicolumn
+   and \\cmidrule Implementation. The wide table can use the graphicx provided.
+   Use \\resizebox{{{resize_width}}}{{!}}{{...}}
+   when resizing this {layout_mode} table.
+7. All decimal metrics are displayed to three decimal places; this is display precision and must not alter row column mapping or
+   Use non traceable new values.
+8. Must use {required_environment} Floating environment; this is the current choice by the researcher.
+   {layout_mode} Formatting; do not switch by yourself.
 
 <researcher_instruction>
 {instruction}
@@ -4826,15 +5119,15 @@ def edit_table_with_local_agent(
                 env=environment,
             )
         except subprocess.TimeoutExpired as exc:
-            raise StudioError("本地 Agent 修改表格超时。") from exc
+            raise StudioError("Local Agent table modification timed out.") from exc
         if process.returncode:
             diagnostic = (process.stdout + "\n" + process.stderr).strip()
             raise StudioError(
-                "本地 Agent 执行失败。\n"
+                "Local agent execution failed.\n"
                 + (diagnostic[-2400:] or "codex exec returned a non-zero status.")
             )
         if not output.exists():
-            raise StudioError("本地 Agent 未写出最终回复。")
+            raise StudioError("Local Agent did not produce a final reply.")
         revised = normalize_table_numeric_precision(
             extract_agent_table_latex(
                 output.read_text(encoding="utf-8", errors="replace")
@@ -4858,7 +5151,7 @@ def table_agent_worker(
             if stored.get("job_token") != job_token:
                 return
             stored["progress"] = 35
-            stored["progress_message"] = "本地 codex agent 正在重写 LaTeX 表格…"
+            stored["progress_message"] = "Local codex agent is rewriting LaTeX tables."
             stored["job_revision"] = int(stored.get("job_revision", 0)) + 1
             layout_mode = str(
                 stored.get("layout_mode")
@@ -4882,9 +5175,9 @@ def table_agent_worker(
         except StudioError as first_error:
             repair_instruction = (
                 instruction
-                + "\n\n你的上一版 LaTeX 未通过本地编译。请修复下面的真实错误，"
-                "保持原修改目标和全部数据不变；只使用标准 LaTeX 与 booktabs，"
-                "不要使用需要额外 package 的命令。\n<compile_error>\n"
+                + "\n\nYour previous version of LaTeX failed local compilation; please fix the real error below."
+                "Keep the original modification targets and all data unchanged; use only standard LaTeX and booktabs."
+                "Do not use commands that require additional packages.\n<compile_error>\n"
                 + str(first_error)[-1800:]
                 + "\n</compile_error>"
             )
@@ -4913,9 +5206,9 @@ def table_agent_worker(
             before_cells = len(table_numeric_cells(latex))
             after_cells = len(table_numeric_cells(revised))
             change_summary = (
-                f"实验数值单元格由 {before_cells} 个扩展为 {after_cells} 个。"
+                f"Experiment value cells are from {before_cells} Expanded to {after_cells} one."
                 if after_cells > before_cells
-                else "表格结构或文字已更新，实验数值单元格数量未变。"
+                else "Table structure or text updated; the number of experimental value cells remains unchanged."
             )
             stored.update(
                 {
@@ -4924,10 +5217,10 @@ def table_agent_worker(
                     "agent_history": history[-20:],
                     "revision": int(stored.get("revision", 0)) + 1,
                     "progress": 100,
-                    "progress_message": "本地 Agent 修改完成，LaTeX 预览已重新编译。",
+                    "progress_message": "Local Agent modification complete; LaTeX preview recompiled.",
                     "last_message": (
-                        "本地 Agent 已按自由文本 Prompt 修改表格；"
-                        f"{change_summary}结果通过固定 label/caption 校验并重新编译。"
+                        "Local Agent has modified the table according to the free text Prompt."
+                        f"{change_summary}Results pass fixed label and caption validation and recompile."
                     ),
                     "job_token": None,
                     "job_started_at": None,
@@ -5056,6 +5349,20 @@ def _is_method_section(section: str) -> bool:
     )
 
 
+def _is_discussion_section(section: str) -> bool:
+    title = str(SECTION_MAP.get(section, {}).get("title", "")).lower()
+    return section.lower() in {"d", "discussion", "analysis"} or any(
+        token in title for token in ("discussion", "analysis")
+    )
+
+
+def _is_related_work_section(section: str) -> bool:
+    title = str(SECTION_MAP.get(section, {}).get("title", "")).lower()
+    return section.lower() in {"rw", "related_work", "related-work"} or (
+        "related work" in title
+    )
+
+
 def unexecuted_experiment_tense_issues(section: str, text: str) -> list[str]:
     """Detect result-like present tense in hosted plan-only experiments.
 
@@ -5102,7 +5409,7 @@ def unexecuted_result_claim_issues(text: str) -> list[str]:
             re.IGNORECASE,
         ),
         "observed comparative outcome": re.compile(
-            r"\b(?:order gap|predictor|proposed method|Steering Commutator)\b"
+            r"\b(?:order gap|predictor|proposed method)\b"
             r".{0,120}\b(?:persists?|shows? higher|outperforms?|improves?|exceeds?|"
             r"achieves?|performs? better)\b",
             re.IGNORECASE | re.DOTALL,
@@ -5237,26 +5544,6 @@ def primary_comparison_outcome(metrics: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def synthesis_comparison_issues(section: str, text: str) -> list[str]:
-    """Reject positive comparative summaries when the primary table shows no wins."""
-    if not _is_synthesis_section(section):
-        return []
-    outcome = primary_comparison_outcome(metrics_bundle())
-    if not outcome or outcome.get("wins") != 0:
-        return []
-    pattern = re.compile(
-        r"\b(?:Steering Commutator|proposed (?:method|predictor)|local pushforward "
-        r"commutator)\b.{0,180}\b(?:outperform(?:s|ed)?|better than|"
-        r"tracked .* more closely|improv(?:e|es|ed|ing) (?:held-out )?"
-        r"(?:alignment|correlation|AUROC)|explains? (?:a )?substantial share|"
-        r"validat(?:e|es|ed) .*predictive mechanism)\b|"
-        r"\b(?:outperform(?:s|ed)?|better than)\b.{0,80}\b(?:IAA|"
-        r"interference-aware (?:allocator|baseline))\b",
-        re.IGNORECASE | re.DOTALL,
-    )
-    return ["positive proposed-method comparison contradicts the primary table"] if pattern.search(text) else []
-
-
 def experimental_setup_issues(section: str, purpose: str, text: str) -> list[str]:
     """Enforce the compact dataset/baseline/settings contract for setup prose."""
     if not (
@@ -5363,15 +5650,59 @@ def section_evidence(
         # paragraph writer to mistake the structural reference for evidence or
         # silently replace a sampled protocol with a different one.
         selected["target_project_brief"] = lightweight["project_evidence"]
+    # Core executed facts are relevant across the paper, not only in Method or
+    # Experiments. Supplying them section-wide prevents an Introduction from
+    # misdescribing an output-schema intervention, and prevents synthesis prose
+    # from recomputing counts and claim decisions from memory.
+    for key in (
+        "execution_summary",
+        "executed_metric_definitions",
+        "executed_prompt_conditions",
+        "writing_evidence_boundaries",
+        "claim_dispositions",
+        "qualitative_evidence_scope",
+    ):
+        value = metrics.get(key)
+        if isinstance(value, dict) and value:
+            selected[key] = value
+        elif isinstance(value, str) and value.strip():
+            selected[key] = value
     if _is_method_section(section) and isinstance(metrics.get("model_design"), dict):
         selected["approved_model_design"] = metrics["model_design"]
+        selected["metric_contract"] = metrics.get("metric_contract", [])
+        selected["executed_metric_definitions"] = metrics.get(
+            "executed_metric_definitions", {}
+        )
+        selected["executed_prompt_conditions"] = metrics.get(
+            "executed_prompt_conditions", {}
+        )
         selected["symbol_registry"] = metrics.get("symbol_registry", [])
+    if _is_discussion_section(section):
+        selected["claims"] = metrics.get("claims", [])
+        selected["evaluation_protocol"] = metrics.get("evaluation_protocol", {})
+        selected["execution_summary"] = metrics.get("execution_summary", {})
+        selected["claim_dispositions"] = metrics.get("claim_dispositions", {})
+        selected["qualitative_evidence_scope"] = metrics.get(
+            "qualitative_evidence_scope", ""
+        )
     if _is_experiment_section(section):
         setup = experiment_setup_context()
         if setup:
             selected["experiment_setup_contract"] = setup
         selected["claims"] = metrics.get("claims", [])
         selected["evaluation_protocol"] = metrics.get("evaluation_protocol", {})
+        selected["execution_summary"] = metrics.get("execution_summary", {})
+        selected["claim_dispositions"] = metrics.get("claim_dispositions", {})
+        selected["executed_metric_definitions"] = metrics.get(
+            "executed_metric_definitions", {}
+        )
+        selected["executed_prompt_conditions"] = metrics.get(
+            "executed_prompt_conditions", {}
+        )
+        selected["qualitative_cases"] = metrics.get("qualitative_cases", {})
+        selected["qualitative_evidence_scope"] = metrics.get(
+            "qualitative_evidence_scope", ""
+        )
         records = execution_record_context(metrics)
         if records:
             selected["execution_records"] = records
@@ -5391,6 +5722,8 @@ def section_evidence(
     if _is_synthesis_section(section):
         selected["claims"] = metrics.get("claims", [])
         selected["evaluation_protocol"] = metrics.get("evaluation_protocol", {})
+        selected["execution_summary"] = metrics.get("execution_summary", {})
+        selected["claim_dispositions"] = metrics.get("claim_dispositions", {})
         outcome = primary_comparison_outcome(metrics)
         if outcome:
             selected["primary_comparison_outcome"] = outcome
@@ -5523,6 +5856,15 @@ def normalize_latex_ready_text(source: str) -> str:
     # visibly starts with ``latex`` and ends with quote-like marks. Strip only
     # standalone fence lines; inline code remains a validation error below.
     source = re.sub(r"(?im)^\s*```(?:latex|tex)?\s*$", "", source).strip()
+    # Provider prose can reintroduce typographic dashes during any of several
+    # repair passes. Canonicalize them at the single ingestion boundary rather
+    # than relying on every prompt to obey a punctuation preference.
+    source = source.replace("—", "; ").replace("–", "-")
+    # ACL's scaffold uses natbib, while providers occasionally emit biblatex
+    # citation commands. Normalize equivalent commands before validation and
+    # compilation so retry prompts do not preserve an incompatible macro.
+    source = re.sub(r"\\textcite\b", r"\\citet", source)
+    source = re.sub(r"\\parencite\b", r"\\citep", source)
     commands = (
         r"cite\w*|ref|pageref|label|textbf|textit|emph|subsection|subsubsection|"
         r"section|paragraph|footnote|url|href|path"
@@ -5711,6 +6053,22 @@ def latex_prose_issues(source: str) -> list[str]:
             issues.append(
                 "displayed equation is too long for one ACL column; split it with aligned"
             )
+            continue
+        # A display can contain a line break while one individual row remains wider
+        # than a column (notably a long first row in cases/aligned).  Check logical
+        # rows independently instead of treating the mere presence of `\\` as proof
+        # that the equation is safe.
+        logical_rows = re.split(r"\\\\(?:\[[^\]]*\])?", body)
+        for row in logical_rows:
+            row = re.sub(r"\\begin\{(?:aligned|split|multlined|gathered|cases)\}", "", row)
+            row = re.sub(r"\\end\{(?:aligned|split|multlined|gathered|cases)\}", "", row)
+            row = re.sub(r"\s+", " ", row).strip()
+            if len(row) > 82:
+                issues.append(
+                    "displayed equation contains a row too long for one ACL column; "
+                    "split the long row itself with aligned"
+                )
+                break
 
     masked = source
     for pattern in (
@@ -5803,17 +6161,17 @@ def candidate_for_accept(
     if candidate:
         latest = normalize_latex_ready_text(str(candidate.get("text", "")).strip())
         if candidate.get("id") != candidate_id and submitted != latest:
-            raise StudioError("候选已被更新；请检查页面自动载入的最新版后再次 Accept。")
+            raise StudioError("The candidate has been updated; please review the automatically loaded latest version on the page and Accept again.")
         text = submitted or latest
         if not text:
-            raise StudioError("候选正文不能为空。")
+            raise StudioError("Candidate body text cannot be empty.")
         candidate["text"] = text
         return candidate, text
 
     accepted = str(paragraph.get("accepted_text", "")).strip()
     if not accepted:
         if not submitted:
-            raise StudioError("当前段落没有可接受的正文。")
+            raise StudioError("The current paragraph has no acceptable body text.")
         candidate = {
             "id": uuid.uuid4().hex,
             "text": submitted,
@@ -5825,9 +6183,9 @@ def candidate_for_accept(
         paragraph["candidate"] = candidate
         return candidate, submitted
     if base_text.strip() != accepted:
-        raise StudioError("已接受版本已在别处更新；页面将载入最新版，请检查后再次修改。")
+        raise StudioError("The accepted version has been updated elsewhere; the page will load the latest version, please review and modify again.")
     if not submitted or submitted == accepted:
-        raise StudioError("正文没有尚未写入的修改。")
+        raise StudioError("There are no edits left unwritten in the main text.")
     candidate = {
         "id": uuid.uuid4().hex,
         "text": submitted,
@@ -6208,6 +6566,34 @@ def execution_record_contradiction_issues(text: str) -> list[str]:
         {},
     )
     issues: list[str] = []
+    if re.search(r"\bnonzero\b[^.\n]{0,45}\b0(?:\.0+)?\b", text, re.I):
+        issues.append("describes an exact zero value as nonzero")
+    if metrics.get("scientific_integrity_version") == 2:
+        reference_alias = r"(?:reference|conformance|RevocationCascade)"
+        reference_superiority = re.search(
+            rf"\b{reference_alias}[^.\n]{{0,100}}\b"
+            r"(?:outperform(?:s|ed)?|perform(?:s|ed)? best|improv(?:e|es|ed)|"
+            r"beat(?:s)?|exceed(?:s|ed)|favor(?:s|ed|ing)?)\b",
+            text,
+            re.I,
+        )
+        if reference_superiority:
+            issues.append("frames oracle-conformance agreement as method superiority")
+        if re.search(
+            r"\b(?:under-propagation|over-propagation)[^.\n]{0,100}\b"
+            r"(?:identical (?:harm|consequence)|more costly|costlier)\b",
+            text,
+            re.I,
+        ):
+            issues.append("asserts an unmeasured equality or cost ordering between failure modes")
+        if re.search(
+            r"\b(?:ablation|removing|removal)[^.\n]{0,100}\b"
+            r"(?:confirm(?:s|ed|ing)?|prove(?:s|d)?|necessary|required|critical|"
+            r"isolat(?:e|es|ed|ing)(?: the)? contribution)\b",
+            text,
+            re.I,
+        ):
+            issues.append("upgrades a registered mutant response into causal component necessity")
     try:
         completed_before_stop = float(metadata["elapsed_seconds"]) < 60.0 * float(
             config["hard_stop_minutes"]
@@ -6365,42 +6751,6 @@ def unsupported_appendix_numeric_issues(
     return [f"number absent from appendix evidence: {item}" for item in unsupported]
 
 
-def numeric_comparison_issues(text: str) -> list[str]:
-    """Catch directly inverted prose comparisons before a paragraph is accepted."""
-    issues: list[str] = []
-    for clause in re.split(r"(?<=[.;])\s+", text):
-        greater = re.search(
-            r"\b(?:exceeds|higher than|larger than|greater than)\b", clause, re.I
-        )
-        lesser = re.search(
-            r"\b(?:below|lower than|smaller than|less than)\b", clause, re.I
-        )
-        comparison = greater or lesser
-        if comparison is None:
-            continue
-        values = _latex_numeric_values(clause)
-        if re.search(r"\b(?:versus|vs\.?)\b", clause, re.I):
-            if len(values) < 2:
-                continue
-            left, right = values[-2:]
-        else:
-            # Only infer direction when the prose itself puts a number on
-            # both sides of the comparison phrase.  Phrases such as
-            # "fell below 5.34, reaching 4.42" mention the reference first
-            # and the measured value second; treating the final two numbers
-            # as left/right produced a false 5.34 < 4.42 rejection.
-            left_values = _latex_numeric_values(clause[: comparison.start()])
-            right_values = _latex_numeric_values(clause[comparison.end() :])
-            if not left_values or not right_values:
-                continue
-            left, right = left_values[-1], right_values[0]
-        if greater is not None and not left > right:
-            issues.append(f"inverted greater-than comparison: {left} versus {right}")
-        if lesser is not None and not left < right:
-            issues.append(f"inverted less-than comparison: {left} versus {right}")
-    return issues
-
-
 def bound_artifact_row_value_issues(text: str, evidence: str) -> list[str]:
     """Detect decimal values borrowed from a different named result row.
 
@@ -6432,9 +6782,9 @@ def bound_artifact_row_value_issues(text: str, evidence: str) -> list[str]:
             (
                 key
                 for key in rows[0]
-                if any(
-                    numeric_cell(str(row.get(key, ""))) is None
-                    and str(row.get(key, "")).strip()
+                if all(
+                    str(row.get(key, "")).strip()
+                    and numeric_cell(str(row.get(key, ""))) is None
                     for row in rows
                 )
             ),
@@ -6481,8 +6831,7 @@ def bound_artifact_row_value_issues(text: str, evidence: str) -> list[str]:
                 for row in matching_rows
                 for key, raw in row.items()
                 if key != identifier_key
-                for value in [numeric_cell(str(raw))]
-                if value is not None
+                for value in _latex_numeric_values(str(raw))
             ]
             allowed = list(row_values)
             allowed.extend(
@@ -6507,6 +6856,45 @@ def bound_artifact_row_value_issues(text: str, evidence: str) -> list[str]:
                 if issue not in issues:
                     issues.append(issue)
     return issues
+
+
+def manuscript_machine_field_issues(section: str, text: str, evidence: str) -> list[str]:
+    """Keep serialized result-schema keys out of reader-facing synthesis prose.
+
+    Result keys are useful provenance inside the prompt, but Discussion is not a
+    JSON ledger. Compare exact parsed object keys with prose tokens so this gate
+    remains structural and project-independent rather than guessing scientific
+    meaning from topic-specific phrases.
+    """
+    if not _is_discussion_section(section):
+        return []
+    try:
+        payload = json.loads(evidence)
+    except (TypeError, json.JSONDecodeError):
+        return []
+
+    keys: set[str] = set()
+
+    def collect(value: Any) -> None:
+        if isinstance(value, dict):
+            for key, child in value.items():
+                candidate = str(key).strip().casefold()
+                if "_" in candidate:
+                    keys.add(candidate)
+                collect(child)
+        elif isinstance(value, list):
+            for child in value:
+                collect(child)
+
+    collect(payload)
+    normalized = text.replace(r"\_", "_").casefold()
+    tokens = set(
+        "".join(character if character.isalnum() or character == "_" else " " for character in normalized).split()
+    )
+    return [
+        f"raw result-schema field in manuscript prose: {key}"
+        for key in sorted(keys & tokens)
+    ]
 
 
 def numerical_placeholder_issues(text: str) -> list[str]:
@@ -6573,7 +6961,7 @@ def provider_configuration(provider: str) -> dict[str, str]:
         },
     }
     if provider not in configurations:
-        raise StudioError(f"不支持的 LLM API：{provider}")
+        raise StudioError(f"Unsupported LLM API:{provider}")
     return configurations[provider]
 
 
@@ -6589,7 +6977,7 @@ def api_setup_for_provider(provider: str) -> dict[str, Any]:
     config = provider_configuration(provider)
     env_name = config["environment_variable"]
     configured = bool(os.environ.get(env_name))
-    commands = [f'export {env_name}="粘贴你的 API key"']
+    commands = [f'export {env_name}="Paste your API key."']
     result = {
         "provider": provider,
         "provider_label": config["label"],
@@ -6599,15 +6987,15 @@ def api_setup_for_provider(provider: str) -> dict[str, Any]:
         "environment_variable": env_name,
         "setup_command": "\n".join(commands),
         "restart_command": API_KEY_RESTART_COMMAND,
-        "security_note": "不要把真实 API key 输入聊天、提交到仓库或保存到浏览器。",
+        "security_note": "Do not input real API keys into the chat, commit to a repository, or save in the browser.",
     }
     if ONLINE_PROJECT_MODE:
         result.update(
             {
-                "location": "Online Paper Studio 会话内存",
+                "location": "Online Paper Studio Session memory",
                 "setup_command": "",
                 "restart_command": "",
-                "security_note": "API key 只驻留在线会话进程内存，不写入项目或浏览器存储。",
+                "security_note": "API key Only resides in online session memory; not written to project or browser storage.",
             }
         )
     return result
@@ -6640,7 +7028,7 @@ def model_options_for_provider(provider: str, current_model: str = "") -> list[d
     ]
     current_model = current_model.strip()
     if current_model and current_model not in {item["id"] for item in options}:
-        options.append({"id": current_model, "label": f"{current_model}（当前配置）"})
+        options.append({"id": current_model, "label": f"{current_model}(Current configuration)"})
     return options
 
 
@@ -6650,9 +7038,9 @@ def select_llm_model(state: dict[str, Any], model: str) -> bool:
     provider_configuration(provider)
     model = model.strip()
     if not model:
-        raise StudioError("模型名称不能为空。")
+        raise StudioError("Model name cannot be empty.")
     if len(model) > 128 or any(character.isspace() or ord(character) < 32 for character in model):
-        raise StudioError("模型名称必须是不含空格或控制字符的单行标识，且不超过 128 个字符。")
+        raise StudioError("Model name must be a single line identifier without spaces or control characters and no more than 128 characters.")
     if model == state.get("model"):
         return False
     state["model"] = model
@@ -6718,18 +7106,18 @@ def post_openai(
         setup = api_setup_for_provider(provider)
         if ONLINE_PROJECT_MODE:
             raise StudioError(
-                f"当前在线会话没有配置 {config['label']} API key；"
-                "请返回 Online Paper Studio 入口并创建新会话。"
+                f"The current online session is not configured. {config['label']} API key; "
+                "Please return to the Online Paper Studio entry and create a new session."
             )
         raise StudioError(
-            f"尚未配置 {config['label']} LLM API。请在启动 Paper Studio 的本机终端输入 "
-            f"`{setup['setup_command']}`，停止当前服务后重新运行 "
-            f"`{API_KEY_RESTART_COMMAND}`。不要把真实 API key 输入聊天、"
-            "提交到仓库或保存到浏览器。"
+            f"Not yet configured {config['label']} LLM API.Please input in the local terminal that runs Paper Studio. "
+            f"`{setup['setup_command']}`, Restart after stopping the current service. "
+            f"`{API_KEY_RESTART_COMMAND}`.Do not input real API keys into the chat."
+            "Submit to the repository or save to the browser."
         )
     if provider != "openai" and payload.get("tools"):
         raise StudioError(
-            f"{config['label']} 当前不支持这个工具调用；请使用不带工具的文本请求。"
+            f"{config['label']} Current tool call is not supported; please use a text request without tools."
         )
     request_payload = payload
     # GPT-4o's Responses API accepts only ``medium`` text verbosity. Several
@@ -6901,26 +7289,26 @@ def has_empty_citation_placeholder(text: str) -> bool:
     return bool(re.search(r"\\cite\w*\s*(?:\[[^\]]*\]\s*)*\{\s*\}", text))
 
 
-def validate_citations_for_accept(text: str, *, workflow: str = "正文") -> None:
+def validate_citations_for_accept(text: str, *, workflow: str = "body text") -> None:
     """Apply one citation gate to interactive and direct-full-draft Accept."""
     if ONLINE_PROJECT_MODE:
         non_placeholder_keys = citation_keys(text)
         if non_placeholder_keys:
             raise StudioError(
-                f"{workflow}线上模式只能保留 \\cite{{}} 标记，不能写入 citation key："
+                f"{workflow}Online mode can only retain \\cite{{}} Mark, cannot write to citation key."
                 + ", ".join(sorted(non_placeholder_keys))
             )
         return
     if has_empty_citation_placeholder(text):
         raise StudioError(
-            f"{workflow}仍有未解决的 \\cite{{}}；请重新生成，或从项目已核验的 "
-            "references.bib 中选择真实引用。"
+            f"{workflow}Still unresolved. \\cite{{}}; Please regenerate, or start from the project already verified items. "
+            "references.bib Select a real citation."
         )
     allowed = bibliography_keys() if ONLINE_PROJECT_MODE else survey_bibliography_keys()
     unknown = sorted(citation_keys(text) - allowed)
     if unknown:
         raise StudioError(
-            f"{workflow}包含未由 survey HTML 核验的 citation keys："
+            f"{workflow}Contains citation keys not verified by survey HTML:"
             + ", ".join(unknown)
         )
 
@@ -7150,7 +7538,7 @@ def repair_empty_citation_placeholders(
         )
         if has_empty_citation_placeholder(revised):
             raise StudioError(
-                "Citation 自动修复后仍有未解决的 \\cite{}；候选未接受。"
+                "Citation Unresolved after automated repair. \\cite{}; Candidate not accepted."
             )
     return response_id, revised
 
@@ -7467,19 +7855,23 @@ def call_openai(
         )
         stable_context = f"""<conversation_bootstrap>
 <approved_outline>{bounded_prompt_text(approved_outline_context(), PAPER_TEXT_CONTEXT_LIMITS['outline'], 'approved outline')}</approved_outline>
-<working_abstract>{bounded_prompt_text(read_text(PAPER / 'working_abstract.txt', 10000), PAPER_TEXT_CONTEXT_LIMITS['working_abstract'], 'working abstract')}</working_abstract>
+<working_abstract>{bounded_prompt_text(effective_working_abstract_context(), PAPER_TEXT_CONTEXT_LIMITS['working_abstract'], 'working abstract')}</working_abstract>
 <writing_style>{bounded_prompt_text(writing_style_context(), PAPER_TEXT_CONTEXT_LIMITS['writing_style'], 'writing style')}</writing_style>
 <bibliography_catalog>{bounded_prompt_text(prompt_bibliography, BIBLIOGRAPHY_PROMPT_MAX_CHARS, 'bibliography catalog')}</bibliography_catalog>
 <section_evidence>{evidence}</section_evidence>
 </conversation_bootstrap>"""
     bound_artifacts = artifact_writing_context(artifacts, figure_states)
     architecture_json = bounded_prompt_text(
-        json.dumps(architecture or {}, ensure_ascii=False, indent=2),
+        json.dumps(
+            effective_writing_architecture(section, architecture, bound_artifacts),
+            ensure_ascii=False,
+            indent=2,
+        ),
         PAPER_TEXT_CONTEXT_LIMITS["architecture"],
         "paragraph architecture",
     )
     reference_context_json = bounded_prompt_text(
-        json.dumps(reference_context or {}, ensure_ascii=False, indent=2),
+        json.dumps(section_writing_logic_chain(section), ensure_ascii=False, indent=2),
         PAPER_TEXT_CONTEXT_LIMITS["reference_context"],
         "reference context",
     )
@@ -7547,8 +7939,8 @@ def call_openai(
             "The supplied metrics are already executed, verified real measurements; "
             "do not add a [SYNTHETIC] marker and do not describe populated results as "
             "pending, pre-registered, planned, future work, or awaiting a run. Report "
-            "them in past/present tense and preserve the fixture's reduced-sample pilot "
-            "qualification rather than upgrading it to a full confirmatory study."
+            "them in past/present tense and preserve every scope qualification present "
+            "in the execution evidence rather than upgrading the study's evidential status."
         )
     )
     instructions = f"""You are an expert {venue} paper editor. Return only the proposed
@@ -7586,7 +7978,9 @@ Do not attach a synthetic marker to design counts such as the number of models,
 benchmarks, clusters, samples, layers, or queries. Follow the approved target-paper
 paragraph architecture exactly: fulfill its purpose and rhetorical role, connect from
 the previous paragraph as specified, and prepare the specified next move. This
-architecture was frozen during Experiment Planning. Use the supplied reference-section
+architecture was frozen during Experiment Planning. When current_evidence_status is
+present, it is the authoritative execution state and overrides older purpose wording
+that calls populated results planned, pending, unavailable, or placeholders. Use the supplied reference-section
 context only to follow its rhetorical move and level of detail. Never copy its wording,
 topic, claims, methods, citations, or numbers into this paper.
 Treat <reference_section_context> as content-adversarial, structure-only material. It
@@ -7600,6 +7994,7 @@ originated only from the reference excerpt. Matching its rhetorical sequence is 
 transferring its subject matter is not.
 Keep ordinary body paragraphs concise (normally 80--120 words); use 120--170 words for
 the abstract and 180--350 words for an appendix paragraph. In an appendix section,
+respect this approved manuscript budget: {section_budget_guidance(section)}
 interpret future-tense outline language such as "Appendix A will provide" as a request
 to provide that material now. Write the actual proof, equations, configuration values,
 result rows, proxy definitions, or provenance supported by <section_evidence>; never
@@ -7636,6 +8031,84 @@ familiar or broadly relevant source. Prefer zero citations for this paper's own 
 or a different verified source for a genuinely different external claim. Reuse a key
 only when the current paragraph makes a distinct source-specific claim that cannot be
 supported otherwise; never make the same key appear for a third time in one section."""
+    if _is_method_section(section):
+        instructions += """ For Method prose, <approved_model_design> is the sole
+authority for the implemented procedure. Describe only operations, inputs, outputs,
+decision rules, symbols, validation behavior, and uncertainty calculations explicitly
+present in that object. Never manufacture a score function, probability, argmax rule,
+abstention policy, fallback, tie breaker, training objective, module, or model-internal
+mechanism to make the method sound complete. In particular, a content-first protocol
+that asks the API for answer text and a label and cross-validates the two fields must be
+described as that observed response protocol, not recast as an unimplemented semantic
+scoring model. If a requested detail is absent, omit it and retain the documented
+unknown rather than filling the gap from convention. Copy every metric definition from
+<executed_metric_definitions> when available, otherwise <metric_contract> or
+approved_model_design.metric_definitions, exactly in substance.
+Do not redefine a within-condition permutation transition as a between-condition
+comparison, change an ordered transition set into all unordered pairs, or invent a
+denominator. Follow <executed_prompt_conditions> literally. Distinguish the shared input
+presentation from the requested response fields, and never apply an answer-text/label
+cross-field check to a condition whose schema contains only a label."""
+    if _is_discussion_section(section):
+        instructions += """ Discussion must interpret the scientific pattern rather
+than reproduce the result ledger. Never expose JSON keys, snake_case field names,
+artifact IDs, raw locators, or an exhaustive list of rows and cells. Select only the
+few measurements needed to support a comparison, round them consistently for readable
+prose, and explain their implication and boundary. Do not restate Experimental Setup,
+do not narrate the table schema, and do not infer model internals from black-box output.
+Treat every alternative explanation as unresolved unless <section_evidence> explicitly
+contains the corresponding executed control and its result. A marginal frequency table
+can establish only the displayed marginal pattern; it cannot establish what caused
+within-item flips. Follow claim_dispositions exactly: distinguish a point-estimate gate
+from confidence-qualified support, and never call an inconclusive claim validated or
+satisfied."""
+    if _is_related_work_section(section):
+        instructions += """ Related Work may compare prior observables, interventions,
+and evaluation scopes, but it must not claim that this paper distinguishes causal
+mechanisms unless section_evidence contains the required executed controls. Differences
+between label-only and text-plus-label output schemas confound response order, verbosity,
+format compliance, and validation behavior; describe them as an intervention comparison,
+not as a decomposition of those explanations. Every source-specific prior-work statement
+must carry a verified citation from the bibliography catalog."""
+    if _is_experiment_section(section):
+        instructions += """ Executed counts in execution_summary override planned budgets
+and projected sample sizes. Clearly distinguish the initial sampled pool, development
+slice, final evaluation set, paired complete-case set, excluded questions, and API calls;
+never multiply or relabel one as another. When authoritative_count_statement or
+authoritative_retry_statement is present, copy the relevant statement exactly rather
+than recalculating, paraphrasing, or replacing any count. Qualitative case prose may report only fields
+present in qualitative_cases. When qualitative_evidence_scope says that attributes were
+not annotated, do not characterize ambiguity, distractor quality, reasoning strategy,
+confidence, or mechanism; state that those interpretations remain unsupported."""
+        instructions += """ Apply executed_prompt_conditions separately by condition.
+A label-only response can establish a valid selected label and inverse-mapped semantic
+answer, but it cannot establish answer-text agreement. Mention text-label cross-field
+validation only for a condition whose executed schema contains both fields. Never say
+that every accepted response passed a shared text-label check when the schemas differ."""
+    if active_metrics.get("scientific_integrity_version") == 2:
+        instructions += """ The scientific-integrity contract uses an independent gold
+oracle. Any implementation that is defined as a reference or conformance control must
+be described only as a check that the executable benchmark agrees with that separate
+oracle. Its perfect oracle agreement is not a method-performance contribution and must
+not be framed as outperforming, improving on, beating, or performing best among
+baselines. Registered alternatives are mutation tests or diagnostic controls, not fair
+competitor systems. State conclusions as benchmark detection of the registered mutant
+failure, using only the preregistered threshold and interval. Do not call a component
+causally necessary merely because removing it reproduces a registered mutant. The
+direct-key mutant is registered for under-propagation and unauthorized actions; the
+any-parent mutant is registered for over-propagation and erasure of independently
+supported conclusions. Never swap those failure directions. Under-propagation and
+over-propagation are distinct harms, not identical harms, and neither may be called more
+costly without a supplied utility or cost measure. When discussing a 100% reference
+score, say only that the reference implementation matched the independent oracle as
+required by conformance; do not call that score perfect performance, robustness, or an
+experimental finding."""
+        if "reference replay cost" in purpose.casefold():
+            instructions += """ In this paragraph, report only the reference control's
+replay latency as its measured quantity. Report affected-node and authorization changes
+only for the registered component mutants. The reference accuracy cells may remain in
+the bound table for auditability, but prose must describe them only as oracle-conformance
+checks and must not present them as gains, achievements, or ablation benefits."""
     is_experimental_setup = _is_experiment_section(section) and bool(
         re.search(
             r"\b(?:experimental setup|protocol|vector extraction|calibration|"
@@ -7677,6 +8150,23 @@ reading of the populated main table and overrides any optimistic claim wording i
 approved plan. If its proposed method has zero wins, explicitly report that the stronger
 baseline outperformed it and do not claim better prediction, improved alignment,
 substantial explained variance, or validation of the predictive mechanism."""
+        instructions += """ Use execution_summary rather than planned counts. Follow each
+claim_dispositions status and confidence gate exactly. A point estimate that passes a
+threshold while its paired confidence interval crosses that threshold is inconclusive,
+not confirmed, validated, or satisfied. Report mixed dataset directions explicitly
+instead of replacing them with a pooled success statement."""
+    instructions += """ A writing-stage motivation or conceptual figure is not empirical
+evidence by itself. If a concrete example is not present in traceable section evidence,
+describe it explicitly as hypothetical and never say that the tested model produced the
+illustrated response. In a permutation example, judge correctness only after mapping the
+displayed response back to semantic content; never score a reordered answer using a
+different ordering's label map. Distinguish where information appears in the input from
+the order of fields requested in the output. An observed within-item answer change
+establishes sensitivity to the intervention, not why the answer changed. Do not infer
+that a model was confused, reasoned in a particular way, or consistently preferred a
+position from a hypothetical example or isolated case. A position preference requires
+the supplied aggregate position observable, and even that marginal pattern does not by
+itself establish the cause of within-item flips."""
     if section_meta.get("render") == "abstract":
         instructions += """ The Abstract must contain no citation commands. State the
 paper's motivation, method, evidence, and bounded conclusion self-containedly; leave
@@ -7800,7 +8290,7 @@ evidence.{(
         text = normalize_latex_ready_text(extract_output_text(correction))
         response_id = correction.get("id")
         if not text or not response_id:
-            raise StudioError("GPT 没有返回执行修改要求后的正文。")
+            raise StudioError("GPT No main text returned after applying modification request.")
     reference_error = artifact_reference_error(text, bound_artifacts)
     if reference_error:
         allowed = [item["required_reference"] for item in bound_artifacts]
@@ -7829,11 +8319,15 @@ evidence.{(
         text = normalize_latex_ready_text(extract_output_text(correction))
         response_id = correction.get("id")
         if not text or not response_id:
-            raise StudioError("GPT 没有返回补充图表引用后的正文。")
+            raise StudioError("GPT No main text returned after supplementing figure references.")
         remaining_reference_error = artifact_reference_error(text, bound_artifacts)
         if remaining_reference_error:
-            raise StudioError("GPT 修正后仍然" + remaining_reference_error)
-    if bound_artifacts and '"artifacts.' in evidence:
+            raise StudioError("GPT Still after correction." + remaining_reference_error)
+    has_traceable_bound_results = any(
+        isinstance(item, dict) and bool(item.get("traceable_results"))
+        for item in bound_artifacts
+    )
+    if has_traceable_bound_results:
         # A generation pass can copy every value yet attach one to the wrong
         # row/column, silently change ``-1`` into a fraction-like phrase, or
         # round .99/1.00/.99 into "all 1.00".  Numeric membership checks cannot
@@ -7862,7 +8356,17 @@ evidence.{(
                     "or narrow any claim the rows do not establish. Preserve the "
                     "required heading, citations, and configured table or figure "
                     "reference exactly once. Never invent a value, source, label, or "
-                    "experimental condition. "
+                    "experimental condition. The supplied rows are executed real "
+                    "measurements: remove plan-only descriptions such "
+                    "as planned, placeholder, will report, or no observed result, and "
+                    "report supported observations in past or present tense while "
+                    "preserving the evidence-defined scope qualification. "
+                    "Honor writing_evidence_boundaries exactly: do not report metrics "
+                    "outside executed_metric_definitions, derive an unreported audit "
+                    "count, infer confidence or a causal mechanism from marginal "
+                    "frequencies, shorten a saved four-answer case sequence, or make a "
+                    "categorical novelty claim. Audit logical consistency as well as "
+                    "table cells. "
                     + MANUSCRIPT_DASH_RULE
                 ),
                 "input": (
@@ -7875,11 +8379,24 @@ evidence.{(
         text = normalize_latex_ready_text(extract_output_text(audit))
         response_id = str(audit.get("id") or "")
         if not text or not response_id:
-            raise StudioError("图表证据审计没有返回修正版段落。")
-        remaining_reference_error = artifact_reference_error(text, bound_artifacts)
-        if remaining_reference_error:
-            raise StudioError("图表证据审计后仍然" + remaining_reference_error)
-        row_value_issues = bound_artifact_row_value_issues(text, evidence)
+            raise StudioError("The chart evidence audit did not return revised paragraphs.")
+        text, response_id = repair_artifact_reference_contract(
+            model=model,
+            response_id=response_id,
+            text=text,
+            bound_artifacts=bound_artifacts,
+        )
+        # Discussion legitimately synthesizes several bound artifacts in one
+        # sentence. A row-local validator cannot assign each numeral to one
+        # table in that setting and therefore produces cross-artifact false
+        # positives. The independent evidence audit above still verifies the
+        # complete result bundle; reserve the strict row-local gate for prose
+        # that is not a cross-artifact Discussion synthesis.
+        row_value_issues = (
+            []
+            if _is_discussion_section(section)
+            else bound_artifact_row_value_issues(text, evidence)
+        )
         for _row_audit_attempt in range(2):
             if not row_value_issues:
                 break
@@ -7911,16 +8428,132 @@ evidence.{(
             text = normalize_latex_ready_text(extract_output_text(correction))
             response_id = str(correction.get("id") or "")
             if not text or not response_id:
-                raise StudioError("跨行数值纠正没有返回修正版段落。")
-            row_value_issues = bound_artifact_row_value_issues(text, evidence)
+                raise StudioError("Cross-row numeric correction did not return revised paragraphs.")
+            row_value_issues = (
+                []
+                if _is_discussion_section(section)
+                else bound_artifact_row_value_issues(text, evidence)
+            )
         if row_value_issues:
             raise StudioError(
-                "正文仍包含来自错误表格行的数值，候选未接受："
+                "The body text still contains values from incorrect table rows; candidate not accepted."
                 + ", ".join(row_value_issues)
             )
-        remaining_reference_error = artifact_reference_error(text, bound_artifacts)
-        if remaining_reference_error:
-            raise StudioError("跨行数值纠正后仍然" + remaining_reference_error)
+        text, response_id = repair_artifact_reference_contract(
+            model=model,
+            response_id=response_id,
+            text=text,
+            bound_artifacts=bound_artifacts,
+        )
+    # Table-bound prose already receives a row-level audit above, but setup,
+    # motivation, synthesis, and limitations can contradict structured facts
+    # without quoting a table cell. Use a fresh verifier conversation so the
+    # audit is not anchored to the drafting model's explanation.
+    has_grounding_contract = not has_traceable_bound_results and any(
+        bool(active_metrics.get(key))
+        for key in (
+            "execution_summary",
+            "executed_metric_definitions",
+            "executed_prompt_conditions",
+            "writing_evidence_boundaries",
+            "claim_dispositions",
+        )
+    )
+    grounding_catalog = (
+        writing_bibliography_catalog(purpose + "\n" + text)
+        if has_grounding_contract and not ONLINE_PROJECT_MODE
+        else ""
+    )
+    grounding = post_openai(
+        {
+            "model": model,
+            "store": True,
+            "instructions": (
+                "Return only the complete corrected LaTeX-ready paragraph. Act as an "
+                "independent evidence and logic editor, not as a stylistic rewriter. "
+                "Preserve supported wording, the required heading, verified citation "
+                "keys, and each configured artifact reference exactly once. Check every "
+                "target-paper fact against <section_evidence>, <paragraph_architecture>, "
+                "and <bound_artifacts>; the structural reference is not scientific "
+                "evidence. Use authoritative count and retry statements verbatim when "
+                "relevant, and never derive a scheduled-call count from the sampled "
+                "pool. Apply response schemas condition by condition: a label-only "
+                "response has no answer-text agreement check. Distinguish identical "
+                "input option presentation from the requested output-field order. "
+                "Follow every confidence-qualified claim disposition exactly. Audit "
+                "logical consistency as well as numeric accuracy: two different semantic "
+                "answers are not semantically identical; a wrong response is not correct; "
+                "and an average must agree with the outcomes being averaged. An observed "
+                "answer change establishes intervention sensitivity but not a preferred "
+                "position, reasoning process, or causal mechanism. A marginal position "
+                "distribution cannot exclude a cause of within-item flips. Treat competing "
+                "explanations as unresolved without executed controls. Remove categorical "
+                "novelty or prior-work-exclusion claims unless the verified catalog and "
+                "approved evidence explicitly establish them. Do not add a new result, "
+                "citation, model, dataset, mechanism, or limitation. "
+                + MANUSCRIPT_DASH_RULE
+            ),
+            "input": (
+                f"<section>{section_meta['title']}</section>\n"
+                f"<paragraph_purpose>{purpose}</paragraph_purpose>\n"
+                f"<paragraph_architecture>{architecture_json}</paragraph_architecture>\n"
+                f"<section_evidence>{evidence}</section_evidence>\n"
+                f"<bound_artifacts>{bound_artifacts_json}</bound_artifacts>\n"
+                f"<verified_catalog>{grounding_catalog}</verified_catalog>\n"
+                f"<paragraph_to_audit>{text}</paragraph_to_audit>"
+            ),
+            "text": {"verbosity": "low"},
+        }
+    ) if has_grounding_contract else {"id": response_id, "output_text": text}
+    text = normalize_latex_ready_text(extract_output_text(grounding))
+    response_id = str(grounding.get("id") or "")
+    if not text or not response_id:
+        raise StudioError("The independent evidence audit did not return a paragraph.")
+    text, response_id = repair_artifact_reference_contract(
+        model=model,
+        response_id=response_id,
+        text=text,
+        bound_artifacts=bound_artifacts,
+    )
+    machine_field_issues = manuscript_machine_field_issues(
+        section, text, evidence
+    )
+    if machine_field_issues:
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete corrected LaTeX-ready Discussion "
+                    "paragraph. Replace every raw JSON key, snake_case field name, "
+                    "artifact ID, and ledger-style row dump with concise scientific "
+                    "interpretation. Mention only the few rounded measurements needed "
+                    "to support the comparison. Preserve the required heading, "
+                    "citations, and each configured figure or table reference exactly "
+                    "once. Do not invent, swap, or extrapolate any result."
+                ),
+                "input": (
+                    "Detected reader-facing schema leakage: "
+                    + "; ".join(machine_field_issues)
+                    + f".\n<bound_result_evidence>{evidence}</bound_result_evidence>"
+                    + f"\n<previous_paragraph>{text}</previous_paragraph>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = str(correction.get("id") or "")
+        remaining_machine_field_issues = manuscript_machine_field_issues(
+            section, text, evidence
+        )
+        if not text or not response_id or remaining_machine_field_issues:
+            raise StudioError(
+                "Discussion still exposes raw result-schema fields; candidate not accepted. "
+                + ", ".join(
+                    remaining_machine_field_issues or machine_field_issues
+                )
+            )
     tense_issues = (
         unexecuted_experiment_tense_issues(section, text)
         if ONLINE_PROJECT_MODE and use_x_for_numbers
@@ -7961,14 +8594,14 @@ evidence.{(
         text = normalize_latex_ready_text(extract_output_text(correction))
         response_id = str(correction.get("id") or "")
         if not text or not response_id:
-            raise StudioError("未执行实验的时态纠正没有返回修正版段落。")
+            raise StudioError("Tense correction for experiments not performed did not return revised paragraphs.")
         tense_issues = unexecuted_experiment_tense_issues(section, text)
         remaining_reference_error = artifact_reference_error(text, bound_artifacts)
         if remaining_reference_error:
-            raise StudioError("实验计划时态纠正后仍然" + remaining_reference_error)
+            raise StudioError("Still after tense correction of the experimental plan." + remaining_reference_error)
     if tense_issues:
         raise StudioError(
-            "实验计划段落经过三次收缩后仍不合格，候选未接受："
+            "Experimental plan paragraph still non compliant after three reductions; candidates not accepted."
             + ", ".join(tense_issues)
         )
     added: list[str] = []
@@ -8031,11 +8664,11 @@ evidence.{(
         text = normalize_latex_ready_text(extract_output_text(correction))
         response_id = str(correction.get("id") or "")
         if not text or not response_id:
-            raise StudioError("Citation 去重没有返回修正版段落。")
+            raise StudioError("Citation Deduplication did not return the revised paragraph.")
         remaining_third_uses = sorted(set(third_use_keys) & citation_keys(text))
         if remaining_third_uses:
             raise StudioError(
-                "同一 section 的 citation key 仍将出现第三次，候选未接受："
+                "The same section citation keys will still appear a third time, candidate not accepted:"
                 + ", ".join(remaining_third_uses)
             )
     setup_issues = experimental_setup_issues(section, purpose, text)
@@ -8094,7 +8727,8 @@ evidence.{(
                 "previous_response_id": response_id,
                 "instructions": (
                     "Return only one compact LaTeX-ready Experimental Setup "
-                    "paragraph of at most 170 words. "
+                    "paragraph of at most 140 words, leaving a safety margin below "
+                    "the deterministic 170-word acceptance limit. "
                     + setup_name_instruction
                     + model_instruction
                     + "State only exact executed models, prompt counts, seeds, "
@@ -8125,7 +8759,7 @@ evidence.{(
         remaining_setup_issues = experimental_setup_issues(section, purpose, text)
         if not text or not response_id or remaining_setup_issues:
             raise StudioError(
-                "Experimental Setup 仍未满足固定格式："
+                "Experimental Setup Still not meeting the fixed format:"
                 + ", ".join(remaining_setup_issues or setup_issues)
             )
     status_issues = real_result_status_issues(text)
@@ -8140,13 +8774,13 @@ evidence.{(
                 "previous_response_id": response_id,
                 "instructions": (
                     "Return only the complete corrected LaTeX-ready paragraph. The "
-                    "configured metrics are already executed real reduced-sample pilot "
+                    "configured metrics are already executed real "
                     "measurements. Remove language that calls populated results pending, "
                     "pre-registered, planned, future, or awaiting execution. Report only "
-                    "the supplied measured evidence in past/present tense; retain the "
-                    "reduced-sample pilot limitation and do not upgrade it to a full "
-                    "confirmatory study. Do not use 'confirmatory' as the status of this "
-                    "pilot's design, protocol, test, seeds, values, or study. Preserve "
+                    "the supplied measured evidence in past/present tense; retain every "
+                    "scope qualification supplied by the evidence and do not upgrade the "
+                    "study's evidential status. Do not use 'confirmatory' unless the "
+                    "evidence explicitly assigns that status. Preserve "
                     "citation keys, exact numbers, headings, "
                     "and required figure/table references. Do not explain the correction."
                 ),
@@ -8166,11 +8800,11 @@ evidence.{(
         text = normalize_latex_ready_text(extract_output_text(correction))
         response_id = str(correction.get("id") or "")
         if not text or not response_id:
-            raise StudioError("GPT 没有返回修正结果状态后的正文。")
+            raise StudioError("GPT No main text returned after updated result status.")
         status_issues = real_result_status_issues(text)
     if status_issues:
         raise StudioError(
-            "真实结果正文仍含未来执行状态：" + ", ".join(status_issues)
+            "Real results text still contains future execution status:" + ", ".join(status_issues)
         )
     execution_issues = execution_record_contradiction_issues(text)
     if execution_issues:
@@ -8182,6 +8816,14 @@ evidence.{(
                 "instructions": (
                     "Return only the complete corrected LaTeX-ready paragraph. "
                     "Correct every contradiction with the supplied execution records. "
+                    "If the integrity contract identifies a reference implementation as "
+                    "an oracle-conformance control, describe its agreement only as a "
+                    "conformance check, not as outperforming or improving on registered "
+                    "mutants. Do not infer causal component necessity from a mutation test. "
+                    "Keep mutant roles fixed: direct-key means under-propagation and "
+                    "unauthorized actions; any-parent means over-propagation and erased "
+                    "independent support. Do not assert an unmeasured cost ordering. "
+                    "Never describe an exact zero value as nonzero. "
                     "If elapsed time is below the configured hard stop, do not claim "
                     "that the stop fired or that cells are missing. Reproduce recorded "
                     "environment fields rather than calling them absent. Preserve "
@@ -8201,7 +8843,7 @@ evidence.{(
         remaining_execution_issues = execution_record_contradiction_issues(text)
         if not text or not response_id or remaining_execution_issues:
             raise StudioError(
-                "正文仍与执行记录矛盾，候选未接受："
+                "Main text still contradicts the execution log; candidate not accepted."
                 + ", ".join(remaining_execution_issues or execution_issues)
             )
     appendix_issues = appendix_content_issues(section, text)
@@ -8234,21 +8876,19 @@ evidence.{(
         remaining_appendix_issues = appendix_content_issues(section, text)
         if not text or not response_id or remaining_appendix_issues:
             raise StudioError(
-                "附录仍然只是内容路线图，候选未接受："
+                "The appendix remains only a content road map; candidate not accepted."
                 + ", ".join(remaining_appendix_issues or appendix_issues)
             )
-    completion_issues = manuscript_completion_placeholder_issues(text)
-    markup_issues = manuscript_markup_issues(text)
-    internal_reference_issues = unsupported_internal_reference_issues(text)
-    appendix_numeric_issues = unsupported_appendix_numeric_issues(
-        section, text, evidence
-    )
-    if (
-        completion_issues
-        or markup_issues
-        or internal_reference_issues
-        or appendix_numeric_issues
-    ):
+    completion_defects: list[str] = []
+    for _completion_attempt in range(3):
+        completion_defects = (
+            manuscript_completion_placeholder_issues(text)
+            + manuscript_markup_issues(text)
+            + unsupported_internal_reference_issues(text)
+            + unsupported_appendix_numeric_issues(section, text, evidence)
+        )
+        if not completion_defects:
+            break
         correction = post_openai(
             {
                 "model": model,
@@ -8267,12 +8907,7 @@ evidence.{(
                 ),
                 "input": (
                     "Detected completion defects: "
-                    + "; ".join(
-                        completion_issues
-                        + markup_issues
-                        + internal_reference_issues
-                        + appendix_numeric_issues
-                    )
+                    + "; ".join(completion_defects)
                     + f".\n<previous_paragraph>{text}</previous_paragraph>"
                 ),
                 "text": {"verbosity": "low"},
@@ -8280,33 +8915,19 @@ evidence.{(
         )
         text = normalize_latex_ready_text(extract_output_text(correction))
         response_id = str(correction.get("id") or "")
-        remaining_completion_issues = manuscript_completion_placeholder_issues(text)
-        remaining_markup_issues = manuscript_markup_issues(text)
-        remaining_internal_issues = unsupported_internal_reference_issues(text)
-        remaining_appendix_numeric_issues = unsupported_appendix_numeric_issues(
-            section, text, evidence
+        if not text or not response_id:
+            raise StudioError("Completion repair did not return a valid paragraph.")
+    completion_defects = (
+        manuscript_completion_placeholder_issues(text)
+        + manuscript_markup_issues(text)
+        + unsupported_internal_reference_issues(text)
+        + unsupported_appendix_numeric_issues(section, text, evidence)
+    )
+    if completion_defects:
+        raise StudioError(
+            "The main text still contains planning placeholders or non existent internal references; candidates not accepted."
+            + ", ".join(completion_defects)
         )
-        if (
-            not text
-            or not response_id
-            or remaining_completion_issues
-            or remaining_markup_issues
-            or remaining_internal_issues
-            or remaining_appendix_numeric_issues
-        ):
-            raise StudioError(
-                "正文仍包含规划占位符或不存在的内部引用，候选未接受："
-                + ", ".join(
-                    remaining_completion_issues
-                    + remaining_markup_issues
-                    + remaining_internal_issues
-                    + remaining_appendix_numeric_issues
-                    or completion_issues
-                    + markup_issues
-                    + internal_reference_issues
-                    + appendix_numeric_issues
-                )
-            )
     no_result_issues = (
         unexecuted_result_claim_issues(text)
         if ONLINE_PROJECT_MODE and use_x_for_numbers
@@ -8343,99 +8964,13 @@ evidence.{(
         text = normalize_latex_ready_text(extract_output_text(correction))
         response_id = str(correction.get("id") or "")
         if not text or not response_id:
-            raise StudioError("无实验结果状态纠正没有返回修正版段落。")
+            raise StudioError("No revised paragraphs returned for the corrected experimental results status.")
         no_result_issues = unexecuted_result_claim_issues(text)
     if no_result_issues:
         raise StudioError(
-            "段落仍声称存在尚未执行的实验结果，候选未接受："
+            "The paragraph still claims there are unperformed experiments; candidate not accepted."
             + ", ".join(no_result_issues)
         )
-    comparison_issues = numeric_comparison_issues(text)
-    if comparison_issues:
-        correction = post_openai(
-            {
-                "model": model,
-                "store": True,
-                "previous_response_id": response_id,
-                "instructions": (
-                    "Return only the complete corrected LaTeX-ready paragraph. "
-                    "Correct the prose direction of every numeric comparison to "
-                    "match the supplied values. Preserve all exact values, citations, "
-                    "headings, and artifact references. Do not invent or swap values."
-                ),
-                "input": (
-                    "Detected inverted comparisons: "
-                    + "; ".join(comparison_issues)
-                    + f".\n<previous_paragraph>{text}</previous_paragraph>"
-                ),
-                "text": {"verbosity": "low"},
-            }
-        )
-        text = normalize_latex_ready_text(extract_output_text(correction))
-        response_id = str(correction.get("id") or "")
-        remaining_comparison_issues = numeric_comparison_issues(text)
-        if not text or not response_id or remaining_comparison_issues:
-            raise StudioError(
-                "数值比较方向仍与数值矛盾，候选未接受："
-                + ", ".join(remaining_comparison_issues or comparison_issues)
-            )
-    synthesis_issues = synthesis_comparison_issues(section, text)
-    if synthesis_issues:
-        outcome = primary_comparison_outcome(metrics_bundle())
-        correction = post_openai(
-            {
-                "model": model,
-                "store": True,
-                "previous_response_id": response_id,
-                "instructions": (
-                    "Return only the complete corrected LaTeX-ready paragraph. "
-                    "The previous synthesis contradicted the populated primary "
-                    "comparison table. State the proposed method's negative result "
-                    "plainly, identify the actual stronger baseline, and narrow the "
-                    "paper's conclusion to what the smoke evidence supports. Preserve "
-                    "the heading contract and exact measured values. Do not invent a "
-                    "positive mechanism result or explain the correction."
-                ),
-                "input": (
-                    "<primary_comparison_outcome>"
-                    + json.dumps(outcome, ensure_ascii=False)
-                    + "</primary_comparison_outcome>\n<previous_paragraph>"
-                    + text
-                    + "</previous_paragraph>"
-                ),
-                "text": {"verbosity": "low"},
-            }
-        )
-        text = normalize_latex_ready_text(extract_output_text(correction))
-        response_id = str(correction.get("id") or "")
-        remaining_synthesis_issues = synthesis_comparison_issues(section, text)
-        if text and response_id and remaining_synthesis_issues:
-            retry = post_openai(
-                {
-                    "model": model,
-                    "store": False,
-                    "instructions": (
-                        "Write only one concise LaTeX-ready conclusion paragraph. "
-                        "Mandatory factual opening: In the primary smoke comparison, "
-                        "IAA outperformed Steering Commutator on all six reported "
-                        "benchmark-metric cells. Explain that this falsifies the "
-                        "planned better-predictor claim while preserving only the "
-                        "same-state null and descriptive order-gap findings. Never "
-                        "say that Steering Commutator outperformed, improved, tracked "
-                        "more closely, or validated its predictive mechanism."
-                    ),
-                    "input": json.dumps(outcome, ensure_ascii=False),
-                    "text": {"verbosity": "low"},
-                }
-            )
-            text = normalize_latex_ready_text(extract_output_text(retry))
-            response_id = str(retry.get("id") or "")
-            remaining_synthesis_issues = synthesis_comparison_issues(section, text)
-        if not text or not response_id or remaining_synthesis_issues:
-            raise StudioError(
-                "总结段仍与主结果表矛盾，候选未接受："
-                + ", ".join(remaining_synthesis_issues or synthesis_issues)
-            )
     placeholder_issues = (
         numerical_placeholder_issues(text)
         if section_meta.get("render") == "abstract" and executed_result_rows
@@ -8467,49 +9002,12 @@ evidence.{(
         text = normalize_latex_ready_text(extract_output_text(correction))
         response_id = str(correction.get("id") or "")
         if not text or not response_id:
-            raise StudioError("GPT 没有返回去除数值占位符后的摘要。")
+            raise StudioError("GPT No summary returned after removing numeric placeholders.")
         remaining_placeholders = numerical_placeholder_issues(text)
         if remaining_placeholders:
             raise StudioError(
-                "摘要仍包含数值占位符，未接受该候选："
+                "The abstract still contains numerical placeholders; this candidate not accepted."
                 + ", ".join(remaining_placeholders)
-            )
-    prose_issues = latex_prose_issues(text)
-    if prose_issues:
-        correction = post_openai(
-            {
-                "model": model,
-                "store": True,
-                "previous_response_id": response_id,
-                "instructions": (
-                    "Return only the complete corrected paragraph in pdflatex-safe "
-                    "LaTeX. Preserve every claim, number, [SYNTHETIC] marker, heading, "
-                    "citation key, and required figure/table reference. Escape prose "
-                    "percent, ampersand, hash, and underscore characters; place all "
-                    "mathematics inside LaTeX math delimiters; replace Unicode math "
-                    "glyphs with LaTeX commands. If a displayed equation is too long "
-                    "for one ACL column, preserve the mathematics but split it into "
-                    "short lines with an aligned environment. "
-                    + MANUSCRIPT_DASH_RULE
-                    + " Do not explain the correction."
-                ),
-                "input": (
-                    "The previous paragraph contains these LaTeX hazards: "
-                    + "; ".join(prose_issues)
-                    + ". Correct it now.\n\n"
-                    + f"<previous_paragraph>{text}</previous_paragraph>"
-                ),
-                "text": {"verbosity": "medium"},
-            }
-        )
-        text = normalize_latex_ready_text(extract_output_text(correction))
-        response_id = correction.get("id")
-        if not text or not response_id:
-            raise StudioError("GPT 没有返回 LaTeX 安全修正版正文。")
-        remaining_issues = latex_prose_issues(text)
-        if remaining_issues:
-            raise StudioError(
-                "GPT 修正后仍包含 LaTeX 风险字符：" + "; ".join(remaining_issues)
             )
     if section_meta.get("render") == "abstract":
         text = remove_manuscript_citations(text)
@@ -8531,6 +9029,10 @@ evidence.{(
         purpose=purpose,
         paragraph=text,
     )
+    # Citation resolution is itself a provider-backed transformation and can
+    # emit biblatex macros or fresh TeX punctuation. Send its final output
+    # through the same canonical ingestion boundary as every other response.
+    text = normalize_latex_ready_text(text)
     for managed_label in (
         str(section_meta.get("start_label") or ""),
         str(section_meta.get("end_label") or ""),
@@ -8546,21 +9048,106 @@ evidence.{(
         required_heading,
         required_heading_style,
     )
+    word_limit = paragraph_word_limit(section)
+    for _word_budget_attempt in range(2):
+        word_count = manuscript_paragraph_word_count(text)
+        if word_limit is None or word_count <= word_limit:
+            break
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete compressed LaTeX-ready paragraph. "
+                    f"It must contain no more than {word_limit} readable words. "
+                    "Preserve every evidence-backed result, numerical value, citation "
+                    "key, required heading, and configured figure or table reference. "
+                    "Remove repetition, generic framing, and expendable transitions. "
+                    "Do not add evidence or explain the edit."
+                ),
+                "input": (
+                    f"The paragraph contains {word_count} readable words.\n"
+                    f"<paragraph_to_compress>{text}</paragraph_to_compress>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = correction.get("id")
+        if not text or not response_id:
+            raise StudioError("Word-budget compression did not return a valid paragraph.")
+        text = enforce_required_heading(
+            strip_redundant_section_name_leadin(text, str(section_meta["title"])),
+            required_heading,
+            required_heading_style,
+        )
+    if word_limit is not None and manuscript_paragraph_word_count(text) > word_limit:
+        raise StudioError(
+            "The paragraph still exceeds its venue-aware word budget after two corrections."
+        )
+    # Citation resolution and heading enforcement both transform the candidate.
+    # Validate and repair only after those final transformations so a hazard
+    # introduced by a citation provider cannot bypass the generation gate and
+    # later abort the transactional batch accept step.
+    prose_issues = latex_prose_issues(text)
+    if prose_issues:
+        correction = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": (
+                    "Return only the complete corrected paragraph in pdflatex-safe "
+                    "LaTeX. Preserve every claim, number, [SYNTHETIC] marker, heading, "
+                    "citation key, and required figure/table reference. Escape prose "
+                    "percent, ampersand, hash, and underscore characters; place all "
+                    "mathematics inside LaTeX math delimiters; replace Unicode math "
+                    "glyphs with LaTeX commands. If a displayed equation is too long "
+                    "for one ACL column, preserve the mathematics but split it into "
+                    "short lines with an aligned environment. "
+                    + MANUSCRIPT_DASH_RULE
+                    + " Do not explain the correction."
+                ),
+                "input": (
+                    "The final paragraph contains these LaTeX hazards: "
+                    + "; ".join(prose_issues)
+                    + ". Correct it now.\n\n"
+                    + f"<previous_paragraph>{text}</previous_paragraph>"
+                ),
+                "text": {"verbosity": "medium"},
+            }
+        )
+        text = normalize_latex_ready_text(extract_output_text(correction))
+        response_id = correction.get("id")
+        if not text or not response_id:
+            raise StudioError("GPT No LaTeX safe revised text was returned.")
+        text = enforce_required_heading(
+            strip_redundant_section_name_leadin(text, str(section_meta["title"])),
+            required_heading,
+            required_heading_style,
+        )
+        remaining_issues = latex_prose_issues(text)
+        if remaining_issues:
+            raise StudioError(
+                "GPT After correction, still contains LaTeX risk characters."
+                + "; ".join(remaining_issues)
+            )
     final_reference_error = artifact_reference_error(text, bound_artifacts)
     if final_reference_error:
         raise StudioError(final_reference_error)
     security_issues = online_latex_security_issues(text)
     if security_issues:
         raise StudioError(
-            "在线写作候选包含被禁用的 LaTeX 文件或执行命令："
+            "Online writing candidates include disabled LaTeX files or commands to execute."
             + ", ".join(security_issues)
         )
     if revision_requested and re.sub(r"\s+", " ", text).strip() == re.sub(
         r"\s+", " ", revision_source
     ).strip():
         raise StudioError(
-            "GPT 连续两次返回与当前版本相同的正文；本次没有保存伪新候选。"
-            "请重试或把修改范围描述得更具体。"
+            "GPT Two consecutive outputs identical to the current version of the body text; this submission did not save a pseudo new candidate."
+            "Please retry or describe the modification scope more specifically."
         )
     return response_id, text, added
 
@@ -8608,11 +9195,11 @@ def manuscript_title_display(source: str | None = None) -> str:
 def normalize_plain_title(title: str) -> str:
     normalized = re.sub(r"\s+", " ", title).strip().strip('"“”')
     if not normalized:
-        raise StudioError("论文标题不能为空。")
+        raise StudioError("Paper title cannot be empty.")
     if len(normalized) > 240:
-        raise StudioError("论文标题不能超过 240 个字符。")
+        raise StudioError("The paper title cannot exceed 240 characters.")
     if "\\" in normalized or "{" in normalized or "}" in normalized:
-        raise StudioError("标题请输入纯文本，不要包含 LaTeX 命令或花括号。")
+        raise StudioError("Please enter the title as plain text, do not include LaTeX commands or curly braces.")
     return normalized
 
 
@@ -8716,6 +9303,46 @@ def save_manuscript_title(title: str) -> CompileResult:
     os.replace(rollback, main)
     compile_paper()
     raise StudioError("LaTeX failed; title edit rolled back.\n" + result.message)
+
+
+def full_draft_title_pending(state: dict[str, Any]) -> bool:
+    """Use explicit title provenance instead of guessing from title wording."""
+    return str(state.get("title_editor", {}).get("status") or "placeholder") == "placeholder"
+
+
+def generate_full_draft_title(model: str) -> None:
+    """Generate and commit the title after the complete manuscript is available."""
+    state = load_state()
+    if not full_draft_title_pending(state):
+        return
+    response_id, title = call_openai_for_title(
+        model=model,
+        prompt=(
+            "Generate the final paper title from the completed manuscript. Name the "
+            "evaluated phenomenon and protocol precisely, and do not claim a confirmed "
+            "benefit when the reported comparison is inconclusive."
+        ),
+        current_title=manuscript_title_display(),
+        previous_response_id=None,
+    )
+    result = save_manuscript_title(title)
+    latest = load_state()
+    editor = latest.setdefault("title_editor", {})
+    editor.update(
+        {
+            "prompt": "",
+            "candidate": "",
+            "previous_response_id": response_id,
+            "last_message": "The final title was generated from the completed manuscript and written to LaTeX.",
+            "status": "generated",
+        }
+    )
+    latest["compile"] = {
+        "status": "ok",
+        "message": result.message,
+        "updated_at": int(time.time()),
+    }
+    save_state(latest)
 
 
 @dataclass
@@ -8828,11 +9455,181 @@ def discard_empty_bibliography_cache_when_citations_exist() -> None:
         bbl_path.unlink()
 
 
+BODY_END_LABEL = "paper:body-end"
+
+
+def ensure_body_end_label() -> None:
+    """Keep a stable aux marker at the end of submission-counted content.
+
+    Venue page limits normally exclude references.  A label immediately after
+    the float barrier and before the bibliography gives us the last body page
+    from LaTeX itself instead of guessing from PDF page count or word count.
+    Existing projects are migrated on their next compile.
+    """
+    main = PAPER / "main.tex"
+    if not main.is_file():
+        return
+    source = main.read_text(encoding="utf-8")
+    marker = f"\\label{{{BODY_END_LABEL}}}"
+    if marker in source:
+        return
+    bibliography = re.search(r"(?m)^\\input\{sections/bibliography\}\s*$", source)
+    end_document = re.search(r"(?m)^\\end\{document\}\s*$", source)
+    insertion = bibliography or end_document
+    if not insertion:
+        return
+    updated = source[: insertion.start()] + marker + "\n" + source[insertion.start() :]
+    temporary = main.with_suffix(".tex.tmp")
+    temporary.write_text(updated, encoding="utf-8")
+    os.replace(temporary, main)
+
+
+def submission_content_page_limit() -> int | None:
+    raw = PROJECT_METADATA.get("target", {}).get("submission_content_pages")
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def compiled_content_page_count() -> int | None:
+    """Read the body-ending page emitted by LaTeX; return None before compile."""
+    aux = read_text(PAPER / "main.aux", 2_000_000)
+    match = re.search(
+        rf"\\newlabel\{{{re.escape(BODY_END_LABEL)}\}}\{{\{{[^}}]*\}}\{{([^}}]+)\}}",
+        aux,
+    )
+    if not match:
+        return None
+    page = match.group(1).strip()
+    return int(page) if page.isdigit() else None
+
+
+def page_budget_status() -> dict[str, Any]:
+    limit = submission_content_page_limit()
+    content_pages = compiled_content_page_count()
+    if limit is None:
+        status = "not_configured"
+    elif content_pages is None:
+        status = "awaiting_compile"
+    elif content_pages > limit:
+        status = "over"
+    else:
+        status = "within"
+    return {
+        "limit": limit,
+        "content_pages": content_pages,
+        "remaining": (
+            limit - content_pages
+            if limit is not None and content_pages is not None
+            else None
+        ),
+        "status": status,
+        "excludes_references": True,
+    }
+
+
+def page_budget_worsened(before: int | None, after: int | None) -> bool:
+    """Reject a new edit that crosses or further exceeds the body-page limit."""
+    limit = submission_content_page_limit()
+    if limit is None or after is None or after <= limit:
+        return False
+    return before is None or before <= limit or after > before
+
+
+def page_budget_error(before: int | None, after: int | None) -> str:
+    limit = submission_content_page_limit()
+    return (
+        "Submission body page budget exceeded; edit rolled back. "
+        f"Body pages changed from {before if before is not None else 'unknown'} "
+        f"to {after if after is not None else 'unknown'}, limit {limit}. "
+        "References are excluded from this count. Shorten the current paragraph "
+        "or move nonessential material to the appendix."
+    )
+
+
+def paragraph_word_limit(section: str) -> int | None:
+    """Allocate the venue body budget before prose reaches LaTeX.
+
+    A page-count-only gate reacts too late: once early paragraphs consume the
+    available pages, shortening only the paragraph that crosses the boundary
+    cannot leave room for the remaining sections.  Allocate the configured
+    section share across its paragraphs and reserve space for each body float.
+    """
+    page_limit = submission_content_page_limit()
+    section_meta = SECTION_MAP.get(section, {})
+    section_spec = next(
+        (item for item in SECTION_SPECS if str(item.get("id")) == section),
+        {},
+    )
+    paragraphs = section_spec.get("paragraphs", [])
+    try:
+        share = float(section_meta.get("length_share"))
+    except (TypeError, ValueError):
+        return None
+    if not page_limit or not paragraphs or not 0 < share <= 1:
+        return None
+    float_count = len(FIGURES) + len(TABLES)
+    total_prose_words = max(900, page_limit * 425 - float_count * 75)
+    allocated = round(total_prose_words * share / len(paragraphs))
+    if section_meta.get("render") == "abstract":
+        return max(100, min(130, allocated))
+    if section == "experiments":
+        # Setup/result paragraphs must retain dataset, metric, baseline, and
+        # artifact contracts; a lower limit makes reproducibility impossible.
+        return max(120, allocated)
+    # Below roughly 70 words, providers tend to drop required evidence or
+    # ignore the limit even after repair. Keep a feasible floor and let the
+    # transactional page gate handle the rare layout-heavy project.
+    return max(70, allocated)
+
+
+def manuscript_paragraph_word_count(text: str) -> int:
+    """Count readable manuscript words while ignoring LaTeX command names."""
+    without_commands = re.sub(r"\\[A-Za-z@]+\*?", " ", text)
+    return len(re.findall(r"\b[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)?\b", without_commands))
+
+
+def section_budget_guidance(section: str) -> str:
+    """Return concise generation guidance derived from the approved page plan."""
+    limit = submission_content_page_limit()
+    raw_share = SECTION_MAP.get(section, {}).get("length_share")
+    share: float | None = None
+    try:
+        if isinstance(raw_share, str) and raw_share.strip().endswith("%"):
+            share = float(raw_share.strip()[:-1]) / 100.0
+        elif raw_share not in (None, ""):
+            share = float(raw_share)
+            if share > 1:
+                share /= 100.0
+    except (TypeError, ValueError):
+        share = None
+    parts = []
+    if limit is not None:
+        parts.append(f"The submission body limit is {limit} pages, excluding references.")
+    if limit is not None and share is not None and 0 < share <= 1:
+        parts.append(
+            f"The approved length share for this section is {share:.0%}, approximately "
+            f"{limit * share:.1f} body pages."
+        )
+    elif share is not None and 0 < share <= 1:
+        parts.append(f"The approved length share for this section is {share:.0%}.")
+    paragraph_limit = paragraph_word_limit(section)
+    if paragraph_limit is not None:
+        parts.append(
+            f"This paragraph must contain no more than {paragraph_limit} readable words."
+        )
+    parts.append("Prefer the shortest prose that preserves every supported claim and citation.")
+    return " ".join(parts)
+
+
 def compile_paper() -> CompileResult:
     with COMPILE_LOCK:
         main = PAPER / "main.tex"
         if not main.exists():
             return CompileResult(False, "paper/main.tex does not exist yet.")
+        ensure_body_end_label()
         sync_manuscript_bibliography_command()
         discard_empty_bibliography_cache_when_citations_exist()
         entrypoint_errors = manuscript_entrypoint_errors()
@@ -8956,11 +9753,11 @@ def paragraph_by_id(
 ) -> tuple[dict[str, Any], int]:
     section_state = state.get("sections", {}).get(section)
     if not isinstance(section_state, dict):
-        raise StudioError(f"批量写作找不到 section：{section}")
+        raise StudioError(f"Batch writing cannot find section:{section}")
     for index, paragraph in enumerate(section_state.get("paragraphs", [])):
         if paragraph.get("id") == paragraph_id:
             return paragraph, index
-    raise StudioError(f"批量写作找不到段落：{section}/{paragraph_id}")
+    raise StudioError(f"Batch writing cannot locate paragraph:{section}/{paragraph_id}")
 
 
 def accept_full_draft_paragraph(
@@ -8978,38 +9775,32 @@ def accept_full_draft_paragraph(
     if reference_error:
         raise StudioError(reference_error)
     if "[CITATION NEEDED]" in text:
-        raise StudioError("批量写作仍包含未解决的 [CITATION NEEDED]。")
-    validate_citations_for_accept(text, workflow="批量写作")
+        raise StudioError("Batch writing still contains unresolved items. [CITATION NEEDED].")
+    validate_citations_for_accept(text, workflow="batch writing")
     prose_issues = latex_prose_issues(text)
     if prose_issues:
-        raise StudioError("批量写作包含 LaTeX 风险字符：" + "; ".join(prose_issues))
+        raise StudioError("Batch writing contains LaTeX risky characters:" + "; ".join(prose_issues))
     appendix_issues = appendix_content_issues(section, text)
     if appendix_issues:
-        raise StudioError("批量写作的附录仍是路线图：" + "; ".join(appendix_issues))
-    comparison_issues = numeric_comparison_issues(text)
-    if comparison_issues:
-        raise StudioError("批量写作的数值比较方向错误：" + "; ".join(comparison_issues))
-    synthesis_issues = synthesis_comparison_issues(section, text)
-    if synthesis_issues:
-        raise StudioError("批量写作的总结与主结果表矛盾：" + "; ".join(synthesis_issues))
+        raise StudioError("Batch writing appendix remains a roadmap:" + "; ".join(appendix_issues))
     execution_issues = execution_record_contradiction_issues(text)
     if execution_issues:
-        raise StudioError("批量写作与执行记录矛盾：" + "; ".join(execution_issues))
+        raise StudioError("Conflicts between bulk writing and execution records." + "; ".join(execution_issues))
     setup_issues = experimental_setup_issues(
         section, str(paragraph.get("purpose") or ""), text
     )
     if setup_issues:
-        raise StudioError("批量写作的实验设置不完整：" + "; ".join(setup_issues))
+        raise StudioError("Batch writing experimental settings are incomplete:" + "; ".join(setup_issues))
     completion_issues = manuscript_completion_placeholder_issues(text)
     if completion_issues:
-        raise StudioError("批量写作仍含规划占位符：" + "; ".join(completion_issues))
+        raise StudioError("Bulk writing still contains planning placeholders." + "; ".join(completion_issues))
     markup_issues = manuscript_markup_issues(text)
     if markup_issues:
-        raise StudioError("批量写作仍含 Markdown 标记：" + "; ".join(markup_issues))
+        raise StudioError("Batch writing still contains Markdown markup." + "; ".join(markup_issues))
     internal_reference_issues = unsupported_internal_reference_issues(text)
     if internal_reference_issues:
         raise StudioError(
-            "批量写作含未配置的内部引用：" + "; ".join(internal_reference_issues)
+            "Batch writing contains unconfigured internal references:" + "; ".join(internal_reference_issues)
         )
     appendix_numeric_issues = unsupported_appendix_numeric_issues(
         section,
@@ -9020,12 +9811,12 @@ def accept_full_draft_paragraph(
     )
     if appendix_numeric_issues:
         raise StudioError(
-            "批量写作的附录含无证据数字：" + "; ".join(appendix_numeric_issues)
+            "Batch writing appendix contains digits without evidence:" + "; ".join(appendix_numeric_issues)
         )
     security_issues = online_latex_security_issues(text)
     if security_issues:
         raise StudioError(
-            "批量写作包含在线模式禁用的 LaTeX 命令：" + ", ".join(security_issues)
+            "Batch writing includes LaTeX commands that disable online mode:" + ", ".join(security_issues)
         )
 
     target = PAPER / "sections" / SECTION_MAP[section]["file"]
@@ -9034,6 +9825,9 @@ def accept_full_draft_paragraph(
     previous = target.read_text(encoding="utf-8") if existed else ""
     bibliography_path = target.parent / "bibliography.tex"
     previous_bibliography = read_text(bibliography_path, 10000)
+    previous_accepted_text = str(paragraph.get("accepted_text") or "")
+    previous_candidate = paragraph.get("candidate")
+    before_body_pages = compiled_content_page_count()
     paragraph["accepted_text"] = text
     paragraph["candidate"] = None
     auto_generate_bound_figure_captions(state, section, paragraph, text)
@@ -9048,8 +9842,13 @@ def accept_full_draft_paragraph(
     bibliography_temporary.write_text(bibliography_text, encoding="utf-8")
     os.replace(bibliography_temporary, bibliography_path)
     compile_result = compile_paper()
-    if not compile_result.ok:
-        paragraph["accepted_text"] = ""
+    after_body_pages = compiled_content_page_count() if compile_result.ok else None
+    budget_failed = compile_result.ok and page_budget_worsened(
+        before_body_pages, after_body_pages
+    )
+    if not compile_result.ok or budget_failed:
+        paragraph["accepted_text"] = previous_accepted_text
+        paragraph["candidate"] = previous_candidate
         if existed:
             rollback = target.with_suffix(".tex.rollback")
             rollback.write_text(previous, encoding="utf-8")
@@ -9060,6 +9859,8 @@ def accept_full_draft_paragraph(
         bibliography_rollback.write_text(previous_bibliography, encoding="utf-8")
         os.replace(bibliography_rollback, bibliography_path)
         compile_paper()
+        if budget_failed:
+            raise StudioError(page_budget_error(before_body_pages, after_body_pages))
         raise StudioError("LaTeX failed; batch paragraph rolled back.\n" + compile_result.message)
 
     section_state["revision"] = int(section_state.get("revision", 0)) + 1
@@ -9077,6 +9878,85 @@ def accept_full_draft_paragraph(
         "updated_at": int(time.time()),
     }
     return compile_result
+
+
+def repair_batch_latex_candidate(
+    *,
+    model: str,
+    section: str,
+    paragraph: dict[str, Any],
+    text: str,
+    compile_error: str,
+) -> str:
+    """Repair one candidate from the actual pdflatex diagnostic."""
+    bound_artifacts = artifact_writing_context(paragraph.get("artifacts", []))
+    required_references = [
+        str(item.get("required_reference") or "") for item in bound_artifacts
+    ]
+    response = post_openai(
+        {
+            "model": model,
+            "store": True,
+            "instructions": (
+                "Return only the complete corrected LaTeX-ready paragraph. The "
+                "candidate failed pdflatex. Fix the syntax identified by the supplied "
+                "compiler diagnostic while preserving every scientific claim, number, "
+                "citation key, required heading, and configured artifact reference. "
+                "Do not add or remove evidence, citations, equations, figures, tables, "
+                "or prose content except where required to make the paragraph compile. "
+                "Use balanced braces and place every mathematical expression inside "
+                "valid LaTeX math delimiters. Do not explain the correction."
+            ),
+            "input": (
+                f"<section>{section}</section>\n"
+                f"<paragraph_id>{paragraph.get('id', '')}</paragraph_id>\n"
+                f"<required_references>{json.dumps(required_references)}</required_references>\n"
+                f"<pdflatex_diagnostic>{compile_error}</pdflatex_diagnostic>\n"
+                f"<paragraph_to_repair>{text}</paragraph_to_repair>"
+            ),
+            "text": {"verbosity": "low"},
+        }
+    )
+    repaired = normalize_latex_ready_text(extract_output_text(response))
+    if not repaired or not response.get("id"):
+        raise StudioError("LaTeX Automatic repair did not return valid paragraphs.")
+    return repaired
+
+
+def repair_batch_page_budget_candidate(
+    *,
+    model: str,
+    section: str,
+    paragraph: dict[str, Any],
+    text: str,
+    diagnostic: str,
+) -> str:
+    """Compress the current paragraph after a measured body-page overflow."""
+    response = post_openai(
+        {
+            "model": model,
+            "store": True,
+            "instructions": (
+                "Return only one complete LaTeX-ready replacement paragraph. "
+                "Shorten it aggressively because the compiled manuscript crossed its "
+                "submission body-page limit. Preserve every supported claim, numerical "
+                "value, citation key, required heading, and figure/table reference. "
+                "Remove repetition, generic framing, and nonessential transitions. Do "
+                "not add evidence or explain the edit."
+            ),
+            "input": (
+                f"<section>{section}</section>\n"
+                f"<paragraph_id>{paragraph.get('id', '')}</paragraph_id>\n"
+                f"<page_budget_diagnostic>{diagnostic}</page_budget_diagnostic>\n"
+                f"<paragraph_to_compress>{text}</paragraph_to_compress>"
+            ),
+            "text": {"verbosity": "low"},
+        }
+    )
+    repaired = normalize_latex_ready_text(extract_output_text(response))
+    if not repaired or not response.get("id"):
+        raise StudioError("Page-budget compression did not return a valid paragraph.")
+    return repaired
 
 
 def update_full_draft_job(token: str, **updates: Any) -> dict[str, Any] | None:
@@ -9155,7 +10035,7 @@ def draft_batch_worker(
                 job.update(
                     current_section=section,
                     current_paragraph=paragraph_id,
-                    progress_message=f"正在生成 {SECTION_MAP[section]['title']} · {paragraph_id}",
+                    progress_message=f"Generating {SECTION_MAP[section]['title']} · {paragraph_id}",
                 )
                 state[job_key] = job
                 save_state(state)
@@ -9222,7 +10102,49 @@ def draft_batch_worker(
 
             # Compilation can take minutes. Do not hold the job lock: cancellation
             # remains responsive and takes effect after this transactional paragraph.
-            accept_full_draft_paragraph(state, section, paragraph, text)
+            for latex_attempt in range(3):
+                try:
+                    accept_full_draft_paragraph(state, section, paragraph, text)
+                    break
+                except StudioError as exc:
+                    diagnostic = str(exc)
+                    latex_failure = diagnostic.startswith("LaTeX failed;")
+                    budget_failure = diagnostic.startswith(
+                        "Submission body page budget exceeded;"
+                    )
+                    if not (latex_failure or budget_failure) or latex_attempt == 2:
+                        raise
+                    text = (
+                        repair_batch_latex_candidate(
+                            model=model,
+                            section=section,
+                            paragraph=paragraph,
+                            text=text,
+                            compile_error=diagnostic,
+                        )
+                        if latex_failure
+                        else repair_batch_page_budget_candidate(
+                            model=model,
+                            section=section,
+                            paragraph=paragraph,
+                            text=text,
+                            diagnostic=diagnostic,
+                        )
+                    )
+                    paragraph.setdefault("history", []).append(
+                        {
+                            "candidate_id": uuid.uuid4().hex,
+                            "comment": (
+                                "[LATEX REPAIR]"
+                                if latex_failure
+                                else "[PAGE BUDGET COMPRESSION]"
+                            ),
+                            "text": text,
+                            "citations_added": citations_added,
+                            "created_at": int(time.time()),
+                        }
+                    )
+                    paragraph["history"] = paragraph["history"][-40:]
 
             with job_lock:
                 latest = load_state()
@@ -9238,7 +10160,7 @@ def draft_batch_worker(
                     job.update(
                         completed=ordinal,
                         progress=int(ordinal * 100 / max(1, len(targets))),
-                        progress_message=f"已写入并编译 {SECTION_MAP[section]['title']} · {paragraph_id}",
+                        progress_message=f"Written and compiled. {SECTION_MAP[section]['title']} · {paragraph_id}",
                     )
                 latest[job_key] = job
                 save_state(latest)
@@ -9247,6 +10169,13 @@ def draft_batch_worker(
                 schedule_ready_mechanism_figures(artifact_ids)
                 if job.get("status") != "running" or job.get("token") != token:
                     return
+
+        if not section_filter:
+            update_full_draft_job(
+                token,
+                progress_message="Generating the final paper title from the completed manuscript...",
+            )
+            generate_full_draft_title(model)
 
         with job_lock:
             state = load_state()
@@ -9259,16 +10188,20 @@ def draft_batch_worker(
                     artifact_ids=artifact_ids,
                 )
                 materialize_batch_artifacts(state, artifact_ids)
-                quality_issues = (
-                    [] if section_filter else completed_manuscript_issues(state)
-                )
-                if quality_issues:
-                    raise StudioError(
-                        "全文生成后的确定性质量检查失败：" + "; ".join(quality_issues)
-                    )
                 pending_artifacts = pending_batch_artifacts(
                     state, artifact_ids
                 )
+                # Mechanism figures finish in an independent Codex worker. A
+                # running artifact is pending work, not a manuscript defect.
+                # Apply the final quality gate only after every bound artifact
+                # has produced its real deliverables.
+                if not pending_artifacts and not section_filter:
+                    quality_issues = completed_manuscript_issues(state)
+                    if quality_issues:
+                        raise StudioError(
+                            "Deterministic quality check after full text generation failed."
+                            + "; ".join(quality_issues)
+                        )
                 job.update(
                     status="artifacts_pending" if pending_artifacts else "completed",
                     token=None,
@@ -9276,26 +10209,26 @@ def draft_batch_worker(
                     completed=job.get("total", len(targets)),
                     progress_message=(
                         (
-                            f"{SECTION_MAP[section_filter]['title']} 正文已写入 LaTeX；"
-                            "正在完成并确认绑定图表："
+                            f"{SECTION_MAP[section_filter]['title']} The main text has been written in LaTeX."
+                            "Completing and confirming the binding of charts."
                             if section_filter
-                            else "正文已全部写入 LaTeX；请在图表工作台完成并确认："
+                            else "The body text has been fully written in LaTeX; please complete and confirm at the figure workbench."
                         )
-                        + "、".join(pending_artifacts)
+                        + ", ".join(pending_artifacts)
                         if pending_artifacts
                         else (
                             (
-                                f"{SECTION_MAP[section_filter]['title']} 的正文已写入 LaTeX 和 PDF，"
-                                "计划图表已以 placeholder 保留。"
+                                f"{SECTION_MAP[section_filter]['title']} The main text has been written into LaTeX and PDF."
+                                "The planned chart is retained as placeholder."
                                 if section_filter
-                                else "全文初稿已写入 LaTeX 并完成 PDF 编译，计划图表已以 placeholder 保留。"
+                                else "The full first draft has been written in LaTeX and PDF compilation completed; planned charts are kept as placeholders."
                             )
                             if ONLINE_PROJECT_MODE
                             else (
-                                f"{SECTION_MAP[section_filter]['title']} 的正文与绑定图表均已完成，"
-                                "并已写入 LaTeX 和 PDF。"
+                                f"{SECTION_MAP[section_filter]['title']} The body text and bound charts have all been completed."
+                                "Written into LaTeX and PDF."
                                 if section_filter
-                                else "全文初稿与全部图表已写入 LaTeX，并完成 PDF 编译。"
+                                else "The full first draft and all figures have been written into LaTeX and PDF compilation completed."
                             )
                         )
                     ),
@@ -9313,9 +10246,9 @@ def draft_batch_worker(
                     status="failed",
                     token=None,
                     progress_message=(
-                        f"当前 Section 生成停在当前段落：{exc}"
+                        f"Current section generation stops at the current paragraph.{exc}"
                         if section_filter
-                        else f"全文生成停在当前段落：{exc}"
+                        else f"Full text generation stops at the current paragraph:{exc}"
                     ),
                     finished_at=int(time.time()),
                 )
@@ -9354,36 +10287,37 @@ def start_full_draft_job(model: str) -> tuple[str, dict[str, Any]]:
     setup = api_setup_for_provider(provider)
     if not setup["configured"]:
         raise StudioError(
-            f"{setup['provider_label']} API 未配置。请在{API_KEY_SETUP_LOCATION}运行 "
-            f"{setup['setup_command']}，然后重新运行 {API_KEY_RESTART_COMMAND}。"
+            f"{setup['provider_label']} API Not configured. Please specify in{API_KEY_SETUP_LOCATION}run "
+            f"{setup['setup_command']}, Then rerun {API_KEY_RESTART_COMMAND}."
         )
     if not outline_is_confirmed():
-        raise StudioError("Outline 尚未确认，不能直接生成全文。")
+        raise StudioError("Outline Not confirmed yet; cannot generate the full text directly.")
     if not (PAPER / "main.tex").exists():
-        raise StudioError("paper/main.tex 不存在；请先建立论文 scaffold。")
+        raise StudioError("paper/main.tex Does not exist; please first create the paper scaffold.")
     model = model.strip()
     if not model:
-        raise StudioError("模型名称不能为空。")
+        raise StudioError("Model name cannot be empty.")
     with FULL_DRAFT_JOB_LOCK:
         state = load_state()
         if full_draft_running(state):
-            raise StudioError("全文初稿任务已经在运行。")
+            raise StudioError("The full text draft task is already running.")
         if section_draft_running(state):
-            raise StudioError("当前 Section 正在生成，请等待完成。")
+            raise StudioError("The current Section is generating; please wait for completion.")
         refresh_full_draft_artifact_status(state)
         if (state.get("full_draft_job") or {}).get("status") == "artifacts_pending":
             pending = (state.get("full_draft_job") or {}).get("pending_artifacts", [])
             raise StudioError(
-                "上一批正文的绑定图表仍在完成中：" + "、".join(pending)
+                "The binding charts from the previous batch of the main text are still in progress:" + ", ".join(pending)
             )
         targets = full_draft_targets(state)
         artifact_ids = None
         artifact_or_quality_work = bool(
             pending_batch_artifacts(state, artifact_ids)
             or completed_manuscript_issues(state)
+            or full_draft_title_pending(state)
         )
         if not targets and not artifact_or_quality_work:
-            raise StudioError("全部段落已经写入 LaTeX，无需再次批量生成。")
+            raise StudioError("All paragraphs already written to LaTeX; no need to generate in bulk again.")
         token = uuid.uuid4().hex
         state["model"] = model
         state["full_draft_job"] = {
@@ -9401,7 +10335,7 @@ def start_full_draft_job(model: str) -> tuple[str, dict[str, Any]]:
             "artifact_ids": [],
             "current_section": "",
             "current_paragraph": "",
-            "progress_message": "正在准备全文初稿…",
+            "progress_message": "Preparing the full draft…",
         }
         save_state(state)
     return token, state
@@ -9413,32 +10347,32 @@ def start_section_draft_job(model: str, section: str) -> tuple[str, dict[str, An
     setup = api_setup_for_provider(provider)
     if not setup["configured"]:
         raise StudioError(
-            f"{setup['provider_label']} API 未配置。请在{API_KEY_SETUP_LOCATION}运行 "
-            f"{setup['setup_command']}，然后重新运行 {API_KEY_RESTART_COMMAND}。"
+            f"{setup['provider_label']} API Not configured. Please specify in{API_KEY_SETUP_LOCATION}run "
+            f"{setup['setup_command']}, Then rerun {API_KEY_RESTART_COMMAND}."
         )
     if not outline_is_confirmed():
-        raise StudioError("Outline 尚未确认，不能生成当前 Section。")
+        raise StudioError("Outline Not confirmed yet; cannot generate the current section.")
     if not (PAPER / "main.tex").exists():
-        raise StudioError("paper/main.tex 不存在；请先建立论文 scaffold。")
+        raise StudioError("paper/main.tex Does not exist; please first create the paper scaffold.")
     if section not in SECTION_MAP:
-        raise StudioError("当前 Section 不存在。")
+        raise StudioError("The current section does not exist.")
     if SECTION_MAP[section].get("writing_mode") == "plan_only":
-        raise StudioError("当前 Section 仅展示计划，不能生成正文。")
+        raise StudioError("Current Section only shows plan, cannot generate main text.")
     model = model.strip()
     if not model:
-        raise StudioError("模型名称不能为空。")
+        raise StudioError("Model name cannot be empty.")
     with SECTION_DRAFT_JOB_LOCK:
         state = load_state()
         if section_draft_running(state):
-            raise StudioError("当前 Section 生成任务已经在运行。")
+            raise StudioError("The current Section generation task is already running.")
         if full_draft_running(state):
-            raise StudioError("全文初稿正在生成，请等待完成。")
+            raise StudioError("The full text first draft is being generated; please wait for completion.")
         refresh_full_draft_artifact_status(state)
         active = state.get("section_draft_job") or {}
         if active.get("status") == "artifacts_pending":
             raise StudioError(
-                "上一 Section 的绑定图表仍在完成中："
-                + "、".join(active.get("pending_artifacts", []))
+                "The binding charts of the previous Section are still in progress."
+                + ", ".join(active.get("pending_artifacts", []))
             )
         targets = full_draft_targets(state, section)
         artifact_ids = section_artifact_ids(state, section)
@@ -9446,7 +10380,7 @@ def start_section_draft_job(model: str, section: str) -> tuple[str, dict[str, An
             pending_batch_artifacts(state, artifact_ids)
         )
         if not targets and not artifact_work:
-            raise StudioError("当前 Section 的正文与绑定图表已经完成。")
+            raise StudioError("Current Section main text and bound charts complete.")
         token = uuid.uuid4().hex
         state["model"] = model
         state["section_draft_job"] = {
@@ -9462,7 +10396,7 @@ def start_section_draft_job(model: str, section: str) -> tuple[str, dict[str, An
             "section": section,
             "artifact_ids": artifact_ids,
             "current_paragraph": "",
-            "progress_message": f"正在准备 {SECTION_MAP[section]['title']} 的全部内容…",
+            "progress_message": f"Preparing {SECTION_MAP[section]['title']} All content...",
         }
         save_state(state)
     return token, state
@@ -9539,7 +10473,7 @@ def paper_page_svg(page: int) -> Path:
             raise StudioError("PDF page does not exist.")
         converter = shutil_which("pdftocairo")
         if not converter:
-            raise StudioError("交互式 PDF 预览需要本地 pdftocairo。")
+            raise StudioError("Interactive PDF preview requires local pdftocairo.")
         version_dir = PAPER_PAGE_DIR / str(int(pdf.stat().st_mtime_ns))
         target = version_dir / f"page-{page}.svg"
         if target.exists():
@@ -9564,7 +10498,7 @@ def paper_page_svg(page: int) -> Path:
         if process.returncode or not temporary.exists():
             temporary.unlink(missing_ok=True)
             raise StudioError(
-                (process.stderr or process.stdout).strip() or "无法渲染 PDF 页面。"
+                (process.stderr or process.stdout).strip() or "Cannot render PDF page."
             )
         temporary.replace(target)
         return target
@@ -9581,7 +10515,7 @@ def parse_synctex_edit(output: str) -> tuple[Path, int]:
                 return Path(current_input), int(line.split(":", 1)[1].strip())
             except ValueError:
                 continue
-    raise StudioError("这个 PDF 位置没有对应的 LaTeX 源内容。")
+    raise StudioError("This PDF location has no corresponding LaTeX source content.")
 
 
 def _line_span(source: str, fragment: str) -> tuple[int, int] | None:
@@ -9662,7 +10596,7 @@ def source_edit_target(source_path: Path, line: int, state: dict[str, Any]) -> d
         None,
     )
     if not section:
-        raise StudioError("该位置属于论文模板，暂时没有对应的段落或图表编辑器。")
+        raise StudioError("This location belongs to the paper template; there is temporarily no corresponding paragraph or figure editor.")
     section_path = PAPER / "sections" / filename
     source = section_path.read_text(encoding="utf-8")
     lines = source.splitlines()
@@ -9701,7 +10635,7 @@ def source_edit_target(source_path: Path, line: int, state: dict[str, Any]) -> d
     ]
     all_spans = paragraph_spans or structural_spans
     if not all_spans:
-        raise StudioError("该 section 还没有可返回编辑的正文段落。")
+        raise StudioError("This section does not yet have returnable body paragraphs.")
     chosen = containing[0] if containing else (
         structural_containing[0] if structural_containing else min(
             all_spans,
@@ -9717,15 +10651,15 @@ def locate_pdf_source(page: int, x: float, y: float, state: dict[str, Any]) -> d
     synctex_file = PAPER / "main.synctex.gz"
     synctex = shutil_which("synctex")
     if not pdf.exists():
-        raise StudioError("请先编译 PDF，再使用双击定位。")
+        raise StudioError("Compile the PDF first, then use double click positioning.")
     if not synctex_file.exists():
         compile_result = compile_paper()
         if not compile_result.ok or not synctex_file.exists():
             raise StudioError(
-                "PDF 双击定位索引缺失，自动重建失败。\n" + compile_result.message
+                "PDF Double click to locate missing index; automatic reconstruction failed.\n" + compile_result.message
             )
     if not synctex:
-        raise StudioError("PDF 双击定位需要本地 SyncTeX。")
+        raise StudioError("PDF Double click positioning requires local SyncTeX.")
     metadata = paper_pdf_metadata()
     if page < 1 or page > int(metadata["page_count"]):
         raise StudioError("PDF page does not exist.")
@@ -9741,7 +10675,7 @@ def locate_pdf_source(page: int, x: float, y: float, state: dict[str, Any]) -> d
         timeout=30,
     )
     if process.returncode:
-        raise StudioError((process.stderr or process.stdout).strip() or "SyncTeX 定位失败。")
+        raise StudioError((process.stderr or process.stdout).strip() or "SyncTeX Failed to locate.")
     source_path, line = parse_synctex_edit(process.stdout)
     target = source_edit_target(source_path, line, state)
     target["source_line"] = str(line)
@@ -9779,22 +10713,22 @@ def run_checked(
                 timeout=timeout,
             )
         except subprocess.TimeoutExpired as exc:
-            raise StudioError("画图命令超时。") from exc
+            raise StudioError("Plot command timed out.") from exc
         output = (process.stdout + "\n" + process.stderr).strip()
         if process.returncode:
             if "Traceback (most recent call last)" in output:
                 last_line = next(
                     (line.strip() for line in reversed(output.splitlines()) if line.strip()),
-                    "画图命令执行失败。",
+                    "Plot command execution failed.",
                 )
-                raise StudioError(f"外部绘图工具执行失败：{last_line[-800:]}")
-            raise StudioError(output[-1200:] or "画图命令执行失败。")
+                raise StudioError(f"External plotting tool execution failed:{last_line[-800:]}")
+            raise StudioError(output[-1200:] or "Plot command execution failed.")
         return output
 
     with FIGURE_PROCESS_LOCK:
         if job_token in CANCELLED_FIGURE_JOBS:
             CANCELLED_FIGURE_JOBS.discard(job_token)
-            raise StudioError("本次 GPT Image 调用已停止。")
+            raise StudioError("The figure-generation job has stopped.")
     process = subprocess.Popen(
         command,
         cwd=cwd,
@@ -9815,7 +10749,7 @@ def run_checked(
     except subprocess.TimeoutExpired as exc:
         _terminate_process_group(process)
         process.communicate()
-        raise StudioError("画图命令超时。") from exc
+        raise StudioError("Plot command timed out.") from exc
     finally:
         with FIGURE_PROCESS_LOCK:
             if RUNNING_FIGURE_PROCESSES.get(job_token) is process:
@@ -9824,14 +10758,14 @@ def run_checked(
     output = (stdout + "\n" + stderr).strip()
     if process.returncode:
         if cancelled:
-            raise StudioError("本次 GPT Image 调用已停止。")
+            raise StudioError("The figure-generation job has stopped.")
         if "Traceback (most recent call last)" in output:
             last_line = next(
                 (line.strip() for line in reversed(output.splitlines()) if line.strip()),
-                "画图命令执行失败。",
+                "Plot command execution failed.",
             )
-            raise StudioError(f"外部绘图工具执行失败：{last_line[-800:]}")
-        raise StudioError(output[-1200:] or "画图命令执行失败。")
+            raise StudioError(f"External plotting tool execution failed:{last_line[-800:]}")
+        raise StudioError(output[-1200:] or "Plot command execution failed.")
     return output
 
 
@@ -9904,7 +10838,7 @@ def mechanism_source(
             "page-width ACL-style method schematic with 2–4 aligned regions; use flat modules, "
             "tokens, paths, matrices, or small semantic glyphs only when they encode the method; "
             "keep all critical content in the central horizontal safe band because the "
-            "landscape GPT Image draft will be cover-cropped to the paper aspect ratio"
+            "wide native-shape composition will be fitted to the paper aspect ratio"
             if wide
             else f"compact single-column {type_profile['role'].lower()} with two or three "
             "aligned visual groups; follow the type-specific object grammar and reading order; "
@@ -10026,8 +10960,10 @@ def initial_mechanism_spec(figure_id: str) -> dict[str, Any]:
         "image_size": "1536x1024" if wide else "1024x1024",
         "quality": "high",
         "draw_prompt": "",
-        "no_text": True,
+        "no_text": False,
         "labels": [],
+        "semantic_contract_version": 2,
+        "required_semantic_roles": ["input", "operation", "output"],
     }
 
 
@@ -10039,11 +10975,11 @@ def mechanism_shape_spec(figure_id: str) -> dict[str, Any]:
             ROOT, shape_spec_value, f"figures.{figure_id}.shape_spec"
         )
         if not shape_spec_path.exists():
-            raise StudioError(f"机制图形状文件不存在：{shape_spec_value}")
+            raise StudioError(f"Mechanism diagram shape file does not exist.{shape_spec_value}")
         try:
             configured_spec = json.loads(shape_spec_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise StudioError(f"机制图形状文件无效：{shape_spec_value}: {exc}") from exc
+            raise StudioError(f"Mechanism diagram shape file is invalid:{shape_spec_value}: {exc}") from exc
         configured_spec["figure_id"] = figure_paths(figure_id)["pdf"].stem
         return validate_mechanism_shape_spec(figure_id, configured_spec)
 
@@ -10073,13 +11009,10 @@ MECHANISM_SHAPE_KINDS = {
 
 def mechanism_shape_provenance(figure_id: str) -> dict[str, str]:
     paths = figure_paths(figure_id)
-    draft = mechanism_draft_path(figure_id)
-    if not draft.exists():
-        raise StudioError("请先生成并检查机制图草稿。")
     prompt = read_text(mechanism_spec_path(figure_id), 200000)
     return {
-        "draft_sha256": hashlib.sha256(draft.read_bytes()).hexdigest(),
         "prompt_spec_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        "composer": "codex-native-shapes-v1",
     }
 
 
@@ -10088,7 +11021,7 @@ def validate_mechanism_shape_spec(
 ) -> dict[str, Any]:
     """Reject silent placeholder rebuilds before they become final paper figures."""
     if not isinstance(raw, dict) or not isinstance(raw.get("shapes"), list):
-        raise StudioError("Editable shape spec 缺少 shapes 数组。")
+        raise StudioError("Editable shape spec Missing shapes array.")
     shapes = raw["shapes"]
     unknown = {
         item.get("kind") if isinstance(item, dict) else type(item).__name__
@@ -10096,10 +11029,10 @@ def validate_mechanism_shape_spec(
         if not isinstance(item, dict) or item.get("kind") not in MECHANISM_SHAPE_KINDS
     }
     if unknown:
-        raise StudioError("Editable shape spec 含未知元素：" + ", ".join(map(str, unknown)))
+        raise StudioError("Editable shape spec Contains unknown elements:" + ", ".join(map(str, unknown)))
     if len(shapes) < 12:
         raise StudioError(
-            "机制图重建结果只有少量元素，疑似 placeholder；至少需要 12 个可编辑元素。"
+            "The mechanism diagram reconstruction results in only a few elements, suspected placeholders; at least 12 editable elements are required."
         )
     modules = sum(
         item["kind"] in {"rounded_rect", "rect", "oval", "hexagon", "right_arrow"}
@@ -10107,10 +11040,62 @@ def validate_mechanism_shape_spec(
     )
     connectors = sum(item["kind"] in {"arrow", "line"} for item in shapes)
     if modules < 4 or connectors < 2:
-        raise StudioError("机制图必须包含至少 4 个图形模块和 2 条可编辑连接线。")
+        raise StudioError("The mechanism diagram must include at least 4 graphical modules and 2 editable connections.")
     canvas = initial_mechanism_spec(figure_id)["canvas_in"]
     single_column = float(canvas[0]) < 5
     text_shapes = [item for item in shapes if str(item.get("text", "")).strip()]
+    if raw.get("no_text") is True:
+        raise StudioError(
+            "Editable mechanism figures cannot set no_text=true; the final figure "
+            "must retain print-readable semantic labels."
+        )
+    try:
+        semantic_contract_version = int(raw.get("semantic_contract_version") or 0)
+    except (TypeError, ValueError) as exc:
+        raise StudioError(
+            "Editable mechanism figure semantic_contract_version must be an integer."
+        ) from exc
+    if semantic_contract_version >= 2:
+        if len(text_shapes) < 3:
+            raise StudioError(
+                "The editable mechanism figure must contain at least three labels "
+                "covering input, operation, and output."
+            )
+        allowed_roles = {"input", "operation", "output", "annotation"}
+        observed_roles = set()
+        for item in text_shapes:
+            role = str(item.get("semantic_role") or "").strip()
+            if role not in allowed_roles:
+                raise StudioError(
+                    "Every text-bearing mechanism shape must declare semantic_role "
+                    "as input, operation, output, or annotation."
+                )
+            observed_roles.add(role)
+        required_roles = {
+            str(item).strip()
+            for item in raw.get(
+                "required_semantic_roles", ["input", "operation", "output"]
+            )
+            if str(item).strip()
+        }
+        missing_roles = required_roles - observed_roles
+        if missing_roles:
+            raise StudioError(
+                "The editable mechanism figure is missing semantic roles: "
+                + ", ".join(sorted(missing_roles))
+            )
+        observed_labels = {str(item.get("text") or "").strip() for item in text_shapes}
+        required_labels = {
+            str(item).strip()
+            for item in raw.get("required_labels", [])
+            if str(item).strip()
+        }
+        missing_labels = required_labels - observed_labels
+        if missing_labels:
+            raise StudioError(
+                "The editable mechanism figure is missing required labels: "
+                + ", ".join(sorted(missing_labels))
+            )
     # Repeated token cells, expert tiles, state bars, and connector segments are
     # normal in ACL mechanism figures. They are individually editable objects
     # but do not create the same reading burden as labels. Keep a strict text
@@ -10120,9 +11105,9 @@ def validate_mechanism_shape_spec(
     max_text_shapes = 14 if single_column else 28
     if len(shapes) > max_shapes or len(text_shapes) > max_text_shapes:
         raise StudioError(
-            "机制图信息密度过高："
-            f"当前 {len(shapes)} 个元素/{len(text_shapes)} 个文字元素，"
-            f"该版面最多 {max_shapes}/{max_text_shapes}。"
+            "Mechanism diagram information density is too high:"
+            f"current {len(shapes)} an element/{len(text_shapes)} A text element,"
+            f"This layout can have at most {max_shapes}/{max_text_shapes}."
         )
     for index, item in enumerate(shapes, start=1):
         coordinates = (
@@ -10133,16 +11118,34 @@ def validate_mechanism_shape_spec(
         for field in coordinates:
             value = item.get(field)
             if not isinstance(value, (int, float)) or not 0 <= float(value) <= 1:
-                raise StudioError(f"机制图第 {index} 个元素的 {field} 必须在 0–1 之间。")
+                raise StudioError(f"Mechanism diagram No. {index} of an element {field} Must be between 0 and 1.")
         if item["kind"] not in {"arrow", "line"} and (
             float(item["w"]) <= 0 or float(item["h"]) <= 0
         ):
-            raise StudioError(f"机制图第 {index} 个元素的宽高必须大于 0。")
+            raise StudioError(f"Mechanism diagram No. {index} An element's width and height must be greater than 0.")
+        if item["kind"] not in {"arrow", "line"} and (
+            float(item["x"]) + float(item["w"]) > 1
+            or float(item["y"]) + float(item["h"]) > 1
+        ):
+            raise StudioError(
+                f"Mechanism diagram element {index} extends beyond the canvas; "
+                "both x+w and y+h must be at most 1."
+            )
         text = str(item.get("text", "")).strip()
         if text:
+            if (
+                item["kind"] in {"rounded_rect", "rect"}
+                and float(item["w"]) >= 0.22
+                and float(item["h"]) >= 0.25
+            ):
+                raise StudioError(
+                    f"Mechanism diagram element {index} is a large visual container "
+                    "with centered text. Use an empty container plus a separate "
+                    "header textbox so internal glyphs cannot cover its label."
+                )
             font_size = float(item.get("font_size", 8))
             if font_size < 7:
-                raise StudioError(f"机制图第 {index} 个文字元素小于 7pt，不可读。")
+                raise StudioError(f"Mechanism diagram No. {index} Several text elements are smaller than 7pt and unreadable.")
             width_pt = float(item["w"]) * float(canvas[0]) * 72
             height_pt = float(item["h"]) * float(canvas[1]) * 72
             chars_per_line = max(1, int(max(width_pt - 4, 1) / (font_size * 0.55)))
@@ -10153,8 +11156,42 @@ def validate_mechanism_shape_spec(
             required_height = estimated_lines * font_size * 1.12 + 2
             if required_height > height_pt:
                 raise StudioError(
-                    f"机制图第 {index} 个文本框容量不足，预计需要 "
-                    f"{required_height:.1f}pt 高度，实际仅 {height_pt:.1f}pt。"
+                    f"Mechanism diagram No. {index} Text box capacity is insufficient; expected to require "
+                    f"{required_height:.1f}pt Height, actual only. {height_pt:.1f}pt."
+                )
+    textboxes = [
+        (index, item)
+        for index, item in enumerate(shapes, start=1)
+        if item.get("kind") == "textbox" and str(item.get("text", "")).strip()
+    ]
+    modules_with_boxes = [
+        (index, item)
+        for index, item in enumerate(shapes, start=1)
+        if item.get("kind") not in {"textbox", "arrow", "line"}
+    ]
+    for text_index, textbox in textboxes:
+        tx1, ty1 = float(textbox["x"]), float(textbox["y"])
+        tx2 = tx1 + float(textbox["w"])
+        ty2 = ty1 + float(textbox["h"])
+        for module_index, module in modules_with_boxes:
+            mx1, my1 = float(module["x"]), float(module["y"])
+            mx2 = mx1 + float(module["w"])
+            my2 = my1 + float(module["h"])
+            overlaps = tx1 < mx2 and tx2 > mx1 and ty1 < my2 and ty2 > my1
+            if not overlaps:
+                continue
+            container_owns_header = (
+                float(module["w"]) >= 0.22
+                and float(module["h"]) >= 0.25
+                and mx1 <= tx1
+                and tx2 <= mx2
+                and my1 <= ty1
+                and ty2 <= my1 + float(module["h"]) * 0.28
+            )
+            if not container_owns_header:
+                raise StudioError(
+                    f"Mechanism diagram textbox {text_index} overlaps graphical "
+                    f"module {module_index}; move the label into clear whitespace."
                 )
     result = dict(raw)
     result["figure_id"] = figure_paths(figure_id)["pdf"].stem
@@ -10199,45 +11236,48 @@ def create_mechanism_shape_spec_with_local_agent(
     figure_id: str,
     provenance: dict[str, str],
 ) -> dict[str, Any]:
-    """Reconstruct the GPT Image draft as rich, fully editable native shapes."""
+    """Have the local code agent author a fully editable native-shape figure."""
     codex = shutil_which("codex")
     if not codex:
-        raise StudioError("未找到本机 codex CLI，无法把 GPT Image 草图重建为可编辑图。")
+        raise StudioError("Local codex CLI not found; cannot generate an editable mechanism diagram.")
     paths = figure_paths(figure_id)
     definition = FIGURES[figure_id]
     canvas = initial_mechanism_spec(figure_id)["canvas_in"]
     draw_spec = read_text(paths["spec"], 200000)
-    prompt = f"""你是 Paper Studio 的本地科研机制图重建 Agent。必须先使用图像查看工具读取
-下面的 GPT Image 草图，再将其构图和论文机制重建成完全可编辑的 PowerPoint 原生形状。
-只返回一个 JSON object，不要 Markdown，不要解释，不要修改仓库文件。
+    prompt = f"""You are Paper Studio's local scientific-figure composition agent.
+Create the figure directly as editable native PowerPoint shapes from the manuscript-backed
+drawing brief below. Return exactly one JSON object: no Markdown, no explanation, and do not
+modify repository files.
 
-GPT Image 草图绝对路径：{paths['draft']}
-图编号：{figure_id}
-标题：{definition['title']}
-机制要求：{definition['description']}
-目标画布（英寸）：{json.dumps(canvas)}
-本轮 GPT Image Prompt/spec：
+Figure number:{figure_id}
+Title:{definition['title']}
+Mechanism requirements:{definition['description']}
+Target canvas (inches):{json.dumps(canvas)}
+This round Prompt/spec for drawing:
 {draw_spec}
 
-严格 schema：
-{{"canvas_in": {json.dumps(canvas)}, "shapes": [
-  {{"kind":"rounded_rect|rect|oval|hexagon|right_arrow", "x":0到1, "y":0到1, "w":0到1, "h":0到1, "fill":"RRGGBB", "line":"RRGGBB", "line_w":1, "text":"简短可编辑标签", "font_size":8, "bold":false, "font_color":"RRGGBB", "align":"left|center|right"}},
-  {{"kind":"textbox", "x":0到1, "y":0到1, "w":0到1, "h":0到1, "text":"标签", "font_size":8, "bold":false, "font_color":"RRGGBB", "align":"left|center|right"}},
-  {{"kind":"arrow|line", "x1":0到1, "y1":0到1, "x2":0到1, "y2":0到1, "color":"RRGGBB", "weight":1}}
+Strict schema:
+{{"semantic_contract_version":2, "required_semantic_roles":["input","operation","output"], "canvas_in": {json.dumps(canvas)}, "shapes": [
+  {{"kind":"rounded_rect|rect|oval|hexagon|right_arrow", "x":0to 1, "y":0to 1, "w":0to 1, "h":0to 1, "fill":"RRGGBB", "line":"RRGGBB", "line_w":1, "text":"Concise editable label", "semantic_role":"input|operation|output|annotation", "font_size":8, "bold":false, "font_color":"RRGGBB", "align":"left|center|right"}},
+  {{"kind":"textbox", "x":0to 1, "y":0to 1, "w":0to 1, "h":0to 1, "text":"tag", "semantic_role":"input|operation|output|annotation", "font_size":8, "bold":false, "font_color":"RRGGBB", "align":"left|center|right"}},
+  {{"kind":"arrow|line", "x1":0to 1, "y1":0to 1, "x2":0to 1, "y2":0to 1, "color":"RRGGBB", "weight":1}}
 ]}}
 
-硬约束：
-1. 必须真实查看草图，把草图的视觉层级、主要模块、图标语义和流向作为重建依据；
-   不得只把标题和 description 塞进一两个文本框。
-2. 至少 12 个独立可编辑元素，其中至少 4 个图形模块、2 条连接线；复杂方法图应更丰富。
-   单栏画布最多 64 个元素、14 个含文字元素，并且最多两个核心视觉分组；双栏最多 100/28。
-3. 所有元素都必须位于 0–1 画布内，互不遮挡，文字简短且拼写正确；不要照抄草图中的乱码。
-   字号不得小于 7pt，每个文本必须完整落在自己的框内；框内标签最多 4 个词，说明句应删除。
-   按实际英寸画布给文本框留足高度；宁可扩大框或删字，也不能依赖 overflow 裁切。
-4. 使用平面科研插图风格：白底、实色、无阴影、无渐变、无 3D。图形和连接关系承载机制，
-   不是大段文字组成的流程图。
-5. 忠实于机制要求和 Prompt，不增加结果数字、攻击细节或未经论文支持的主张。
-6. 不得加入 raster/background/image 元素；最终每个对象都必须能在 PowerPoint 中单独编辑。
+Hard constraints:
+1. Directly design visual hierarchy major modules icon semantics and flow based on the paper mechanism and drawing prompt.
+   Must not simply stuff the title and description into one or two text boxes.
+2. At least 12 independent editable elements, including at least 4 graphic modules and 2 connecting lines; complex method diagrams should be richer.
+   Single column canvas supports up to 64 elements, 14 containing text, and up to two core visual groups; double column supports up to 100/28.
+3. All elements must lie within a 0 to 1 canvas, not overlap, text concise and correctly spelled; do not copy garbled text from sketches.
+   Font size must not be smaller than 7pt; each text must fit entirely within its own box; labels inside the box may be up to 4 words; explanatory sentence should be removed.
+   Leave sufficient height for text boxes based on actual inch canvas size; prefer expanding the box or removing text rather than relying on overflow clipping.
+   Large containers must have empty text and a separate header textbox in a reserved header band; no icon, node, bar, or connector may cross that header band.
+4. Use a flat research illustration style: white background, solid colors, no shadows, no gradients, no 3D. The graphics and connections illustrate the mechanism.
+   Not a flowchart consisting of large blocks of text.
+5. Be faithful to the mechanism requirements and the Prompt, and do not add result numbers, attack details, or claims not supported by the paper.
+6. May not include raster background image elements; ultimately each object must be individually editable in PowerPoint.
+7. The final JSON must retain semantic_contract_version=2. Every text-bearing shape must declare semantic_role.
+   At least one visible label must cover each required role: input, operation, and output.
 """
     environment = local_agent_environment()
     STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -10245,54 +11285,84 @@ GPT Image 草图绝对路径：{paths['draft']}
         prefix=f"agent-mechanism-{figure_id.lower()}-", dir=STATE_DIR
     ) as temporary_name:
         output = Path(temporary_name) / "last_message.txt"
-        command = [
-            codex,
-            "exec",
-            "--ephemeral",
-            *local_agent_auth_args(),
-            "--sandbox",
-            "read-only",
-            "--color",
-            "never",
-            "--cd",
-            str(ROOT),
-            "--output-last-message",
-            str(output),
-            "-",
-        ]
-        try:
-            process = subprocess.run(
-                command,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                timeout=MECHANISM_AGENT_TIMEOUT_SECONDS,
-                env=environment,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise StudioError("本地 Agent 重建可编辑机制图超时。") from exc
-        if process.returncode or not output.exists():
-            diagnostic = (process.stdout + "\n" + process.stderr).strip()
-            raise StudioError(
-                "本地 Agent 重建可编辑机制图失败。\n"
-                + (diagnostic[-2400:] or "codex exec 未返回 shape spec。")
-            )
-        source = output.read_text(encoding="utf-8", errors="replace").strip()
-    fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", source, re.DOTALL)
-    if fenced:
-        source = fenced.group(1)
-    else:
-        start, end = source.find("{"), source.rfind("}")
-        if start < 0 or end <= start:
-            raise StudioError("本地 Agent 没有返回 shape spec JSON。")
-        source = source[start : end + 1]
-    try:
-        raw = json.loads(source)
-    except json.JSONDecodeError as exc:
-        raise StudioError(f"本地 Agent 返回的 shape spec 无法解析：{exc}") from exc
-    raw = normalize_mechanism_text_boxes(figure_id, raw)
-    raw["source_provenance"] = provenance
-    return validate_mechanism_shape_spec(figure_id, raw)
+        retry_feedback = ""
+        last_error: StudioError | None = None
+        for attempt in range(3):
+            command = [
+                codex,
+                "exec",
+                "--ephemeral",
+                *local_agent_auth_args(),
+                "--sandbox",
+                "read-only",
+                "--color",
+                "never",
+                "--cd",
+                str(ROOT),
+                "--output-last-message",
+                str(output),
+                "-",
+            ]
+            attempt_prompt = prompt + retry_feedback
+            try:
+                process = subprocess.run(
+                    command,
+                    input=attempt_prompt,
+                    capture_output=True,
+                    text=True,
+                    timeout=MECHANISM_AGENT_TIMEOUT_SECONDS,
+                    env=environment,
+                )
+            except subprocess.TimeoutExpired as exc:
+                raise StudioError("Local Agent rebuild of the editable mechanism diagram timed out.") from exc
+            if process.returncode or not output.exists():
+                diagnostic = (process.stdout + "\n" + process.stderr).strip()
+                raise StudioError(
+                    "Local Agent failed to rebuild the editable mechanism diagram.\n"
+                    + (diagnostic[-2400:] or "codex exec Shape spec not returned.")
+                )
+            source = output.read_text(encoding="utf-8", errors="replace").strip()
+            fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", source, re.DOTALL)
+            if fenced:
+                source = fenced.group(1)
+            else:
+                start, end = source.find("{"), source.rfind("}")
+                if start < 0 or end <= start:
+                    last_error = StudioError("Local Agent did not return a shape spec JSON.")
+                    retry_feedback = (
+                        "\n\nYour previous response was not one JSON object. Return only "
+                        "a complete corrected JSON object matching the schema."
+                    )
+                    continue
+                source = source[start : end + 1]
+            try:
+                raw = json.loads(source)
+            except json.JSONDecodeError as exc:
+                last_error = StudioError(
+                    f"The shape spec returned by the Local Agent cannot be parsed.{exc}"
+                )
+                retry_feedback = (
+                    "\n\nYour previous JSON was invalid: " + str(exc)
+                    + ". Return only a complete corrected JSON object."
+                )
+                continue
+            raw = normalize_mechanism_text_boxes(figure_id, raw)
+            raw["semantic_contract_version"] = 2
+            raw["required_semantic_roles"] = ["input", "operation", "output"]
+            raw["source_provenance"] = provenance
+            try:
+                return validate_mechanism_shape_spec(figure_id, raw)
+            except StudioError as exc:
+                last_error = exc
+                retry_feedback = (
+                    "\n\nThe validator rejected your previous shape spec: "
+                    + str(exc)
+                    + " Correct the geometry while preserving the scientific semantics. "
+                    "Return the entire corrected JSON object only."
+                )
+        raise last_error or StudioError(
+            "Local Agent did not return a valid editable mechanism shape spec after three attempts."
+        )
 
 
 def generate_mechanism_prompt(
@@ -10303,7 +11373,7 @@ def generate_mechanism_prompt(
 ) -> tuple[str, str]:
     setup = api_setup_for_provider(str(state.get("llm_provider") or DEFAULT_PROVIDER))
     if not setup["configured"]:
-        raise StudioError(f"{setup['provider_label']} API 未配置，无法生成画图 Prompt。")
+        raise StudioError(f"{setup['provider_label']} API Not configured, unable to generate drawing Prompt.")
     paths = figure_paths(figure_id)
     FIGURE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     source = mechanism_source(
@@ -10354,9 +11424,9 @@ Return the complete revised image-generation prompt."""
         figure_id, extract_output_text(response)
     )
     if not response_id:
-        raise StudioError("GPT 没有返回可继续的 Figure conversation response id。")
+        raise StudioError("GPT No continuation Figure conversation response id returned.")
     if not prompt:
-        raise StudioError("GPT 没有返回可用的画图 Prompt。")
+        raise StudioError("GPT No usable drawing Prompt returned.")
     issues = mechanism_prompt_contract_issues(figure_id, prompt)
     if issues:
         repair_payload = {
@@ -10380,7 +11450,7 @@ Return the complete revised image-generation prompt."""
         remaining = mechanism_prompt_contract_issues(figure_id, prompt)
         if not response_id or not prompt or remaining:
             raise StudioError(
-                "GPT 机制图 Prompt 未通过语义契约：" + "；".join(remaining or issues)
+                "GPT Mechanism Diagram Prompt did not pass the semantic contract." + "; ".join(remaining or issues)
             )
     return response_id, prompt
 
@@ -10428,17 +11498,27 @@ def mechanism_prompt_contract_issues(figure_id: str, prompt: str) -> list[str]:
         issues.append(
             "does not explicitly enforce the configured text-label limit"
         )
+    registry = {
+        str(item.get("id", "")): str(item.get("latex", ""))
+        for item in metrics_bundle().get("symbol_registry", [])
+        if isinstance(item, dict)
+    }
+    for symbol_id in FIGURES[figure_id].get("symbol_ids", []):
+        latex = registry.get(str(symbol_id), "")
+        if not latex:
+            issues.append(f"references unknown registered symbol {symbol_id}")
+        elif latex not in prompt:
+            issues.append(f"does not preserve registered symbol {symbol_id} as {latex}")
     return issues
 
 
 def draw_mechanism_draft(
     figure_id: str, prompt: str, *, job_token: str | None = None
 ) -> None:
-    if not os.environ.get("OPENAI_API_KEY"):
-        raise StudioError("OPENAI_API_KEY 未配置，无法调用 GPT Image。")
+    """Compose the candidate directly as native editable shapes with Codex."""
     prompt = prompt.strip()
     if not prompt:
-        raise StudioError("请先生成并确认画图 Prompt。")
+        raise StudioError("Generate and confirm the drawing Prompt first.")
     paths = figure_paths(figure_id)
     FIGURE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
@@ -10451,22 +11531,19 @@ def draw_mechanism_draft(
     if paths["spec"].exists():
         spec.update(json.loads(paths["spec"].read_text(encoding="utf-8")))
     spec["draw_prompt"] = prompt
+    spec["no_text"] = False
+    spec["semantic_contract_version"] = 2
+    spec["required_semantic_roles"] = ["input", "operation", "output"]
     paths["spec"].write_text(
         json.dumps(spec, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
-    run_checked(
-        [
-            "python3",
-            str(FIGURE_TOOL),
-            "draw",
-            str(paths["spec"]),
-            "--provider",
-            "openai",
-            "--out",
-            str(paths["draft"]),
-        ],
-        cwd=FIGURE_SOURCE_DIR,
-        job_token=job_token,
+    provenance = mechanism_shape_provenance(figure_id)
+    shape_spec = create_mechanism_shape_spec_with_local_agent(
+        figure_id, provenance
+    )
+    paths["shapes"].write_text(
+        json.dumps(shape_spec, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
     )
 
 
@@ -10520,7 +11597,7 @@ def update_data_panel_job(
 
 
 def fail_figure_job(figure_id: str, job_token: str, error: Exception) -> None:
-    message = str(error).strip() or "图像任务失败。"
+    message = str(error).strip() or "Image task failed."
     update_figure_job(
         figure_id,
         job_token,
@@ -10540,7 +11617,7 @@ def cancel_figure_job(figure_id: str) -> dict[str, Any]:
         figure_state = state["figures"][figure_id]
         job_token = str(figure_state.get("job_token") or "")
         if figure_state.get("status") != "image_generating" or not job_token:
-            raise StudioError("当前没有正在运行的 GPT Image 调用。")
+            raise StudioError("There are currently no Codex drawing tasks running.")
         with FIGURE_PROCESS_LOCK:
             CANCELLED_FIGURE_JOBS.add(job_token)
             process = RUNNING_FIGURE_PROCESSES.get(job_token)
@@ -10551,9 +11628,9 @@ def cancel_figure_job(figure_id: str) -> dict[str, Any]:
                 "progress": 0,
                 "progress_message": "",
                 "last_message": (
-                    "已停止本次 GPT Image 调用；当前 Prompt 和上一版草图均已保留。"
+                    "This Codex drawing task has been stopped; the current Prompt and the previous version of the candidate have both been retained."
                     if has_previous_draft
-                    else "已停止本次 GPT Image 调用；当前 Prompt 已保留。"
+                    else "This Codex drawing task has been stopped; the current Prompt has been retained."
                 ),
                 "job_token": None,
                 "job_started_at": None,
@@ -10577,7 +11654,7 @@ def generate_prompt_worker(
             figure_id,
             job_token,
             progress=20,
-            progress_message="正在整理该 section 的正文、outline 与 figure 任务…",
+            progress_message="Organizing the section text, outline, and figure tasks…",
         )
         state = load_state()
         update_figure_job(
@@ -10585,9 +11662,9 @@ def generate_prompt_worker(
             job_token,
             progress=45,
             progress_message=(
-                "GPT 正在按你的指令重写画图 Prompt…"
+                "GPT Rewriting the drawing prompt according to your instructions."
                 if current_prompt
-                else "GPT 正在把正文机制转成画图 Prompt…"
+                else "GPT Converting the main text mechanism into a drawing prompt."
             ),
         )
         response_id, prompt = generate_mechanism_prompt(
@@ -10617,8 +11694,8 @@ def generate_prompt_worker(
             prompt_history=prompt_history[-20:],
             prompt_approved_at=None,
             progress=100,
-            progress_message="画图 Prompt 已生成，等待你的确认。",
-            last_message="请检查或修改画图 Prompt；确认后才会调用 GPT Image。",
+            progress_message="Drawing Prompt has been generated, awaiting your confirmation.",
+            last_message="Please review or modify the drawing Prompt; Codex drawing will only be invoked after confirmation.",
             job_token=None,
         )
     except Exception as exc:  # pragma: no cover - external process boundary
@@ -10631,13 +11708,13 @@ def draw_figure_worker(figure_id: str, job_token: str, prompt: str) -> None:
             figure_id,
             job_token,
             progress=15,
-            progress_message="Prompt 已确认，正在准备 GPT Image 请求…",
+            progress_message="Prompt Confirmed; preparing Codex native graphics task…",
         )
         update_figure_job(
             figure_id,
             job_token,
             progress=35,
-            progress_message="GPT Image 正在绘制并归档草图，这一步通常需要几分钟…",
+            progress_message="Codex Designing and archiving native editable graphics…",
         )
         draw_mechanism_draft(figure_id, prompt, job_token=job_token)
         update_figure_job(
@@ -10645,7 +11722,7 @@ def draw_figure_worker(figure_id: str, job_token: str, prompt: str) -> None:
             job_token,
             status="agent_generating",
             progress=55,
-            progress_message="GPT Image 已完成，正在自动生成论文用 PPTX 与 PDF…",
+            progress_message="Native graphics complete; generating the paper PPTX and PDF.",
             last_message="",
         )
         message = build_mechanism_figure(figure_id, job_token=job_token)
@@ -10656,10 +11733,10 @@ def draw_figure_worker(figure_id: str, job_token: str, prompt: str) -> None:
             revision=int(load_state()["figures"][figure_id].get("revision", 0)) + 1,
             approved_at=None,
             progress=100,
-            progress_message="GPT Image、PPTX 与 PDF candidate 已全部生成。",
+            progress_message="Codex Original graphics, PPTX, and PDF candidate have all been generated.",
             last_message=(
                 message
-                + " 请检查最终候选；需要时可修改 Prompt 重画，满意后直接确认插入正文。"
+                + " Please review the final candidate; if needed modify the Prompt and redraw; once satisfied, confirm to insert into the body."
             ),
             job_token=None,
         )
@@ -10688,15 +11765,15 @@ def finalize_automatic_mechanism_figure(figure_id: str) -> None:
             ensure_figure_caption_before_approval(state, figure_id)
             binding = first_artifact_binding(figure_id)
             if not binding:
-                raise StudioError(f"{figure_id} 尚未绑定负责首次引用它的段落。")
+                raise StudioError(f"{figure_id} Not yet bound to the paragraph that first cites it.")
             section, paragraph_id = binding
             figure_state.update(
                 status="approved",
                 approved_at=int(time.time()),
                 placement_after=figure_state.get("placement_after") or paragraph_id,
                 progress=100,
-                progress_message="对应段落完成后自动生成并插入论文。",
-                last_message="机制图已自动生成、插入并等待 PDF 编译。",
+                progress_message="Automatically generate and insert into the paper after the corresponding paragraph is completed.",
+                last_message="The mechanism diagram has been automatically generated, inserted, and is awaiting PDF compilation.",
             )
             section_source, accepted = render_section_source(
                 section,
@@ -10714,7 +11791,7 @@ def finalize_automatic_mechanism_figure(figure_id: str) -> None:
                 figure_state.update(
                     status="built",
                     approved_at=None,
-                    last_message="机制图已生成，但自动插入后的 LaTeX 编译失败："
+                    last_message="The mechanism diagram has been generated, but LaTeX compilation after automatic insertion failed:"
                     + compile_result.message,
                 )
                 save_state(state)
@@ -10743,7 +11820,7 @@ def automatic_mechanism_figure_worker(figure_id: str, job_token: str) -> None:
                 job_token,
                 status="agent_generating",
                 progress=45,
-                progress_message="复用已完成的 GPT Image 草图，继续重建可编辑机制图…",
+                progress_message="Reuse the native shape corresponding to the current Prompt to continue generating editable mechanism diagrams…",
             )
             message = build_mechanism_figure(figure_id, job_token=job_token)
             updated = update_figure_job(
@@ -10753,7 +11830,7 @@ def automatic_mechanism_figure_worker(figure_id: str, job_token: str) -> None:
                 revision=int(load_state()["figures"][figure_id].get("revision", 0)) + 1,
                 approved_at=None,
                 progress=100,
-                progress_message="机制图、可编辑 PPTX 与论文 PDF 已自动生成。",
+                progress_message="Mechanism diagram, editable PPTX and paper PDF have been automatically generated.",
                 last_message=message,
                 job_token=None,
             )
@@ -10764,7 +11841,7 @@ def automatic_mechanism_figure_worker(figure_id: str, job_token: str) -> None:
             figure_id,
             job_token,
             progress=15,
-            progress_message="对应段落已完成，正在自动生成画图 Prompt…",
+            progress_message="Corresponding paragraph completed; automatically generating drawing Prompt…",
         )
         state = load_state()
         response_id, prompt = generate_mechanism_prompt(figure_id, state)
@@ -10776,7 +11853,7 @@ def automatic_mechanism_figure_worker(figure_id: str, job_token: str) -> None:
             draw_prompt=prompt,
             prompt_approved_at=int(time.time()),
             progress=35,
-            progress_message="画图 Prompt 已自动确认，正在生成机制图草图…",
+            progress_message="Drawing Prompt automatically confirmed; generating a mechanism diagram sketch.",
         )
         draw_mechanism_draft(figure_id, prompt, job_token=job_token)
         update_figure_job(
@@ -10784,7 +11861,7 @@ def automatic_mechanism_figure_worker(figure_id: str, job_token: str) -> None:
             job_token,
             status="agent_generating",
             progress=60,
-            progress_message="草图已完成，正在重建可编辑 PPTX 与论文 PDF…",
+            progress_message="Sketch complete; rebuilding editable PPTX and paper PDF.",
         )
         message = build_mechanism_figure(figure_id, job_token=job_token)
         updated = update_figure_job(
@@ -10794,7 +11871,7 @@ def automatic_mechanism_figure_worker(figure_id: str, job_token: str) -> None:
             revision=int(load_state()["figures"][figure_id].get("revision", 0)) + 1,
             approved_at=None,
             progress=100,
-            progress_message="机制图、可编辑 PPTX 与论文 PDF 已自动生成。",
+            progress_message="Mechanism diagram, editable PPTX and paper PDF have been automatically generated.",
             last_message=message,
             job_token=None,
         )
@@ -10841,7 +11918,7 @@ def schedule_ready_mechanism_figures(
             figure_state.update(
                 status="prompt_generating",
                 progress=5,
-                progress_message="对应段落已完成，机制图自动任务正在启动…",
+                progress_message="The corresponding paragraph is complete, and the automatic mechanism diagram task is starting.",
                 last_message="",
                 approved_at=None,
             )
@@ -10862,41 +11939,40 @@ def schedule_ready_mechanism_figures(
 def completed_mechanism_draft_matches_job(
     figure_id: str, figure_state: dict[str, Any]
 ) -> bool:
-    """Recognize a completed image artifact written just before a state-save race/crash."""
+    """Recognize native shapes written just before a state-save race or crash."""
     if FIGURES[figure_id]["kind"] != "mechanism":
         return False
     paths = figure_paths(figure_id)
-    draft = mechanism_draft_path(figure_id)
     spec_path = mechanism_spec_path(figure_id)
-    if not draft.exists() or not spec_path.exists():
+    if not paths["shapes"].exists() or not spec_path.exists():
         return False
     try:
         spec = json.loads(spec_path.read_text(encoding="utf-8"))
-        iteration_dir = spec_path.parent / "iterations" / str(spec["figure_id"])
-        prompt_files = sorted(iteration_dir.glob("round_*.prompt.txt"))
-        latest_prompt = prompt_files[-1].read_text(encoding="utf-8").strip()
-    except (OSError, KeyError, IndexError, json.JSONDecodeError):
+        shapes = json.loads(paths["shapes"].read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
         return False
-    approved_at = int(figure_state.get("prompt_approved_at") or 0)
     return (
-        latest_prompt == str(figure_state.get("draw_prompt", "")).strip()
-        and int(draft.stat().st_mtime) >= approved_at
+        str(spec.get("draw_prompt") or "").strip()
+        == str(figure_state.get("draw_prompt", "")).strip()
+        and shapes.get("source_provenance") == mechanism_shape_provenance(figure_id)
     )
 
 
 def completed_mechanism_draft_matches_prompt(figure_id: str, prompt: str) -> bool:
-    """Return true only when the current draft came from this exact prompt."""
+    """Return true only when the current native shapes came from this prompt."""
+    paths = figure_paths(figure_id)
     spec_path = mechanism_spec_path(figure_id)
-    if not mechanism_draft_path(figure_id).exists() or not spec_path.exists():
+    if not paths["shapes"].exists() or not spec_path.exists():
         return False
     try:
         spec = json.loads(spec_path.read_text(encoding="utf-8"))
-        iteration_dir = spec_path.parent / "iterations" / str(spec["figure_id"])
-        prompt_files = sorted(iteration_dir.glob("round_*.prompt.txt"))
-        latest_prompt = prompt_files[-1].read_text(encoding="utf-8").strip()
-    except (OSError, KeyError, IndexError, json.JSONDecodeError):
+        shapes = json.loads(paths["shapes"].read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
         return False
-    return latest_prompt == prompt.strip()
+    return (
+        str(spec.get("draw_prompt") or "").strip() == prompt.strip()
+        and shapes.get("source_provenance") == mechanism_shape_provenance(figure_id)
+    )
 
 
 def completed_mechanism_deliverables_match_current_draft(figure_id: str) -> bool:
@@ -10931,8 +12007,8 @@ def recover_interrupted_figure_jobs() -> None:
                         "status": "draft",
                         "revision": int(figure_state.get("revision", 0)) + 1,
                         "progress": 100,
-                        "progress_message": "GPT Image 草图已完成。",
-                        "last_message": "草图已生成并归档；已从中断的状态记录中恢复。",
+                        "progress_message": "Native-shape sketch completed.",
+                        "last_message": "The sketch has been generated and archived; restored from the interrupted state record.",
                         "job_token": None,
                         "job_started_at": None,
                     }
@@ -10943,7 +12019,7 @@ def recover_interrupted_figure_jobs() -> None:
                         "status": "failed",
                         "progress": 0,
                         "progress_message": "",
-                        "last_message": "服务器重启中断了上一次图像任务，请重新发起。",
+                        "last_message": "Server restart interrupted the previous image task; please reinitiate.",
                         "job_token": None,
                         "job_started_at": None,
                     }
@@ -10965,7 +12041,7 @@ def recover_interrupted_table_jobs() -> None:
                     "status": "error",
                     "progress": 0,
                     "progress_message": "",
-                    "last_message": "服务器重启中断了上一次表格任务，请重新发起。",
+                    "last_message": "Server restart interrupted the previous table task; please reinitiate.",
                     "job_token": None,
                     "job_started_at": None,
                 }
@@ -10981,12 +12057,12 @@ def validate_editable_shape_deliverables(
 ) -> None:
     """Prove that the final PPT is composed only of editable native objects."""
     if not pptx.exists() or not pdf.exists():
-        raise StudioError("全可编辑机制图交付物不完整。")
+        raise StudioError("The fully editable mechanism diagram deliverable is incomplete.")
     try:
         with zipfile.ZipFile(pptx) as package:
             media = [name for name in package.namelist() if name.startswith("ppt/media/")]
             if media:
-                raise StudioError("PPTX 仍含位图媒体，未达到每个部件均可编辑的要求。")
+                raise StudioError("PPTX Still contains bitmap media, not meeting the requirement that every component be editable.")
             slide_xml = package.read("ppt/slides/slide1.xml").decode(
                 "utf-8", errors="replace"
             )
@@ -10994,21 +12070,19 @@ def validate_editable_shape_deliverables(
             expected = len(shape_spec.get("shapes", []))
             if native_objects < expected or native_objects < 12:
                 raise StudioError(
-                    "PPTX 原生对象数量不足："
-                    f"期望至少 {max(expected, 12)} 个，实际 {native_objects} 个。"
+                    "PPTX Insufficient native objects:"
+                    f"Expected at least {max(expected, 12)} Units, actual {native_objects} one."
                 )
     except zipfile.BadZipFile as exc:
-        raise StudioError("机制图 PPTX 文件无效。") from exc
+        raise StudioError("Mechanism diagram PPTX file is invalid.") from exc
     if pdf.stat().st_size < 1000:
-        raise StudioError("全可编辑机制图 PDF 无效。")
+        raise StudioError("Fully editable mechanism diagram PDF is invalid.")
 
 
 def build_mechanism_figure(
     figure_id: str, *, job_token: str | None = None
 ) -> str:
     paths = figure_paths(figure_id)
-    if not mechanism_draft_path(figure_id).exists():
-        raise StudioError("请先生成并检查机制图草稿。")
     FIGURE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
     paths["pptx"].parent.mkdir(parents=True, exist_ok=True)
@@ -11018,7 +12092,7 @@ def build_mechanism_figure(
             figure_id,
             job_token,
             progress=35,
-            progress_message="本地 Agent 正在查看 GPT 草图并重建独立模块、箭头和文字…",
+            progress_message="Local Agent is designing independent modules, arrows and text…",
         )
     shape_spec = mechanism_shape_spec(figure_id)
     paths["shapes"].write_text(
@@ -11029,7 +12103,7 @@ def build_mechanism_figure(
             figure_id,
             job_token,
             progress=68,
-            progress_message="形状重建完成，正在生成全原生对象 PPTX…",
+            progress_message="Shape reconstruction complete; generating full native object PPTX…",
         )
     run_checked(
         [
@@ -11048,7 +12122,7 @@ def build_mechanism_figure(
             figure_id,
             job_token,
             progress=86,
-            progress_message="PPTX 已生成，正在从同一组原生形状导出论文 PDF…",
+            progress_message="PPTX Generated; exporting the paper PDF from the same set of native shapes…",
         )
     run_checked(
         [
@@ -11064,8 +12138,8 @@ def build_mechanism_figure(
     )
     validate_editable_shape_deliverables(shape_spec, paths["pptx"], paths["pdf"])
     return (
-        f"已按 GPT 草图重建 {len(shape_spec['shapes'])} 个独立 PowerPoint 原生对象；"
-        "PPTX 不含背景位图，每个模块、箭头和文字都可单独编辑。"
+        f"Codex Directly generated. {len(shape_spec['shapes'])} A standalone PowerPoint native object."
+        "PPTX No background bitmap; each module, arrow and text can be edited independently."
     )
 
 
@@ -11078,7 +12152,7 @@ def build_mechanism_figure_worker(
             figure_id,
             job_token,
             progress=25,
-            progress_message="正在准备 GPT 草图与论文机制信息，随后重建全可编辑对象…",
+            progress_message="Preparing GPT sketches and paper mechanism information, then reconstruct all editable objects.",
         )
         message = build_mechanism_figure(figure_id, job_token=job_token)
         update_figure_job(
@@ -11088,7 +12162,7 @@ def build_mechanism_figure_worker(
             revision=int(load_state()["figures"][figure_id].get("revision", 0)) + 1,
             approved_at=None,
             progress=100,
-            progress_message="全可编辑 PPTX 与同构 PDF candidate 已生成。",
+            progress_message="Fully editable PPTX and isomorphic PDF candidate have been generated.",
             last_message=message,
             job_token=None,
         )
@@ -11103,16 +12177,16 @@ def extract_agent_python_source(raw: str) -> str:
     if fenced:
         source = fenced.group(1).strip()
     if not source:
-        raise StudioError("本地 Agent 没有返回绘图代码。")
+        raise StudioError("Local Agent did not return drawing code.")
     try:
         compile(source, "<local-agent-data-figure>", "exec")
     except SyntaxError as exc:
-        raise StudioError(f"本地 Agent 返回的绘图代码无法解析：{exc}") from exc
+        raise StudioError(f"The drawing code returned by the local Agent cannot be parsed.{exc}") from exc
     required_fragments = ("matplotlib", "--metrics", "--pdf", "--png")
     missing = [item for item in required_fragments if item not in source]
     if missing:
         raise StudioError(
-            "本地 Agent 返回的绘图代码缺少必要接口：" + ", ".join(missing)
+            "Local Agent returned drawing code lacks required interfaces." + ", ".join(missing)
         )
     return source + ("\n" if not source.endswith("\n") else "")
 
@@ -11137,8 +12211,8 @@ def data_figure_python() -> str:
         if probe.returncode == 0:
             return candidate
     raise StudioError(
-        "找不到同时安装 matplotlib 与 numpy 的本地 Python。"
-        "请设置 PAPER_STUDIO_PLOT_PYTHON。"
+        "Cannot find a local Python installation with both matplotlib and numpy."
+        "Please set PAPER_STUDIO_PLOT_PYTHON."
     )
 
 
@@ -11152,7 +12226,7 @@ def create_data_figure_code_with_local_agent(
     """Ask the installed Codex CLI to author a traceable result-figure program."""
     codex = shutil_which("codex")
     if not codex:
-        raise StudioError("未找到本机 codex CLI，无法生成实验结果图。")
+        raise StudioError("The local Codex CLI was not found; cannot generate experimental result figures.")
     definition = FIGURES[figure_id]
     panel_definition = next(
         (
@@ -11163,7 +12237,7 @@ def create_data_figure_code_with_local_agent(
         None,
     )
     if not panel_definition:
-        raise StudioError("该数据图没有可生成的独立子图定义。")
+        raise StudioError("This data figure has no defined independent subfigure.")
     panel_id = panel_definition["id"]
     metrics = metrics_bundle()
     evidence = {
@@ -11184,34 +12258,34 @@ def create_data_figure_code_with_local_agent(
         if current_source.strip()
         else ""
     )
-    prompt = f"""你是 Paper Studio 的本地科研绘图 agent。请为下面的论文实验结果图
-编写一个独立、可重复运行的 Python 程序。只返回完整 Python 源码，不要解释，
-不要 Markdown fence，也不要修改仓库文件。
+    prompt = f"""You are the local Paper Studio drawing agent. Please produce the paper experiment results figure below.
+Write an independent repeatable Python program. Return only the complete Python source code, do not explain.
+Do not use Markdown fences and do not modify repository files.
 
-图编号：{figure_id}({panel_id})
-论文图：{definition['title']}
-子图标题：{panel_definition['title']}
-用途：{presentation_goal}
-版面：独立原子子图；此阶段不要添加 (a)/(b) 角标，也不要和其他子图拼接
+Figure number:{figure_id}({panel_id})
+Paper figure:{definition['title']}
+Subfigure title:{panel_definition['title']}
+Uses:{presentation_goal}
+Layout: independent atomic subplots; do not add at this stage. (a)/(b) Superscripts, and do not concatenate with other subfigures.
 
-硬约束：
-1. --metrics 指向一个顶层含 traceable_results 的 JSON；该对象按下方
-   <traceable_results> 所示的 dotted result key 映射到已有结果。只能绘制其中已有的数值；
-   不得创造、插值或推断实验结果。
-2. 命令行必须接受 --metrics、--pdf、--png 三个参数，并把同一张图分别保存为
-   矢量 PDF 和网页 PNG。使用 matplotlib 的 Agg backend。
-3. 这是一个独立子图，宽 3.32 英寸，排版清晰、论文风格、白底；小字号仍需可读。
-4. 内容目标：{presentation_goal}
-5. 如果 JSON 缺少必需字段，应抛出清楚错误，绝不能用默认数字顶替。
-6. 仅使用 Python 标准库、numpy 和 matplotlib。程序执行时不得联网、不得调用模型。
-7. 若数据带 synthetic 标记，在图内加入醒目的 “SYNTHETIC FIXTURE” 标记。
-8. 所有标题、图例、水印、刻度、标签和注释必须落在画布内且互不遮挡；单栏预览中
-   不得出现截断。保存前使用 tight/constrained layout，并为水印单独预留边距。
-9. 不要在底部放长段叙述；把 finding 压缩为图内可读的短语，或不显示。
-10. 只使用 matplotlib 官方支持的 Artist/Text 参数；不要把 CSS/PPT 属性（例如
-    tracking、letter-spacing）传给 matplotlib。
-11. 单序列图不显示冗余图例；序列含义写进标题、轴标签或 Caption，避免图例遮挡
-    数据点、数值标签或标题。多序列图例也必须避开数据区域。
+Hard constraints:
+1. --metrics References a top level JSON object containing traceable_results; this object is as below
+   <traceable_results> The shown dotted result key maps to existing results. Only values already available may be plotted.
+   Must not create, interpolate, or infer experimental results.
+2. The command line must accept three parameters --metrics --pdf --png and save the same figure separately as
+   Vector PDF and webpage PNG; use the Agg backend of matplotlib.
+3. This is a standalone subfigure, width 3.32 inches, laid out clearly in a paper style on a white background; the small font must remain legible.
+4. Content target:{presentation_goal}
+5. If JSON is missing required fields, throw a clear error and must not substitute default numbers.
+6. Only use Python standard library, numpy and matplotlib. During execution no network access and no model calls.
+7. If data is labeled synthetic, include a prominent SYNTHETIC FIXTURE marker in the figure.
+8. All titles, legends, watermarks, axes ticks, labels, and annotations must stay within the canvas and not overlap; in single-column preview,
+   Do not allow truncation. Before saving use tight or constrained layout and reserve margins for the watermark.
+9. Do not place long narrative at the bottom; compress findings into short phrases readable in the figure, or do not show.
+10. Only use Artist and Text parameters officially supported by matplotlib; do not include CSS/PPT properties (for example
+    tracking, letter-spacing)Passed to matplotlib.
+11. Single sequence diagram should not display redundant legends; sequence meaning is written into the title axis labels or Caption to avoid legend overlap.
+    Data points, numeric labels, or titles. Multi-series legends must also avoid the data region.
 
 <traceable_results>
 {json.dumps(evidence, ensure_ascii=False, indent=2)}
@@ -11249,15 +12323,15 @@ def create_data_figure_code_with_local_agent(
                 env=environment,
             )
         except subprocess.TimeoutExpired as exc:
-            raise StudioError("本地 Agent 生成实验结果图代码超时。") from exc
+            raise StudioError("The local Agent timed out while generating the experiment result graph code.") from exc
         if process.returncode:
             diagnostic = (process.stdout + "\n" + process.stderr).strip()
             raise StudioError(
-                "本地 Agent 生成实验结果图失败。\n"
+                "Local Agent failed to generate the experiment result figure.\n"
                 + (diagnostic[-2400:] or "codex exec returned a non-zero status.")
             )
         if not output.exists():
-            raise StudioError("本地 Agent 未写出绘图代码。")
+            raise StudioError("Local Agent did not write drawing code.")
         return extract_agent_python_source(
             output.read_text(encoding="utf-8", errors="replace")
         )
@@ -11270,7 +12344,7 @@ def generate_data_figure_with_local_agent(
     definition = FIGURES[figure_id]
     panel_id = panel_id or definition.get("panels", [{}])[0].get("id")
     if not panel_id:
-        raise StudioError("该数据图没有独立子图。")
+        raise StudioError("This data figure has no independent subfigures.")
     paths = data_panel_paths(figure_id, panel_id)
     FIGURE_DIR.mkdir(parents=True, exist_ok=True)
     DATA_FIGURE_AGENT_DIR.mkdir(parents=True, exist_ok=True)
@@ -11311,9 +12385,9 @@ def generate_data_figure_with_local_agent(
             cwd=ROOT,
         )
     if not paths["pdf"].exists() or not paths["preview"].exists():
-        raise StudioError("本地 Agent 绘图程序未同时生成 PDF 和 PNG。")
+        raise StudioError("Local Agent drawing program did not generate PDF and PNG simultaneously.")
     return (
-        f"{figure_id}({panel_id}) 已单独生成 PDF candidate。"
+        f"{figure_id}({panel_id}) PDF candidate has been generated separately."
     )
 
 
@@ -11321,14 +12395,14 @@ def default_data_figure_layout_prompt(figure_id: str) -> str:
     panel_ids = [item["id"] for item in FIGURES[figure_id].get("panels", [])]
     if len(panel_ids) == 1:
         return (
-            f"将子图 {panel_ids[0]} 放入单栏，裁掉四周空白，不添加角标；"
-            "输出可编辑 PPTX 与同布局矢量 PDF。"
+            f"Subfigure {panel_ids[0]} Place into a single column, crop the four margins, and do not add corner labels."
+            "Output editable PPTX and vector PDF with the same layout."
         )
     labels = "/".join(f"({panel_id})" for panel_id in panel_ids)
     return (
-        f"按 {', '.join(panel_ids)} 的顺序横向放入单栏，裁掉四周空白，"
-        f"子图之间不留间距；左上角依次添加 {labels}，角标字体 8 pt；"
-        "输出可编辑 PPTX 与同布局矢量 PDF。"
+        f"press {', '.join(panel_ids)} The order is laid out horizontally into a single column, trimming surrounding whitespace."
+        f"No spacing between subplots; add sequentially at the top left corner. {labels}, Superscript font 8 pt;"
+        "Output editable PPTX and vector PDF with the same layout."
     )
 
 
@@ -11340,27 +12414,27 @@ def generate_data_figure_agent_worker(
             figure_id,
             job_token,
             progress=20,
-            progress_message="正在启动本地 Codex agent 并整理可追溯实验结果…",
+            progress_message="Launching local Codex agent and organizing traceable experimental results.",
         )
         update_data_panel_job(
             figure_id,
             panel_id,
             job_token,
             progress=20,
-            progress_message="正在整理这张子图的可追溯实验结果…",
+            progress_message="Organizing the traceable experimental results for this subfigure…",
         )
         update_figure_job(
             figure_id,
             job_token,
             progress=45,
-            progress_message="本地 Agent 正在生成实验结果 PDF candidate…",
+            progress_message="Local Agent is generating the experiment results PDF candidate…",
         )
         update_data_panel_job(
             figure_id,
             panel_id,
             job_token,
             progress=45,
-            progress_message="本地 Agent 正在生成这张子图的 PDF candidate…",
+            progress_message="Local Agent is generating the PDF candidate for this subfigure…",
         )
         message = generate_data_figure_with_local_agent(
             figure_id, panel_id, instruction
@@ -11375,7 +12449,7 @@ def generate_data_figure_agent_worker(
             "agent_prompt": instruction,
             "last_message": message,
             "progress": 100,
-            "progress_message": "PDF candidate 已生成。",
+            "progress_message": "PDF candidate Generated.",
         }
         all_panels_built = all(item.get("status") == "built" for item in panels.values())
         revision = int(load_state()["figures"][figure_id].get("revision", 0)) + 1
@@ -11400,7 +12474,7 @@ def generate_data_figure_agent_worker(
                 job_token,
                 status="agent_generating",
                 progress=85,
-                progress_message="正在生成无角标的最终 PPTX 与矢量 PDF…",
+                progress_message="Generating final PPTX and vector PDF without corner marks.",
                 panels=panels,
             )
             try:
@@ -11415,8 +12489,8 @@ def generate_data_figure_agent_worker(
                     revision=revision,
                     approved_at=None,
                     progress=100,
-                    progress_message="单图 PDF 已生成；最终文件封装失败。",
-                    last_message=f"{message}\n最终文件封装失败：{composition_error}",
+                    progress_message="Single figure PDF generated; final file packaging failed.",
+                    last_message=f"{message}\nFinal file packaging failed:{composition_error}",
                     panels=panels,
                     composed_at=None,
                     job_token=None,
@@ -11429,7 +12503,7 @@ def generate_data_figure_agent_worker(
                 revision=revision,
                 approved_at=None,
                 progress=100,
-                progress_message="最终单图 PDF candidate 已生成。",
+                progress_message="The final single-figure PDF candidate has been generated.",
                 last_message=f"{message}\n{composition_message}",
                 panels=panels,
                 layout_prompt="",
@@ -11448,9 +12522,9 @@ def generate_data_figure_agent_worker(
             approved_at=None,
             progress=100,
             progress_message=(
-                "全部独立子图已生成；请检查后手动点击“合成图”。"
+                "All independent subplots generated; please check and then click Synthesize Figure."
                 if all_panels_built
-                else f"本地 Agent 已生成独立子图 {figure_id}({panel_id})。"
+                else f"Local Agent has generated independent subfigures. {figure_id}({panel_id})."
             ),
             last_message=message,
             panels=panels,
@@ -11466,7 +12540,7 @@ def generate_data_figure_agent_worker(
                 "status": "failed",
                 "last_message": str(exc),
                 "progress": 0,
-                "progress_message": "生成失败。",
+                "progress_message": "Generation failed.",
             }
         )
         panels[panel_id] = panel_state
@@ -11490,11 +12564,11 @@ def data_figure_layout(prompt: str) -> dict[str, Any]:
         if any(
             token in normalized
             for token in (
-                "竖排",
-                "纵向",
-                "上下排列",
-                "上下放置",
-                "上下堆叠",
+                "vertical layout",
+                "vertical",
+                "top-bottom arrangement",
+                "vertical placement",
+                "vertical stacking",
                 "vertical",
                 "stack",
             )
@@ -11502,11 +12576,21 @@ def data_figure_layout(prompt: str) -> dict[str, Any]:
         else "horizontal"
     )
     labels = not any(
-        token in normalized for token in ("无角标", "不要角标", "no label", "without label")
+        token in normalized
+        for token in (
+            "no badge",
+            "do not use subscripts",
+            "no superscripts",
+            "no label",
+            "without label",
+        )
     )
     width = (
         "two-column"
-        if any(token in normalized for token in ("双栏", "跨栏", "two-column", "full width"))
+        if any(
+            token in normalized
+            for token in ("two-column", "two columns", "across columns", "full width")
+        )
         else "single-column"
     )
     return {"orientation": orientation, "labels": labels, "width": width}
@@ -11520,14 +12604,14 @@ def extract_agent_layout_json(raw: str) -> dict[str, Any]:
     else:
         start, end = source.find("{"), source.rfind("}")
         if start < 0 or end <= start:
-            raise StudioError("本地 Agent 没有返回布局 JSON。")
+            raise StudioError("Local Agent did not return layout JSON.")
         source = source[start : end + 1]
     try:
         result = json.loads(source)
     except json.JSONDecodeError as exc:
-        raise StudioError(f"本地 Agent 返回的布局 JSON 无法解析：{exc}") from exc
+        raise StudioError(f"Layout JSON returned by the local Agent cannot be parsed:{exc}") from exc
     if not isinstance(result, dict):
-        raise StudioError("本地 Agent 的布局计划必须是 JSON object。")
+        raise StudioError("The local Agent layout plan must be a JSON object.")
     return result
 
 
@@ -11538,37 +12622,37 @@ def validate_data_figure_layout(
     width = raw.get("width")
     order = raw.get("panel_order")
     if orientation not in {"horizontal", "vertical"}:
-        raise StudioError("Agent 布局的 orientation 必须是 horizontal 或 vertical。")
+        raise StudioError("Agent Layout orientation must be horizontal or vertical.")
     if width not in {"single-column", "two-column"}:
-        raise StudioError("Agent 布局的 width 必须是 single-column 或 two-column。")
+        raise StudioError("Agent The layout width must be single-column or two-column.")
     if not isinstance(order, list) or sorted(order) != sorted(panel_ids):
-        raise StudioError("Agent 布局必须且只能包含全部已生成 panel。")
+        raise StudioError("Agent The layout must include all generated panels and only those panels.")
     gap = raw.get("gap_pt", 0)
     crop = raw.get("crop_margins_pt", 0)
     if not isinstance(gap, (int, float)) or not 0 <= gap <= 24:
-        raise StudioError("Agent 布局的 gap_pt 必须在 0–24 之间。")
+        raise StudioError("Agent Layout gap_pt must be between 0 and 24.")
     if not isinstance(crop, (int, float)) or not 0 <= crop <= 12:
-        raise StudioError("Agent 布局的 crop_margins_pt 必须在 0–12 之间。")
+        raise StudioError("Agent The layout crop_margins_pt must be between 0 and 12.")
     raw_labels = raw.get("labels", [])
     if not isinstance(raw_labels, list):
-        raise StudioError("Agent 布局的 labels 必须是数组。")
+        raise StudioError("Agent Layout labels must be an array.")
     labels = []
     seen: set[str] = set()
     for item in raw_labels:
         if not isinstance(item, dict):
-            raise StudioError("每个角标必须是 JSON object。")
+            raise StudioError("Each annotation must be a JSON object.")
         panel_id = str(item.get("panel_id", ""))
         text = str(item.get("text", "")).strip()
         position = str(item.get("position", ""))
         font_size = item.get("font_size_pt", 8)
         if panel_id not in panel_ids or panel_id in seen:
-            raise StudioError("Agent 布局包含未知或重复的角标 panel。")
+            raise StudioError("Agent Layout contains unknown or duplicate panel corner labels.")
         if not text or len(text) > 12:
-            raise StudioError("Agent 角标文字必须为 1–12 个字符。")
+            raise StudioError("Agent Superscript text must be 1–12 characters.")
         if position not in {"top-left", "top-right", "bottom-left", "bottom-right"}:
-            raise StudioError("Agent 角标位置不受支持。")
+            raise StudioError("Agent Superscript position not supported.")
         if not isinstance(font_size, (int, float)) or not 6 <= font_size <= 24:
-            raise StudioError("Agent 角标 font_size_pt 必须在 6–24 之间。")
+            raise StudioError("Agent The subscript font_size_pt must be between 6 and 24.")
         labels.append(
             {
                 "panel_id": panel_id,
@@ -11595,7 +12679,7 @@ def create_data_figure_layout_with_local_agent(
     """Use the local Codex Agent to translate natural language into safe layout JSON."""
     codex = shutil_which("codex")
     if not codex:
-        raise StudioError("未找到本机 codex CLI，无法解释论文组合 Prompt。")
+        raise StudioError("Could not find the local Codex CLI; unable to interpret the paper assembly Prompt.")
     panels = FIGURES[figure_id].get("panels", [])
     panel_ids = [item["id"] for item in panels]
     panel_context = [
@@ -11606,37 +12690,37 @@ def create_data_figure_layout_with_local_agent(
         }
         for item in panels
     ]
-    prompt = f"""你是 Paper Studio 的本地论文排版 Agent。把研究者的自然语言要求
-转换成一个严格 JSON 布局计划。只返回 JSON object，不要 Markdown，不要解释，
-不要修改文件，也不要运行绘图程序。
+    prompt = f"""You are the Paper Studio local paper typesetting Agent. Translate the researchers natural language requirements.
+Convert into a strict JSON layout plan. Return only a JSON object, do not Markdown, do not explain.
+Do not modify files and do not run the drawing program.
 
-研究者要求：
+Investigator requirement:
 {instruction.strip()}
 
-可用子图：
+Available subfigures:
 {json.dumps(panel_context, ensure_ascii=False, indent=2)}
 
-严格 schema：
+Strict schema:
 {{
   "orientation": "horizontal" | "vertical",
   "width": "single-column" | "two-column",
   "panel_order": {json.dumps(panel_ids)},
-  "gap_pt": 0 到 24 的数字,
-  "crop_margins_pt": 0 到 12 的数字,
+  "gap_pt": 0 Numbers up to 24.,
+  "crop_margins_pt": 0 Numbers up to 12.,
   "labels": [
     {{"panel_id": "a", "text": "(a)", "position": "top-left", "font_size_pt": 8}}
   ]
 }}
 
-约束：
-1. panel_order 必须且只能包含全部可用子图，但可按研究者要求调整顺序。
-2. “不留空白/无缝/紧贴”对应 gap_pt=0；裁掉四周白边对应 crop_margins_pt=0。
-3. 没有要求角标时 labels=[]；要求 a/b 角标时为每个 panel 生成一项。默认字号 8 pt；
-   若研究者指定字号，写入 font_size_pt。
-4. 执行器会把各子图作为独立矢量对象放入 PPT，把角标作为可编辑文本框；
-   最终矢量 PDF 使用同一布局无交互生成，不得要求用户点击 PowerPoint 权限。
-   不要提出 PNG 拼接、栅格化或修改实验数据。
-5. 无法表达的装饰性要求应忽略，不得增加 schema 外字段。
+Constraints:
+1. panel_order Must include all available subplots and only them; the order may be adjusted per researchers requirements.
+2. No spaces; seamless; tightly aligned with gap_pt.=0; Crop margins on all four sides corresponding to crop_margins_pt.=0.
+3. Labels when superscripts are not requested.=[]; Require a b superscript for each panel; default font size 8 pt.
+   If the researcher specifies a font size, write font_size_pt.
+4. The executor will place each subfigure as an independent vector object into PPT, with the corner label as an editable text box;
+   The final vector PDF is generated in the same layout without interactive steps and does not require user PowerPoint permissions.
+   Do not propose PNG stitching, rasterization or modification of experimental data.
+5. Decorative requirements that cannot be expressed should be ignored and must not add fields outside the schema.
 """
     environment = local_agent_environment()
     STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -11669,12 +12753,12 @@ def create_data_figure_layout_with_local_agent(
                 env=environment,
             )
         except subprocess.TimeoutExpired as exc:
-            raise StudioError("本地 Agent 解释论文组合 Prompt 超时。") from exc
+            raise StudioError("Local Agent timed out while processing the paper composition Prompt.") from exc
         if process.returncode or not output.exists():
             diagnostic = (process.stdout + "\n" + process.stderr).strip()
             raise StudioError(
-                "本地 Agent 解释论文组合 Prompt 失败。\n"
-                + (diagnostic[-2400:] or "codex exec 未返回布局计划。")
+                "Local Agent failed to interpret the paper composition Prompt.\n"
+                + (diagnostic[-2400:] or "codex exec Layout plan not returned.")
             )
         raw = extract_agent_layout_json(
             output.read_text(encoding="utf-8", errors="replace")
@@ -11686,7 +12770,7 @@ def pdf_page_size(pdf: Path, *, cwd: Path) -> tuple[float, float]:
     output = run_checked(["pdfinfo", str(pdf)], cwd=cwd)
     match = re.search(r"^Page size:\s+([0-9.]+)\s+x\s+([0-9.]+)\s+pts", output, re.M)
     if not match:
-        raise StudioError(f"无法读取 PDF 页面尺寸：{pdf.name}")
+        raise StudioError(f"Unable to read PDF page size:{pdf.name}")
     return float(match.group(1)), float(match.group(2))
 
 
@@ -11699,7 +12783,7 @@ def ensure_artifact_tool_runtime() -> None:
         / ".cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules"
     )
     if not (runtime_modules / "@oai" / "artifact-tool").exists():
-        raise StudioError("本机 PowerPoint 构建运行时缺少 @oai/artifact-tool。")
+        raise StudioError("The local PowerPoint build is missing. @oai/artifact-tool.")
     link = PPT_COMPOSER.parent / "node_modules"
     if not link.exists():
         link.symlink_to(runtime_modules, target_is_directory=True)
@@ -11790,18 +12874,18 @@ def compose_data_figure(
     definition = FIGURES[figure_id]
     panels = definition.get("panels", [])
     if not panels:
-        raise StudioError("该图没有可组合的独立子图。")
+        raise StudioError("This figure has no combinable independent subfigures.")
     missing = [
         panel["id"]
         for panel in panels
         if not data_panel_paths(figure_id, panel["id"])["pdf"].exists()
     ]
     if missing:
-        raise StudioError("请先逐个生成子图：" + ", ".join(missing))
+        raise StudioError("Please generate subfigures one by one first:" + ", ".join(missing))
     required = ["pdfcrop", "pdfinfo", "pdftocairo", "latexmk", "node"]
     missing_tools = [command for command in required if not shutil_which(command)]
     if missing_tools:
-        raise StudioError("本地 PPT 组合缺少工具：" + ", ".join(missing_tools))
+        raise StudioError("Local PPT bundle missing tools." + ", ".join(missing_tools))
     ensure_artifact_tool_runtime()
 
     layout = layout or create_data_figure_layout_with_local_agent(figure_id, prompt)
@@ -11903,12 +12987,12 @@ def compose_data_figure(
             encoding="utf-8",
         )
         paths["layout_prompt"].write_text(prompt.strip() + "\n", encoding="utf-8")
-    direction = "横向" if layout["orientation"] == "horizontal" else "纵向"
-    label_note = "并添加角标" if layout["labels"] else ""
+    direction = "horizontal" if layout["orientation"] == "horizontal" else "vertical"
+    label_note = " with panel badges" if layout["labels"] else ""
     return (
-        f"已将 {len(panels)} 张矢量子图作为独立对象放入 PPT，"
-        f"无缝{direction}排版{label_note}；PPTX 与最终矢量 PDF 使用同一布局，"
-        "全程无需 PowerPoint 权限确认。"
+        f"Placed {len(panels)} vector subfigures as independent editable objects in a "
+        f"{direction} PowerPoint layout{label_note}. The PPTX and final vector PDF use "
+        "the same composition. PowerPoint permission confirmation not required."
     )
 
 
@@ -11918,6 +13002,29 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         provider = "openai"
     api_key_setup = api_setup_for_provider(provider)
     api_key_configured = bool(api_key_setup["configured"])
+    report_paths = [
+        ROOT / "reports" / name
+        for name in (
+            "01_LIT_SURVEY.html",
+            "02_IDEA_REPORT.html",
+            "03_EXPERIMENT_PLAN.html",
+            "04_RUN_PLAN.html",
+            "05_EXP_RESULT.html",
+        )
+        if (ROOT / "reports" / name).is_file()
+    ]
+    report_signature = "\n".join(
+        f"{path.name}:{path.stat().st_size}:{path.stat().st_mtime_ns}"
+        for path in report_paths
+    )
+    report_version = (
+        hashlib.sha256(report_signature.encode("utf-8")).hexdigest()[:10]
+        if report_signature
+        else "none"
+    )
+    reports_updated_at = max(
+        (int(path.stat().st_mtime) for path in report_paths), default=None
+    )
     provider_options = [
         {
             "id": candidate,
@@ -11937,10 +13044,12 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
                 "name": "",
                 "eyebrow": "PAPER STUDIO",
                 "studio_title": "Paper Studio",
-                "subtitle": "等待载入论文项目数据",
+                "subtitle": "Waiting for loading paper project data",
                 "config_file": PROJECT_CONFIG_FILE.relative_to(ROOT).as_posix(),
                 "root": "" if (ONLINE_PROJECT_MODE or DEMO_MODE) else str(ROOT.resolve()),
                 "loaded": False,
+                "report_version": report_version,
+                "reports_updated_at": reports_updated_at,
                 "venue": "",
                 "target": {},
                 "reference_paper": {},
@@ -11961,6 +13070,13 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
                 "page_count": 0,
                 "page_width_pt": 612.0,
                 "page_height_pt": 792.0,
+                "page_budget": {
+                    "limit": None,
+                    "content_pages": None,
+                    "remaining": None,
+                    "status": "not_configured",
+                    "excludes_references": True,
+                },
             },
             "outline_confirmed": False,
             "demo_mode": DEMO_MODE,
@@ -11968,9 +13084,15 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
             "api_key_configured": api_key_configured,
             "api_key_setup": api_key_setup,
             "api_usage": usage_summary(API_USAGE_FILE),
+            "figure_capabilities": {
+                "mechanism_renderer": "codex-native-shapes",
+                "requires_image_api": False,
+                "text_provider": provider,
+            },
             "full_draft": {
                 "available": False,
                 "pending_paragraphs": 0,
+                "pending_title": False,
                 "total_paragraphs": 0,
                 "writing_order": [],
                 "job": None,
@@ -11986,6 +13108,8 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         "config_file": PROJECT_CONFIG_FILE.relative_to(ROOT).as_posix(),
         "root": "" if (ONLINE_PROJECT_MODE or DEMO_MODE) else str(ROOT.resolve()),
         "loaded": True,
+        "report_version": report_version,
+        "reports_updated_at": reports_updated_at,
         "venue": str(PROJECT_METADATA.get("venue", "")),
         "target": {
             key: value
@@ -12014,10 +13138,13 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         if SECTION_MAP.get(section_id, {}).get("writing_mode") != "plan_only"
     )
     pending_paragraphs = len(full_draft_targets(state))
+    pending_artifacts = pending_batch_artifacts(state)
     outline_confirmed = outline_is_confirmed()
     result["full_draft"] = {
         "available": outline_confirmed and api_key_configured,
         "pending_paragraphs": pending_paragraphs,
+        "pending_title": full_draft_title_pending(state),
+        "pending_artifacts": pending_artifacts,
         "total_paragraphs": total_paragraphs,
         "writing_order": draft_writing_order(),
         "job": result.pop("full_draft_job", None),
@@ -12095,6 +13222,7 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
         "version": int(pdf.stat().st_mtime_ns) if pdf.exists() else None,
         "url": "/paper.pdf",
         **pdf_metadata,
+        "page_budget": page_budget_status(),
     }
     result["outline_confirmed"] = outline_confirmed
     result["demo_mode"] = DEMO_MODE
@@ -12105,6 +13233,11 @@ def public_state(state: dict[str, Any]) -> dict[str, Any]:
     result["api_key_configured"] = api_key_configured
     result["api_key_setup"] = api_key_setup
     result["api_usage"] = usage_summary(API_USAGE_FILE)
+    result["figure_capabilities"] = {
+        "mechanism_renderer": "codex-native-shapes",
+        "requires_image_api": False,
+        "text_provider": provider,
+    }
     result["figures"] = figure_public_state(state)
     result["tables"] = table_public_state(state)
     return result
@@ -12116,7 +13249,7 @@ def _remove_generated_path(path: Path) -> None:
     try:
         resolved.relative_to(PAPER.resolve())
     except ValueError as exc:
-        raise StudioError(f"拒绝清理 paper/ 之外的路径：{path}") from exc
+        raise StudioError(f"Refuse to clean paths outside paper/.{path}") from exc
     protected = {
         PAPER.resolve(),
         PROJECT_CONFIG_FILE.resolve(),
@@ -12125,7 +13258,7 @@ def _remove_generated_path(path: Path) -> None:
         (PAPER / "references.bib").resolve(),
     }
     if resolved in protected:
-        raise StudioError(f"拒绝清理 Paper Studio 输入：{path}")
+        raise StudioError(f"Refuse to clear Paper Studio input.{path}")
     if resolved.is_dir():
         shutil.rmtree(resolved)
     else:
@@ -12151,10 +13284,10 @@ def restore_source_figure_inputs() -> None:
             continue
         source_value = str(definition.get("source_asset") or "").strip()
         if not source_value:
-            raise StudioError(f"来源图 {figure_id} 缺少 source_asset。")
+            raise StudioError(f"Source figure {figure_id} Missing source_asset.")
         source = _project_path(ROOT, source_value, f"figures.{figure_id}.source_asset")
         if not source.is_file() or source.suffix.lower() != ".pdf":
-            raise StudioError(f"来源图 {figure_id} 的 PDF 不存在：{source_value}")
+            raise StudioError(f"Source figure {figure_id} The PDF does not exist:{source_value}")
         target = figure_paths(figure_id)["pdf"]
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
@@ -12167,7 +13300,7 @@ def _clear_generated_tree(root: Path, protected_files: set[Path] | None = None) 
     try:
         resolved_root.relative_to(PAPER.resolve())
     except ValueError as exc:
-        raise StudioError(f"拒绝清理 paper/ 之外的目录：{root}") from exc
+        raise StudioError(f"Refuse to clean directories outside paper/.{root}") from exc
     if not root.exists():
         return
     protected_below_root = {
@@ -12196,7 +13329,7 @@ def reset_generated_paper(model: str) -> dict[str, Any]:
     """Clear generated manuscript/runtime artifacts while preserving project inputs."""
     with FIGURE_PROCESS_LOCK:
         if RUNNING_FIGURE_PROCESSES:
-            raise StudioError("仍有绘图调用运行；请先用进度条右侧的停止按钮结束调用。")
+            raise StudioError("Drawing calls are still running; please use the stop button on the right side of the progress bar to terminate the calls.")
 
     current_provider = active_llm_provider()
     fresh = _default_state()
@@ -12241,7 +13374,7 @@ def reset_generated_paper(model: str) -> dict[str, Any]:
 
     compile_result = compile_paper()
     if not compile_result.ok:
-        raise StudioError("清空完成，但空壳 PDF 编译失败。\n" + compile_result.message)
+        raise StudioError("Cleared completed tasks, but the empty PDF compilation failed.\n" + compile_result.message)
     fresh["compile"] = {
         "status": "ok",
         "message": compile_result.message,
@@ -12371,8 +13504,8 @@ class Handler(BaseHTTPRequestHandler):
             body = self.read_json()
             if ONLINE_PROJECT_MODE and self.path in ONLINE_DISABLED_ARTIFACT_AGENT_PATHS:
                 raise StudioError(
-                    "在线会话当前不运行图表构建 Agent；"
-                    "论文对话、正文、标题、Caption 与 LLM 写作功能仍可正常使用。"
+                    "The online session is not currently running the chart building Agent."
+                    "Paper dialogue, body, titles, captions, and LLM writing features can still be used normally."
                 )
             if self.path == "/api/generate":
                 self.handle_generate(body)
@@ -12449,10 +13582,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_llm_provider(self, body: dict[str, Any]) -> None:
         if ONLINE_PROJECT_MODE:
-            raise StudioError("在线写作会话统一使用共享 DeepSeek API，不支持切换服务商。")
+            raise StudioError("Online writing sessions uniformly use the shared DeepSeek API and do not support switching providers.")
         state = load_state()
         if draft_batch_running(state):
-            raise StudioError("批量写作任务正在生成；请等待任务完成后再切换 LLM API。")
+            raise StudioError("Batch writing tasks are being generated; please wait for the tasks to complete before switching the LLM API.")
         provider = str(body.get("provider") or "").strip().lower()
         if select_llm_provider(state, provider):
             save_state(state)
@@ -12460,10 +13593,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_llm_model(self, body: dict[str, Any]) -> None:
         if ONLINE_PROJECT_MODE:
-            raise StudioError("在线写作会话统一使用共享 DeepSeek API，不支持切换模型。")
+            raise StudioError("Online writing sessions uniformly use the shared DeepSeek API and do not support switching models.")
         state = load_state()
         if draft_batch_running(state):
-            raise StudioError("批量写作任务正在生成；请等待任务完成后再切换写作模型。")
+            raise StudioError("Batch writing tasks are being generated; please wait for the tasks to complete before switching writing models.")
         model = str(body.get("model") or "").strip()
         if select_llm_model(state, model):
             save_state(state)
@@ -12472,7 +13605,7 @@ class Handler(BaseHTTPRequestHandler):
     def handle_title_generate(self, body: dict[str, Any]) -> None:
         state = load_state()
         if draft_batch_running(state):
-            raise StudioError("批量写作任务正在生成；请等待任务完成。")
+            raise StudioError("Batch writing tasks are being generated; please wait for completion.")
         editor = state["title_editor"]
         prompt = str(body.get("prompt", "")).strip() or (
             "Generate one concise, specific academic title that reflects the paper's actual "
@@ -12493,7 +13626,7 @@ class Handler(BaseHTTPRequestHandler):
                 "prompt": prompt,
                 "candidate": candidate,
                 "previous_response_id": response_id,
-                "last_message": "GPT candidate 尚未保存；可继续编辑，确认后再写入 LaTeX。",
+                "last_message": "GPT candidate Not saved yet; can continue editing, confirm before writing to LaTeX.",
             }
         )
         state["model"] = model
@@ -12502,13 +13635,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_title_save(self, body: dict[str, Any]) -> None:
         if draft_batch_running(load_state()):
-            raise StudioError("批量写作任务正在生成；请等待任务完成。")
+            raise StudioError("Batch writing tasks are being generated; please wait for completion.")
         title = normalize_plain_title(str(body.get("title", "")))
         result = save_manuscript_title(title)
         state = load_state()
         editor = state["title_editor"]
         editor["candidate"] = ""
-        editor["last_message"] = "标题已确认写入 LaTeX，并完成 PDF 编译。"
+        editor["last_message"] = "The title has been written to LaTeX and PDF compilation completed."
+        editor["status"] = "confirmed"
         state["compile"] = {
             "status": "ok",
             "message": result.message,
@@ -12533,7 +13667,7 @@ class Handler(BaseHTTPRequestHandler):
         panel_id = str(body.get("panel_id", "")).lower()
         valid = {item["id"] for item in FIGURES[figure_id].get("panels", [])}
         if panel_id not in valid:
-            raise StudioError("请选择一个有效的独立子图。")
+            raise StudioError("Please select a valid independent subfigure.")
         return panel_id
 
     def require_table(self, body: dict[str, Any]) -> str:
@@ -12609,12 +13743,12 @@ class Handler(BaseHTTPRequestHandler):
     def handle_generate(self, body: dict[str, Any]) -> None:
         section = self.require_section(body)
         if SECTION_MAP[section].get("writing_mode") == "plan_only":
-            raise StudioError("尚未上传实验结果；该 section 仅展示段落规划，不生成正文。")
+            raise StudioError("No experimental results uploaded yet; this section only shows paragraph planning and does not generate body text.")
         if not ONLINE_PROJECT_MODE:
             ensure_survey_bibliography()
         state = load_state()
         if draft_batch_running(state):
-            raise StudioError("批量写作任务正在生成；请等待任务完成。")
+            raise StudioError("Batch writing tasks are being generated; please wait for completion.")
         model = str(body.get("model") or state.get("model") or DEFAULT_MODEL).strip()
         section_state = state["sections"][section]
         paragraph = current_paragraph(section_state)
@@ -12677,14 +13811,14 @@ class Handler(BaseHTTPRequestHandler):
             state = load_state()
             if draft_batch_running(state):
                 raise StudioError(
-                    "批量写作已在单段生成期间启动；已丢弃这份过时候选，批量任务继续运行。"
+                    "Batch writing has started during single paragraph generation; this past candidate has been discarded, batch tasks continue."
                 )
             section_state = state["sections"][section]
             paragraph = current_paragraph(section_state)
             if paragraph is None or (
                 requested_paragraph_id and paragraph["id"] != requested_paragraph_id
             ):
-                raise StudioError("段落位置已在生成期间改变；已丢弃这份过时候选。")
+                raise StudioError("Paragraph position was changed during generation; this prior candidate has been discarded.")
             candidate_id = uuid.uuid4().hex
             section_state["previous_response_id"] = response_id
             section_state["bibliography_fingerprint"] = bibliography_fingerprint()
@@ -12719,22 +13853,22 @@ class Handler(BaseHTTPRequestHandler):
     def handle_accept(self, body: dict[str, Any]) -> None:
         section = self.require_section(body)
         if SECTION_MAP[section].get("writing_mode") == "plan_only":
-            raise StudioError("尚未上传实验结果；该 section 仅展示段落规划，不能写入正文。")
+            raise StudioError("No experimental results uploaded yet; this section only displays paragraph planning and cannot write the body.")
         requested_paragraph_id = str(body.get("paragraph_id", "")).strip()
         candidate_id = str(body.get("candidate_id", ""))
         submitted_text = str(body.get("candidate_text", "")).strip()
         base_text = str(body.get("base_text", ""))
         state = load_state()
         if draft_batch_running(state):
-            raise StudioError("批量写作任务正在生成；请等待任务完成。")
+            raise StudioError("Batch writing tasks are being generated; please wait for completion.")
         section_state = state["sections"][section]
         paragraph = current_paragraph(section_state)
         if paragraph is None:
             raise StudioError("This section has no remaining paragraph.")
         if requested_paragraph_id and paragraph["id"] != requested_paragraph_id:
             raise StudioError(
-                f"当前编辑位置已从 {requested_paragraph_id} 更新到 {paragraph['id']}；"
-                "请检查后再次 Accept。"
+                f"Current editing position has been moved from {requested_paragraph_id} Update to {paragraph['id']}; "
+                "Please check and Accept again."
             )
         candidate, text = candidate_for_accept(
             paragraph,
@@ -12764,34 +13898,28 @@ class Handler(BaseHTTPRequestHandler):
         reference_error = artifact_reference_error(text, bound_artifacts)
         if reference_error:
             raise StudioError(reference_error)
-        validate_citations_for_accept(text, workflow="本地正文" if not ONLINE_PROJECT_MODE else "在线正文")
+        validate_citations_for_accept(text, workflow="local body text" if not ONLINE_PROJECT_MODE else "Online body text")
         appendix_issues = appendix_content_issues(section, text)
         if appendix_issues:
-            raise StudioError("附录候选仍是内容路线图：" + "; ".join(appendix_issues))
-        comparison_issues = numeric_comparison_issues(text)
-        if comparison_issues:
-            raise StudioError("候选的数值比较方向错误：" + "; ".join(comparison_issues))
-        synthesis_issues = synthesis_comparison_issues(section, text)
-        if synthesis_issues:
-            raise StudioError("候选总结与主结果表矛盾：" + "; ".join(synthesis_issues))
+            raise StudioError("Appendix candidate remains a content roadmap." + "; ".join(appendix_issues))
         execution_issues = execution_record_contradiction_issues(text)
         if execution_issues:
-            raise StudioError("候选与执行记录矛盾：" + "; ".join(execution_issues))
+            raise StudioError("Discrepancy between candidate and execution records." + "; ".join(execution_issues))
         setup_issues = experimental_setup_issues(
             section, str(paragraph.get("purpose") or ""), text
         )
         if setup_issues:
-            raise StudioError("实验设置候选不完整：" + "; ".join(setup_issues))
+            raise StudioError("Experiment setup candidates incomplete:" + "; ".join(setup_issues))
         completion_issues = manuscript_completion_placeholder_issues(text)
         if completion_issues:
-            raise StudioError("候选仍含规划占位符：" + "; ".join(completion_issues))
+            raise StudioError("Candidates still contain planning placeholders:" + "; ".join(completion_issues))
         markup_issues = manuscript_markup_issues(text)
         if markup_issues:
-            raise StudioError("候选仍含 Markdown 标记：" + "; ".join(markup_issues))
+            raise StudioError("Candidate still contains Markdown markup." + "; ".join(markup_issues))
         internal_reference_issues = unsupported_internal_reference_issues(text)
         if internal_reference_issues:
             raise StudioError(
-                "候选含未配置的内部引用：" + "; ".join(internal_reference_issues)
+                "Candidate contains unconfigured internal citations." + "; ".join(internal_reference_issues)
             )
         appendix_numeric_issues = unsupported_appendix_numeric_issues(
             section,
@@ -12802,18 +13930,18 @@ class Handler(BaseHTTPRequestHandler):
         )
         if appendix_numeric_issues:
             raise StudioError(
-                "附录候选含无证据数字：" + "; ".join(appendix_numeric_issues)
+                "Appendix candidate contains numbers without evidence." + "; ".join(appendix_numeric_issues)
             )
         prose_issues = latex_prose_issues(text)
         if prose_issues:
             raise StudioError(
-                "候选含有会破坏 pdflatex 正文的字符，请先让 GPT 修正或手动转为 "
-                "LaTeX：" + "; ".join(prose_issues)
+                "Candidates containing characters that will break the pdflatex body text; please have GPT correct or manually convert to "
+                "LaTeX:" + "; ".join(prose_issues)
             )
         security_issues = online_latex_security_issues(text)
         if security_issues:
             raise StudioError(
-                "在线模式禁止会读取文件、写文件或执行代码的 LaTeX 命令："
+                "Online mode prohibits LaTeX commands that read files, write files, or execute code."
                 + ", ".join(security_issues)
             )
         if not (PAPER / "main.tex").exists():
@@ -12827,6 +13955,9 @@ class Handler(BaseHTTPRequestHandler):
         bibliography_path = sections_dir / "bibliography.tex"
         previous_bibliography = read_text(bibliography_path, 10000)
         was_accepted = bool(paragraph.get("accepted_text"))
+        previous_accepted_text = str(paragraph.get("accepted_text") or "")
+        previous_candidate = paragraph.get("candidate")
+        before_body_pages = compiled_content_page_count()
         paragraph["accepted_text"] = text
         paragraph["candidate"] = None
         auto_generate_bound_figure_captions(state, section, paragraph, text)
@@ -12841,7 +13972,13 @@ class Handler(BaseHTTPRequestHandler):
         bibliography_temporary.write_text(bibliography_text, encoding="utf-8")
         os.replace(bibliography_temporary, bibliography_path)
         compile_result = compile_paper()
-        if not compile_result.ok:
+        after_body_pages = compiled_content_page_count() if compile_result.ok else None
+        budget_failed = compile_result.ok and page_budget_worsened(
+            before_body_pages, after_body_pages
+        )
+        if not compile_result.ok or budget_failed:
+            paragraph["accepted_text"] = previous_accepted_text
+            paragraph["candidate"] = previous_candidate
             if existed:
                 rollback = target.with_suffix(".tex.rollback")
                 rollback.write_text(previous, encoding="utf-8")
@@ -12852,6 +13989,8 @@ class Handler(BaseHTTPRequestHandler):
             bibliography_rollback.write_text(previous_bibliography, encoding="utf-8")
             os.replace(bibliography_rollback, bibliography_path)
             compile_paper()
+            if budget_failed:
+                raise StudioError(page_budget_error(before_body_pages, after_body_pages))
             raise StudioError("LaTeX failed; edit rolled back.\n" + compile_result.message)
 
         section_state["revision"] = int(section_state.get("revision", 0)) + 1
@@ -12927,12 +14066,12 @@ class Handler(BaseHTTPRequestHandler):
             job = state.get("full_draft_job") or {}
             token = str(job.get("token") or "")
             if job.get("status") != "running" or not token:
-                raise StudioError("当前没有正在运行的全文生成任务。")
+                raise StudioError("There is currently no full text generation task running.")
             CANCELLED_FULL_DRAFT_JOBS.add(token)
             job.update(
                 status="cancelled",
                 token=None,
-                progress_message="已请求停止；当前正在事务处理的段落完成后停止，之后可继续补齐未完成段落。",
+                progress_message="Stop request issued; will stop after the currently processing paragraph finishes, then can continue to complete the unfinished paragraphs.",
                 finished_at=int(time.time()),
             )
             state["full_draft_job"] = job
@@ -12941,18 +14080,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_reset_generated_paper(self, body: dict[str, Any]) -> None:
         if draft_batch_running(load_state()):
-            raise StudioError("请先等待或停止批量写作任务，再清空生成内容。")
+            raise StudioError("Please wait or stop the batch writing tasks, then clear the generated content.")
         confirmation = str(body.get("project_id", "")).strip()
         if confirmation != PROJECT_ID:
-            raise StudioError("项目 ID 不匹配；未删除任何生成内容。")
+            raise StudioError("Project ID mismatch; no generated content was deleted.")
         model = str(body.get("model") or DEFAULT_MODEL).strip()
         if not model:
-            raise StudioError("模型名称不能为空。")
+            raise StudioError("Model name cannot be empty.")
         state = reset_generated_paper(model)
         self.send_json(
             {
                 "ok": True,
-                "message": "已清空生成正文、对话、图表 candidate 与运行状态；项目输入已保留。",
+                "message": "Generated body text, dialogue, figure candidates, and run state have been cleared; project input has been retained.",
                 "state": public_state(state),
             }
         )
@@ -13006,21 +14145,21 @@ class Handler(BaseHTTPRequestHandler):
         """
         requested_width = str(body.get("layout_width", "single-column"))
         if requested_width not in {"single-column", "two-column"}:
-            raise StudioError("插入论文宽度必须是单栏或双栏。")
+            raise StudioError("The inserted paper width must be single column or double column.")
         paths = figure_paths(figure_id)
         render_data_figure_deterministic(figure_id, metrics_bundle(), paths["pdf"], paths["preview"])
         panel_paths = data_panel_paths(figure_id, panel_id)
         panel_paths["pdf"].parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(paths["pdf"], panel_paths["pdf"])
         shutil.copyfile(paths["preview"], panel_paths["preview"])
-        message = "已从上传数据确定性生成图表（无需 Agent）。"
+        message = "Charts deterministically generated from uploaded data (no Agent needed)."
         panels = dict(figure_state.get("panels", {}))
         panel_state = dict(panels.get(panel_id, {}))
         panel_state.update(
             status="built",
             revision=int(panel_state.get("revision", 0)) + 1,
             progress=100,
-            progress_message="图表已确定性生成。",
+            progress_message="The charts have been deterministically generated.",
             last_message=message,
         )
         panels[panel_id] = panel_state
@@ -13029,7 +14168,7 @@ class Handler(BaseHTTPRequestHandler):
             revision=int(figure_state.get("revision", 0)) + 1,
             approved_at=None,
             progress=100,
-            progress_message="最终单图已确定性生成。",
+            progress_message="The final single figure has been deterministically generated.",
             last_message=message,
             panels=panels,
             layout_mode=requested_width,
@@ -13055,7 +14194,7 @@ class Handler(BaseHTTPRequestHandler):
         figure_id = self.require_figure(body)
         self.reject_online_placeholder_figure(figure_id)
         if FIGURES[figure_id].get("kind") == "source":
-            raise StudioError("来源图已从参考论文的可追溯 PDF 载入，无需重新生成。")
+            raise StudioError("Source figure loaded from the traceable PDF of the reference paper; no need to regenerate.")
         panel_id = self.require_panel(figure_id, body)
         state = load_state()
         ready, reason = figure_generation_gate(figure_id, state)
@@ -13064,28 +14203,28 @@ class Handler(BaseHTTPRequestHandler):
         figure_state = state["figures"][figure_id]
         if FIGURES[figure_id]["kind"] == "mechanism":
             if ONLINE_PROJECT_MODE:
-                raise StudioError("在线会话当前不运行机制图设计 Agent；论文对话、正文、标题、Caption、表格与 LLM 写作功能仍可正常使用。")
-            raise StudioError("机制图必须先生成并确认画图 Prompt，再调用 GPT Image。")
+                raise StudioError("Online sessions currently do not run a mechanism diagram design agent; paper dialogue, main text, titles, captions, tables, and LLM writing functions remain usable.")
+            raise StudioError("Mechanism diagrams use the dedicated Codex native-shape workflow.")
         if figure_state.get("status") in FIGURE_RUNNING_STATUSES:
-            raise StudioError("该图已有任务正在运行。")
+            raise StudioError("A task is already running for this figure.")
         if ONLINE_PROJECT_MODE:
             self.handle_figure_generate_deterministic(figure_id, panel_id, state, figure_state, body)
             return
         instruction = str(body.get("agent_prompt", "")).strip()
         if len(instruction) > 8000:
-            raise StudioError("数据图修改命令过长，请压缩到 8000 字符以内。")
+            raise StudioError("Data chart modification command is too long; compress to within 8000 characters.")
         layout_prompt = str(body.get("layout_prompt", "")).strip()
         if len(layout_prompt) > 4000:
-            raise StudioError("论文组合 Prompt 过长，请压缩到 4000 字符以内。")
+            raise StudioError("The paper composition prompt is too long; please compress it to within 4000 characters.")
         requested_width = str(body.get("layout_width", "single-column"))
         if requested_width not in {"single-column", "two-column"}:
-            raise StudioError("插入论文宽度必须是单栏或双栏。")
+            raise StudioError("The inserted paper width must be single column or double column.")
         token = uuid.uuid4().hex
         figure_state.update(
             {
                 "status": "agent_generating",
                 "progress": 10,
-                "progress_message": "正在启动本地 Agent…",
+                "progress_message": "Starting local Agent…",
                 "last_message": "",
                 "approved_at": None,
                 "agent_prompt": instruction,
@@ -13102,7 +14241,7 @@ class Handler(BaseHTTPRequestHandler):
                 "agent_prompt": instruction,
                 "last_message": "",
                 "progress": 10,
-                "progress_message": "正在启动这张子图的本地 Agent…",
+                "progress_message": "Starting the local Agent for this sub-figure.",
             }
         )
         save_state(state)
@@ -13114,7 +14253,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": f"本地 Agent 已启动，正在单独生成 {figure_id}({panel_id})。",
+                "message": f"Local Agent started and is generating separately. {figure_id}({panel_id}).",
                 "state": public_state(state),
             },
             status=202,
@@ -13123,11 +14262,11 @@ class Handler(BaseHTTPRequestHandler):
     def handle_figure_compose(self, body: dict[str, Any]) -> None:
         figure_id = self.require_figure(body)
         if FIGURES[figure_id]["kind"] != "data":
-            raise StudioError("只有实验数据图需要本地 PDF 组合。")
+            raise StudioError("Only experimental data figures require local PDF assembly.")
         state = load_state()
         figure_state = state["figures"][figure_id]
         if figure_state.get("status") in FIGURE_RUNNING_STATUSES:
-            raise StudioError("该图已有任务正在运行。")
+            raise StudioError("A task is already running for this figure.")
         prompt = str(body.get("layout_prompt", "")).strip()
         if not prompt:
             prompt = default_data_figure_layout_prompt(figure_id)
@@ -13138,9 +14277,9 @@ class Handler(BaseHTTPRequestHandler):
             )
         )
         if requested_width not in {"single-column", "two-column"}:
-            raise StudioError("插入论文宽度必须是单栏或双栏。")
+            raise StudioError("The inserted paper width must be single column or double column.")
         if len(prompt) > 4000:
-            raise StudioError("论文组合 Prompt 过长，请压缩到 4000 字符以内。")
+            raise StudioError("The paper composition prompt is too long; please compress it to within 4000 characters.")
         panels = figure_state.get("panels", {})
         missing = [
             item["id"]
@@ -13148,7 +14287,7 @@ class Handler(BaseHTTPRequestHandler):
             if panels.get(item["id"], {}).get("status") != "built"
         ]
         if missing:
-            raise StudioError("请先逐个生成子图：" + ", ".join(missing))
+            raise StudioError("Please generate subfigures one by one first:" + ", ".join(missing))
         layout = create_data_figure_layout_with_local_agent(figure_id, prompt)
         layout["width"] = requested_width
         message = compose_data_figure(figure_id, prompt, layout)
@@ -13171,7 +14310,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_runtime_key(self, body: dict[str, Any]) -> None:
         if DEMO_MODE:
-            raise StudioError("只读 Demo 不能更换 API Key。")
+            raise StudioError("Read only Demo cannot change API Key.")
         if ONLINE_PROJECT_MODE:
             # Every online session now shares one server-provisioned DeepSeek
             # key (see online_studio.server.shared_deepseek_api_key); letting
@@ -13179,14 +14318,14 @@ class Handler(BaseHTTPRequestHandler):
             # process would both defeat the per-user spend cap (which is
             # keyed off DeepSeek usage) and let one session hijack another's
             # credentials for the process's remaining lifetime.
-            raise StudioError("在线写作会话统一使用共享 DeepSeek API，不支持更换 Key 或服务商。")
+            raise StudioError("Online writing sessions use the shared DeepSeek API uniformly; changing the Key or service provider is not supported.")
         provider = str(body.get("provider", "openai")).strip().lower()
         key = str(body.get("api_key", ""))
         configuration = provider_configuration(provider)
         if not 8 <= len(key) <= 512 or any(
             character.isspace() or ord(character) < 32 for character in key
         ):
-            raise StudioError("API Key 格式无效，请检查后重试。")
+            raise StudioError("API Key Invalid format, please check and retry.")
         os.environ[configuration["environment_variable"]] = key
         with STATE_LOCK:
             state = load_state()
@@ -13195,7 +14334,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "API Key 已安全更新。",
+                "message": "API Key Safely updated.",
                 "state": public_state(state),
             }
         )
@@ -13204,28 +14343,28 @@ class Handler(BaseHTTPRequestHandler):
         figure_id = self.require_figure(body)
         self.reject_online_placeholder_figure(figure_id)
         if FIGURES[figure_id]["kind"] != "mechanism":
-            raise StudioError("数据图不使用画图 Prompt。")
+            raise StudioError("Data figure does not use a drawing Prompt.")
         state = load_state()
         ready, reason = figure_generation_gate(figure_id, state)
         if not ready:
             raise StudioError(reason)
         figure_state = state["figures"][figure_id]
         if figure_state.get("status") in FIGURE_RUNNING_STATUSES:
-            raise StudioError("该图已有任务正在运行。")
+            raise StudioError("A task is already running for this figure.")
         current_prompt = str(
             body.get("current_prompt", figure_state.get("draw_prompt", ""))
         ).strip()
         prompt_instruction = str(body.get("prompt_instruction", "")).strip()
         if len(prompt_instruction) > 4000:
-            raise StudioError("Prompt 修改指令过长，请压缩到 4000 字符以内。")
+            raise StudioError("Prompt The modification instruction is too long; please reduce to within 4000 characters.")
         if current_prompt and not prompt_instruction:
-            raise StudioError("重新生成 Prompt 前，请先填写希望 GPT 如何修改。")
+            raise StudioError("Before regenerating the Prompt, please specify how you want GPT to modify it.")
         job_token = uuid.uuid4().hex
         figure_state.update(
             {
                 "status": "prompt_generating",
                 "progress": 5,
-                "progress_message": "画图 Prompt 任务已开始…",
+                "progress_message": "Drawing Prompt task started…",
                 "last_message": "",
                 "prompt_approved_at": None,
                 "draw_prompt": current_prompt,
@@ -13242,7 +14381,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "GPT 正在根据该 section 正文生成画图 Prompt。",
+                "message": "GPT Generating drawing prompts for this section text.",
                 "state": public_state(state),
             },
             status=202,
@@ -13252,17 +14391,17 @@ class Handler(BaseHTTPRequestHandler):
         figure_id = self.require_figure(body)
         self.reject_online_placeholder_figure(figure_id)
         if FIGURES[figure_id]["kind"] != "mechanism":
-            raise StudioError("数据图不调用 GPT Image。")
+            raise StudioError("Data figures use the deterministic or local Agent plotting workflow.")
         state = load_state()
         ready, reason = figure_generation_gate(figure_id, state)
         if not ready:
             raise StudioError(reason)
         figure_state = state["figures"][figure_id]
         if figure_state.get("status") in FIGURE_RUNNING_STATUSES:
-            raise StudioError("该图已有任务正在运行。")
+            raise StudioError("A task is already running for this figure.")
         prompt = str(body.get("draw_prompt", "")).strip()
         if not prompt:
-            raise StudioError("请先让 GPT 生成画图 Prompt，并检查后确认。")
+            raise StudioError("First have GPT generate the drawing Prompt, then review and confirm.")
         if completed_mechanism_draft_matches_prompt(figure_id, prompt):
             paths = figure_paths(figure_id)
             previous_status = str(figure_state.get("status", ""))
@@ -13277,10 +14416,10 @@ class Handler(BaseHTTPRequestHandler):
                     "status": previous_status,
                     "draw_prompt": prompt,
                     "progress": 100,
-                    "progress_message": "Prompt 未变化，已复用上次 GPT Image。",
+                    "progress_message": "Prompt unchanged; reusing the previous native-shape composition.",
                     "last_message": (
-                        "Prompt 与上次成功绘图完全相同；未调用 GPT Image，"
-                        "继续显示原来的图。"
+                        "Prompt identical to the last successful plot; no new drawing job was invoked."
+                        "Continue displaying the original image."
                     ),
                 }
             )
@@ -13302,7 +14441,7 @@ class Handler(BaseHTTPRequestHandler):
                 "draw_prompt": prompt,
                 "prompt_approved_at": now,
                 "progress": 5,
-                "progress_message": "已确认画图 Prompt，GPT Image 任务正在排队…",
+                "progress_message": "Drawing prompt confirmed; native-shape generation is queued.",
                 "last_message": "",
                 "approved_at": None,
             }
@@ -13317,7 +14456,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "Prompt 已确认，GPT Image 正在生成草图。",
+                "message": "Prompt confirmed; Codex is generating an editable native-shape sketch.",
                 "state": public_state(state),
             },
             status=202,
@@ -13327,7 +14466,7 @@ class Handler(BaseHTTPRequestHandler):
         figure_id = self.require_figure(body)
         self.reject_online_placeholder_figure(figure_id)
         if FIGURES[figure_id]["kind"] != "mechanism":
-            raise StudioError("数据图没有 GPT Image 调用可停止。")
+            raise StudioError("The data chart has no running drawing job to stop.")
         state = cancel_figure_job(figure_id)
         self.send_json(
             {
@@ -13341,20 +14480,20 @@ class Handler(BaseHTTPRequestHandler):
         figure_id = self.require_figure(body)
         self.reject_online_placeholder_figure(figure_id)
         if FIGURES[figure_id]["kind"] != "mechanism":
-            raise StudioError("数据图由可复现脚本直接构建，无需 PPT 重建步骤。")
+            raise StudioError("Data charts are constructed directly by reproducible scripts, no PPT reconstruction steps needed.")
         state = load_state()
         ready, reason = figure_generation_gate(figure_id, state)
         if not ready:
             raise StudioError(reason)
         figure_state = state["figures"][figure_id]
         if figure_state.get("status") in FIGURE_RUNNING_STATUSES:
-            raise StudioError("该图已有任务正在运行。")
+            raise StudioError("A task is already running for this figure.")
         token = uuid.uuid4().hex
         figure_state.update(
             {
                 "status": "agent_generating",
                 "progress": 10,
-                "progress_message": "正在启动本地 Agent 重建可编辑机制图…",
+                "progress_message": "Starting local Agent to rebuild the editable mechanism diagram…",
                 "approved_at": None,
                 "last_message": "",
             }
@@ -13369,7 +14508,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "本地 Agent 已启动，正在按 GPT Image 草图重建可编辑图。",
+                "message": "Local Agent started, building the editable figure from the confirmed drawing specification.",
                 "state": public_state(state),
             },
             status=202,
@@ -13384,13 +14523,13 @@ class Handler(BaseHTTPRequestHandler):
             raise StudioError(reason)
         paths = figure_paths(figure_id)
         if not paths["pdf"].exists():
-            raise StudioError("请先生成最终 PDF。")
+            raise StudioError("Please generate the final PDF first.")
         if FIGURES[figure_id]["kind"] == "data" and not state["figures"][figure_id].get("composed_at"):
-            raise StudioError("请先用论文组合 Prompt 生成最终组合 PDF。")
+            raise StudioError("Please first use the paper composition Prompt to generate the final assembled PDF.")
         if not paths["pptx"].exists() and FIGURES[figure_id]["kind"] != "source" and not (
             ONLINE_PROJECT_MODE and FIGURES[figure_id]["kind"] == "data"
         ):
-            raise StudioError("插图缺少排版用的可编辑 PPTX，不能确认。")
+            raise StudioError("The illustration lacks an editable PPTX for layout and cannot confirm.")
         figure_state = state["figures"][figure_id]
         ensure_figure_caption_before_approval(state, figure_id)
         section = FIGURES[figure_id]["source_sections"][0]
@@ -13415,10 +14554,10 @@ class Handler(BaseHTTPRequestHandler):
             figure_state["approved_at"] = previous_approved_at
             compile_paper()
             raise StudioError(
-                "LaTeX 插图编译失败；正文和图状态已回滚。\n" + compile_result.message
+                "LaTeX Illustration compilation failed; the text and figure state have been rolled back.\n" + compile_result.message
             )
         figure_state["last_message"] = (
-            f"该图已插入 {SECTION_MAP[section]['title']}，正文引用已补充，PDF 已重新编译。"
+            f"This figure has been inserted. {SECTION_MAP[section]['title']}, In-text citations added; PDF recompiled."
         )
         state["compile"] = {
             "status": "ok",
@@ -13443,7 +14582,7 @@ class Handler(BaseHTTPRequestHandler):
         current_caption = str(body.get("current_caption", "")).strip()
         prompt_instruction = str(body.get("prompt_instruction", "")).strip()
         if len(prompt_instruction) > 4000:
-            raise StudioError("Caption Prompt 过长，请压缩到 4000 字符以内。")
+            raise StudioError("Caption Prompt Too long, compress to 4000 characters or fewer.")
         state = load_state()
         caption = generate_figure_caption(
             figure_id,
@@ -13455,7 +14594,7 @@ class Handler(BaseHTTPRequestHandler):
             {
                 "ok": True,
                 "caption": caption,
-                "message": "GPT Caption candidate 已生成；检查后请保存。",
+                "message": "GPT Caption candidate Generated; please review and save.",
             }
         )
 
@@ -13463,11 +14602,11 @@ class Handler(BaseHTTPRequestHandler):
         figure_id = self.require_figure(body)
         caption = normalize_figure_caption_text(str(body.get("caption", "")))
         if not caption:
-            raise StudioError("Caption 不能为空。")
+            raise StudioError("Caption Cannot be empty.")
         caption_issues = figure_caption_issues(caption)
         if caption_issues:
             raise StudioError(
-                "Caption 必须是一句简短英文句子：" + "；".join(caption_issues)
+                "Caption Must be a short English sentence." + "; ".join(caption_issues)
             )
 
         state = load_state()
@@ -13479,7 +14618,7 @@ class Handler(BaseHTTPRequestHandler):
         figure_state["caption_generated_from_sha256"] = ""
         figure_state["caption_generated_at"] = None
         figure_state["caption_last_error"] = ""
-        figure_state["last_message"] = "Caption 已保存。"
+        figure_state["last_message"] = "Caption Saved."
 
         online_placeholder = is_hosted_placeholder_artifact(figure_id)
         if figure_state.get("status") == "approved" or online_placeholder:
@@ -13506,7 +14645,7 @@ class Handler(BaseHTTPRequestHandler):
                     figure_state["caption"] = previous_caption
                 compile_paper()
                 raise StudioError(
-                    "Caption 导致 LaTeX 编译失败；修改已回滚。\n"
+                    "Caption LaTeX compilation failed; changes have been rolled back.\n"
                     + compile_result.message
                 )
             state["compile"] = {
@@ -13514,7 +14653,7 @@ class Handler(BaseHTTPRequestHandler):
                 "message": compile_result.message,
                 "updated_at": int(time.time()),
             }
-            figure_state["last_message"] = "Caption 已保存并重新编译正文。"
+            figure_state["last_message"] = "Caption Saved and recompiled the main text."
 
         save_state(state)
         self.send_json(
@@ -13537,20 +14676,20 @@ class Handler(BaseHTTPRequestHandler):
             (item for item in paragraphs if item["id"] == placement_after), None
         )
         if paragraph is None:
-            raise StudioError("所选自然段不属于该图绑定的 section。")
+            raise StudioError("The selected paragraph does not belong to the section bound to this figure.")
         if not paragraph.get("accepted_text"):
-            raise StudioError(f"{placement_after} 尚未写入正文，不能把图放在它后面。")
+            raise StudioError(f"{placement_after} Main text not written yet; cannot place the figure after it.")
 
         figure_state = state["figures"][figure_id]
         layout_mode = str(
             body.get("layout_mode", figure_state.get("layout_mode", "single-column"))
         )
         if layout_mode not in {"single-column", "two-column", "wrapfigure"}:
-            raise StudioError("排版方式必须是单栏、双栏或 Wrapfigure。")
+            raise StudioError("The layout must be single column, double column, or WrapFigure.")
         if layout_mode == "wrapfigure":
             raise StudioError(
-                "当前 AAAI 2026 官方模板禁止 wrapfig/Wrapfigure；"
-                "请选择单栏或双栏，否则论文无法编译。"
+                "The current AAAI 2026 official template prohibits wrapfig/WrapFigure."
+                "Please choose single-column or double-column layout; otherwise the paper cannot be compiled."
             )
         previous_placement = figure_state.get("placement_after")
         previous_mode = figure_state.get("layout_mode")
@@ -13578,8 +14717,8 @@ class Handler(BaseHTTPRequestHandler):
             figure_state["composed_at"] = int(time.time())
         if figure_state.get("status") != "approved":
             figure_state["last_message"] = (
-                f"插图位置已设为 {placement_after} 后，排版方式为 {layout_mode}；"
-                "确认图片时会写入正文。"
+                f"Figure placement set to {placement_after} Layout method is {layout_mode}; "
+                "Confirming the image will be written into the main text."
             )
             save_state(state)
             self.send_json(
@@ -13611,11 +14750,11 @@ class Handler(BaseHTTPRequestHandler):
             figure_state["layout_plan"] = previous_plan
             compile_paper()
             raise StudioError(
-                "移动插图后 LaTeX 编译失败；位置已回滚。\n" + compile_result.message
+                "LaTeX compilation failed after moving the illustration; the placement has been rolled back.\n" + compile_result.message
             )
 
         figure_state["last_message"] = (
-            f"该图已移动到 {placement_after} 后，PDF 已重新编译。"
+            f"This figure has been moved to {placement_after} The PDF has been recompiled."
         )
         state["compile"] = {
             "status": "ok",
@@ -13653,9 +14792,9 @@ class Handler(BaseHTTPRequestHandler):
             )
         ).strip()
         if len(prompt) > 8000:
-            raise StudioError("表格 Prompt 过长，请压缩到 8000 字符以内。")
+            raise StudioError("Table prompt is too long; please compress it to within 8000 characters.")
         if table_state.get("status") == "agent_editing":
-            raise StudioError("该表已有本地 Agent 任务正在运行。")
+            raise StudioError("This table already has a local Agent task running.")
         if ONLINE_PROJECT_MODE:
             # No local Agent subprocess online -- generate_table_latex's
             # deterministic structured-prompt parser already handles the
@@ -13678,8 +14817,8 @@ class Handler(BaseHTTPRequestHandler):
                     "status": "built",
                     "latex": latex,
                     "progress": 100,
-                    "progress_message": "表格已从可追溯结果生成并编译。",
-                    "last_message": "已按 Prompt 规格从可追溯结果确定性生成。",
+                    "progress_message": "Tables have been generated and compiled from traceable results.",
+                    "last_message": "Generated deterministically from traceable results according to Prompt specifications.",
                     "revision": int(table_state.get("revision", 0)) + 1,
                     "job_token": None,
                     "job_started_at": None,
@@ -13688,14 +14827,14 @@ class Handler(BaseHTTPRequestHandler):
             )
             save_state(state)
             self.send_json(
-                {"ok": True, "message": "表格已生成。", "state": public_state(state)}
+                {"ok": True, "message": "Table has been generated.", "state": public_state(state)}
             )
             return
         token = uuid.uuid4().hex
         latex = str(table_state.get("latex", ""))
         instruction = (
-            "根据以下规格生成一张完整的论文结果表初稿。完整覆盖可追溯结果，"
-            "不要省略已有实验数字。\n\n" + prompt
+            "Generate a complete draft of the paper results table according to the following specifications, fully covering traceable results."
+            "Do not omit existing experiment numbers.\n\n" + prompt
         )
         table_state.update(
             {
@@ -13703,7 +14842,7 @@ class Handler(BaseHTTPRequestHandler):
                 "status": "agent_editing",
                 "agent_prompt": instruction,
                 "progress": 10,
-                "progress_message": "正在启动本地 Codex agent 生成表格初稿…",
+                "progress_message": "Starting local Codex agent to generate the initial draft of the table…",
                 "last_message": "",
                 "job_token": token,
                 "job_started_at": int(time.time()),
@@ -13720,7 +14859,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "本地 Agent 已启动，正在从可追溯结果生成 LaTeX 表格。",
+                "message": "Local Agent started, generating LaTeX tables from traceable results.",
                 "state": public_state(state),
             },
             status=202,
@@ -13751,22 +14890,22 @@ class Handler(BaseHTTPRequestHandler):
             raise StudioError(reason)
         table_state = state["tables"][table_id]
         if table_state.get("status") == "agent_editing":
-            raise StudioError("该表已有本地 Agent 修改任务正在运行。")
+            raise StudioError("This table already has a local Agent modification task running.")
         latex = self.validate_table_latex(
             table_id, str(body.get("latex", table_state.get("latex", "")))
         )
         instruction = str(body.get("agent_prompt", "")).strip()
         if not instruction:
-            raise StudioError("请填写给本地 Agent 的表格修改 Prompt。")
+            raise StudioError("Please fill in the table modification Prompt for the local Agent.")
         if len(instruction) > 8000:
-            raise StudioError("本地 Agent Prompt 过长，请压缩到 8000 字符以内。")
+            raise StudioError("Local Agent Prompt is too long; please compress to within 8000 characters.")
         token = uuid.uuid4().hex
         table_state.update(
             {
                 "status": "agent_editing",
                 "agent_prompt": instruction,
                 "progress": 10,
-                "progress_message": "正在启动本机 codex agent（只读 sandbox）…",
+                "progress_message": "Starting local codex agent (read-only sandbox)…",
                 "last_message": "",
                 "job_token": token,
                 "job_started_at": int(time.time()),
@@ -13783,7 +14922,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "本地 Agent 已启动；没有调用 Paper Studio 的 GPT API。",
+                "message": "Local Agent has started; no call to Paper Studio GPT API.",
                 "state": public_state(state),
             },
             status=202,
@@ -13800,7 +14939,7 @@ class Handler(BaseHTTPRequestHandler):
             table_state["status"] = "built"
             table_state["approved_at"] = None
         table_state["revision"] = int(table_state.get("revision", 0)) + 1
-        table_state["last_message"] = "表格 LaTeX 修改已保存；确认后才会写入正文。"
+        table_state["last_message"] = "Table LaTeX modifications have been saved; they will be written into the main text only after confirmation."
         save_state(state)
         self.send_json(
             {
@@ -13846,7 +14985,7 @@ class Handler(BaseHTTPRequestHandler):
             state["tables"][table_id] = previous_state
             compile_paper()
             state["tables"][table_id]["last_message"] = (
-                "插入正文失败，表格和正文已回滚。\n" + compile_result.message
+                "Inserting the main text failed; tables and text have been rolled back.\n" + compile_result.message
             )
             state["compile"] = {
                 "status": "error",
@@ -13855,11 +14994,11 @@ class Handler(BaseHTTPRequestHandler):
             }
             save_state(state)
             raise StudioError(
-                "LaTeX 表格编译失败；正文和表格状态已回滚。\n"
+                "LaTeX Table compilation failed; the text and table states have been rolled back.\n"
                 + compile_result.message
             )
         table_state["last_message"] = (
-            f"该表已插入 {SECTION_MAP[section]['title']}，PDF 已重新编译。"
+            f"This table has been inserted. {SECTION_MAP[section]['title']}, PDF Recompiled."
         )
         state["compile"] = {
             "status": "ok",
@@ -13891,9 +15030,9 @@ class Handler(BaseHTTPRequestHandler):
             None,
         )
         if paragraph is None:
-            raise StudioError("所选自然段不属于该表绑定的 section。")
+            raise StudioError("The selected paragraph does not belong to the section bound to this table.")
         if not paragraph.get("accepted_text"):
-            raise StudioError(f"{placement_after} 尚未写入正文，不能把表放在它后面。")
+            raise StudioError(f"{placement_after} Main text not written yet; cannot place table after it.")
         table_state = state["tables"][table_id]
         layout_mode = str(
             body.get("layout_mode")
@@ -13905,7 +15044,7 @@ class Handler(BaseHTTPRequestHandler):
             )
         ).strip()
         if layout_mode not in {"single-column", "two-column"}:
-            raise StudioError("表格排版方式仅支持单栏或双栏。")
+            raise StudioError("Table typesetting supports only single column or double column.")
         previous_state = dict(table_state)
         previous_latex = str(table_state.get("latex") or "")
         converted_latex = previous_latex
@@ -13920,8 +15059,8 @@ class Handler(BaseHTTPRequestHandler):
             table_state["latex"] = converted_latex
         if table_state.get("status") != "approved":
             table_state["last_message"] = (
-                f"表格位置已设为 {placement_after} 后，排版方式为 {layout_mode}；"
-                "确认表格时会写入正文。"
+                f"Table placement set to {placement_after} Layout method is {layout_mode}; "
+                "The table will be written into the main text upon confirmation."
             )
             save_state(state)
             self.send_json(
@@ -13956,12 +15095,12 @@ class Handler(BaseHTTPRequestHandler):
                     pass
             compile_paper()
             raise StudioError(
-                "更新表格位置或宽度后 LaTeX 编译失败；修改已回滚。\n"
+                "LaTeX compilation failed after updating the table position or width; changes have been rolled back.\n"
                 + compile_result.message
             )
         table_state["last_message"] = (
-            f"该表已移动到 {placement_after} 后并切换为 {layout_mode}，"
-            "PDF 已重新编译。"
+            f"This table has moved to {placement_after} Then switch to. {layout_mode}, "
+            "PDF Recompiled."
         )
         state["compile"] = {
             "status": "ok",
@@ -14019,8 +15158,8 @@ def main() -> None:
         try:
             if not args.provider:
                 raise StudioError(
-                    "终端全文写作必须先询问使用哪个 API，然后显式传入 "
-                    "--provider openai 或 --provider deepseek。"
+                    "Terminal full text writing must first ask which API to use, then explicitly pass it in. "
+                    "--provider openai or --provider deepseek."
                 )
             state = load_state()
             if select_llm_provider(state, args.provider):
@@ -14033,9 +15172,9 @@ def main() -> None:
         return
     if not ONLINE_PROJECT_MODE and not EMBEDDED_ONLY and not DEMO_MODE:
         print(
-            "ERROR: 本地论文编辑器只在 Research Studio 中提供。请运行 "
+            "ERROR: Local paper editor is only available in Research Studio. Please run "
             "`python3 -m research_avatar.research_studio.server --ensure-studios` "
-            "并打开 http://127.0.0.1:8780。",
+            "And opens http://127.0.0.1:8780.",
             file=sys.stderr,
         )
         raise SystemExit(2)

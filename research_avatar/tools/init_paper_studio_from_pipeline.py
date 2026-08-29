@@ -4,12 +4,17 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import re
 import shutil
+import sys
 from pathlib import Path
 
 from bs4 import BeautifulSoup
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from research_avatar.online_studio.server import (
     _ResultArtifactTables,
@@ -73,12 +78,13 @@ def validate_report_only_contract(root: Path, contract: dict) -> None:
         raise ValueError(f"reports/ is missing canonical pipeline HTML: {', '.join(missing)}")
 
     policy = contract.get("downstream_input_policy", {})
-    if policy.get("mode") != "REPORT_HTML_ONLY":
-        raise ValueError("experiment plan must declare downstream_input_policy.mode=REPORT_HTML_ONLY")
-    if policy.get("files") != [f"reports/{name}" for name in PIPELINE_REPORTS]:
-        raise ValueError("downstream_input_policy.files must list reports/01 through reports/05 in order")
-    if policy.get("external_source_text_allowed") is not False:
-        raise ValueError("downstream_input_policy must forbid external source text")
+    if policy:
+        if policy.get("mode") != "REPORT_HTML_ONLY":
+            raise ValueError("experiment plan must declare downstream_input_policy.mode=REPORT_HTML_ONLY")
+        if policy.get("files") != [f"reports/{name}" for name in PIPELINE_REPORTS]:
+            raise ValueError("downstream_input_policy.files must list reports/01 through reports/05 in order")
+        if policy.get("external_source_text_allowed") is not False:
+            raise ValueError("downstream_input_policy must forbid external source text")
 
     references = contract.get("references", {})
     paper_roles = [
@@ -89,16 +95,22 @@ def validate_report_only_contract(root: Path, contract: dict) -> None:
     if len(paper_roles) != 1 or paper_roles[0][0] != "researcher_owned_logic":
         raise ValueError("experiment plan must select exactly one researcher-owned structural reference paper")
     reference = paper_roles[0][1]
-    for field in ("title", "authors", "venue", "publication_key", "url", "selection_basis", "experiment_design_alignment"):
+    required_reference_fields = (
+        ("title", "authors", "venue", "publication_key", "url", "selection_basis", "experiment_design_alignment")
+        if policy
+        else ("title",)
+    )
+    for field in required_reference_fields:
         if not str(reference.get(field) or "").strip():
             raise ValueError(f"selected structural reference lacks {field}")
-    if reference.get("mode") != "abstracted":
+    if policy and reference.get("mode") != "abstracted":
         raise ValueError("report-only initialization requires an abstracted structural reference")
 
-    selected = selected_idea_from_report(reports / "02_IDEA_REPORT.html")
     planned = contract.get("selected_idea", {})
-    if str(planned.get("id") or "").strip() != selected["id"]:
-        raise ValueError("Experiment Plan selected idea does not match reports/02_IDEA_REPORT.html")
+    if planned:
+        selected = selected_idea_from_report(reports / "02_IDEA_REPORT.html")
+        if str(planned.get("id") or "").strip() != selected["id"]:
+            raise ValueError("Experiment Plan selected idea does not match reports/02_IDEA_REPORT.html")
 
 
 def contract_from(path: Path) -> dict:
@@ -119,21 +131,41 @@ def result_tables(path: Path) -> dict:
     return parser.rows
 
 
+def result_evidence(path: Path) -> dict:
+    """Read structured writing evidence embedded in the canonical result HTML."""
+    soup = BeautifulSoup(path.read_text(encoding="utf-8"), "html.parser")
+    node = soup.find("script", id="experiment-evidence")
+    if node is None or not node.string:
+        return {}
+    value = json.loads(node.string)
+    if not isinstance(value, dict):
+        raise ValueError("experiment-evidence must be a JSON object")
+    return value
+
+
 def artifact_binding_contract(
     contract: dict, sections: list[dict]
 ) -> tuple[dict[str, dict[str, list[str]]], dict[str, dict[str, list[str]]]]:
     """Separate manuscript citations from figure-generation dependencies.
 
-    ``artifact_refs`` is a publication-layout contract: exactly the paragraph
-    named by ``paper_artifacts[].introduced_after`` owns the manuscript
-    reference and float. ``artifact_dependencies`` may name additional
-    paragraphs whose accepted prose is needed to build the artifact, but those
-    paragraphs must not be forced to cite it.
+    ``artifact_refs`` is both a publication-layout and prose-reference contract.
+    The paragraph named by ``paper_artifacts[].introduced_after`` owns the float;
+    later Discussion/Analysis paragraphs may cite the same artifact again when
+    interpreting it. ``artifact_dependencies`` names paragraphs whose accepted
+    prose is needed to build the artifact and never creates a citation by itself.
     """
     paragraph_locations = {
         paragraph["id"]: section["id"]
         for section in sections
         for paragraph in section["paragraphs"]
+    }
+    paragraph_order = {
+        paragraph["id"]: order
+        for order, paragraph in enumerate(
+            paragraph
+            for section in sections
+            for paragraph in section["paragraphs"]
+        )
     }
     section_aliases = {
         str(alias): section["id"]
@@ -175,11 +207,23 @@ def artifact_binding_contract(
                 f"introduced_after={owner_section}/{owner}"
             )
         actual = citations.get(artifact_id, {})
-        expected = {owner_section: [owner]}
-        if actual != expected:
+        owner_citations = actual.get(owner_section, [])
+        if owner not in owner_citations:
             raise ValueError(
-                f"Artifact {artifact_id} must be cited only by {owner_section}/{owner}; "
+                f"Artifact {artifact_id} must be introduced by {owner_section}/{owner}; "
                 f"found {actual or 'no citation owner'}"
+            )
+        premature = [
+            paragraph_id
+            for paragraph_ids in actual.values()
+            for paragraph_id in paragraph_ids
+            if paragraph_id != owner
+            and paragraph_order.get(paragraph_id, -1) <= paragraph_order[owner]
+        ]
+        if premature:
+            raise ValueError(
+                f"Artifact {artifact_id} is cited before its owning float: "
+                + ", ".join(premature)
             )
         dependency_ids = dependencies.setdefault(artifact_id, {}).setdefault(
             owner_section, []
@@ -298,9 +342,9 @@ def reference_contexts(contract: dict, sections: list[dict]) -> dict:
             purpose = str(paragraph.get("purpose") or "").strip()
             label = paragraph_id
             if role:
-                label += f"（{role}）"
+                label += f"({role})"
             if purpose:
-                label += f"：{purpose}"
+                label += f":{purpose}"
             logic_nodes.append(label)
         section_logic_chain = " → ".join(node for node in logic_nodes if node)
         excerpts = []
@@ -314,7 +358,9 @@ def reference_contexts(contract: dict, sections: list[dict]) -> dict:
                     mappings.extend(item for item in values if isinstance(item, dict))
             ids = []
             for mapping in mappings:
-                source_id = str(mapping.get("source_paragraph_id") or "").strip()
+                source_id = str(
+                    mapping.get("source_paragraph_id") or mapping.get("source_id") or ""
+                ).strip()
                 source_text = str(
                     mapping.get("complete_source_text")
                     or mapping.get("source_text")
@@ -338,7 +384,7 @@ def reference_contexts(contract: dict, sections: list[dict]) -> dict:
         if not excerpts:
             contexts[section["id"]] = {
                 "mode": "abstracted",
-                "source_heading": "提炼后的结构约束",
+                "source_heading": "Refined structure constraints",
                 "logic_summary_zh": section_logic_chain,
                 "writing_constraints": [
                     {
@@ -376,11 +422,101 @@ def repair_reference_context(root: Path, plan: Path) -> dict:
     if not config_path.is_file():
         raise ValueError("paper/paper_studio.json does not exist")
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    sections = config.get("sections")
+    # Reference-only repair also supports older approved contracts whose
+    # outline paragraphs predate the explicit plan_sentence/title fields. Use
+    # the existing Paper Studio structure and mapped source prose as migration
+    # inputs before handing the contract to the current canonical parser.
+    normalized_contract = copy.deepcopy(contract)
+    configured_sections = {
+        str(section.get("id") or ""): section
+        for section in config.get("sections", [])
+        if isinstance(section, dict)
+    }
+    for section in normalized_contract.get("paper_outline", []):
+        if not isinstance(section, dict):
+            continue
+        configured_section = configured_sections.get(str(section.get("id") or ""), {})
+        section.setdefault(
+            "title",
+            str(configured_section.get("title") or section.get("id") or "Section"),
+        )
+        configured_paragraphs = {
+            str(paragraph.get("id") or ""): paragraph
+            for paragraph in configured_section.get("paragraphs", [])
+            if isinstance(paragraph, dict)
+        }
+        for paragraph in section.get("paragraphs", []):
+            if not isinstance(paragraph, dict):
+                continue
+            configured_paragraph = configured_paragraphs.get(
+                str(paragraph.get("id") or ""), {}
+            )
+            mapped_text = next(
+                (
+                    str(mapping.get("source_text") or "").strip()
+                    for mapping in paragraph.get("reference_mapping", [])
+                    if isinstance(mapping, dict)
+                    and str(mapping.get("source_text") or "").strip()
+                ),
+                "",
+            )
+            paragraph.setdefault(
+                "plan_sentence",
+                str(
+                    paragraph.get("purpose")
+                    or configured_paragraph.get("purpose")
+                    or mapped_text
+                    or f"Develop paragraph {paragraph.get('id') or 'content'}."
+                ).strip(),
+            )
+            paragraph.setdefault(
+                "rhetorical_role",
+                str(
+                    configured_paragraph.get("rhetorical_role")
+                    or "reference-grounded paragraph"
+                ),
+            )
+            paragraph.setdefault(
+                "relation_to_previous",
+                str(
+                    configured_paragraph.get("relation_to_previous")
+                    or "continue the approved section logic"
+                ),
+            )
+            paragraph.setdefault(
+                "relation_to_next",
+                str(
+                    configured_paragraph.get("relation_to_next")
+                    or "prepare the next approved paragraph"
+                ),
+            )
+    planned_sections = _outline_sections(normalized_contract)
+    materialize_appendix_contracts(planned_sections)
+    configured_by_id = {
+        str(section.get("id")): section
+        for section in config.get("sections", []) if isinstance(section, dict)
+    }
+    sections = []
+    for planned in planned_sections:
+        section_id = str(planned["id"])
+        configured = configured_by_id.get(section_id, {})
+        refreshed = {
+            **configured,
+            "id": section_id,
+            "title": clean_title(str(planned["title"])),
+            "render": planned["render"],
+            "file": str(configured.get("file") or f"{section_id}.tex"),
+            "paragraphs": planned["paragraphs"],
+        }
+        if planned["render"] != "abstract":
+            refreshed["latex_title"] = clean_title(str(planned["title"]))
+            refreshed["start_label"] = f"sec:{section_id.replace('_', '-')}"
+        sections.append(refreshed)
+    config["sections"] = sections
     if not isinstance(sections, list) or not sections:
         raise ValueError("paper/paper_studio.json has no configured sections")
 
-    contexts = reference_contexts(contract, sections)
+    contexts = reference_contexts(normalized_contract, sections)
     payload = {
         "reference_title": contract.get("references", {})
         .get("researcher_owned_logic", {})
@@ -396,11 +532,6 @@ def repair_reference_context(root: Path, plan: Path) -> dict:
         )
         temporary.replace(path)
 
-    # reference_contexts() updates only reference_paragraph_ids. Preserve
-    # every other project setting, manuscript paragraph, and history entry.
-    replace_json(config_path, config)
-    replace_json(paper / "reference_context.json", payload)
-
     metrics_value = str(
         config.get("paths", {}).get("metrics", "paper/metrics.json")
     ).strip()
@@ -413,6 +544,11 @@ def repair_reference_context(root: Path, plan: Path) -> dict:
         else {}
     )
     metrics["model_design"] = contract.get("grounding", {}).get("model_design", {})
+    metrics["metric_contract"] = contract.get("metric_contract", [])
+    metrics["claims"] = contract.get("claims", [])
+    metrics["contract_approval_sha256"] = contract.get("approval_contract_sha256")
+    metrics["scientific_integrity_version"] = contract.get("scientific_integrity_version")
+    metrics["gold_standard_contract"] = contract.get("gold_standard_contract", {})
     metrics["symbol_registry"] = contract.get("consistency_requirements", {}).get(
         "symbol_registry", []
     )
@@ -424,7 +560,9 @@ def repair_reference_context(root: Path, plan: Path) -> dict:
         refreshed_figures, refreshed_tables, refreshed_metrics = _artifact_definitions(
             refreshed_contract, sections
         )
+        changed_artifacts: set[str] = set()
         metrics["artifacts"] = refreshed_metrics.get("artifacts", {})
+        metrics.update(result_evidence(results_report))
         for collection_name, refreshed in (
             ("figures", refreshed_figures),
             ("tables", refreshed_tables),
@@ -435,20 +573,36 @@ def repair_reference_context(root: Path, plan: Path) -> dict:
             for artifact_id, definition in refreshed.items():
                 if artifact_id not in configured:
                     continue
+                previous_contract = {
+                    field: configured[artifact_id].get(field)
+                    for field in ("data_grid", "prompt", "result_keys", "caption")
+                }
                 for field in (
                     "title", "description", "caption", "result_keys",
-                    "dimensions", "visible_dimensions",
+                    "dimensions", "visible_dimensions", "x_axis_label",
+                    "y_axis_label", "chart_type", "panels", "kind", "symbol_ids", "prompt",
                 ):
                     if field in definition:
                         configured[artifact_id][field] = definition[field]
                 if definition.get("data_grid"):
                     configured[artifact_id]["data_grid"] = definition["data_grid"]
-        replace_json(config_path, config)
+                refreshed_contract_fields = {
+                    field: configured[artifact_id].get(field)
+                    for field in ("data_grid", "prompt", "result_keys", "caption")
+                }
+                if previous_contract != refreshed_contract_fields:
+                    changed_artifacts.add(artifact_id)
         result_evidence_synced = True
-    replace_json(metrics_path, metrics)
+    else:
+        changed_artifacts = set()
+
+    title = str(contract.get("paper_title") or contract.get("selected_idea", {}).get("title") or "").strip()
+    if title:
+        config.setdefault("project", {})["initial_title"] = title
 
     state_path = paper / ".paper_studio/state.json"
     state_updated = False
+    state: dict | None = None
     if state_path.is_file():
         state = json.loads(state_path.read_text(encoding="utf-8"))
         ids_by_paragraph = {
@@ -477,14 +631,59 @@ def repair_reference_context(root: Path, plan: Path) -> dict:
                 definition = configured.get(artifact_id, {})
                 if not isinstance(runtime_artifact, dict) or not isinstance(definition, dict):
                     continue
+                artifact_contract_changed = artifact_id in changed_artifacts
+                # The configured contract may already have been refreshed by a
+                # previous initialization while the approved table LaTeX still
+                # contains the old caption.  Compare the rendered deliverable as
+                # well; otherwise a restart can silently preserve stale table
+                # semantics even though config and runtime metadata look current.
+                if collection_name == "tables" and runtime_artifact.get("status") == "approved":
+                    rendered = str(runtime_artifact.get("latex") or "")
+                    caption_match = re.search(r"\\caption\{([^{}]*)\}", rendered)
+                    rendered_caption = caption_match.group(1) if caption_match else ""
+                    rendered_caption = re.sub(r"\\([%&_#])", r"\1", rendered_caption)
+                    expected_caption = str(definition.get("caption") or "").strip()
+                    if expected_caption and rendered_caption.strip() != expected_caption:
+                        artifact_contract_changed = True
                 for field in (
                     "title", "description", "caption", "result_keys",
-                    "dimensions", "visible_dimensions", "data_grid",
+                    "dimensions", "visible_dimensions", "data_grid", "figure_type",
+                    "x_axis_label", "y_axis_label", "chart_type", "kind", "symbol_ids",
                 ):
                     if field in definition:
                         runtime_artifact[field] = definition[field]
-        replace_json(state_path, state)
+                if artifact_contract_changed:
+                    runtime_artifact["status"] = "pending"
+                    runtime_artifact["approved_at"] = None
+                    runtime_artifact["job_token"] = None
+                    runtime_artifact["progress"] = 0
+                    runtime_artifact["progress_message"] = "Artifact contract changed; regenerate from refreshed traceable data."
+                    if collection_name == "tables":
+                        prompt = definition.get("prompt", {})
+                        runtime_artifact["latex"] = ""
+                        runtime_artifact["generation_prompt"] = "\n".join([
+                            f"Data source: {config.get('paths', {}).get('metrics', 'paper/metrics.json')}",
+                            f"Column: {prompt.get('columns', '')}",
+                            f"Row: {prompt.get('rows', 'source')}",
+                            f"Caption: {definition.get('caption', '')}",
+                            f"Font size: {prompt.get('font_size', 'small')}",
+                            f"Optimal value: {prompt.get('best_values', 'none')}",
+                        ])
+                    else:
+                        for panel in runtime_artifact.get("panels", {}).values():
+                            if isinstance(panel, dict):
+                                panel.update(status="pending", progress=0, progress_message="")
         state_updated = True
+
+    # Commit only after every plan, artifact, metrics, and state transformation
+    # has completed successfully. A mismatched plan/config pair must leave the
+    # existing writing project byte-for-byte intact instead of updating the
+    # reference context and then failing while rebuilding artifact definitions.
+    replace_json(config_path, config)
+    replace_json(paper / "reference_context.json", payload)
+    replace_json(metrics_path, metrics)
+    if state is not None:
+        replace_json(state_path, state)
 
     return {
         "reference_context": str((paper / "reference_context.json").relative_to(root)),
@@ -504,9 +703,33 @@ def repair_reference_context(root: Path, plan: Path) -> dict:
     }
 
 
+def has_authored_paper_studio_state(root: Path) -> bool:
+    """Return whether initialization would overwrite accepted browser work."""
+    state_path = root / "paper/.paper_studio/state.json"
+    if not state_path.is_file():
+        return False
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return any(
+        str(paragraph.get("accepted_text") or "").strip()
+        for section in state.get("sections", {}).values()
+        if isinstance(section, dict)
+        for paragraph in section.get("paragraphs", [])
+        if isinstance(paragraph, dict)
+    )
+
+
 def initialize(root: Path, plan: Path, results: Path) -> dict:
     plan = require_report_html(root, plan, "experiment plan")
     results = require_report_html(root, results, "experiment results")
+    # Re-running pipeline initialization after browser drafting used to replace
+    # every section with an "Awaiting paragraph" shell while leaving accepted
+    # text in state.json.  Treat an authored project as a refresh operation;
+    # destructive clearing remains an explicit Paper Studio UI action.
+    if has_authored_paper_studio_state(root):
+        return repair_reference_context(root, plan)
     contract = contract_from(plan)
     validate_report_only_contract(root, contract)
     contract["_result_tables"] = result_tables(results)
@@ -566,6 +789,7 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
             "file": filename,
             "result_keys": result_keys,
             "render": render,
+            "length_share": section.get("length_share"),
             "paragraphs": section["paragraphs"],
         }
         if render != "abstract":
@@ -634,6 +858,7 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
         # Keep late figure/table floats from drifting into and splitting the
         # bibliography.  The scaffold's template includes ``placeins``.
         r"\FloatBarrier",
+        r"\label{paper:body-end}",
         r"\input{sections/bibliography}",
         r"\end{document}",
         "",
@@ -641,11 +866,15 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
     (paper / "main.tex").write_text(main, encoding="utf-8")
 
     grounding = contract.get("grounding", {})
+    executed_evidence = result_evidence(results)
     metrics.update({
         "claims": contract.get("claims", []),
+        "scientific_integrity_version": contract.get("scientific_integrity_version"),
+        "gold_standard_contract": contract.get("gold_standard_contract", {}),
         # Keep the approved Method specification in the bounded report-derived
         # evidence bundle. Paper Studio must not reduce it to paragraph titles.
         "model_design": grounding.get("model_design", {}),
+        "metric_contract": contract.get("metric_contract", []),
         "symbol_registry": contract.get("consistency_requirements", {}).get(
             "symbol_registry", []
         ),
@@ -659,6 +888,7 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
         "result_source": str(results.relative_to(root)),
         "contract_approval_sha256": contract.get("approval_contract_sha256"),
         "evidence_grade": contract.get("plan_variant", {}).get("evidence_grade", "validated"),
+        **executed_evidence,
     })
     (paper / "metrics.json").write_text(
         json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -695,7 +925,7 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
             "decision_source": str(plan.relative_to(root)),
             "eyebrow": "LOCAL PAPER STUDIO",
             "studio_title": "Paper Studio",
-            "subtitle": "基于已批准段落规划与可追溯实验结果逐段写作",
+            "subtitle": "Based on approved paragraph planning and traceable experimental results, write section by section.",
         },
         "sections": section_specs,
         # Results must exist before their compression into the abstract.

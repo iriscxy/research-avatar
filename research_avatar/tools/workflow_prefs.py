@@ -35,32 +35,32 @@ from pathlib import Path
 # --------------------------------------------------------------------------- #
 _CUES: dict[str, list[str]] = {
     "cadence": [  # iteration rhythm: small first, then scale
-        r"先.{0,12}(再|然后|才)", r"smoke", r"试跑", r"小数据", r"通了", r"跑通",
-        r"sanity", r"pilot", r"first.{0,20}then", r"1\s?个?\s?epoch", r"先验证",
+        r"First.{0,12}(again|then|only)", r"smoke", r"trial run", r"Small data", r"connected", r"run successfully",
+        r"sanity", r"pilot", r"first.{0,20}then", r"1\s?item?\s?epoch", r"Verify first",
     ],
     "prohibition": [
-        r"不要", r"别(?!的)", r"永远不", r"从不", r"不能", r"禁止", r"不准",
-        r"\bnever\b", r"\bdon'?t\b", r"\bdo not\b", r"\bavoid\b", r"不许",
+        r"do not", r"other(?!of)", r"Never", r"never", r"cannot", r"prohibit", r"not permitted",
+        r"\bnever\b", r"\bdon'?t\b", r"\bdo not\b", r"\bavoid\b", r"not allowed",
     ],
     "mandate": [
-        r"必须", r"一定要", r"总是", r"永远", r"每次", r"记得", r"务必",
+        r"must", r"Must", r"always", r"forever", r"Each time", r"remember", r"must",
         r"\balways\b", r"\bmust\b", r"\bmake sure\b", r"\bremember to\b",
     ],
     "tradeoff": [
-        r"宁可", r"宁愿", r"优先", r"偏好", r"更倾向", r"尽量", r"能.{0,6}就不",
-        r"\bprefer\b", r"\binstead\b", r"\brather\b", r"简单", r"别太复杂", r"最省",
+        r"would rather", r"would rather", r"Priority", r"preference", r"More inclined", r"as far as possible", r"can.{0,6}Will not",
+        r"\bprefer\b", r"\binstead\b", r"\brather\b", r"simple", r"Not too complicated", r"most efficient",
     ],
     "correction": [
-        r"不对", r"错了", r"不是这样", r"应该是", r"其实", r"重新", r"改成",
-        r"\bactually\b", r"\bwrong\b", r"\bshould be\b", r"\bno,\b", r"搞错",
+        r"incorrect", r"wrong", r"Not like this", r"Should be", r"actually", r"again", r"change to",
+        r"\bactually\b", r"\bwrong\b", r"\bshould be\b", r"\bno,\b", r"mistake",
     ],
     "process": [
-        r"顺序", r"流程", r"步骤", r"第[一二三]步", r"workflow", r"先做", r"接下来",
+        r"order", r"process", r"steps", r"the[One two three]step", r"workflow", r"do first", r"Next",
         r"\bworkflow\b", r"\bpipeline\b", r"\bstep\b",
     ],
     "rigor": [
-        r"复现", r"复跑", r"reproduce", r"baseline", r"对不上", r"seed",
-        r"消融", r"ablation", r"可复现", r"raw", r"追溯", r"几个种子", r"如实",
+        r"reproduce", r"Rerun", r"reproduce", r"baseline", r"Does not match", r"seed",
+        r"Ablation", r"ablation", r"Reproducible", r"raw", r"Traceability", r"Several seeds", r"accurately",
     ],
 }
 

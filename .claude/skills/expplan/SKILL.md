@@ -123,12 +123,27 @@ Work backward from testable claims:
   dev/final freezing; `/expplan` does not choose train/dev/test splits.
 - Give every result target exactly one source action: `RUN_LOCAL` or explicitly
   approved `REUSE_REPORTED`.
-- Set `scientific_integrity_version=1`. Every metric records a unit, evidence
+- Set `scientific_integrity_version=2`. Every metric records a unit, evidence
   source (`BENCHMARK_LABEL`, `MODEL_OUTPUT`, `SYSTEM_TRACE`,
   `HUMAN_ANNOTATION`, `LLM_JUDGE`, or `DERIVED`), raw input fields, executable
   calculation, implementation entrypoint, and protocol checks. Claim-side
   `metric_ids` and metric-side `claim_mappings` must be exact inverses; never
   bind every metric to every claim as a convenience.
+- Register a `gold_standard_contract` whenever any metric compares predictions
+  with gold state. The gold source must be an official benchmark label, real
+  human annotation, or an independent executable oracle. Its implementation
+  entrypoint, input schema, output schema, fixtures, and conformance command
+  must be distinct from every evaluated method. A method may be a reference
+  implementation of the specification, but its output can never generate the
+  labels used to claim that the same method is superior. Conformance of a
+  reference implementation is not an empirical performance contribution.
+- Give every metric a structured numeric `valid_range`, `sampling_unit`,
+  `comparison_population_id`, `input_schema`, and structured aggregation with
+  estimator, resampling unit, interval, and repetitions. Difference metrics
+  must admit the full signed domain. Timing metrics consume saved timing fields
+  and have no arbitrary accuracy-like upper bound. Comparisons may share a
+  claim only when their population IDs match, or when an approved alignment
+  rule makes the populations commensurate.
 - Give every claim a deterministic `outcome_rule`. A tie, missing value,
   interval crossing the registered null, or failure to meet the registered
   margin is `inconclusive` or `weakened` as specified, never automatically
@@ -143,6 +158,11 @@ Work backward from testable claims:
 - Represent a project-created unpublished dataset as
   `SELF_BUILT_UNPUBLISHED`, with its planned collection/versioning contract and
   no external dataset URL. Never fabricate a publication or repository link.
+- Every published or public benchmark must carry a structured
+  `protocol_contract` naming the official split source, prompt or input source,
+  scorer source, a small conformance fixture, and its executable conformance
+  command. A title or prose statement that the protocol is followed is not
+  protocol evidence.
 
 ## Projected paper
 
@@ -158,6 +178,15 @@ Design the projected paper inside `reports/03_EXPERIMENT_PLAN.html`. Include:
   `heading` and `heading_style: subsection`; continuation paragraphs leave both
   fields empty so Paper Studio renders each heading exactly once;
 - paper-shaped figure/table shells at their insertion points;
+- every Discussion/Analysis paragraph that interprets an experimental result
+  must bind and cite the exact existing figure or table that supplies that
+  result. Keep the float at its first owning Experiments paragraph, but allow
+  later Discussion paragraphs to reference it again; never discuss an
+  unbound result ledger or rely on section-wide implicit evidence;
+- for every count-only non-experimental figure, an explicit `shell.figure_type`
+  chosen from `motivation_contrast`, `model_architecture`, `method_workflow`, or
+  `agent_interaction`; this approved field is authoritative downstream, so never
+  leave Paper Studio to infer the type from a title, caption, or keyword;
 - artifact ledger, implementation plan, budget, and stop/refine/pivot criteria.
 
 The visible report is the projected paper plan, not an experiment registry. Use
@@ -235,6 +264,11 @@ and the behavioral or evidentiary criterion therefore needed. It is count-only
 during `/expplan`; do not invent quantitative findings or draw final artwork.
 Attach it to the Introduction gap paragraph unless the researcher explicitly
 approves another role.
+Set its `shell.figure_type` to `motivation_contrast`. A distinct figure that
+exposes modules and operator-level interfaces uses `model_architecture`; an
+ordered training, inference, or measurement process uses `method_workflow`;
+an actor/tool/environment exchange uses `agent_interaction`. Choose by the
+figure's scientific job, and keep the chosen type explicit in the contract.
 
 ### Page-fill hard rule
 

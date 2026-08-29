@@ -54,7 +54,10 @@
   \renewcommand\thelinenumber{\fillzeros[3]{\arabic{linenumber}}}
   \AtBeginDocument{\linenumbers}
 
-  \setlength{\linenumbersep}{1.6cm}
+  % Keep review line numbers inside the column margin. A centimetre-scale
+  % separation pushes inner-column numbers across the two-column gutter and
+  % can overlap the opposite column in rendered PDFs.
+  \setlength{\linenumbersep}{8pt}
 
   % Bug: An equation with $$ ... $$ isn't numbered, nor is the previous line.
 

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import datetime as dt
 import hashlib
 import html as html_module
@@ -13,6 +14,13 @@ import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
+# This validator is intentionally runnable both as a module and by its documented
+# repository-relative script path.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from research_avatar.figure_contract import MECHANISM_FIGURE_TYPES
 
 CONTRACT_RE = re.compile(
     r'<script type="application/json" id="experiment-plan-contract">(.*?)</script>', re.S
@@ -96,6 +104,135 @@ def validate_implementation_integrity(contract: dict) -> list[str]:
         source_url = str(item.get("source_url", "")).rstrip("/")
         if item.get("source_kind") == "OFFICIAL_GITHUB" and source_url not in repository_urls:
             errors.append(f"implementation {method} source is absent from repository_contract")
+    return errors
+
+
+def validate_scientific_integrity_v2(contract: dict, project_root: Path) -> list[str]:
+    """Validate independent gold and executable metric domains for integrity v2."""
+    if contract.get("scientific_integrity_version") != 2:
+        return []
+    errors: list[str] = []
+    gold = contract.get("gold_standard_contract")
+    required_gold = {
+        "id", "source_type", "oracle_entrypoint", "oracle_code_files", "input_schema",
+        "output_schema", "fixtures", "conformance_command", "independence_statement",
+    }
+    if not isinstance(gold, dict) or any(gold.get(field) in (None, "", []) for field in required_gold):
+        return ["scientific_integrity_version=2 requires a complete gold_standard_contract"]
+    if gold.get("source_type") not in {
+        "OFFICIAL_BENCHMARK_LABEL", "HUMAN_ANNOTATION", "INDEPENDENT_EXECUTABLE_ORACLE"
+    }:
+        errors.append("gold_standard_contract has an invalid source_type")
+    oracle_entrypoint = str(gold.get("oracle_entrypoint", ""))
+    evaluated_entrypoints = {
+        str(item.get("local_implementation", ""))
+        for item in contract.get("implementation_contract", []) if isinstance(item, dict)
+    }
+    if oracle_entrypoint in evaluated_entrypoints:
+        errors.append("gold oracle entrypoint must be distinct from every evaluated method")
+    oracle_paths = {str(path) for path in gold.get("oracle_code_files", [])}
+    for path in oracle_paths:
+        oracle_file = project_root / path
+        if not oracle_file.is_file():
+            errors.append(f"gold oracle code file does not exist: {path}")
+            continue
+        if gold.get("source_type") == "INDEPENDENT_EXECUTABLE_ORACLE" and oracle_file.suffix == ".py":
+            try:
+                tree = ast.parse(oracle_file.read_text(encoding="utf-8"))
+            except (OSError, SyntaxError) as exc:
+                errors.append(f"gold oracle code cannot be audited: {path}: {exc}")
+                continue
+            evaluated_modules = {
+                Path(str(item.get("local_implementation", "")).split(":", 1)[0]).stem
+                for item in contract.get("implementation_contract", []) if isinstance(item, dict)
+            }
+            imported_modules = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    imported_modules.update(alias.name.split(".")[0] for alias in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    imported_modules.add(node.module.split(".")[0])
+            overlap = imported_modules & evaluated_modules
+            if overlap:
+                errors.append(
+                    f"gold oracle imports evaluated implementation module(s): {sorted(overlap)}"
+                )
+    for item in contract.get("implementation_contract", []):
+        implementation_path = str(item.get("local_implementation", "")).split(":", 1)[0]
+        if implementation_path in oracle_paths:
+            errors.append(f"gold oracle code overlaps evaluated method implementation: {implementation_path}")
+    for field in ("input_schema", "output_schema", "fixtures"):
+        if not isinstance(gold.get(field), list) or not gold.get(field):
+            errors.append(f"gold_standard_contract.{field} must be a non-empty list")
+
+    population_ids: dict[str, str] = {}
+    metrics = contract.get("metric_contract", [])
+    for index, metric in enumerate(metrics if isinstance(metrics, list) else []):
+        label = f"metric_contract[{index}]"
+        valid_range = metric.get("valid_range")
+        if not isinstance(valid_range, dict) or "min" not in valid_range or "max" not in valid_range:
+            errors.append(f"{label}.valid_range must explicitly contain min and max")
+        else:
+            minimum, maximum = valid_range.get("min"), valid_range.get("max")
+            if not isinstance(minimum, (int, float)):
+                errors.append(f"{label}.valid_range.min must be numeric")
+            if maximum is not None and not isinstance(maximum, (int, float)):
+                errors.append(f"{label}.valid_range.max must be numeric or null")
+            if isinstance(minimum, (int, float)) and isinstance(maximum, (int, float)) and minimum >= maximum:
+                errors.append(f"{label}.valid_range must have min < max")
+        sampling_unit = str(metric.get("sampling_unit", "")).strip()
+        population_id = str(metric.get("comparison_population_id", "")).strip()
+        if not sampling_unit or not population_id:
+            errors.append(f"{label} requires sampling_unit and comparison_population_id")
+        population_ids[str(metric.get("id", ""))] = population_id
+        input_schema = metric.get("input_schema")
+        if not isinstance(input_schema, list) or not input_schema:
+            errors.append(f"{label}.input_schema must be a non-empty structured list")
+            roles: set[str] = set()
+        else:
+            roles = {str(item.get("role", "")) for item in input_schema if isinstance(item, dict)}
+            if any(
+                not isinstance(item, dict)
+                or not str(item.get("name", "")).strip()
+                or not str(item.get("role", "")).strip()
+                for item in input_schema
+            ):
+                errors.append(f"{label}.input_schema entries require name and role")
+        if metric.get("evidence_source") == "SYSTEM_TRACE" and "timing_measurement" not in roles:
+            errors.append(f"{label} SYSTEM_TRACE metric requires a timing_measurement input")
+        if "timing_measurement" in roles and isinstance(valid_range, dict):
+            if valid_range.get("min") != 0 or valid_range.get("max") is not None:
+                errors.append(f"{label} wall-clock timing domain must be [0, +infinity)")
+        if "paired_control_output" in roles and isinstance(valid_range, dict):
+            minimum, maximum = valid_range.get("min"), valid_range.get("max")
+            if not (
+                isinstance(minimum, (int, float))
+                and isinstance(maximum, (int, float))
+                and minimum < 0 < maximum
+            ):
+                errors.append(f"{label} signed paired difference domain must include negative and positive values")
+        if "gold_label" in roles and metric.get("gold_standard_id") != gold.get("id"):
+            errors.append(f"{label} gold_label input must bind the approved gold standard")
+        aggregation = metric.get("aggregation_contract")
+        required_aggregation = {"estimator", "resampling_unit", "confidence_level", "resamples"}
+        if not isinstance(aggregation, dict) or any(
+            aggregation.get(field) in (None, "", []) for field in required_aggregation
+        ):
+            errors.append(f"{label} requires a complete aggregation_contract")
+        elif aggregation.get("resampling_unit") != sampling_unit:
+            errors.append(f"{label} resampling_unit must equal sampling_unit")
+        display = metric.get("display_contract")
+        if not isinstance(display, dict) or any(
+            not str(display.get(field, "")).strip()
+            for field in ("expanded_name", "unit_expansion", "interval_expansion")
+        ):
+            errors.append(f"{label} requires display_contract expansions")
+
+    for index, claim in enumerate(contract.get("claims", [])):
+        metric_ids = [str(item) for item in claim.get("measurement_contract", {}).get("metric_ids", [])]
+        populations = {population_ids.get(metric_id, "") for metric_id in metric_ids}
+        if len(populations) > 1 and not claim.get("measurement_contract", {}).get("population_alignment_rule"):
+            errors.append(f"claims[{index}] combines metrics from different populations without alignment")
     return errors
 PENDING_TD_RE = re.compile(
     r'<td\b[^>]*class\s*=\s*["\'][^"\']*\bpending\b[^"\']*["\'][^>]*>\s*\[PENDING\]\s*</td>',
@@ -192,6 +329,8 @@ def visible_shell(source: str, artifact_id: str) -> str | None:
 def validate(plan: Path) -> list[str]:
     errors: list[str] = []
     source = plan.read_text(encoding="utf-8")
+    if re.search(r'<a\b[^>]*\bhref\s*=\s*["\']\s*["\']', source, re.I):
+        errors.append("report contains an empty hyperlink; unpublished/private sources must render as plain text")
     match = CONTRACT_RE.search(source)
     if not match:
         return ["missing experiment-plan-contract"]
@@ -226,9 +365,9 @@ def validate(plan: Path) -> list[str]:
                 contract.get("parent_approval_sha256", "")
             ).strip():
                 errors.append("an amended contract requires parent_approval_sha256")
-    if contract.get("scientific_integrity_version") != 1:
+    if contract.get("scientific_integrity_version") not in {1, 2}:
         errors.append(
-            "scientific_integrity_version must be 1; regenerate the plan with "
+            "scientific_integrity_version must be 1 or 2; regenerate the plan with "
             "claim/metric, implementation, and evidence-source integrity contracts"
         )
     if contract.get("approval_status") not in {"pending", "approved"}:
@@ -249,6 +388,7 @@ def validate(plan: Path) -> list[str]:
     if not structure_key:
         errors.append("profile_contract.structure_reference_key is required")
     project_root = plan.parent.parent if plan.parent.name == "reports" else plan.parent
+    errors.extend(validate_scientific_integrity_v2(contract, project_root))
     profile_path = project_root / "researcher-profile/PROFILE.html"
     publications_path = project_root / "researcher-profile/publications.json"
     publication_keys: set[str] = set()
@@ -328,6 +468,18 @@ def validate(plan: Path) -> list[str]:
         url = str(dataset.get("url", "")).strip()
         if status in {"PUBLISHED", "PUBLIC_REPOSITORY"} and not nonplaceholder_url(url):
             errors.append(f"dataset_citations[{index}] requires a real public URL")
+        if status in {"PUBLISHED", "PUBLIC_REPOSITORY"}:
+            protocol = dataset.get("protocol_contract")
+            required_protocol = {
+                "official_split_source", "prompt_or_input_source", "scorer_source",
+                "conformance_fixture", "conformance_command",
+            }
+            if not isinstance(protocol, dict) or any(
+                protocol.get(field) in (None, "", []) for field in required_protocol
+            ):
+                errors.append(
+                    f"dataset_citations[{index}] public benchmark requires a complete protocol_contract"
+                )
         if status in {"USER_PROVIDED_PRIVATE", "SELF_BUILT_UNPUBLISHED"}:
             if url:
                 errors.append(f"dataset_citations[{index}] private/unpublished data must not have a URL")
@@ -361,9 +513,9 @@ def validate(plan: Path) -> list[str]:
                         f"metric_contract[{index}].claim_mappings[{mapping_index}].measurement_role "
                         "must be DIRECT or PROXY"
                     )
-                if "cannot_establish" not in mapping or "companion_requirements" not in mapping:
+                if "cannot_establish" not in mapping or "companion_requirements" not in mapping or not str(mapping.get("construct_definition", "")).strip():
                     errors.append(
-                        f"metric_contract[{index}].claim_mappings[{mapping_index}] lacks limitations/companions"
+                        f"metric_contract[{index}].claim_mappings[{mapping_index}] lacks construct/limitations/companions"
                     )
         for field in ("alternative_explanations", "companion_requirements"):
             if not isinstance(metric.get(field), list):
@@ -450,6 +602,23 @@ def validate(plan: Path) -> list[str]:
             errors.append(
                 f"claims[{index}].outcome_rule primary_metric_id is not in the claim metric_ids"
             )
+        else:
+            if outcome_rule.get("operator") not in {"greater_than", "less_than"}:
+                errors.append(
+                    f"claims[{index}].outcome_rule operator must be greater_than or less_than"
+                )
+            try:
+                float(outcome_rule.get("support_threshold"))
+            except (TypeError, ValueError):
+                errors.append(
+                    f"claims[{index}].outcome_rule support_threshold must be numeric"
+                )
+            primary_metric = metrics_by_id.get(outcome_rule.get("primary_metric_id"), {})
+            primary_mapping = next((mapping for mapping in primary_metric.get("claim_mappings", []) if mapping.get("claim_id") == claim_id), {})
+            if primary_mapping.get("measurement_role") != "DIRECT":
+                errors.append(f"claims[{index}].outcome_rule primary metric must be DIRECT for this claim")
+            if primary_mapping.get("construct_definition") != measurement.get("construct_definition"):
+                errors.append(f"claims[{index}] primary metric construct differs from the claim construct")
 
     claim_ids = {
         str(claim.get("id")) for claim in contract.get("claims", [])
@@ -471,6 +640,10 @@ def validate(plan: Path) -> list[str]:
                 )
             else:
                 inverse_metric_ids[claim_id].add(metric_id)
+                claim = next(item for item in contract.get("claims", []) if str(item.get("id")) == claim_id)
+                mapping = next(item for item in metric.get("claim_mappings", []) if str(item.get("claim_id")) == claim_id)
+                if mapping.get("construct_definition") != claim.get("measurement_contract", {}).get("construct_definition"):
+                    errors.append(f"metric_contract[{metric_index}] mapping construct disagrees with claim {claim_id}")
     for claim_index, claim in enumerate(contract.get("claims", [])):
         claim_id = str(claim.get("id", ""))
         declared = {
@@ -535,6 +708,25 @@ def validate(plan: Path) -> list[str]:
             errors.append(f"grounding.{forbidden} is forbidden; tables own dataset/metric and expplan does not own split")
 
     artifacts = contract.get("paper_artifacts", [])
+    paragraph_sections = {
+        str(paragraph.get("id", "")): str(section.get("id", ""))
+        for section in contract.get("paper_outline", []) if isinstance(section, dict)
+        for paragraph in section.get("paragraphs", []) if isinstance(paragraph, dict)
+    }
+    for artifact in artifacts:
+        if not isinstance(artifact, dict):
+            continue
+        artifact_id = str(artifact.get("id", ""))
+        owner = str(artifact.get("introduced_after", ""))
+        section_id = str(artifact.get("section_id", ""))
+        if not section_id:
+            errors.append(f"{artifact_id}: paper artifact requires section_id")
+        elif owner not in paragraph_sections:
+            errors.append(f"{artifact_id}: introduced_after does not resolve to a projected paragraph")
+        elif paragraph_sections[owner] != section_id:
+            errors.append(
+                f"{artifact_id}: section_id does not match introduced_after owner section"
+            )
     result_artifacts = {
         item.get("artifact_id") for item in contract.get("result_requirements", [])
     }
@@ -610,8 +802,12 @@ def validate(plan: Path) -> list[str]:
                 errors.append(f"{aid}: missing no-fabricated-table-values warning")
             if "Dataset" not in block_text and "Datasets" not in block_text:
                 errors.append(f"{aid}: dataset is not determined in the visible main table/note")
-            if "<a href=" not in block:
-                errors.append(f"{aid}: dataset citation is missing from the visible table/note")
+            public_datasets = [item for item in contract.get("dataset_citations", []) if item.get("status") in {"PUBLISHED", "PUBLIC_REPOSITORY"}]
+            unpublished_datasets = [item for item in contract.get("dataset_citations", []) if item.get("status") in {"USER_PROVIDED_PRIVATE", "SELF_BUILT_UNPUBLISHED"}]
+            if public_datasets and not all(f'href="{item.get("url")}"' in block for item in public_datasets):
+                errors.append(f"{aid}: public dataset citation is missing from the visible table/note")
+            if unpublished_datasets and not all(str(item.get("name")) in block for item in unpublished_datasets):
+                errors.append(f"{aid}: private/unpublished dataset name is missing from the visible table/note")
             if reported_reconstruction:
                 reported_cells = re.findall(
                     r'<td class="reported" data-target-id="[^"]+">(.*?)</td>', block, re.S
@@ -647,14 +843,20 @@ def validate(plan: Path) -> list[str]:
                 errors.append(f"{aid}: figure source table lacks dataset or metric")
             if "Required fields" not in block:
                 errors.append(f"{aid}: figure source table does not specify the required data schema")
-            if "<a href=" not in block:
-                errors.append(f"{aid}: dataset citation is missing from figure source table")
+            public_datasets = [item for item in contract.get("dataset_citations", []) if item.get("status") in {"PUBLISHED", "PUBLIC_REPOSITORY"}]
+            unpublished_datasets = [item for item in contract.get("dataset_citations", []) if item.get("status") in {"USER_PROVIDED_PRIVATE", "SELF_BUILT_UNPUBLISHED"}]
+            if public_datasets and not all(f'href="{item.get("url")}"' in block for item in public_datasets):
+                errors.append(f"{aid}: public dataset citation is missing from figure source table")
+            if unpublished_datasets and not all(str(item.get("name")) in block for item in unpublished_datasets):
+                errors.append(f"{aid}: private/unpublished dataset name is missing from figure source table")
             expected_panels = len(artifact.get("shell", {}).get("required_data", []))
             panel_pairs = re.findall(r'<section\b[^>]*class="panel-pair"[^>]*>(.*?)</section>', block, re.S)
             if len(panel_pairs) != expected_panels:
                 errors.append(f"{aid}: expected {expected_panels} one-table/one-preview panel pairs, found {len(panel_pairs)}")
+            geometry_preview = artifact.get("shell", {}).get("preview_mode") == "geometry_only_inline"
             for index, pair in enumerate(panel_pairs, 1):
-                if pair.count('class="required-data figure-source-data"') != 1 or pair.count("data:image/png;base64,") != 1:
+                preview_count = pair.count("<svg") if geometry_preview else pair.count("data:image/png;base64,")
+                if pair.count('class="required-data figure-source-data"') != 1 or preview_count != 1:
                     errors.append(f"{aid} panel {index}: must contain exactly one source table and one preview")
                 pending = PENDING_TD_RE.findall(pair)
                 if not pending:
@@ -662,16 +864,22 @@ def validate(plan: Path) -> list[str]:
                 if any(re.search(r"\bcolspan\s*=", cell, re.I) for cell in pending):
                     errors.append(f"{aid} panel {index}: colspan/summary pending cell has no one-to-one plotted scalar")
             plotting = artifact.get("shell", {}).get("plotting", {})
-            for field in ("source", "schema", "fixture_generator", "fixture", "pdf", "png"):
+            required_plotting_fields = (
+                ("source", "pdf", "png")
+                if geometry_preview and plotting.get("interface_version") == 2
+                else ("source", "schema", "fixture_generator", "fixture", "pdf", "png")
+            )
+            for field in required_plotting_fields:
                 value = plotting.get(field)
                 path = plan.parents[1] / value if value else None
-                if not value or not path.exists() or path.stat().st_size == 0:
+                output_only = geometry_preview and field in {"pdf", "png"}
+                if not value or (not output_only and (not path.exists() or path.stat().st_size == 0)):
                     errors.append(f"{aid}: missing plotting {field}: {value}")
             for slug, outputs in plotting.get("panels", {}).items():
                 for field in ("pdf", "png"):
                     value = outputs.get(field)
                     path = plan.parents[1] / value if value else None
-                    if not value or not path.exists() or path.stat().st_size == 0:
+                    if not value or (not geometry_preview and (not path.exists() or path.stat().st_size == 0)):
                         errors.append(f"{aid}/{slug}: missing panel {field}: {value}")
             source_path = plan.parents[1] / plotting.get("source", "")
             if source_path.exists():
@@ -679,12 +887,19 @@ def validate(plan: Path) -> list[str]:
                 common_path = source_path.with_name("_common.py")
                 if common_path.exists():
                     plot_source += common_path.read_text(encoding="utf-8")
-                for interface in ("--schema", "--figure", "--panel", "--metrics", "--pdf", "--png", "matplotlib.use(\"Agg\")", "validate_rendered_marks"):
+                interfaces = (
+                    ("--metrics", "--pdf", "--png", "matplotlib.use(\"Agg\")")
+                    if geometry_preview and plotting.get("interface_version") == 2
+                    else ("--schema", "--figure", "--panel", "--metrics", "--pdf", "--png", "matplotlib.use(\"Agg\")", "validate_rendered_marks")
+                )
+                for interface in interfaces:
                     if interface not in plot_source:
                         errors.append(f"{aid}: plotting source lacks {interface}")
-            fixture_path = plan.parents[1] / plotting.get("fixture", "")
-            schema_path = plan.parents[1] / plotting.get("schema", "")
-            if fixture_path.exists() and schema_path.exists():
+            fixture_value = plotting.get("fixture")
+            schema_value = plotting.get("schema")
+            fixture_path = plan.parents[1] / fixture_value if fixture_value else None
+            schema_path = plan.parents[1] / schema_value if schema_value else None
+            if fixture_path and schema_path and fixture_path.exists() and schema_path.exists():
                 fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
                 schema = json.loads(schema_path.read_text(encoding="utf-8"))
                 if fixture.get("synthetic") is not True:
@@ -739,6 +954,11 @@ def validate(plan: Path) -> list[str]:
         if artifact.get("kind") != "figure" or artifact.get("shell", {}).get("data_driven") is not False:
             continue
         aid = artifact.get("id", "")
+        figure_type = artifact.get("shell", {}).get("figure_type")
+        if figure_type not in MECHANISM_FIGURE_TYPES:
+            errors.append(
+                f"{aid}: non-experimental figure requires an explicit shell.figure_type"
+            )
         if visible_shell(page, aid):
             errors.append(f"{aid}: non-experimental figure must be count-only, not rendered during expplan")
         if aid in result_artifacts:
@@ -798,23 +1018,23 @@ def validate(plan: Path) -> list[str]:
         reference_tables = float_budget.get("reference_body_tables")
         count_pairs = (
             (
-                f"本计划 {body_figures + body_tables}（{body_figures} 图，{body_tables} 表）",
+                f"This plan {body_figures + body_tables}({body_figures} figure,{body_tables} table)",
                 f"this plan {body_figures + body_tables} ({body_figures} figures, {body_tables} tables)",
             ),
             (
-                f"参考论文 {reference_figures + reference_tables}（{reference_figures} 图，{reference_tables} 表）",
+                f"Reference papers {reference_figures + reference_tables}({reference_figures} figure,{reference_tables} table)",
                 f"reference paper {reference_figures + reference_tables} ({reference_figures} figures, {reference_tables} tables)",
             ),
         )
         for chinese, english in count_pairs:
             if chinese not in budget_text and english not in budget_text:
                 errors.append(f"whole-paper float budget lacks: {chinese} / {english}")
-        for forbidden in ("Experiments", "正文", "因此", "回指", "出现位置", "content floats"):
+        for forbidden in ("Experiments", "body text", "therefore", "refers back", "Location of occurrence", "content floats"):
             if forbidden in budget_text:
                 errors.append(f"whole-paper float budget must ignore artifact placement: {forbidden}")
         if "<a " in budget.group(1) or "reference label" in budget_text.lower():
             errors.append("whole-paper float budget must end after the two numeric entries without a reference label/link")
-        if "图表数量：" not in budget_text and "Figure/table count:" not in budget_text:
+        if "Chart count:" not in budget_text and "Figure/table count:" not in budget_text:
             errors.append("whole-paper float budget needs an explicit visible figure/table count label")
         for css_token in (".float-budget{", "font-size:18px", "border:2px solid"):
             if css_token not in page:
@@ -824,9 +1044,15 @@ def validate(plan: Path) -> list[str]:
     if not dataset_sources:
         errors.append("contract lacks dataset_citations")
     for item in dataset_sources:
-        name, url = item.get("name"), item.get("url")
-        if not re.search(rf'<a href="{re.escape(url)}">{re.escape(name)}</a>', page):
-            errors.append(f"confirmed dataset lacks its direct citation: {name}")
+        name, url, status = item.get("name"), item.get("url"), item.get("status")
+        if status in {"PUBLISHED", "PUBLIC_REPOSITORY"}:
+            if not url or not re.search(rf'<a href="{re.escape(url)}">{re.escape(name)}</a>', page):
+                errors.append(f"public dataset lacks its direct citation: {name}")
+        else:
+            if not re.search(rf'>\s*{re.escape(str(name))}\s*<', page):
+                errors.append(f"private/unpublished dataset is not visibly named: {name}")
+            if re.search(rf'<a href="">\s*{re.escape(str(name))}\s*</a>', page):
+                errors.append(f"private/unpublished dataset must be plain text, not an empty link: {name}")
 
     setup_match = re.search(
         r'<div\s+data-experiment-setup(?:\s+class="[^"]*")?>(.*?)</div>',

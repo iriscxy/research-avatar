@@ -1,4 +1,4 @@
-# Code-agent-native composition and refinement
+# Codex-native composition and refinement
 
 ## Stage 1 — visual grammar
 
@@ -9,15 +9,15 @@ geometry, non-color encodings, and label-to-visual ratio. Never copy scientific
 content, labels, artwork, or a distinctive layout. The manuscript remains the
 only source of scientific content.
 
-## Stage 2 — code-agent composition
+## Stage 2 — Codex composition
 
-The code agent reads the approved figure slot, manuscript evidence, and visual
-grammar, then writes a concise project-local composition brief and the complete
-native shape specification. No image-generation model is called and no raster
-draft is used. The shape spec must explicitly encode the input, load-bearing
-operation or criterion, and output or contrast. Semantically different branches
-must differ through geometry, ordering, markers, or pictograms rather than color
-or labels alone.
+Codex reads the approved figure slot, manuscript evidence, and visual grammar,
+then writes a concise project-local composition brief and the complete native
+shape specification as the authoritative composition. The shape spec must
+explicitly encode the input, load-bearing operation or
+criterion, and output or contrast. Semantically different branches must differ
+through geometry, ordering, markers, or pictograms rather than color or labels
+alone.
 
 Reject the design before rendering when its object inventory is mostly labeled
 rectangles, when an unexplained symbol carries meaning, or when an unfamiliar

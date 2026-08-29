@@ -47,11 +47,44 @@ ethics warnings for ordinary model work without a concrete human-impact path.
 
 ## Generate the slate
 
-Use the profile and survey's structural gaps to generate six initial
-candidates. Each candidate starts with one plain-language sentence stating the
+Use an API-assisted candidate-diversification pass when a supported provider is
+configured. If the researcher named OpenAI or DeepSeek, use that provider; if
+exactly one of `OPENAI_API_KEY` and `DEEPSEEK_API_KEY` is configured, use it;
+otherwise ask for the provider instead of exposing or copying a key. Run:
+
+```bash
+python3 research_avatar/tools/generate_idea_candidates_api.py \
+  --provider <openai-or-deepseek> \
+  --output reports/.build/02_IDEA_CANDIDATES.api.json
+```
+
+The two API rounds deliberately vary mechanisms and evaluation regimes. Their
+output is an unverified seed pool, never a novelty result: retain its response
+IDs and survey/profile digests, then independently apply the collision,
+feasibility, scope-necessity, and devil's-advocate checks below. If no supported
+API is configured, retain the existing Code Agent generation path and label the
+report provenance `code-agent-only`; never imply that an API was called.
+
+Use the profile and survey's structural gaps to select six initial candidates
+from the verified API seed pool plus any genuinely distinct Code Agent seeds.
+Each candidate starts with one plain-language sentence stating the
 problem, intervention/test, and observable outcome, followed by one core
 mechanism, 2–4 concrete method steps, hypothesis, falsifier, feasibility, and
 closest work.
+
+Give every candidate a structured `source_grounding` that names at least one
+exact Survey Gap/Opening or Live Debate and one literature-family
+`failure_boundary`. Render these links in the candidate card. A generic claim
+that the idea is "grounded in the survey" is not traceability.
+
+When a completed RunPlan records a verified baseline implementation anomaly,
+read `reports/.build/reideation_input.json`, generated from its
+`reideation_checkpoint`, as optional empirical grounding. Require the evidence
+digest to match the current artifact. Preserve the command, artifact, observed
+mismatch, and the baseline's intended contract;
+generate an idea from it only when the anomaly survives conformance checks and
+changes a testable mechanism. Never treat an adapter bug or failed reproduction
+as evidence that a scientific idea works.
 
 On rerun, load unrejected prior idea records as structured inputs, add genuinely
 new angles, and rerank the union before rendering the whole report again. Never
@@ -84,33 +117,20 @@ Read
 [`references/generation-and-novelty.md`](references/generation-and-novelty.md)
 for the complete generation, collision-check, scope, and ranking procedure.
 
-## Canonical report and readability pass
+## Canonical report
 
 Write one self-contained `reports/02_IDEA_REPORT.html`, linking the landscape
 survey and only verified papers. Do not create a novelty dossier or standalone
 wildcard report. Persist hidden per-idea novelty audits and an optional
 structured selection record in this file.
 
-After scientific content and links are fixed, the researcher must choose
-`provider: openai|deepseek`, then the LLM API rewrites eligible visible prose:
-
-```bash
-python3 research_avatar/tools/rewrite_ideagen_html.py reports/02_IDEA_REPORT.html --provider "<provider>" [--model "<model>"]
-```
-
-The rewrite may improve clarity only; it cannot change claims, evidence,
-citations, novelty status, scope, or uncertainty. Missing key, API failure,
-partial coverage, or a missing `ideagen-readable-rewrite` receipt is a hard
-stop. The Code Agent must not substitute its own final rewrite.
-
 Read [`references/report-and-gate.md`](references/report-and-gate.md) while
-rendering, rewriting, validating, and presenting the decision gate.
+rendering, validating, and presenting the decision gate.
 
 Run:
 
 ```bash
 python3 research_avatar/tools/validate_ideagen_report.py reports/02_IDEA_REPORT.html
-python3 research_avatar/tools/validate_ideagen_readability.py reports/02_IDEA_REPORT.html
 python3 research_avatar/tools/validate_report_structure.py --kind ideas --html reports/02_IDEA_REPORT.html
 ```
 

@@ -20,6 +20,13 @@ def _bib_value(value: str) -> str:
     )
 
 
+def _normalize_author_separators(value: str) -> str:
+    """Translate serialized author-list separators into BibTeX ``and``."""
+    if ";" in value and " and " not in value:
+        return " and ".join(part.strip() for part in value.split(";") if part.strip())
+    return value
+
+
 def _survey_authors(article: str, visible_metadata: str) -> str:
     """Return BibTeX authors without inventing names absent from the survey.
 
@@ -36,7 +43,13 @@ def _survey_authors(article: str, visible_metadata: str) -> str:
         flags=re.IGNORECASE | re.DOTALL,
     )
     if explicit_match:
-        return _bib_value(_plain(explicit_match.group(2)))
+        explicit = _bib_value(_plain(explicit_match.group(2)))
+        # HTML data attributes commonly serialize an author list with
+        # semicolons.  BibTeX does not treat ``;`` as an author separator: it
+        # parses the entire value as one person and natbib consequently drops
+        # the leading authors from citations.  Normalize the serialized list
+        # at the ingestion boundary while preserving names verbatim.
+        return _normalize_author_separators(explicit)
 
     citation_label = visible_metadata.split("·", 1)[0].strip()
     if not citation_label or re.search(r"\b(?:19|20)\d{2}\b", citation_label):
@@ -51,7 +64,7 @@ def _survey_authors(article: str, visible_metadata: str) -> str:
             for part in citation_label.split("&")
             if part.strip()
         )
-    return _bib_value(citation_label)
+    return _normalize_author_separators(_bib_value(citation_label))
 
 
 def verified_survey_bibliography(source: str) -> str:
@@ -71,7 +84,7 @@ def verified_survey_bibliography(source: str) -> str:
     ):
         article = article_match.group(0)
         verification_text = _plain(article)
-        if "已验证" not in verification_text and "verified" not in verification_text.casefold():
+        if "Verified" not in verification_text and "verified" not in verification_text.casefold():
             continue
         title_match = re.search(
             r"<h4\b[^>]*>\s*<a\b[^>]*href=[\"'](https?://[^\"']+)[\"'][^>]*>(.*?)</a>",

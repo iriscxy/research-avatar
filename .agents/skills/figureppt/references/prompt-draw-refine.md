@@ -13,8 +13,8 @@ only source of scientific content.
 
 Codex reads the approved figure slot, manuscript evidence, and visual grammar,
 then writes a concise project-local composition brief and the complete native
-shape specification. No image-generation model is called and no raster draft is
-used. The shape spec must explicitly encode the input, load-bearing operation or
+shape specification as the authoritative composition. The shape spec must
+explicitly encode the input, load-bearing operation or
 criterion, and output or contrast. Semantically different branches must differ
 through geometry, ordering, markers, or pictograms rather than color or labels
 alone.

@@ -115,6 +115,13 @@ to this manifest and repeat the exact command, code/config/environment files,
 raw artifact locator, and code revision. A terminal transcript, shell history,
 or narrative description is not a substitute for the manifest.
 
+For every public benchmark used by a running or completed Goal, execute the
+approved dataset `protocol_contract` before producing metrics. Embed a
+`protocol_conformance` receipt in the run-plan state with the benchmark name,
+exact command, fixture, official split/input/scorer sources, logs, exit status,
+and `VERIFIED` status. A completed state without this receipt must fail even if
+result files exist.
+
 Map every embedded-contract `result_requirements` item to its producing goal,
 artifact/target ID, acquisition contract, source, raw file and JSON key path
 when local, and dimensions. Normal completion must

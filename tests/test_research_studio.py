@@ -71,15 +71,14 @@ class ResearchStudioTests(unittest.TestCase):
             f"{studio.PAPER_STUDIO_URL}/api/health", timeout=1.2
         )
 
-    def test_research_studio_has_no_runtime_skill_dependency(self):
+    def test_research_studio_has_no_runtime_skill_file_dependency(self):
         source = Path(studio.__file__).read_text(encoding="utf-8")
         self.assertNotIn("researcher-profile/profile.md", source.lower())
         self.assertNotIn(".agents/skills", source)
-        self.assertNotIn("$profileconstruct", source)
-        self.assertNotIn("$researchlit", source)
-        self.assertNotIn("$ideagen", source)
-        self.assertNotIn("$expplan", source)
-        self.assertNotIn("$runplan", source)
+        self.assertEqual(studio.STAGE_GENERATION_COMMANDS["literature"], "$researchlit")
+        self.assertEqual(studio.STAGE_GENERATION_COMMANDS["ideas"], "$ideagen")
+        self.assertEqual(studio.STAGE_GENERATION_COMMANDS["expplan"], "$expplan")
+        self.assertEqual(studio.STAGE_GENERATION_COMMANDS["runplan"], "$runplan")
 
     @patch("research_avatar.research_studio.server.subprocess.Popen")
     @patch("research_avatar.research_studio.server.paper_studio_status")
@@ -256,7 +255,7 @@ class ResearchStudioTests(unittest.TestCase):
     @patch("research_avatar.research_studio.server.webbrowser.open")
     @patch("research_avatar.research_studio.server.start_paper_studio")
     @patch("research_avatar.research_studio.server.ensure_research_studio")
-    def test_ensure_project_studios_reuses_both_and_opens_pages(
+    def test_ensure_project_studios_reuses_both_without_duplicate_tab(
         self, ensure_research, start_paper, open_browser
     ):
         ensure_research.return_value = {
@@ -275,10 +274,20 @@ class ResearchStudioTests(unittest.TestCase):
             result["urls"],
             ["http://127.0.0.1:8780"],
         )
-        self.assertEqual(
-            open_browser.call_args_list,
-            [call("http://127.0.0.1:8780")],
-        )
+        open_browser.assert_not_called()
+
+    @patch("research_avatar.research_studio.server.webbrowser.open")
+    @patch("research_avatar.research_studio.server.start_paper_studio")
+    @patch("research_avatar.research_studio.server.ensure_research_studio")
+    def test_ensure_project_studios_opens_only_for_new_server_or_explicit_new_tab(
+        self, ensure_research, start_paper, open_browser
+    ):
+        start_paper.return_value = {"ok": True, "url": "http://127.0.0.1:8765"}
+        ensure_research.return_value = {"url": "http://127.0.0.1:8780", "started": True}
+        ensure_project_studios()
+        ensure_research.return_value = {"url": "http://127.0.0.1:8780", "started": False}
+        ensure_project_studios(new_tab=True)
+        self.assertEqual(open_browser.call_count, 2)
 
     @patch("research_avatar.research_studio.server.webbrowser.open")
     @patch("research_avatar.research_studio.server.start_paper_studio")
@@ -314,12 +323,14 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertNotIn('id="refresh"', index_source)
         self.assertNotIn('id="stage-body"', index_source)
         self.assertIn('class="stage-surface"', index_source)
+        self.assertIn('class="studio-status"', index_source)
+        self.assertIn("report_version", app_source)
         self.assertNotIn("missingStageMarkup", app_source)
         self.assertNotIn("goalMarkup", app_source)
         self.assertNotIn("ideaMarkup", app_source)
         self.assertNotIn("expplanApprovalMarkup", app_source)
         self.assertNotIn("artifactMarkup", app_source)
-        self.assertNotIn("该阶段尚未开始", app_source)
+        self.assertNotIn("This stage has not started yet.", app_source)
         self.assertNotIn("profileTerminalMarkup", app_source)
         self.assertIn("renderArtifactTabs(stage, primaryArtifact?.key", app_source)
         self.assertIn("selectArtifact(primaryArtifact.key)", app_source)
@@ -330,9 +341,22 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertIn('id="preview-copy-status"', index_source)
         self.assertIn("Run the following command in the local terminal", index_source)
         self.assertIn('previewCommand.textContent = command', app_source)
-        self.assertIn('command.startsWith("python3 -m ")', app_source)
+        self.assertIn('value.startsWith("$")', app_source)
+        self.assertIn('value.startsWith("python3 -m ")', app_source)
         self.assertIn('previewCommandCopy.addEventListener("click"', app_source)
         self.assertIn("navigator.clipboard.writeText(value)", app_source)
+
+    def test_missing_report_stages_expose_copyable_skill_commands(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            state = build_state(root, root)
+
+        by_id = {stage["id"]: stage for stage in state["stages"]}
+        self.assertEqual(by_id["profile"]["command"], studio.STAGE_GENERATION_COMMANDS["profile"])
+        self.assertEqual(by_id["literature"]["command"], "$researchlit")
+        self.assertEqual(by_id["ideas"]["command"], "$ideagen")
+        self.assertEqual(by_id["expplan"]["command"], "$expplan")
+        self.assertEqual(by_id["runplan"]["command"], "$runplan")
 
     def test_paper_stage_embeds_interactive_studio_instead_of_pdf(self):
         with TemporaryDirectory() as directory:
@@ -528,7 +552,7 @@ class ResearchStudioTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn(".pipeline-button strong{font-size:11px", style_source)
         self.assertIn("font:750 8px var(--serif)", style_source)
-        self.assertIn("/style.css?v=20260820-command-copy", index_source)
+        self.assertIn("/style.css?v=20260827-skill-command-copy", index_source)
 
     def test_live_demo_matches_the_local_six_stage_navigation(self):
         root = Path(__file__).resolve().parents[1]
@@ -546,9 +570,9 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertIn("grid-template-columns:repeat(6,minmax(112px,1fr))", demo_style)
         self.assertIn('id: "literature"', demo_source)
         self.assertIn("Problem → Approaches → Evaluation → Gaps", demo_source)
-        self.assertIn("结果太多、太乱", demo_source)
-        self.assertNotIn("README 对比", demo_source)
-        self.assertNotIn("解析研究画像", demo_source)
+        self.assertIn("The results are too numerous and messy", demo_source)
+        self.assertNotIn("README comparison", demo_source)
+        self.assertNotIn("Parse research image", demo_source)
         self.assertNotIn("upload-zone", demo_source)
         self.assertNotIn("paper/WRITING_STYLE.md", demo_source)
         self.assertNotIn("PROFILE.md", demo_source)
@@ -556,13 +580,13 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertIn('canonicalArtifact("profile")', demo_source)
         self.assertNotIn("profileDocument", demo_source)
         self.assertNotIn('class="profile-output"', demo_source)
-        self.assertIn("$profileconstruct 使用 ~/Downloads/scholar_profile.html", demo_source)
+        self.assertIn("$profileconstruct use ~/Downloads/scholar_profile.html", demo_source)
         for report_key in ("profile", "literature", "ideas", "expplan", "runplan"):
             self.assertIn(f'canonicalArtifact("{report_key}")', demo_source)
         self.assertNotIn('reportDocument("results"', demo_source)
         self.assertNotIn('reportDocument("paper-studio"', demo_source)
-        self.assertNotIn("调研范围与分类", demo_source)
-        self.assertIn("结构参考 · Ref Paper", demo_source)
+        self.assertNotIn("Research scope and classification", demo_source)
+        self.assertIn("Structure reference · Ref Paper", demo_source)
         self.assertIn("F2 · Permutation consistency", demo_source)
         self.assertIn("Number of random permutations included", demo_source)
         self.assertNotIn("MORE", demo_source)
@@ -573,9 +597,9 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertNotIn("F3A · Only the first-exit layer", demo_source)
         self.assertNotIn("F4 · Safety–utility sensitivity", demo_source)
         self.assertNotIn("results/typo_margin", demo_source)
-        self.assertIn('"全部任务已确认"', demo_source)
-        self.assertIn("一次确认全部任务", demo_source)
-        self.assertIn("逐项确认", demo_source)
+        self.assertIn('"All tasks confirmed"', demo_source)
+        self.assertIn("Confirm all tasks at once", demo_source)
+        self.assertIn("Itemized confirmation", demo_source)
         self.assertNotIn('data-action="select-idea"', demo_source)
         self.assertNotIn('data-action="approve-expplan"', demo_source)
         self.assertNotIn('data-action="run-view"', demo_source)
@@ -621,7 +645,7 @@ class ResearchStudioTests(unittest.TestCase):
                 '<main><div data-selected-idea="I1"><b>Selected: I1 — First</b></div>'
                 '<article class="idea" data-idea-id="I1"><h3>I1 · First</h3><p class="pitch">One</p></article>'
                 '<article class="idea" data-idea-id="I2"><h3>I2 · Second</h3><p class="pitch">Two</p></article>'
-                '<section class="gate"><h2>已选择 I1</h2></section></main></body>',
+                '<section class="gate"><h2>I1 selected</h2></section></main></body>',
                 encoding="utf-8",
             )
             saved = record_idea_selection(path, "I2", "Best falsifier")

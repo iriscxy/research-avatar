@@ -47,15 +47,15 @@ class ReportStructureTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "literature-zh.html"
             translated = [
-                ("problem", "1. 问题"),
-                ("approaches", "2. 方法"),
-                ("evaluation", "3. 评估"),
-                ("gaps", "4. 差距"),
+                ("problem", "1. issue"),
+                ("approaches", "2. method"),
+                ("evaluation", "3. evaluation"),
+                ("gaps", "4. gap"),
             ]
             path.write_text(
                 "".join(
                     f'<section data-report-section="{section_id}"><h2>{title}</h2>'
-                    f"<p>这是包含充分内容的固定报告章节，用于验证翻译后结构。</p></section>"
+                    f"<p>This is a content rich fixed report chapter for validating the translated structure.</p></section>"
                     for section_id, title in translated
                 ),
                 encoding="utf-8",
@@ -127,9 +127,9 @@ class ReportStructureTests(unittest.TestCase):
         english_structures = json.loads(
             (ROOT / "research_avatar/web/demo/report-structures.en.json").read_text(encoding="utf-8")
         )
-        self.assertIn("<span>内容总结</span>", source)
-        self.assertNotIn("HTML 内容总结", source)
-        self.assertNotIn("功能展示", source)
+        self.assertIn("<span>Content summary</span>", source)
+        self.assertNotIn("HTML Content summary", source)
+        self.assertNotIn("Feature demonstration", source)
         demo_keys = {
             "profile": "profile",
             "literature": "literature",
@@ -144,7 +144,7 @@ class ReportStructureTests(unittest.TestCase):
                 for _section_id, title in REPORT_STRUCTURES[report_kind]["sections"]
             ]
             if report_kind == "results":
-                expected = ["Acquisition Process" if title == "生成过程" else title for title in expected]
+                expected = ["Acquisition Process" if title == "generation process" else title for title in expected]
             actual = [section["title"] for section in english_structures[demo_key]["sections"]]
             self.assertEqual(actual, expected, report_kind)
         expected_subsections = [

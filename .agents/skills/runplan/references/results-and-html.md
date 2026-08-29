@@ -16,6 +16,15 @@ Only validated ledger rows may fill artifact targets; the browser writing workfl
 those validated rows and the filled `05` view rather than copying numbers from
 conversation history.
 
+For every final `claim_decision`, store the approved primary result ID and the
+raw JSON locators of its confidence-interval bounds. The validator reloads the
+point estimate and bounds, applies the approved threshold and direction, and
+recomputes `supported`, `weakened`, `falsified`, or `inconclusive`; a manually
+written outcome is never authoritative. When a producing Goal for a
+`HUMAN_ANNOTATION` metric becomes `running` or `completed`, both the real
+annotation file and rubric file must already exist or validation refuses the
+transition.
+
 The `05` renderer must produce artifact cells, plots, provenance anchors,
 provenance payload, and generation-process cards together from the same
 validated ledger snapshot. It must render to a temporary file and publish only
@@ -95,7 +104,7 @@ are plain status text and are never clickable. Keep the paper-shaped row ×
 column geometry; do not add a visible provenance column or one ledger row per
 result.
 
-At the end of `05_EXP_RESULT.html`, render one compact collapsible “生成过程”
+At the end of `05_EXP_RESULT.html`, render one compact collapsible `Generation Process`
 index with `id="result-provenance-index"` and a stable target
 `id="provenance-<result_id>"` for every clickable value. Clicking a value must
 update the page hash, open the matching card, move focus to it, and call
@@ -150,7 +159,7 @@ Render exactly two user-facing experiment artifacts. In both files, each `<secti
 
 1. `1. Artifact Completion` (`artifact-completion`);
 2. `2. Paper Tables and Figures` (`paper-artifacts`): approved data-bearing artifacts in paper order with unchanged geometry and pending states;
-3. `3. 生成过程` (`generation-process`): one collapsible provenance index containing raw path, actual command, code/config, calculation, and verification.
+3. `3. Generation Process` (`generation-process`): one collapsible provenance index containing raw path, actual command, code/config, calculation, and verification.
 
 Every title in both files must own substantive project-specific content; an empty section, title-only slot, or placeholder-only body is invalid. Do not add, rename, reorder, or omit these sections. Before presenting either file, run `python3 research_avatar/tools/validate_report_structure.py --kind runplan --html reports/04_RUN_PLAN.html` and `python3 research_avatar/tools/validate_report_structure.py --kind results --html reports/05_EXP_RESULT.html` in addition to the ledger/result validators.
 

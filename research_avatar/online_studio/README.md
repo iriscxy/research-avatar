@@ -28,8 +28,8 @@ and compatibility testing, but it is not a second public onboarding entry.
 
 - **Paper writing inside Research Studio (`http://127.0.0.1:8780`)** is the only
   local user-facing entry and has the complete feature set: prose, editable
-  tables, Python data figures, GPT Image mechanism figures, and editable native
-  PPTX/PDF reconstruction. The underlying writer process is an implementation
+  tables, Python data figures, and Codex-designed editable native mechanism
+  figures in PPTX/PDF. The underlying writer process is an implementation
   detail, not a separate product page.
 - **Online Paper Studio** intentionally exposes only prose/title writing,
   deterministic editable tables, and deterministic Python-rendered data figures.
@@ -69,7 +69,7 @@ python3 -m research_avatar.online_studio --host 127.0.0.1 --port 8899
 ```
 
 Then open <http://127.0.0.1:8899>. Use this gateway for browser-visible or headless
-regression testing of login, Demo/免费纯文字 PaperWrite 版 navigation, upload, online-only controls,
+regression testing of login, Demo/Free text-only PaperWrite navigation, upload, online-only controls,
 project export, and unauthenticated `/studio` redirects. Debug here first; deploy
 only after the whole browser path passes.
 
@@ -135,9 +135,8 @@ not currently expose Containers as a China Network feature.
 Container runs this gateway process, the spawned per-session
 `research_avatar.paper_studio.server` writer subprocess, `latexmk`/`pdflatex`,
 Poppler, and the bundled Codex CLI all inside the same instance; a live
-end-to-end "直接生成全文初稿" batch run against `basic` (1 GiB) killed the
-writer subprocess mid-job (the gateway stayed up and reported "会话不存在或已
-过期"), losing the researcher's in-progress session even though completed
+end-to-end "Generate full first draft" batch run against `basic` (1 GiB) killed the
+writer subprocess mid-job (the gateway stayed up and reported "Session does not exist or has expired"), losing the researcher's in-progress session even though completed
 paragraphs were already saved to disk under the now-unreachable session root.
 Do not downgrade the tier without re-running a full real batch-writing job
 against it first.
@@ -189,5 +188,5 @@ The Cloudflare container overrides these values to 10 active writing sessions an
 version-scoped public container name, so `max_instances: 6` is a platform ceiling,
 not `6 × 10` user capacity. Login records persist in D1, but Container writing
 workspaces are ephemeral. Download the project ZIP from inside an active Paper
-Studio session before it expires; the outer 免费纯文字 PaperWrite 版 page intentionally has no
+Studio session before it expires; the outer Free text-only PaperWrite page intentionally has no
 export control.

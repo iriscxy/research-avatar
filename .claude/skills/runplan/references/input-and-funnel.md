@@ -104,17 +104,17 @@ the hidden `run-plan-state` JSON embedded in `04_RUN_PLAN.html`; expose only det
 work. Do not render long field tables, nested bullet contracts, or one visible
 row per result target.
 
-Every visible goal must end with one short `对应图表` line naming the exact
+Every visible goal must end with one short `Corresponding artifacts` line naming the exact
 data-bearing figure/table IDs it supports (`F2`, `T1`, etc.). If it supports no
-paper artifact directly, say `无直接图表` and state its infrastructure role.
-Immediately below the execution estimate, show `图表覆盖：N/N` followed by the
+paper artifact directly, say `No direct artifact` and state its infrastructure role.
+Immediately below the execution estimate, show `Artifact coverage: N/N` followed by the
 complete data-bearing artifact-ID set derived from `03.result_requirements`.
 Figures without any result requirement are writing-stage artifacts: do not map
 them to a Goal, count them in RunPlan coverage, draw them in `04`, or copy them
 to `05`. Embed only data-bearing IDs in `approved_artifact_ids` and
 `artifact_coverage`. Generation and validation must fail unless those IDs
 exactly equal the ordered unique artifact IDs in `03.result_requirements`, each
-has at least one owning goal, and every visible `对应图表` mapping agrees with
+has at least one owning goal, and every visible `Corresponding artifacts` mapping agrees with
 the hidden state.
 
 Copy `03.implementation_contract` byte-for-byte into the embedded run-plan
@@ -134,9 +134,9 @@ invalidated. A completed goal must visibly retain its `✅`; do not replace it
 with prose such as “status: completed.”
 
 Render the one active or proposed **Current Goal inside its matching `Gn.m` goal
-card**, immediately after that goal's description and `对应图表` line. The nested
+card**, immediately after that goal's description and `Corresponding artifacts` line. The nested
 panel contains the complete `/goal` in a selectable `<pre>`, a dedicated
-`复制 /goal` button that copies that exact text with visible success/failure status,
+`Copy /goal` button that copies that exact text with visible success/failure status,
 outputs, resources, and completion check. Never shorten the copied command.
 Never render Current Goal as a separate top-level section. When a goal completes,
 regenerate from embedded state: the completed card keeps `✅`, and the Current

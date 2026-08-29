@@ -32,7 +32,8 @@
     {"number":"1","title":"Execution Estimate","content":"Every goal declares its budget, dependencies, estimated time, and stopping condition before execution."},
     {"number":"2","title":"Implementation Sources","content":"Every result records raw logs, the executed command, calculation rule, and verification status."},
     {"number":"3","title":"Figure/Table Coverage","content":"G1.1→F1/F2/F3, G2.1→T1, G2.2→T2, G3.1→T3, G4.1→T4, and G5.1→F4/F5."},
-    {"number":"4","title":"Parts and Goals","content":"Inspect each goal's part, state, actual output, and completion criterion."}
+    {"number":"4","title":"Parts and Goals","content":"Inspect each goal's part, state, actual output, and completion criterion."},
+    {"number":"5","title":"Post-baseline Idea Checkpoint","content":"After baseline reproduction, separate implementation defects from verified scientific anomalies and offer re-ideation only when a new evidence-backed premise exists."}
   ]},
   "results": {"artifact":"Experiment Results and Evidence","note":"Every paper evidence unit is verified and retains row- or cell-level provenance","sections":[
     {"number":"1","title":"Artifact Completion","content":"Each figure and table records whether results exist, verification passed, and which goal produced it."},

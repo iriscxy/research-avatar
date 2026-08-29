@@ -50,7 +50,7 @@ class PaperStructureTests(unittest.TestCase):
                 "relation_to_next": "sets up introduction", "length_share": 1.0,
                 "reference_context": {
                     "source_heading": "Abstract",
-                    "logic_summary_zh": "参考摘要压缩了问题、方法和结果。",
+                    "logic_summary_zh": "The reference abstract compresses the problem, method and results.",
                     "reference_paragraph_ids": ["REF-A1"],
                 },
                 "paragraphs": [{
@@ -319,7 +319,7 @@ class PaperStructureTests(unittest.TestCase):
 
     def test_reference_paragraph_may_end_in_cjk_punctuation(self):
         payload = copy.deepcopy(self.payload)
-        source = "标题\n摘要\n这是从参考论文中提取的完整自然段。"
+        source = "Title\nabstract\nThis is a complete natural paragraph extracted from the reference paper."
         validate_structure_design(self.contract, source, payload)
 
     def test_drops_wholly_outside_reference_paragraph_and_rebinds_context(self):
