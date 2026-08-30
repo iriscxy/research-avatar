@@ -130,6 +130,19 @@ PROVIDER_MODEL_OPTIONS = {
         ("deepseek-v4-flash", "DeepSeek V4 Flash"),
     ),
 }
+
+
+def model_for_provider(provider: str, requested: str = "") -> str:
+    """Return a provider-compatible model, never a stale cross-provider value."""
+    candidate = requested.strip()
+    compatible = (
+        candidate.startswith("gpt-")
+        if provider == "openai"
+        else candidate.startswith("deepseek-")
+        if provider == "deepseek"
+        else False
+    )
+    return candidate if compatible else PROVIDER_DEFAULT_MODELS[provider]
 # A method figure can require image inspection plus a 30–50 object native-shape
 # plan. Two minutes regularly terminates a healthy local Agent just before it
 # returns JSON, especially when two figures are reconstructed concurrently.
@@ -2439,6 +2452,9 @@ def load_state() -> dict[str, Any]:
                 state["model"] = PROVIDER_DEFAULT_MODELS["openai"]
         state.setdefault("llm_provider", DEFAULT_PROVIDER)
         state.setdefault("model", PROVIDER_DEFAULT_MODELS.get(state["llm_provider"]) or DEFAULT_MODEL)
+        state["model"] = model_for_provider(
+            state["llm_provider"], str(state.get("model") or "")
+        )
         title_editor = state.setdefault("title_editor", default["title_editor"])
         for field, value in default["title_editor"].items():
             title_editor.setdefault(field, value)
@@ -4781,6 +4797,19 @@ def completed_manuscript_issues(state: dict[str, Any]) -> list[str]:
             f"{budget['content_pages']} pages for a {budget['limit']}-page limit "
             "(references excluded)"
         )
+    elif budget["status"] == "under":
+        measured = budget.get("last_page_fill")
+        minimum = budget.get("minimum_last_page_fill")
+        fill_detail = (
+            f", final-page fill {float(measured):.1%} below {float(minimum):.1%}"
+            if measured is not None and minimum is not None
+            else ""
+        )
+        issues.append(
+            "submission body does not fill the configured page target: "
+            f"{budget['content_pages']} measured pages for a {budget['limit']}-page target"
+            f"{fill_detail} (references excluded)"
+        )
     return issues
 
 
@@ -7041,6 +7070,10 @@ def select_llm_model(state: dict[str, Any], model: str) -> bool:
         raise StudioError("Model name cannot be empty.")
     if len(model) > 128 or any(character.isspace() or ord(character) < 32 for character in model):
         raise StudioError("Model name must be a single line identifier without spaces or control characters and no more than 128 characters.")
+    if model_for_provider(provider, model) != model:
+        raise StudioError(
+            f"Model {model} is incompatible with the selected {provider} provider."
+        )
     if model == state.get("model"):
         return False
     state["model"] = model
@@ -7787,6 +7820,7 @@ def call_openai(
     required_heading_style: str | None = None,
     include_section_context: bool | None = None,
     minimum_online_citation_placeholders: int = 0,
+    maximum_word_override: int | None = None,
 ) -> tuple[str, str, list[str]]:
     fresh_rewrite = bool(
         re.search(
@@ -9048,8 +9082,10 @@ evidence.{(
         required_heading,
         required_heading_style,
     )
-    word_limit = paragraph_word_limit(section)
-    for _word_budget_attempt in range(2):
+    _word_minimum, word_limit = paragraph_word_range(section)
+    if isinstance(maximum_word_override, int) and maximum_word_override > 0:
+        word_limit = maximum_word_override
+    for _word_ceiling_attempt in range(2):
         word_count = manuscript_paragraph_word_count(text)
         if word_limit is None or word_count <= word_limit:
             break
@@ -9061,10 +9097,9 @@ evidence.{(
                 "instructions": (
                     "Return only the complete compressed LaTeX-ready paragraph. "
                     f"It must contain no more than {word_limit} readable words. "
-                    "Preserve every evidence-backed result, numerical value, citation "
-                    "key, required heading, and configured figure or table reference. "
-                    "Remove repetition, generic framing, and expendable transitions. "
-                    "Do not add evidence or explain the edit."
+                    "Preserve every evidence-backed claim, numerical value, citation key, "
+                    "required heading, and configured figure/table reference. Remove repetition, "
+                    "generic framing, and expendable transitions. Do not add evidence or explain."
                 ),
                 "input": (
                     f"The paragraph contains {word_count} readable words.\n"
@@ -9076,15 +9111,17 @@ evidence.{(
         text = normalize_latex_ready_text(extract_output_text(correction))
         response_id = correction.get("id")
         if not text or not response_id:
-            raise StudioError("Word-budget compression did not return a valid paragraph.")
+            raise StudioError("Word-ceiling correction did not return a valid paragraph.")
         text = enforce_required_heading(
             strip_redundant_section_name_leadin(text, str(section_meta["title"])),
             required_heading,
             required_heading_style,
         )
-    if word_limit is not None and manuscript_paragraph_word_count(text) > word_limit:
+    final_word_count = manuscript_paragraph_word_count(text)
+    if word_limit is not None and final_word_count > word_limit:
         raise StudioError(
-            "The paragraph still exceeds its venue-aware word budget after two corrections."
+            f"The paragraph remains above its venue-aware {word_limit}-word ceiling "
+            f"after two corrections (measured {final_word_count})."
         )
     # Citation resolution and heading enforcement both transform the candidate.
     # Validate and repair only after those final transformations so a hazard
@@ -9456,6 +9493,8 @@ def discard_empty_bibliography_cache_when_citations_exist() -> None:
 
 
 BODY_END_LABEL = "paper:body-end"
+BODY_END_POSITION_LABEL = "paper:body-end-position"
+DEFAULT_MINIMUM_BODY_PAGE_FILL = 0.85
 
 
 def ensure_body_end_label() -> None:
@@ -9471,14 +9510,40 @@ def ensure_body_end_label() -> None:
         return
     source = main.read_text(encoding="utf-8")
     marker = f"\\label{{{BODY_END_LABEL}}}"
+    position_marker = f"\\zsavepos{{{BODY_END_POSITION_LABEL}}}"
+    changed = False
+    if "\\usepackage{zref-savepos}" not in source:
+        documentclass = re.search(r"(?m)^\\documentclass(?:\[[^]]*\])?\{[^}]+\}\s*$", source)
+        if documentclass:
+            source = (
+                source[: documentclass.end()]
+                + "\n\\usepackage{zref-savepos}"
+                + source[documentclass.end() :]
+            )
+            changed = True
+    if marker in source and position_marker not in source:
+        source = source.replace(marker, position_marker + "\n" + marker, 1)
+        changed = True
     if marker in source:
+        if not changed:
+            return
+        temporary = main.with_suffix(".tex.tmp")
+        temporary.write_text(source, encoding="utf-8")
+        os.replace(temporary, main)
         return
     bibliography = re.search(r"(?m)^\\input\{sections/bibliography\}\s*$", source)
     end_document = re.search(r"(?m)^\\end\{document\}\s*$", source)
     insertion = bibliography or end_document
     if not insertion:
         return
-    updated = source[: insertion.start()] + marker + "\n" + source[insertion.start() :]
+    updated = (
+        source[: insertion.start()]
+        + position_marker
+        + "\n"
+        + marker
+        + "\n"
+        + source[insertion.start() :]
+    )
     temporary = main.with_suffix(".tex.tmp")
     temporary.write_text(updated, encoding="utf-8")
     os.replace(temporary, main)
@@ -9506,15 +9571,63 @@ def compiled_content_page_count() -> int | None:
     return int(page) if page.isdigit() else None
 
 
+def minimum_body_page_fill() -> float:
+    raw = PROJECT_METADATA.get("target", {}).get("minimum_body_page_fill")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        value = DEFAULT_MINIMUM_BODY_PAGE_FILL
+    return min(0.98, max(0.50, value))
+
+
+def compiled_body_fill_fraction() -> float | None:
+    """Measure how far body content reaches down its final text page.
+
+    A page-number label alone treats a body ending near the top of the last
+    allowed page as "full". ``zref-savepos`` records the physical body-end
+    position after the float barrier. Geometry's logged top/bottom margins then
+    let us normalize that position within the template's usable text area.
+    """
+    aux = read_text(PAPER / "main.aux", 2_000_000)
+    position = re.search(
+        rf"\\zref@newlabel\{{{re.escape(BODY_END_POSITION_LABEL)}\}}"
+        r"\{[^\n]*?\\posy\{([0-9]+)\}",
+        aux,
+    )
+    log = read_text(PAPER / "main.log", 2_000_000)
+    geometry = re.search(
+        r"\* v-part:\(T,H,B\)=\(([0-9.]+)pt,\s*([0-9.]+)pt,\s*([0-9.]+)pt\)",
+        log,
+    )
+    paper_height = re.search(r"\* \\paperheight=([0-9.]+)pt", log)
+    if not position or not geometry or not paper_height:
+        return None
+    y_points = int(position.group(1)) / 65536.0
+    top_margin = float(geometry.group(1))
+    bottom_margin = float(geometry.group(3))
+    page_height = float(paper_height.group(1))
+    text_top = page_height - top_margin
+    usable_height = text_top - bottom_margin
+    if usable_height <= 0:
+        return None
+    return min(1.0, max(0.0, (text_top - y_points) / usable_height))
+
+
 def page_budget_status() -> dict[str, Any]:
     limit = submission_content_page_limit()
     content_pages = compiled_content_page_count()
+    fill_fraction = compiled_body_fill_fraction()
+    minimum_fill = minimum_body_page_fill()
     if limit is None:
         status = "not_configured"
     elif content_pages is None:
         status = "awaiting_compile"
     elif content_pages > limit:
         status = "over"
+    elif content_pages < limit:
+        status = "under"
+    elif fill_fraction is not None and fill_fraction < minimum_fill:
+        status = "under"
     else:
         status = "within"
     return {
@@ -9527,6 +9640,10 @@ def page_budget_status() -> dict[str, Any]:
         ),
         "status": status,
         "excludes_references": True,
+        "last_page_fill": (
+            round(fill_fraction, 4) if fill_fraction is not None else None
+        ),
+        "minimum_last_page_fill": minimum_fill,
     }
 
 
@@ -9585,6 +9702,30 @@ def paragraph_word_limit(section: str) -> int | None:
     return max(70, allocated)
 
 
+def paragraph_word_range(section: str) -> tuple[int | None, int | None]:
+    """Return a venue-aware evidence-bearing word range for one paragraph."""
+    maximum = paragraph_word_limit(section)
+    if maximum is None:
+        return None, None
+    section_meta = SECTION_MAP.get(section, {})
+    if section_meta.get("render") == "abstract":
+        minimum = max(90, math.ceil(maximum * 0.80))
+    elif section == "experiments":
+        minimum = max(95, math.ceil(maximum * 0.80))
+    else:
+        minimum = max(50, math.ceil(maximum * 0.75))
+    return min(minimum, maximum), maximum
+
+
+def paragraph_expansion_word_limit(section: str) -> int:
+    """Upper bound used only after a complete PDF is measured as underfilled."""
+    if SECTION_MAP.get(section, {}).get("render") == "abstract":
+        return 140
+    if section == "experiments":
+        return 150
+    return 120
+
+
 def manuscript_paragraph_word_count(text: str) -> int:
     """Count readable manuscript words while ignoring LaTeX command names."""
     without_commands = re.sub(r"\\[A-Za-z@]+\*?", " ", text)
@@ -9615,12 +9756,15 @@ def section_budget_guidance(section: str) -> str:
         )
     elif share is not None and 0 < share <= 1:
         parts.append(f"The approved length share for this section is {share:.0%}.")
-    paragraph_limit = paragraph_word_limit(section)
-    if paragraph_limit is not None:
+    paragraph_minimum, paragraph_limit = paragraph_word_range(section)
+    if paragraph_limit is not None and paragraph_minimum is not None:
         parts.append(
-            f"This paragraph must contain no more than {paragraph_limit} readable words."
+            f"This paragraph must contain between {paragraph_minimum} and "
+            f"{paragraph_limit} readable words."
         )
-    parts.append("Prefer the shortest prose that preserves every supported claim and citation.")
+    parts.append(
+        "Use concrete evidence-bearing detail to meet the range; never pad with generic prose."
+    )
     return " ".join(parts)
 
 
@@ -9959,6 +10103,131 @@ def repair_batch_page_budget_candidate(
     return repaired
 
 
+def repair_underfilled_manuscript(
+    model: str,
+    state: dict[str, Any],
+    *,
+    job_key: str,
+    token: str,
+) -> dict[str, Any]:
+    """Expand evidence-bearing paragraphs until measured PDF body fill passes."""
+    attempted: set[tuple[str, str]] = set()
+    priority = {
+        section: index
+        for index, section in enumerate(
+            ("experiments", "discussion", "method", "introduction", "related_work", "conclusion", "limitations")
+        )
+    }
+    for _iteration in range(12):
+        budget = page_budget_status()
+        if budget.get("status") != "under":
+            return state
+        candidates: list[tuple[int, int, str, dict[str, Any], int, int]] = []
+        for section, section_state in state.get("sections", {}).items():
+            if section not in priority:
+                continue
+            maximum = paragraph_expansion_word_limit(section)
+            for paragraph in section_state.get("paragraphs", []):
+                paragraph_id = str(paragraph.get("id") or "")
+                key = (section, paragraph_id)
+                text = str(paragraph.get("accepted_text") or "").strip()
+                current = manuscript_paragraph_word_count(text)
+                headroom = maximum - current
+                if text and headroom >= 12 and key not in attempted:
+                    candidates.append(
+                        (priority[section], -headroom, section, paragraph, current, maximum)
+                    )
+        if not candidates:
+            raise StudioError(
+                "The manuscript remains physically underfilled after all evidence-bearing "
+                "paragraphs reached their approved word ceilings; return to Experiment Plan "
+                "and add substantive evidence rather than padding prose."
+            )
+        # Several paragraphs commonly share both section priority and word
+        # headroom.  Comparing the raw tuples then falls through to the
+        # paragraph dictionaries, which are not orderable in Python 3.  Keep
+        # selection deterministic with the paragraph id as the final scalar
+        # tie-breaker.
+        _rank, _headroom, section, paragraph, current, maximum = min(
+            candidates,
+            key=lambda item: (
+                item[0],
+                item[1],
+                item[2],
+                str(item[3].get("id") or ""),
+            ),
+        )
+        paragraph_id = str(paragraph.get("id") or "")
+        attempted.add((section, paragraph_id))
+        job = state.get(job_key) or {}
+        if job.get("token") != token or job.get("status") != "running":
+            return state
+        job["progress_message"] = (
+            f"Balancing body-page fill · {SECTION_MAP[section]['title']} · {paragraph_id} "
+            f"({budget.get('last_page_fill')} → target {budget.get('minimum_last_page_fill')})"
+        )
+        state[job_key] = job
+        save_state(state)
+        artifact_ids = [str(item) for item in paragraph.get("artifacts", [])]
+        try:
+            response_id, revised, citations_added = call_openai(
+                section=section,
+                model=model,
+                previous_response_id=None,
+                purpose=str(paragraph.get("purpose") or ""),
+                required_heading=paragraph.get("heading"),
+                required_heading_style=paragraph.get("heading_style"),
+                architecture=paragraph_architecture(paragraph),
+                reference_context=paragraph_reference_context(section, paragraph),
+                comment=(
+                    f"The compiled body fills only {budget.get('last_page_fill')} of its final "
+                    f"allowed page, below {budget.get('minimum_last_page_fill')}. Expand this "
+                    f"paragraph from {current} toward {maximum} readable words using only concrete "
+                    "details already supported by its purpose and section evidence. Do not add "
+                    "generic filler, a new claim, experiment, number, citation, or artifact."
+                ),
+                current_text=str(paragraph.get("accepted_text") or ""),
+                bibliography_update="",
+                artifacts=artifact_ids,
+                figure_states=json.loads(json.dumps(state.get("figures", {}))),
+                include_section_context=True,
+                maximum_word_override=maximum,
+            )
+        except StudioError:
+            # ``call_openai`` applies the same claim/provenance validator before
+            # returning a candidate.  Treat that early rejection exactly like
+            # an acceptance-time rejection: preserve the manuscript and try a
+            # different evidence-bearing paragraph.
+            continue
+        revised_count = manuscript_paragraph_word_count(revised)
+        if revised_count < current + 8:
+            continue
+        paragraph["candidate"] = {
+            "id": uuid.uuid4().hex,
+            "text": revised,
+            "purpose": paragraph.get("purpose"),
+            "citations_added": citations_added,
+            "created_at": int(time.time()),
+        }
+        try:
+            accept_full_draft_paragraph(state, section, paragraph, revised)
+        except StudioError:
+            # Expansion is opportunistic.  Claim/provenance, LaTeX, and page
+            # validators already roll the paragraph back transactionally.  A
+            # rejected candidate must not abort the whole manuscript; retain
+            # the accepted evidence and try the next eligible paragraph.
+            continue
+        section_state = state["sections"][section]
+        section_state["previous_response_id"] = response_id
+        section_state["bibliography_fingerprint"] = bibliography_fingerprint()
+        state["model"] = model
+        save_state(state)
+    raise StudioError(
+        "The manuscript remains physically underfilled after twelve evidence-grounded "
+        "page-fill revisions; return to Experiment Plan and add substantive evidence."
+    )
+
+
 def update_full_draft_job(token: str, **updates: Any) -> dict[str, Any] | None:
     with FULL_DRAFT_JOB_LOCK:
         state = load_state()
@@ -10170,7 +10439,7 @@ def draft_batch_worker(
                 if job.get("status") != "running" or job.get("token") != token:
                     return
 
-        if not section_filter:
+        if not section_filter and full_draft_title_pending(load_state()):
             update_full_draft_job(
                 token,
                 progress_message="Generating the final paper title from the completed manuscript...",
@@ -10196,6 +10465,13 @@ def draft_batch_worker(
                 # Apply the final quality gate only after every bound artifact
                 # has produced its real deliverables.
                 if not pending_artifacts and not section_filter:
+                    if page_budget_status().get("status") == "under":
+                        state = repair_underfilled_manuscript(
+                            model,
+                            state,
+                            job_key=job_key,
+                            token=token,
+                        )
                     quality_issues = completed_manuscript_issues(state)
                     if quality_issues:
                         raise StudioError(
@@ -10294,7 +10570,7 @@ def start_full_draft_job(model: str) -> tuple[str, dict[str, Any]]:
         raise StudioError("Outline Not confirmed yet; cannot generate the full text directly.")
     if not (PAPER / "main.tex").exists():
         raise StudioError("paper/main.tex Does not exist; please first create the paper scaffold.")
-    model = model.strip()
+    model = model_for_provider(provider, model)
     if not model:
         raise StudioError("Model name cannot be empty.")
     with FULL_DRAFT_JOB_LOCK:
@@ -10306,9 +10582,17 @@ def start_full_draft_job(model: str) -> tuple[str, dict[str, Any]]:
         refresh_full_draft_artifact_status(state)
         if (state.get("full_draft_job") or {}).get("status") == "artifacts_pending":
             pending = (state.get("full_draft_job") or {}).get("pending_artifacts", [])
-            raise StudioError(
-                "The binding charts from the previous batch of the main text are still in progress:" + ", ".join(pending)
-            )
+            actively_running = [
+                artifact_id
+                for artifact_id in pending
+                if artifact_id in state.get("figures", {})
+                and state["figures"][artifact_id].get("status") in FIGURE_RUNNING_STATUSES
+            ]
+            if actively_running:
+                raise StudioError(
+                    "The binding charts from the previous batch are still running:"
+                    + ", ".join(actively_running)
+                )
         targets = full_draft_targets(state)
         artifact_ids = None
         artifact_or_quality_work = bool(
@@ -10358,7 +10642,7 @@ def start_section_draft_job(model: str, section: str) -> tuple[str, dict[str, An
         raise StudioError("The current section does not exist.")
     if SECTION_MAP[section].get("writing_mode") == "plan_only":
         raise StudioError("Current Section only shows plan, cannot generate main text.")
-    model = model.strip()
+    model = model_for_provider(provider, model)
     if not model:
         raise StudioError("Model name cannot be empty.")
     with SECTION_DRAFT_JOB_LOCK:
@@ -10407,7 +10691,11 @@ def run_direct_full_draft(model: str) -> None:
     token, state = start_full_draft_job(model)
     job = state["full_draft_job"]
     print(f"Direct full draft: 0 / {job['total']} paragraphs")
-    full_draft_worker(token, model)
+    # ``start_full_draft_job`` normalizes stale selections to the active
+    # provider.  Always run with that canonical value; passing the caller's
+    # pre-normalized model can send an OpenAI model name to DeepSeek (or the
+    # reverse) after the job has already been accepted.
+    full_draft_worker(token, str(state["model"]))
     finished = load_state().get("full_draft_job") or {}
     status = finished.get("status")
     message = str(finished.get("progress_message") or status or "unknown status")
@@ -11188,7 +11476,19 @@ def validate_mechanism_shape_spec(
                 and my1 <= ty1
                 and ty2 <= my1 + float(module["h"]) * 0.28
             )
-            if not container_owns_header:
+            module_owns_label = (
+                not str(module.get("text") or "").strip()
+                and str(module.get("semantic_role") or "")
+                and str(module.get("semantic_role") or "")
+                == str(textbox.get("semantic_role") or "")
+                and mx1 <= tx1
+                and tx2 <= mx2
+                and my1 <= ty1
+                and ty2 <= my2
+                and float(textbox["w"]) * float(textbox["h"])
+                <= float(module["w"]) * float(module["h"]) * 0.65
+            )
+            if not (container_owns_header or module_owns_label):
                 raise StudioError(
                     f"Mechanism diagram textbox {text_index} overlaps graphical "
                     f"module {module_index}; move the label into clear whitespace."
@@ -11459,11 +11759,30 @@ def mechanism_prompt_with_contract_footer(figure_id: str, prompt: str) -> str:
     """Make the final image-facing instruction win over verbose model prose."""
     wide = str(FIGURES[figure_id].get("width", "")).startswith("two-column")
     limit = "sixteen" if wide else "eight"
+    registry = {
+        str(item.get("id", "")): str(item.get("latex", "")).strip()
+        for item in metrics_bundle().get("symbol_registry", [])
+        if isinstance(item, dict)
+    }
+    required_symbols = [
+        registry[str(symbol_id)]
+        for symbol_id in FIGURES[figure_id].get("symbol_ids", [])
+        if registry.get(str(symbol_id))
+    ]
+    symbol_requirement = (
+        " Preserve these registered scientific symbols exactly as visible labels: "
+        + "; ".join(required_symbols)
+        + "."
+        if required_symbols
+        else ""
+    )
     footer = (
-        "Mandatory final rendering constraints: use no more than "
+        "Mandatory final rendering constraints override every contradictory earlier "
+        "instruction. Use no more than "
         f"{limit} text labels total, each at most four words; omit any earlier label "
         "request that exceeds this limit. Put no caption, explanatory sentence, "
         "empirical chart, score ranking, or decorative unexplained glyph inside the figure."
+        + symbol_requirement
     )
     return prompt.strip() + "\n\n" + footer
 
@@ -11749,6 +12068,7 @@ def draw_figure_worker(figure_id: str, job_token: str, prompt: str) -> None:
 
 def finalize_automatic_mechanism_figure(figure_id: str) -> None:
     """Insert an automatically built mechanism figure when prose writes are idle."""
+    resume_page_fill: tuple[str, str] | None = None
     with AUTOMATIC_MECHANISM_FINALIZE_LOCK:
         with STATE_LOCK:
             state = load_state()
@@ -11801,8 +12121,43 @@ def finalize_automatic_mechanism_figure(figure_id: str) -> None:
                 "message": compile_result.message,
                 "updated_at": int(time.time()),
             }
-            refresh_full_draft_artifact_status(state)
+            pending = pending_batch_artifacts(state)
+            full_job = state.get("full_draft_job") or {}
+            if (
+                not pending
+                and full_job.get("status") == "artifacts_pending"
+                and page_budget_status().get("status") == "under"
+            ):
+                token = uuid.uuid4().hex
+                model = str(state.get("model") or DEFAULT_MODEL)
+                full_job.update(
+                    token=token,
+                    status="running",
+                    server_instance=SERVER_INSTANCE_TOKEN,
+                    server_pid=os.getpid(),
+                    started_at=int(time.time()),
+                    finished_at=None,
+                    total=0,
+                    completed=0,
+                    progress=100,
+                    current_section="",
+                    current_paragraph="",
+                    pending_artifacts=[],
+                    progress_message="Balancing evidence-bearing prose to the measured body-page target…",
+                )
+                state["full_draft_job"] = full_job
+                resume_page_fill = (token, model)
+            else:
+                refresh_full_draft_artifact_status(state)
             save_state(state)
+        if resume_page_fill:
+            token, model = resume_page_fill
+            threading.Thread(
+                target=full_draft_worker,
+                args=(token, model),
+                daemon=True,
+                name=f"page-fill-{token[:8]}",
+            ).start()
 
 
 def automatic_mechanism_figure_worker(figure_id: str, job_token: str) -> None:
@@ -14039,9 +14394,10 @@ class Handler(BaseHTTPRequestHandler):
         state = load_state()
         model = str(body.get("model") or state.get("model") or DEFAULT_MODEL).strip()
         token, state = start_full_draft_job(model)
+        active_model = str(state["model"])
         threading.Thread(
             target=full_draft_worker,
-            args=(token, model),
+            args=(token, active_model),
             daemon=True,
             name=f"batch-draft-{token[:8]}",
         ).start()
@@ -14052,9 +14408,10 @@ class Handler(BaseHTTPRequestHandler):
         model = str(body.get("model") or state.get("model") or DEFAULT_MODEL).strip()
         section = self.require_section(body)
         token, state = start_section_draft_job(model, section)
+        active_model = str(state["model"])
         threading.Thread(
             target=section_draft_worker,
-            args=(token, model, section),
+            args=(token, active_model, section),
             daemon=True,
             name=f"section-draft-{section}-{token[:8]}",
         ).start()

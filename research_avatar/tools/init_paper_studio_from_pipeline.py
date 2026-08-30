@@ -845,9 +845,16 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
     # If the venue does not require a pre-title abstract, place it immediately
     # after \maketitle and before Introduction rather than after all sections.
     after_maketitle = ([] if before_maketitle else abstract_inputs) + body_inputs
+    template_preamble = [str(line) for line in template.get("preamble", [])]
+    position_preamble = (
+        []
+        if any("zref-savepos" in line for line in template_preamble)
+        else [r"\usepackage{zref-savepos}"]
+    )
     main = "\n".join([
         str(template["documentclass"]),
-        *[str(line) for line in template.get("preamble", [])],
+        *template_preamble,
+        *position_preamble,
         f"\\title{{{_latex_escape(title)}}}",
         r"\author{Anonymous Author(s)}",
         r"\date{}",
@@ -858,6 +865,7 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
         # Keep late figure/table floats from drifting into and splitting the
         # bibliography.  The scaffold's template includes ``placeins``.
         r"\FloatBarrier",
+        r"\zsavepos{paper:body-end-position}",
         r"\label{paper:body-end}",
         r"\input{sections/bibliography}",
         r"\end{document}",
@@ -912,6 +920,18 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
     )
 
     reference = contract.get("references", {}).get("researcher_owned_logic", {})
+    project_target = {
+        key: value
+        for key in ("venue", "track", "cycle", "submission_content_pages", "deadline")
+        if (value := target.get(key)) not in (None, "")
+    }
+    page_fill = contract.get("page_fill_contract", {})
+    if isinstance(page_fill, dict) and isinstance(
+        page_fill.get("minimum_last_page_fill"), (int, float)
+    ):
+        project_target["minimum_body_page_fill"] = float(
+            page_fill["minimum_last_page_fill"]
+        )
     config = {
         "schema_version": "1.0",
         "project": {
@@ -920,7 +940,7 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
             "initial_title": title,
             "venue": venue,
             "bibliography_style": str(template.get("bibliographystyle") or "").strip(),
-            "target": {key: value for key in ("venue", "track", "cycle", "submission_content_pages", "deadline") if (value := target.get(key)) not in (None, "")},
+            "target": project_target,
             "reference_paper": {key: value for key in ("title", "authors", "venue", "publication_key", "url") if (value := reference.get(key))},
             "decision_source": str(plan.relative_to(root)),
             "eyebrow": "LOCAL PAPER STUDIO",

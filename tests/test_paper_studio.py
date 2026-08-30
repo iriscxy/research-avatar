@@ -425,6 +425,8 @@ class PaperStudioTests(unittest.TestCase):
 
     def test_model_selection_accepts_researcher_input_and_resets_all_llm_chains(self):
         state = _default_state()
+        state["llm_provider"] = "openai"
+        state["model"] = "gpt-5-nano"
         state["title_editor"]["previous_response_id"] = "title-old"
         first_section = next(iter(state["sections"].values()))
         first_section["previous_response_id"] = "section-old"
@@ -442,6 +444,12 @@ class PaperStudioTests(unittest.TestCase):
 
         state["llm_provider"] = "deepseek"
         state["model"] = "deepseek-v4-flash"
+        with self.assertRaisesRegex(StudioError, "incompatible"):
+            studio.select_llm_model(state, "gpt-5-nano")
+        self.assertEqual(
+            studio.model_for_provider("deepseek", "gpt-5-nano"),
+            "deepseek-v4-flash",
+        )
         self.assertEqual(
             [item["id"] for item in studio.model_options_for_provider("deepseek")],
             ["deepseek-v4-pro", "deepseek-v4-flash"],
@@ -746,11 +754,11 @@ class PaperStudioTests(unittest.TestCase):
                 section["revision"] = int(section.get("revision", 0)) + 1
                 studio.save_state(accepted)
 
-                stale_background_request["model"] = "background-model"
+                stale_background_request["model"] = "deepseek-v4-pro"
                 studio.save_state(stale_background_request)
                 recovered = studio.load_state()
 
-        self.assertEqual(recovered["model"], "background-model")
+        self.assertEqual(recovered["model"], "deepseek-v4-pro")
         self.assertEqual(
             recovered["sections"]["introduction"]["paragraphs"][0]["accepted_text"],
             "Newest accepted prose.",
@@ -932,11 +940,11 @@ class PaperStudioTests(unittest.TestCase):
                 completed_figure["job_revision"] += 1
                 studio.save_state(completed)
 
-                stale_prose_request["model"] = "prose-request-model"
+                stale_prose_request["model"] = "deepseek-v4-pro"
                 studio.save_state(stale_prose_request)
                 recovered = studio.load_state()
 
-        self.assertEqual(recovered["model"], "prose-request-model")
+        self.assertEqual(recovered["model"], "deepseek-v4-pro")
         self.assertEqual(recovered["figures"]["F1"]["status"], "draft")
         self.assertIsNone(recovered["figures"]["F1"]["job_token"])
 
@@ -1177,6 +1185,39 @@ class PaperStudioTests(unittest.TestCase):
         with self.assertRaisesRegex(StudioError, "overlaps graphical module"):
             validate_mechanism_shape_spec("F1", {"shapes": shapes})
 
+    def test_mechanism_shape_spec_allows_semantic_label_owned_by_module(self):
+        shapes = [
+            {
+                "kind": "rounded_rect",
+                "x": 0.05 + i * 0.15,
+                "y": 0.2,
+                "w": 0.12,
+                "h": 0.2,
+                "text": "",
+                "semantic_role": "input" if i == 0 else "annotation",
+            }
+            for i in range(4)
+        ]
+        shapes += [
+            {"kind": "arrow", "x1": 0.17, "y1": 0.3, "x2": 0.2, "y2": 0.3},
+            {"kind": "arrow", "x1": 0.32, "y1": 0.3, "x2": 0.35, "y2": 0.3},
+        ]
+        shapes += [
+            {
+                "kind": "textbox",
+                "x": 0.07 if i == 0 else 0.05,
+                "y": 0.24 if i == 0 else 0.5 + i * 0.04,
+                "w": 0.08 if i == 0 else 0.8,
+                "h": 0.09 if i == 0 else 0.03,
+                "text": "Input" if i == 0 else "",
+                "semantic_role": "input" if i == 0 else "annotation",
+                "font_size": 8,
+            }
+            for i in range(6)
+        ]
+        result = validate_mechanism_shape_spec("F1", {"shapes": shapes})
+        self.assertEqual(len(result["shapes"]), 12)
+
     def test_mechanism_agent_retries_with_validator_feedback(self):
         source = Path(studio.__file__).read_text(encoding="utf-8")
         worker = source.split(
@@ -1345,7 +1386,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('id="title-save"', html)
         self.assertIn('"/api/title/generate"', source)
         self.assertIn('"/api/title/save"', source)
-        self.assertIn("GPT candidate Not saved yet", source)
+        self.assertIn("Model candidate not saved yet", source)
         self.assertIn("function updateTitleSaveButton()", source)
         self.assertIn('changed ? "Confirm writing to LaTeX" : "Written to PDF"', source)
         self.assertIn("currentTitle", source)
@@ -1382,6 +1423,17 @@ class PaperStudioTests(unittest.TestCase):
             source,
         )
 
+    def test_failed_pending_figure_does_not_disable_full_draft_retry(self):
+        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        render = source[
+            source.index("function renderFullDraft()") :
+            source.index("async function startFullDraftFromBrowser()")
+        ]
+        self.assertIn("const activelyGeneratingArtifacts", render)
+        self.assertIn('Boolean(job && job.status === "failed")', render)
+        self.assertIn("|| activelyGeneratingArtifacts ||", render)
+        self.assertNotIn("|| artifactsPending ||", render)
+
     def test_full_draft_api_uses_persisted_provider_model_when_body_omits_model(self):
         handler = object.__new__(Handler)
         handler.send_json = MagicMock()
@@ -1401,6 +1453,30 @@ class PaperStudioTests(unittest.TestCase):
 
         start.assert_called_once_with("deepseek-v4-flash")
         thread.assert_called_once()
+        self.assertEqual(
+            thread.call_args.kwargs["args"],
+            ("job-token", "deepseek-v4-flash"),
+        )
+
+    def test_full_draft_api_runs_with_provider_normalized_model(self):
+        handler = object.__new__(Handler)
+        handler.send_json = MagicMock()
+        with (
+            patch.object(studio, "load_state", return_value={"model": "gpt-5-nano"}),
+            patch.object(
+                studio,
+                "start_full_draft_job",
+                return_value=("job-token", {"model": "deepseek-v4-flash"}),
+            ),
+            patch.object(studio.threading, "Thread") as thread,
+            patch.object(studio, "public_state", return_value={}),
+        ):
+            handler.handle_full_draft_start({"model": "gpt-5-nano"})
+
+        self.assertEqual(
+            thread.call_args.kwargs["args"],
+            ("job-token", "deepseek-v4-flash"),
+        )
 
     def test_section_draft_api_passes_the_selected_section_to_the_batch_writer(self):
         handler = object.__new__(Handler)
@@ -1422,6 +1498,10 @@ class PaperStudioTests(unittest.TestCase):
 
         start.assert_called_once_with("deepseek-v4-flash", section)
         thread.assert_called_once()
+        self.assertEqual(
+            thread.call_args.kwargs["args"],
+            ("job-token", "deepseek-v4-flash", section),
+        )
 
     def test_full_draft_uses_the_same_outline_approval_rule_as_public_state(self):
         source = Path(studio.__file__).read_text(encoding="utf-8")
@@ -1864,7 +1944,7 @@ class PaperStudioTests(unittest.TestCase):
         )
         self.assertIn('"/api/figure/caption"', source)
         self.assertIn('"/api/figure/caption/generate"', source)
-        self.assertIn('GPT candidate Not saved yet', source)
+        self.assertIn('Model candidate not saved yet', source)
         self.assertIn('Caption Modified, not yet updated in the main text and PDF.', source)
         self.assertIn('function approveFigureOrSaveCaption()', source)
         self.assertIn('$("data-approve").onclick = approveFigureOrSaveCaption', source)
@@ -4058,11 +4138,11 @@ args = parser.parse_args()
             patch.object(studio, "FIGURES", {"F1": {}, "F2": {}}),
             patch.object(studio, "TABLES", {"T1": {}, "T2": {}}),
         ):
-            self.assertEqual(studio.paragraph_word_limit("introduction"), 70)
-            self.assertEqual(studio.paragraph_word_limit("abstract"), 100)
-            self.assertEqual(studio.paragraph_word_limit("experiments"), 120)
+            self.assertEqual(studio.paragraph_word_range("introduction"), (53, 70))
+            self.assertEqual(studio.paragraph_word_range("abstract"), (90, 100))
+            self.assertEqual(studio.paragraph_word_range("experiments"), (96, 120))
             guidance = studio.section_budget_guidance("introduction")
-            self.assertIn("no more than 70 readable words", guidance)
+            self.assertIn("between 53 and 70 readable words", guidance)
 
     def test_citation_resolver_starts_a_new_chain_when_previous_id_is_absent(self):
         captured = {}
@@ -6240,7 +6320,7 @@ args = parser.parse_args()
             source.count(
                 "reference_context=paragraph_reference_context(section, paragraph)"
             ),
-            2,
+            3,
         )
         self.assertNotIn(
             "reference_context=section_reference_context(section)",
@@ -6572,7 +6652,7 @@ args = parser.parse_args()
                     "A simpler single-column drawing prompt with at most eight text labels."
                 )
             )
-            self.assertIn("use no more than eight text labels total", prompt)
+            self.assertIn("Use no more than eight text labels total", prompt)
 
     def test_mechanism_prompt_contract_rejects_results_captions_and_analysis_leaks(self):
         invalid = (
@@ -6603,6 +6683,26 @@ args = parser.parse_args()
             self.assertTrue(any("SYM-S" in issue for issue in studio.mechanism_prompt_contract_issues("F1", missing)))
             exact = "Show S(v) in the mechanism. Use no more than 8 text labels."
             self.assertEqual(studio.mechanism_prompt_contract_issues("F1", exact), [])
+
+    def test_mechanism_prompt_footer_deterministically_restores_registered_symbols(self):
+        with (
+            patch.dict(studio.FIGURES["F1"], {"symbol_ids": ["SYM-S"]}),
+            patch.object(
+                studio,
+                "metrics_bundle",
+                return_value={
+                    "symbol_registry": [
+                        {"id": "SYM-S", "latex": "S(v)", "meaning": "support sets"}
+                    ]
+                },
+            ),
+        ):
+            prompt = studio.mechanism_prompt_with_contract_footer(
+                "F1", "Draw the mechanism without mathematical notation."
+            )
+            self.assertIn("override every contradictory earlier instruction", prompt)
+            self.assertIn("S(v)", prompt)
+            self.assertEqual(studio.mechanism_prompt_contract_issues("F1", prompt), [])
 
     def test_full_draft_worker_fills_only_pending_paragraph_and_finishes(self):
         with TemporaryDirectory() as directory:
@@ -6927,6 +7027,35 @@ args = parser.parse_args()
         self.assertEqual(started["full_draft_job"]["total"], 0)
         self.assertEqual(started["full_draft_job"]["status"], "running")
 
+    def test_full_draft_can_retry_a_failed_pending_figure(self):
+        state = _default_state()
+        for section in state["sections"].values():
+            for paragraph in section["paragraphs"]:
+                paragraph["accepted_text"] = "Accepted prose."
+        for figure_id in studio.FIGURE_ORDER:
+            state["figures"][figure_id]["status"] = "approved"
+        state["figures"]["F1"]["status"] = "failed"
+        for table_id in studio.TABLE_ORDER:
+            state["tables"][table_id]["status"] = "approved"
+        state["full_draft_job"] = {
+            "status": "artifacts_pending",
+            "pending_artifacts": ["F1"],
+        }
+        with (
+            patch.object(studio, "load_state", return_value=state),
+            patch.object(studio, "save_state"),
+            patch.object(studio, "outline_is_confirmed", return_value=True),
+            patch.object(studio, "active_llm_provider", return_value="deepseek"),
+            patch.object(studio, "api_setup_for_provider", return_value={"configured": True}),
+            patch.object(studio, "batch_figure_has_real_deliverables", return_value=False),
+            patch.object(studio, "completed_manuscript_issues", return_value=[]),
+            patch.object(studio, "PAPER") as paper,
+        ):
+            paper.__truediv__.return_value.exists.return_value = True
+            _token, started = studio.start_full_draft_job("deepseek-v4-flash")
+        self.assertEqual(started["full_draft_job"]["status"], "running")
+        self.assertEqual(started["full_draft_job"]["total"], 0)
+
     def test_online_full_draft_treats_non_data_placeholder_as_complete(self):
         state = _default_state()
         for section in state["sections"].values():
@@ -7235,9 +7364,43 @@ args = parser.parse_args()
                 source.index(r"\label{paper:body-end}"),
                 source.index(r"\input{sections/bibliography}"),
             )
+            self.assertLess(
+                source.index(r"\zsavepos{paper:body-end-position}"),
+                source.index(r"\label{paper:body-end}"),
+            )
             self.assertEqual(status["content_pages"], 8)
             self.assertEqual(status["status"], "within")
             self.assertTrue(status["excludes_references"])
+
+    def test_body_page_budget_measures_last_page_physical_fill(self):
+        with TemporaryDirectory(dir=studio.ROOT / "tests") as directory:
+            paper = Path(directory)
+            (paper / "main.aux").write_text(
+                "\\newlabel{paper:body-end}{{}{4}{}{Doc-Start}{}}\n"
+                "\\zref@newlabel{paper:body-end-position}{\\posx{0}\\posy{20504497}}\n",
+                encoding="utf-8",
+            )
+            (paper / "main.log").write_text(
+                "* v-part:(T,H,B)=(71.13188pt, 702.78308pt, 71.13188pt)\n"
+                "* \\paperheight=845.04684pt\n",
+                encoding="utf-8",
+            )
+            with (
+                patch.object(studio, "PAPER", paper),
+                patch.dict(
+                    studio.PROJECT_METADATA,
+                    {
+                        "target": {
+                            "submission_content_pages": 4,
+                            "minimum_body_page_fill": 0.85,
+                        }
+                    },
+                    clear=True,
+                ),
+            ):
+                status = studio.page_budget_status()
+            self.assertAlmostEqual(status["last_page_fill"], 0.656, places=3)
+            self.assertEqual(status["status"], "under")
 
     def test_page_budget_rejects_crossing_or_worsening_but_allows_reduction(self):
         with patch.dict(
@@ -7268,6 +7431,175 @@ args = parser.parse_args()
             issues = studio.completed_manuscript_issues({"sections": {}, "figures": {}, "tables": {}})
         self.assertTrue(any("10 pages for a 8-page limit" in item for item in issues))
 
+    def test_completed_manuscript_gate_rejects_an_underfilled_body(self):
+        with (
+            patch.object(
+                studio,
+                "page_budget_status",
+                return_value={
+                    "status": "under",
+                    "content_pages": 4,
+                    "limit": 4,
+                    "last_page_fill": 0.66,
+                    "minimum_last_page_fill": 0.85,
+                },
+            ),
+            patch.object(studio, "metrics_bundle", return_value={"synthetic": True}),
+            patch.object(studio, "batch_figure_has_real_deliverables", return_value=True),
+            patch.object(studio, "read_text", return_value=""),
+        ):
+            issues = studio.completed_manuscript_issues({"sections": {}, "figures": {}, "tables": {}})
+        self.assertTrue(any("final-page fill 66.0% below 85.0%" in item for item in issues))
+
+    def test_underfilled_manuscript_expands_evidence_before_completion(self):
+        paragraph = {
+            "id": "E1-P1",
+            "purpose": "Explain the measured robustness result.",
+            "accepted_text": "Short evidence paragraph.",
+            "artifacts": [],
+        }
+        tied_paragraph = {
+            "id": "E1-P2",
+            "purpose": "Explain a second measured robustness result.",
+            "accepted_text": "Short evidence paragraph.",
+            "artifacts": [],
+        }
+        state = {
+            "sections": {
+                "experiments": {"paragraphs": [paragraph, tied_paragraph]}
+            },
+            "figures": {},
+            "full_draft_job": {"status": "running", "token": "job-token"},
+        }
+        expanded = " ".join(["supported"] * 40)
+
+        def accept(_state, _section, target, text):
+            target["accepted_text"] = text
+
+        with (
+            patch.object(
+                studio,
+                "page_budget_status",
+                side_effect=[
+                    {
+                        "status": "under",
+                        "last_page_fill": 0.70,
+                        "minimum_last_page_fill": 0.85,
+                    },
+                    {"status": "within"},
+                ],
+            ),
+            patch.object(
+                studio,
+                "call_openai",
+                return_value=("response", expanded, []),
+            ) as generate,
+            patch.object(studio, "accept_full_draft_paragraph", side_effect=accept),
+            patch.object(studio, "save_state"),
+            patch.object(studio, "bibliography_fingerprint", return_value="bib"),
+        ):
+            repaired = studio.repair_underfilled_manuscript(
+                "model", state, job_key="full_draft_job", token="job-token"
+            )
+
+        self.assertEqual(repaired["sections"]["experiments"]["paragraphs"][0]["accepted_text"], expanded)
+        self.assertEqual(
+            repaired["sections"]["experiments"]["paragraphs"][1]["accepted_text"],
+            "Short evidence paragraph.",
+        )
+        self.assertEqual(generate.call_args.kwargs["maximum_word_override"], 150)
+
+    def test_underfill_repair_skips_a_rejected_expansion_candidate(self):
+        paragraphs = [
+            {
+                "id": paragraph_id,
+                "purpose": "Explain measured evidence.",
+                "accepted_text": "Short evidence paragraph.",
+                "artifacts": [],
+            }
+            for paragraph_id in ("E1-P1", "E1-P2")
+        ]
+        state = {
+            "sections": {"experiments": {"paragraphs": paragraphs}},
+            "figures": {},
+            "full_draft_job": {"status": "running", "token": "job-token"},
+        }
+        expanded = " ".join(["supported"] * 40)
+
+        def accept(_state, _section, target, text):
+            if target["id"] == "E1-P1":
+                raise StudioError("candidate evidence validation failed")
+            target["accepted_text"] = text
+
+        with (
+            patch.object(
+                studio,
+                "page_budget_status",
+                side_effect=[
+                    {"status": "under", "last_page_fill": 0.70, "minimum_last_page_fill": 0.85},
+                    {"status": "under", "last_page_fill": 0.70, "minimum_last_page_fill": 0.85},
+                    {"status": "within"},
+                ],
+            ),
+            patch.object(studio, "call_openai", return_value=("response", expanded, [])),
+            patch.object(studio, "accept_full_draft_paragraph", side_effect=accept),
+            patch.object(studio, "save_state"),
+            patch.object(studio, "bibliography_fingerprint", return_value="bib"),
+        ):
+            repaired = studio.repair_underfilled_manuscript(
+                "model", state, job_key="full_draft_job", token="job-token"
+            )
+
+        self.assertEqual(paragraphs[0]["accepted_text"], "Short evidence paragraph.")
+        self.assertEqual(paragraphs[1]["accepted_text"], expanded)
+        self.assertIs(repaired, state)
+
+    def test_underfill_repair_skips_a_candidate_rejected_during_generation(self):
+        paragraphs = [
+            {
+                "id": paragraph_id,
+                "purpose": "Explain measured evidence.",
+                "accepted_text": "Short evidence paragraph.",
+                "artifacts": [],
+            }
+            for paragraph_id in ("E1-P1", "E1-P2")
+        ]
+        state = {
+            "sections": {"experiments": {"paragraphs": paragraphs}},
+            "figures": {},
+            "full_draft_job": {"status": "running", "token": "job-token"},
+        }
+        expanded = " ".join(["supported"] * 40)
+
+        def accept(_state, _section, target, text):
+            target["accepted_text"] = text
+
+        with (
+            patch.object(
+                studio,
+                "page_budget_status",
+                side_effect=[
+                    {"status": "under", "last_page_fill": 0.70, "minimum_last_page_fill": 0.85},
+                    {"status": "under", "last_page_fill": 0.70, "minimum_last_page_fill": 0.85},
+                    {"status": "within"},
+                ],
+            ),
+            patch.object(
+                studio,
+                "call_openai",
+                side_effect=[StudioError("candidate evidence validation failed"), ("response", expanded, [])],
+            ),
+            patch.object(studio, "accept_full_draft_paragraph", side_effect=accept),
+            patch.object(studio, "save_state"),
+            patch.object(studio, "bibliography_fingerprint", return_value="bib"),
+        ):
+            studio.repair_underfilled_manuscript(
+                "model", state, job_key="full_draft_job", token="job-token"
+            )
+
+        self.assertEqual(paragraphs[0]["accepted_text"], "Short evidence paragraph.")
+        self.assertEqual(paragraphs[1]["accepted_text"], expanded)
+
     def test_public_state_discloses_native_codex_drawing_capability(self):
         visible = public_state(_default_state())
         self.assertEqual(
@@ -7276,7 +7608,7 @@ args = parser.parse_args()
         )
         self.assertFalse(visible["figure_capabilities"]["requires_image_api"])
 
-    def test_paper_studio_exposes_project_report_and_connection_status(self):
+    def test_paper_studio_omits_internal_project_runtime_metadata(self):
         visible = public_state(_default_state())
         self.assertIn("report_version", visible["project"])
         self.assertIn("reports_updated_at", visible["project"])
@@ -7288,9 +7620,21 @@ args = parser.parse_args()
             "runtime-reports-updated",
             "runtime-connection",
         ):
-            self.assertIn(f'id="{element_id}"', html)
-        self.assertIn('$("runtime-connection").textContent = "Connected"', script)
-        self.assertIn('$("runtime-connection").textContent = "Disconnected"', script)
+            self.assertNotIn(f'id="{element_id}"', html)
+            self.assertNotIn(f'$("{element_id}")', script)
+
+    def test_paper_studio_uses_provider_neutral_writing_labels(self):
+        html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
+        script = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        self.assertIn("Feedback to the writing model", html)
+        for obsolete in (
+            "Feedback to GPT",
+            "GPT Generate candidate titles",
+            "GPT Generated drawing prompt",
+            "Prompt modification instructions for GPT",
+            "GPT Generate caption candidate",
+        ):
+            self.assertNotIn(obsolete, html + script)
 
 
 if __name__ == "__main__":

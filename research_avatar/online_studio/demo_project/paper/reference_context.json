@@ -5,7 +5,7 @@
   "sections": {
     "abstract": {
       "source_heading": "Abstract",
-      "logic_summary_zh": "参考摘要先提出问题和局限，再给出解释、证据与审慎结论。",
+      "logic_summary_zh": "The reference abstract first states the problem and limitations, then provides an explanation, evidence, and a cautious conclusion.",
       "excerpts": [
         {
           "reference_paragraph_id": "REF-ABS-P1",
@@ -16,7 +16,7 @@
     },
     "introduction": {
       "source_heading": "Introduction",
-      "logic_summary_zh": "参考引言从重要性收窄到缺口，再提出方案与可验证边界。",
+      "logic_summary_zh": "The reference introduction narrows from importance to the gap, then presents the approach and its testable boundary.",
       "excerpts": [
         {
           "reference_paragraph_id": "REF-I-P1",
@@ -42,7 +42,7 @@
     },
     "related_work": {
       "source_heading": "Related Work",
-      "logic_summary_zh": "参考论文先分类方法与理论，再定位自身贡献。",
+      "logic_summary_zh": "The reference paper first categorizes methods and theory, then positions its own contribution.",
       "excerpts": [
         {
           "reference_paragraph_id": "REF-RW-P1",
@@ -63,7 +63,7 @@
     },
     "method": {
       "source_heading": "Method",
-      "logic_summary_zh": "参考方法部分先概述思路，再定义过程和实现细节。",
+      "logic_summary_zh": "The reference method first outlines the idea, then defines the procedure and implementation details.",
       "excerpts": [
         {
           "reference_paragraph_id": "REF-PR-P1",
@@ -89,7 +89,7 @@
     },
     "experiments": {
       "source_heading": "Experiments",
-      "logic_summary_zh": "参考实验部分依次说明设置、数据、比较方法与指标。",
+      "logic_summary_zh": "The reference experiments describe the setup, data, comparison methods, and metrics in sequence.",
       "excerpts": [
         {
           "reference_paragraph_id": "REF-V-P6",
@@ -115,7 +115,7 @@
     },
     "discussion": {
       "source_heading": "Discussion",
-      "logic_summary_zh": "参考讨论区分可观察结论、不可确定部分与适用边界。",
+      "logic_summary_zh": "The reference discussion separates observable conclusions, unresolved questions, and scope boundaries.",
       "excerpts": [
         {
           "reference_paragraph_id": "REF-P-P1",
@@ -131,7 +131,7 @@
     },
     "conclusion": {
       "source_heading": "Conclusion",
-      "logic_summary_zh": "参考结论总结贡献、证据边界和未来方向。",
+      "logic_summary_zh": "The reference conclusion summarizes the contribution, evidence boundary, and future directions.",
       "excerpts": [
         {
           "reference_paragraph_id": "REF-CON-P1",

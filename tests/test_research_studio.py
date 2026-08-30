@@ -80,6 +80,19 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertEqual(studio.STAGE_GENERATION_COMMANDS["expplan"], "$expplan")
         self.assertEqual(studio.STAGE_GENERATION_COMMANDS["runplan"], "$runplan")
 
+    def test_research_studio_shell_omits_internal_runtime_metadata(self):
+        static_root = Path(studio.__file__).parent / "static"
+        html = (static_root / "index.html").read_text(encoding="utf-8")
+        script = (static_root / "app.js").read_text(encoding="utf-8")
+        for element_id in (
+            "project-name",
+            "report-version",
+            "reports-updated",
+            "connection-status",
+        ):
+            self.assertNotIn(f'id="{element_id}"', html)
+            self.assertNotIn(f'#{element_id}', script)
+
     @patch("research_avatar.research_studio.server.subprocess.Popen")
     @patch("research_avatar.research_studio.server.paper_studio_status")
     def test_paper_studio_rejects_a_different_workspace_on_the_port(self, status, popen):

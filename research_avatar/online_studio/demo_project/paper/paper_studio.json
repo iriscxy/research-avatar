@@ -17,7 +17,7 @@
     "decision_source": "lightweight-onboarding",
     "eyebrow": "ONLINE PAPER STUDIO",
     "studio_title": "Paper Studio",
-    "subtitle": "从科研项目主旨与指定参考论文开始写作"
+    "subtitle": "Start writing from the project brief and designated reference paper"
   },
   "sections": [
     {
@@ -369,6 +369,7 @@
       "title": "Problem motivation and evaluation question",
       "label": "fig:motivation",
       "kind": "mechanism",
+      "figure_type": "motivation_contrast",
       "phase": 1,
       "width": "single-column",
       "include_scale": 0.78,

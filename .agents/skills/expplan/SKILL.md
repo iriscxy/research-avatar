@@ -283,8 +283,10 @@ Experiments/result paragraphs, the exact result-bearing artifact IDs, and
 distinct evidence blocks for the main comparison plus at least three applicable
 diagnostic/analysis kinds among robustness or sensitivity, ablation, failure or
 qualitative analysis, and cost or efficiency. For a normal full-length plan,
-the conservative lower page estimate must reach at least 90% of the venue body
-limit; a four-page short paper normally needs at least four experiment/result
+the conservative lower page estimate must reach at least 97.5% of the venue body
+limit and `minimum_last_page_fill` must be 0.80--0.98 (use 0.85 by default), so
+later PDF validation measures physical occupancy rather than page number alone;
+a four-page short paper normally needs at least four experiment/result
 paragraphs and three distinct result-bearing figures or tables. These are
 minimum sufficiency checks, not instructions to duplicate evidence or add
 scientifically empty experiments.

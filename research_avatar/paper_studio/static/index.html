@@ -13,12 +13,6 @@
       <div class="brand">
         <h1 id="studio-title">Paper Studio</h1>
         <p id="project-reference-paper" class="project-reference-paper" hidden></p>
-        <dl id="project-runtime-status" class="project-runtime-status">
-          <div><dt>Project</dt><dd id="runtime-project-id">—</dd></div>
-          <div><dt>Reports</dt><dd id="runtime-report-version">—</dd></div>
-          <div><dt>Updated</dt><dd id="runtime-reports-updated">—</dd></div>
-          <div><dt>Connection</dt><dd id="runtime-connection">Connecting…</dd></div>
-        </dl>
       </div>
       <div id="sections" class="sections"></div>
       <div class="sidebar-foot">
@@ -106,10 +100,10 @@
             <div class="title-editor-body">
               <label for="paper-title">Current title / editable candidate titles.</label>
               <textarea id="paper-title" rows="2" placeholder="Enter paper title"></textarea>
-              <label for="title-gpt-prompt">Title GPT Prompt</label>
+              <label for="title-gpt-prompt">Title-generation instructions</label>
               <textarea id="title-gpt-prompt" rows="3" placeholder="For example, emphasize representation contraction, remain cautious, do not add unverified claims."></textarea>
               <div class="title-actions">
-                <button id="title-generate" class="primary">GPT Generate candidate titles</button>
+                <button id="title-generate" class="primary">Generate candidate titles</button>
                 <button id="title-save" class="accept">Confirm writing to LaTeX</button>
               </div>
               <span id="title-status" class="title-status"></span>
@@ -148,7 +142,7 @@
           <label id="candidate-label" for="candidate">Current candidate paragraph.</label>
           <textarea id="candidate" rows="15" placeholder="The system is combining approved paragraph structure working abstract and experimental results to generate the current paragraph."></textarea>
 
-          <label for="comment">Feedback to GPT.</label>
+          <label for="comment">Feedback to the writing model</label>
           <textarea id="comment" rows="4" placeholder="For example, motivation is too generic; clarify three confounds and shorten the last sentence."></textarea>
 
           <div class="actions">
@@ -233,7 +227,7 @@
                     <small>Codex Will render native editable graphics according to this complete description.</small>
                   </div>
                 </header>
-                <label for="draw-prompt">GPT Generated drawing prompt.</label>
+                <label for="draw-prompt">Model-generated drawing prompt</label>
                 <textarea id="draw-prompt" rows="11" placeholder="First generate the drawing prompt; you can directly modify the complete prompt on the left or enter modification commands on the right."></textarea>
               </section>
 
@@ -242,12 +236,12 @@
                   <span class="mechanism-step-number">2</span>
                   <div>
                     <strong>Modify prompt</strong>
-                    <small>Describe how you want GPT to adjust the left side Prompt.</small>
+                    <small>Describe how you want the model to adjust the prompt on the left.</small>
                   </div>
                 </header>
-                <label for="prompt-instruction">Prompt modification instructions for GPT.</label>
+                <label for="prompt-instruction">Drawing-prompt revision instructions</label>
                 <textarea id="prompt-instruction" rows="7" placeholder="For example the current content is too long; replace with a simple single column graphic, keep only two core modules, reduce text."></textarea>
-                <button id="figure-prompt" class="secondary mechanism-revise-action">GPT Generate drawing prompt.</button>
+                <button id="figure-prompt" class="secondary mechanism-revise-action">Generate drawing prompt</button>
               </section>
             </div>
 
@@ -318,9 +312,9 @@
           <section id="figure-caption-box" class="figure-caption-box">
             <label for="figure-caption">Image caption</label>
             <textarea id="figure-caption" rows="3" placeholder="Describe what this figure shows and the required experimental conditions."></textarea>
-            <label for="figure-caption-prompt">Caption modification Prompt for GPT.</label>
+            <label for="figure-caption-prompt">Caption-revision instructions</label>
             <textarea id="figure-caption-prompt" rows="2" placeholder="For example, explain what each of three curves represents; compress to one sentence; retain the synthetic declaration."></textarea>
-            <button id="figure-caption-generate" class="primary">GPT Generate caption candidate.</button>
+            <button id="figure-caption-generate" class="primary">Generate caption candidate</button>
             <div class="figure-caption-actions">
               <span id="figure-caption-status">The current main text will use this caption.</span>
               <button id="figure-caption-save" class="secondary">Save caption</button>

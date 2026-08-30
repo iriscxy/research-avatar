@@ -138,6 +138,14 @@ def validate_page_fill_contract(contract: dict) -> list[str]:
             )
 
     micro_override = page_fill.get("micro_study_override") is True
+    minimum_last_page_fill = page_fill.get("minimum_last_page_fill")
+    if (
+        not isinstance(minimum_last_page_fill, (int, float))
+        or not 0.80 <= float(minimum_last_page_fill) <= 0.98
+    ):
+        errors.append(
+            "page_fill_contract.minimum_last_page_fill must be between 0.80 and 0.98"
+        )
     minimum_result_artifacts = max(2, math.ceil(target_pages * 0.75))
     if not micro_override and len(result_artifact_ids) < minimum_result_artifacts:
         errors.append(
@@ -204,9 +212,9 @@ def validate_page_fill_contract(contract: dict) -> list[str]:
         maximum = float(expected_pages["max"])
         if minimum <= 0 or maximum < minimum:
             errors.append("page-fill expected body-page range is invalid")
-        elif not micro_override and minimum < target_pages * 0.9:
+        elif not micro_override and minimum < target_pages * 0.975:
             errors.append(
-                "page-fill lower estimate must reach at least 90% of the venue body limit"
+                "page-fill lower estimate must reach at least 97.5% of the venue body limit"
             )
         elif maximum > target_pages + 0.5:
             errors.append(

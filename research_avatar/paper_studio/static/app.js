@@ -452,7 +452,7 @@ function updateAcceptButton() {
       ? "LaTeX has been written."
       : "Waiting for candidate.";
   $("accept").title = accepted && !canAccept
-    ? "The current version is written in LaTeX; you can modify the main text directly or fill in a comment to have GPT generate a new candidate."
+    ? "The current version is written in LaTeX; you can modify the main text directly or give the writing model feedback to generate a new candidate."
     : "";
 }
 
@@ -548,7 +548,7 @@ function renderTitleEditor(force = false) {
   renderTitleDraftInput(titleInput, "title", editor.candidate || editor.current_title || "", force);
   renderTitleDraftInput(promptInput, "prompt", editor.prompt || "", force);
   $("title-status").textContent = editor.last_message || (
-    editor.candidate ? "GPT candidate Not saved yet; can be edited and confirmed." : "Must confirm after modification before writing to LaTeX."
+    editor.candidate ? "Model candidate not saved yet; it can be edited and confirmed." : "Must confirm after modification before writing to LaTeX."
   );
   $("title-status").classList.remove("error");
   if (!titleBusy) $("title-generate").disabled = false;
@@ -1604,7 +1604,7 @@ function renderFigures() {
   $("figure-layout-mode").value = figure.layout_mode || "single-column";
   $("figure-prompt").textContent = figure.draw_prompt
     ? "Update Prompt per the right side instructions."
-    : "GPT Generate drawing prompt.";
+    : "Generate drawing prompt";
   updateMechanismFlow(figure);
   updateFigureButtonStates();
 
@@ -1720,13 +1720,6 @@ function render() {
   $("api-key-restart-command").textContent = apiKeySetup.restart_command || "python3 -m research_avatar.paper_studio.server";
   document.querySelector(".workspace").classList.toggle("api-key-missing", !apiKeyReady);
   $("studio-title").textContent = project.studio_title || "Paper Studio";
-  $("runtime-project-id").textContent = project.id || "—";
-  $("runtime-report-version").textContent = project.report_version || "—";
-  $("runtime-reports-updated").textContent = project.reports_updated_at
-    ? new Date(project.reports_updated_at * 1000).toLocaleString()
-    : "—";
-  $("runtime-connection").textContent = "Connected";
-  $("runtime-connection").className = "connected";
   const referencePaper = project.reference_paper || {};
   const referenceEl = $("project-reference-paper");
   if (referencePaper.title) {
@@ -1914,16 +1907,32 @@ function renderFullDraft() {
   const pendingArtifacts = Array.isArray(draft.pending_artifacts)
     ? draft.pending_artifacts
     : [];
+  const activelyGeneratingArtifacts = pendingArtifacts.some((artifactId) => {
+    const figure = (state.figures || []).find((item) => item.id === artifactId);
+    return figure && [
+      "prompt_generating",
+      "image_generating",
+      "agent_generating",
+      "generating",
+    ].includes(figure.status);
+  });
   const pendingTitle = Boolean(draft.pending_title);
-  const hasRemainingWork = pending > 0 || pendingArtifacts.length > 0 || pendingTitle;
+  const hasRemainingWork = pending > 0 || pendingArtifacts.length > 0 || pendingTitle
+    || Boolean(job && job.status === "failed");
   const total = Number(draft.total_paragraphs || 0);
+  const failed = Boolean(job && job.status === "failed");
   card.classList.toggle("is-running", running);
-  card.classList.toggle("is-failed", Boolean(job && job.status === "failed"));
+  card.classList.toggle("is-failed", failed);
   card.classList.toggle("is-completed", Boolean(job && job.status === "completed"));
   card.classList.toggle("has-pending-artifacts", Boolean(job && job.status === "artifacts_pending"));
 
   const summary = $("full-draft-summary");
-  if (job && job.progress_message) {
+  summary.title = job && job.progress_message ? job.progress_message : "";
+  if (failed && String(job.progress_message || "").includes("page budget exceeded")) {
+    summary.textContent = "The current paragraph would exceed the configured body-page limit, so it was rolled back safely. Continue to rebalance and finish the remaining text.";
+  } else if (failed && job.progress_message) {
+    summary.textContent = String(job.progress_message).split("\n", 1)[0];
+  } else if (job && job.progress_message) {
     summary.textContent = job.progress_message;
   } else if (!state.outline_confirmed) {
     summary.textContent = studioT("Please first confirm the outline; batch mode will not bypass paper structure confirmation.", "Confirm the outline first; batch drafting does not bypass structure approval.");
@@ -1943,9 +1952,11 @@ function renderFullDraft() {
 
   const start = $("full-draft-start");
   const cancel = $("full-draft-cancel");
-  start.disabled = fullDraftRequestBusy || queuedFullDraftStart || running || artifactsPending || !draft.available || !hasRemainingWork;
-  start.textContent = job && ["failed", "cancelled"].includes(job.status) && pending > 0
-    ? "Continue completing the unfinished main text"
+  start.disabled = fullDraftRequestBusy || queuedFullDraftStart || running || activelyGeneratingArtifacts || !draft.available || !hasRemainingWork;
+  start.textContent = job && ["failed", "cancelled"].includes(job.status)
+    ? pending > 0
+      ? "Continue completing the unfinished main text"
+      : "Continue finalizing the full draft"
     : pending === 0 && pendingArtifacts.length
       ? "Continue generating figures and tables"
     : pending === 0 && pendingTitle
@@ -1960,7 +1971,9 @@ function renderFullDraft() {
   progressRow.hidden = !job;
   $("full-draft-progress").value = Number((job && job.progress) || 0);
   $("full-draft-progress-text").textContent = job
-    ? `${Number(job.completed || 0)} / ${Number(job.total || pending)} · ${job.progress_message || job.status}`
+    ? failed
+      ? `${Number(job.completed || 0)} / ${Number(job.total || pending)} · Draft paused; details are shown above.`
+      : `${Number(job.completed || 0)} / ${Number(job.total || pending)} · ${job.progress_message || job.status}`
     : "";
 
   ["candidate", "comment", "generate", "section-draft-start", "accept", "paper-title", "title-gpt-prompt", "title-generate", "title-save", "model", "reset-generated"].forEach((id) => {
@@ -2684,7 +2697,7 @@ $("figure-prompt").onclick = () => startFigureJob(
     current_prompt: $("draw-prompt").value,
     prompt_instruction: $("prompt-instruction").value,
   },
-  "Starting GPT drawing prompt task…",
+  "Starting drawing-prompt generation…",
 );
 
 $("figure-draw").onclick = () => startFigureJob(
@@ -2818,7 +2831,7 @@ $("figure-caption-generate").onclick = async () => {
   const originalLabel = button.textContent;
   try {
     updateFigureButtonStates();
-    button.textContent = "GPT Generating Caption…";
+    button.textContent = "Generating caption…";
     $("figure-caption-status").textContent = "Generating Caption candidate.";
     const payload = await request("/api/figure/caption/generate", {
       method: "POST",
@@ -2841,8 +2854,8 @@ $("figure-caption-generate").onclick = async () => {
     $("figure-caption-prompt").dataset.dirty = "false";
     captionInput.dataset.dirty = String(dirty);
     $("figure-caption-status").textContent = dirty
-      ? "GPT candidate Not saved yet"
-      : "GPT candidate Same as the current caption.";
+      ? "Model candidate not saved yet"
+      : "Model candidate is the same as the current caption.";
     updateFigureButtonStates();
   } catch (error) {
     $("figure-caption-status").textContent = error.message;
@@ -3052,8 +3065,6 @@ $("table-approve").onclick = () => runFigureAction(
 
 refresh().catch((error) => {
   $("section-title").textContent = "Loading failed";
-  $("runtime-connection").textContent = "Disconnected";
-  $("runtime-connection").className = "disconnected";
   $("load-error-message").textContent = error.message;
   $("load-error").hidden = false;
   [

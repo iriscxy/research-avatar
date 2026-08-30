@@ -35,6 +35,7 @@ def complete_contract() -> dict:
         ],
         "page_fill_contract": {
             "target_body_pages": 4,
+            "minimum_last_page_fill": 0.85,
             "section_length_shares": {
                 section_id: share for section_id, share, _ in sections
             },
@@ -50,7 +51,7 @@ def complete_contract() -> dict:
                 {"kind": "cost_or_efficiency", "paragraph_ids": ["E4-P1"],
                  "experiment_ids": ["E-COST"], "artifact_ids": ["T2"]},
             ],
-            "expected_body_pages": {"min": 3.7, "max": 4.2},
+            "expected_body_pages": {"min": 3.9, "max": 4.1},
             "feasibility_status": "credible_full_length",
             "micro_study_override": False,
             "estimation_basis": "Section shares, four experiment paragraphs, and three result floats.",
@@ -75,7 +76,7 @@ class ExpPlanPageFillTests(unittest.TestCase):
         self.assertTrue(any("result-bearing artifacts" in error for error in errors))
         self.assertTrue(any("experiment/result paragraphs" in error for error in errors))
         self.assertTrue(any("three distinct diagnostic" in error for error in errors))
-        self.assertTrue(any("90%" in error for error in errors))
+        self.assertTrue(any("97.5%" in error for error in errors))
 
     def test_micro_study_requires_an_explicit_shortfall(self):
         contract = complete_contract()

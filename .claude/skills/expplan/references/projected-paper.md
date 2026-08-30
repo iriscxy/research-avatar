@@ -262,7 +262,8 @@ such as a component ablation, robustness analysis, or defense evaluation.
 Store the auditable decision in `page_fill_contract` with
 `target_body_pages`, `section_length_shares`, `experiment_paragraph_ids`,
 `result_artifact_ids`, `evidence_blocks`, `expected_body_pages`,
-`feasibility_status`, `micro_study_override`, and `estimation_basis`.
+`minimum_last_page_fill`, `feasibility_status`, `micro_study_override`, and
+`estimation_basis`.
 `section_length_shares` must cover the projected outline exactly and sum to
 1.0. Each evidence block names its kind, target paragraph IDs, experiment IDs,
 and artifact IDs. A full-length plan includes `main_comparison` and at least
