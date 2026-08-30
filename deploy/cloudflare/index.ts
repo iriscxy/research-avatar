@@ -173,6 +173,9 @@ export class OnlineStudioContainerV54 extends OnlineStudioContainer {}
 // Read-only editor-navigation release. Rotate to ship the Paper Studio bundle
 // that hides its nested language control and permits transient PDF navigation.
 export class OnlineStudioContainerV55 extends OnlineStudioContainer {}
+// Automatic figure completion and venue-length release. Rotate the class so
+// live V55 instances cannot keep serving the previous Paper Studio bundle.
+export class OnlineStudioContainerV56 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({

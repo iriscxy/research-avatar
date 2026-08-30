@@ -2496,9 +2496,9 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
-        self.assertIn('"class_name": "OnlineStudioContainerV55"', wrangler)
+        self.assertIn('"class_name": "OnlineStudioContainerV56"', wrangler)
         self.assertIn('"regions": ["APAC"]', wrangler)
-        self.assertIn("export class OnlineStudioContainerV55", worker)
+        self.assertIn("export class OnlineStudioContainerV56", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
 
     def test_cloudflare_worker_forwards_only_deepseek_secret_to_container(self):
