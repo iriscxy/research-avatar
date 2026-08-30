@@ -14,10 +14,6 @@ const previewCommand = document.querySelector("#preview-command");
 const previewCommandCopy = document.querySelector("#preview-command-copy");
 const previewCopyStatus = document.querySelector("#preview-copy-status");
 const artifactTabs = document.querySelector("#artifact-tabs");
-const studioProjectId = document.querySelector("#studio-project-id");
-const studioReportVersion = document.querySelector("#studio-report-version");
-const studioUpdatedAt = document.querySelector("#studio-updated-at");
-const studioConnection = document.querySelector("#studio-connection");
 const stageStorageKey = "research-studio.active-stage";
 const artifactSandbox = "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads";
 
@@ -98,19 +94,6 @@ function renderStage() {
   if (primaryArtifact) selectArtifact(primaryArtifact.key); else clearPreview();
 }
 
-function renderStudioStatus(connected = true) {
-  const project = app.state?.project || {};
-  studioProjectId.textContent = project.id || "—";
-  studioReportVersion.textContent = app.state?.report_version || "—";
-  const updated = Number(app.state?.reports_updated_at || 0);
-  studioUpdatedAt.textContent = updated
-    ? new Date(updated * 1000).toLocaleString()
-    : "—";
-  studioUpdatedAt.dateTime = updated ? new Date(updated * 1000).toISOString() : "";
-  studioConnection.textContent = connected ? "● Connected" : "● Disconnected";
-  studioConnection.classList.toggle("disconnected", !connected);
-}
-
 function renderArtifactTabs(stage, selectedKey) {
   const available = stage.artifacts?.filter(item => item.exists) || [];
   artifactTabs.hidden = available.length < 2;
@@ -183,12 +166,10 @@ async function loadState({preserveStage = true} = {}) {
     app.state = await response.json();
     if (!preserveStage) setStage(Math.min(savedStage(), app.state.stages.length - 1));
     else if (app.stage >= app.state.stages.length) setStage(0);
-    renderStudioStatus(true);
     renderStage();
   } catch (error) {
     clearPreview();
     previewTitle.textContent = `Load failed: ${error.message}`;
-    renderStudioStatus(false);
   } finally {
     app.loading = false;
   }

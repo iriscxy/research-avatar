@@ -1365,7 +1365,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('return "abstract";', source)
         self.assertNotIn("paper-studio.active-section", source)
         self.assertNotIn("paper-studio.active-view", source)
-        self.assertIn("static/app.js?v=20260829.1-feedback-status-budget", index)
+        self.assertIn("static/app.js?v=20260830.1-deduplicated-planning", index)
 
     def test_full_draft_click_queues_behind_an_inflight_paragraph_generation(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
@@ -1804,7 +1804,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260829.1-feedback-status-budget"', html)
+        self.assertIn('src="static/app.js?v=20260830.1-deduplicated-planning"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1937,20 +1937,22 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260829.1-feedback-status-budget"', html)
+        self.assertIn('src="static/app.js?v=20260830.1-deduplicated-planning"', html)
         self.assertNotIn("System-defined paragraph task", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
         self.assertIn('id="pdf-page-indicator"', html)
         self.assertIn("function updatePdfPageIndicator()", source)
         self.assertIn("pages.onscroll = updatePdfPageIndicator", source)
-        self.assertIn('href="static/style.css?v=20260829.1-feedback-status-budget"', html)
+        self.assertIn('href="static/style.css?v=20260830.1-deduplicated-planning"', html)
         self.assertLess(
             html.index('id="compile"'),
             html.index('id="reset-generated"'),
         )
         self.assertIn('id="reference-context-card" class="reference-context-card" open hidden', html)
         self.assertIn('id="reference-excerpts-toggle" class="reference-excerpts-toggle"', html)
+        self.assertNotIn('id="reference-context-summary"', html)
+        self.assertNotIn('$("reference-context-summary")', source)
         self.assertNotIn('<details class="structure-card">', html)
         self.assertIn('id="reset-generated-dialog"', html)
         self.assertIn('id="reset-project-id" readonly', html)

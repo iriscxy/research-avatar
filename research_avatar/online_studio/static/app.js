@@ -1,7 +1,7 @@
 const languageSelect = document.querySelector('#language-select');
 const initialLanguage = new URLSearchParams(window.location.search).get('lang')
   || window.localStorage.getItem('research-avatar-language')
-  || 'zh';
+  || 'en';
 let uiLanguage = initialLanguage === 'en' ? 'en' : 'zh';
 let authenticatedUser = null;
 
@@ -67,11 +67,28 @@ function applyInterfaceLanguage() {
   document.querySelectorAll('[data-placeholder-zh][data-placeholder-en]').forEach((node) => {
     node.placeholder = node.dataset[`placeholder${uiLanguage === 'en' ? 'En' : 'Zh'}`];
   });
+  refreshFilePickerNames();
   if (authenticatedUser) {
     document.querySelector('#account-label').textContent =
       authenticatedUser.email + ' · ' + (authenticatedUser.provider === 'google' ? 'Google' : localized('Email account', 'Email account'));
   }
 }
+
+function refreshFilePickerName(input) {
+  const name = input.closest('.file-picker')?.querySelector('.file-picker-name');
+  if (!name) return;
+  name.textContent = input.files?.[0]?.name
+    || name.dataset[`empty${uiLanguage === 'en' ? 'En' : 'Zh'}`]
+    || 'No file selected';
+}
+
+function refreshFilePickerNames() {
+  document.querySelectorAll('.file-picker-input').forEach(refreshFilePickerName);
+}
+
+document.querySelectorAll('.file-picker-input').forEach((input) => {
+  input.addEventListener('change', () => refreshFilePickerName(input));
+});
 
 function setInterfaceLanguage(language) {
   uiLanguage = language === 'en' ? 'en' : 'zh';
@@ -130,6 +147,7 @@ function showUploadView() {
   document.querySelector('#resume-studio').classList.remove('hidden');
   useOnboarding.classList.remove('hidden');
   form.reset();
+  refreshFilePickerNames();
   submit.disabled = false;
 }
 

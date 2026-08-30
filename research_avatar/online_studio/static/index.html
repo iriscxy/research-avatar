@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light">
   <title>Online Paper Studio</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/online-assets/style.css?v=20260823.4-visible-language-control">
+  <link rel="stylesheet" href="/online-assets/style.css?v=20260830.1-local-file-picker">
 </head>
 <body>
   <main class="shell">
@@ -58,17 +58,25 @@
         <form id="setup-form" class="card unified-setup">
       <div class="setup-heading">
         <p class="step-index">01</p>
-        <div><h2 data-zh="Upload paper writing materials" data-en="Upload paper-writing materials">Upload paper writing materials</h2><p data-zh="Only submit the research project summary and a structure reference paper. The system analyzes the reference paper chapters and paragraph logic and writes the target paper section by section; the experimental section is drafted as an executable experimental design with all quantitative values set to xx; Introduction keeps the Motivation figure slot by default, other planned figures are kept as placeholders, exportable for local completion in the terminal." data-en="Upload a project brief and one structural reference paper. The system analyzes the reference paper's section and paragraph logic, then drafts the target paper paragraph by paragraph. Unavailable results remain xx and planned figures and tables remain placeholders for later local completion.">Only submit the research project summary and a structure reference paper. The system analyzes the reference paper chapters and paragraph logic and writes the target paper section by section; the experimental section is drafted as an executable experimental design with all quantitative values set to xx; Introduction keeps the Motivation figure slot by default, other planned figures are kept as placeholders, exportable for local completion in the terminal.</p></div>
+        <div><h2 data-zh="Upload paper writing materials" data-en="Upload paper-writing materials">Upload paper writing materials</h2><p data-zh="Only submit the research project summary and a structure reference paper. The system analyzes the reference paper chapters and paragraph logic and writes the target paper section by section; the experimental section is drafted as an executable experimental design with all quantitative values set to xx; Introduction keeps the Motivation figure slot by default, other planned figures are kept as placeholders, exportable for local completion in the terminal. For the complete research workflow, executable experiments, and publication-ready figure tools, use the local edition." data-en="Upload a project brief and one structural reference paper. The system analyzes the reference paper's section and paragraph logic, then drafts the target paper paragraph by paragraph. Unavailable results remain xx and planned figures and tables remain placeholders for later local completion. For the complete research workflow, executable experiments, and publication-ready figure tools, use the local edition.">Only submit the research project summary and a structure reference paper. The system analyzes the reference paper chapters and paragraph logic and writes the target paper section by section; the experimental section is drafted as an executable experimental design with all quantitative values set to xx; Introduction keeps the Motivation figure slot by default, other planned figures are kept as placeholders, exportable for local completion in the terminal. For the complete research workflow, executable experiments, and publication-ready figure tools, use the local edition.</p></div>
       </div>
       <label><span data-zh="Target conference or journal (venue)." data-en="Target conference / journal">Target conference or journal (venue).</span><input name="venue" required placeholder="For example ACL 2027, EMNLP 2026 Findings" data-placeholder-zh="For example ACL 2027, EMNLP 2026 Findings" data-placeholder-en="e.g. ACL 2027 or EMNLP 2026 Findings"></label>
-      <label><span data-zh="Current work description" data-en="Project brief">Current work description</span>
-        <input name="project_brief_file" type="file" accept=".doc,.docx,.txt,.pdf,.md,.markdown,.json,.html,.htm" required>
+      <div class="material-field"><span data-zh="Current work description" data-en="Project brief">Current work description</span>
+        <div class="file-picker">
+          <input id="project-brief-file" class="file-picker-input" name="project_brief_file" type="file" accept=".doc,.docx,.txt,.pdf,.md,.markdown,.json,.html,.htm" required>
+          <label class="file-picker-button" for="project-brief-file" data-zh="Choose file" data-en="Choose file">Choose file</label>
+          <span class="file-picker-name" data-empty-zh="No file selected" data-empty-en="No file selected">No file selected</span>
+        </div>
         <small data-zh="Describe the research question methods data current progress expected contributions and limitations to clarify what the writing API is doing." data-en="Describe the research question, method, data, progress, expected contribution, and limitations so the writing API understands the project.">Describe the research question methods data current progress expected contributions and limitations to clarify what the writing API is doing.</small>
-      </label>
-      <label><span data-zh="Structure reference paper" data-en="Structural reference paper">Structure reference paper</span>
-        <input name="reference_paper_file" type="file" accept=".txt,.pdf,.md,.markdown,.html,.htm" required>
+      </div>
+      <div class="material-field"><span data-zh="Structure reference paper" data-en="Structural reference paper">Structure reference paper</span>
+        <div class="file-picker">
+          <input id="reference-paper-file" class="file-picker-input" name="reference_paper_file" type="file" accept=".txt,.pdf,.md,.markdown,.html,.htm" required>
+          <label class="file-picker-button" for="reference-paper-file" data-zh="Choose file" data-en="Choose file">Choose file</label>
+          <span class="file-picker-name" data-empty-zh="No file selected" data-empty-en="No file selected">No file selected</span>
+        </div>
         <small data-zh="Upload a complete paper. The system only mimics its section organization and argument progression and does not copy its research claims data or wording." data-en="Upload one complete paper. The system follows only its section organization and argumentative progression, never its claims, numbers, or wording.">Upload a complete paper. The system only mimics its section organization and argument progression and does not copy its research claims data or wording.</small>
-      </label>
+      </div>
       <p id="message" role="status" aria-live="polite"></p>
       <button id="submit" type="submit" data-zh="Enter Paper Studio. →" data-en="Open Paper Studio →">Enter Paper Studio. →</button>
       <p class="security" data-zh="Online writing sessions are temporary workspaces using the shared DeepSeek API; before closure or timeout export the project as a ZIP from the writing desk." data-en="Online writing sessions are temporary workspaces using a shared DeepSeek API. Export the project ZIP before closing or timing out.">Online writing sessions are temporary workspaces using the shared DeepSeek API; before closure or timeout export the project as a ZIP from the writing desk.</p>
@@ -78,6 +86,6 @@
       </section>
     </div>
   </main>
-  <script src="/online-assets/app.js?v=20260823.7-single-language-control" defer></script>
+  <script src="/online-assets/app.js?v=20260830.1-local-file-picker" defer></script>
 </body>
 </html>

@@ -323,8 +323,12 @@ class ResearchStudioTests(unittest.TestCase):
         self.assertNotIn('id="refresh"', index_source)
         self.assertNotIn('id="stage-body"', index_source)
         self.assertIn('class="stage-surface"', index_source)
-        self.assertIn('class="studio-status"', index_source)
-        self.assertIn("report_version", app_source)
+        self.assertNotIn('class="studio-status"', index_source)
+        self.assertNotIn('id="studio-project-id"', index_source)
+        self.assertNotIn('id="studio-report-version"', index_source)
+        self.assertNotIn('id="studio-updated-at"', index_source)
+        self.assertNotIn('id="studio-connection"', index_source)
+        self.assertNotIn("renderStudioStatus", app_source)
         self.assertNotIn("missingStageMarkup", app_source)
         self.assertNotIn("goalMarkup", app_source)
         self.assertNotIn("ideaMarkup", app_source)
@@ -552,7 +556,7 @@ class ResearchStudioTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn(".pipeline-button strong{font-size:11px", style_source)
         self.assertIn("font:750 8px var(--serif)", style_source)
-        self.assertIn("/style.css?v=20260827-skill-command-copy", index_source)
+        self.assertIn("/style.css?v=20260830.1-clean-stage-shell", index_source)
 
     def test_live_demo_matches_the_local_six_stage_navigation(self):
         root = Path(__file__).resolve().parents[1]

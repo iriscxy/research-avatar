@@ -639,7 +639,6 @@ function renderReferenceContext(section) {
   $("reference-context-title").textContent = abstracted
     ? "Refined reference structure"
     : "The corresponding formulation in the reference papers.";
-  $("reference-context-summary").textContent = context.logic_summary_zh;
   const toggle = $("reference-excerpts-toggle");
   toggle.hidden = abstracted;
   $("reference-excerpts-title").textContent = abstracted ? "" : "View referenced original text.";

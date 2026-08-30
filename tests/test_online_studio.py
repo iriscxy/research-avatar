@@ -2564,6 +2564,13 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertEqual(html.count('class="step-index"'), 1)
         for field in ("project_brief_file", "reference_paper_file"):
             self.assertIn(f'name="{field}"', html)
+        self.assertEqual(html.count('class="file-picker-input"'), 2)
+        self.assertEqual(html.count('data-en="Choose file"'), 2)
+        self.assertEqual(html.count('data-empty-en="No file selected"'), 2)
+        self.assertIn("|| 'en';", script)
+        self.assertIn("refreshFilePickerNames();", script)
+        self.assertIn("input.addEventListener('change'", script)
+        self.assertIn("use the local edition", html)
         self.assertNotIn('name="results_file"', html)
         self.assertNotIn("results_files:", script)
         self.assertNotIn('name="scholar_file"', html)
