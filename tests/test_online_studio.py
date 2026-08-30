@@ -2496,9 +2496,9 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
-        self.assertIn('"class_name": "OnlineStudioContainerV56"', wrangler)
+        self.assertIn('"class_name": "OnlineStudioContainerV57"', wrangler)
         self.assertIn('"regions": ["APAC"]', wrangler)
-        self.assertIn("export class OnlineStudioContainerV56", worker)
+        self.assertIn("export class OnlineStudioContainerV57", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
 
     def test_cloudflare_worker_forwards_only_deepseek_secret_to_container(self):
@@ -2515,7 +2515,11 @@ class OnlineStudioTests(unittest.TestCase):
             Path(__file__).resolve().parents[1]
             / "deploy/cloudflare/Dockerfile.release"
         ).read_text(encoding="utf-8")
-        for module in ("paper_structure.py", "survey_bibliography.py"):
+        for module in (
+            "paper_structure.py",
+            "survey_bibliography.py",
+            "figure_contract.py",
+        ):
             self.assertIn(f"COPY research_avatar/{module} ", dockerfile)
             self.assertIn(
                 f"/usr/local/lib/python3.12/site-packages/research_avatar/{module}",

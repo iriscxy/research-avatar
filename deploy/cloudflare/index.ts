@@ -176,6 +176,9 @@ export class OnlineStudioContainerV55 extends OnlineStudioContainer {}
 // Automatic figure completion and venue-length release. Rotate the class so
 // live V55 instances cannot keep serving the previous Paper Studio bundle.
 export class OnlineStudioContainerV56 extends OnlineStudioContainer {}
+// Runtime packaging repair: the online gateway imports figure_contract, which
+// must be present in both application and site-packages roots in the image.
+export class OnlineStudioContainerV57 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
