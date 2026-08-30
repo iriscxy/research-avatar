@@ -258,6 +258,19 @@ models, methods, and metrics, a second aggregate table over the same cells is a
 duplicate and must be removed or replaced with a distinct claim-bearing test,
 such as a component ablation, robustness analysis, or defense evaluation.
 (c) **Page-fill feasibility vs the target venue (do this BEFORE the GATE — a hard check, not a nicety).** The experiment plan must design *enough* experiments to fill the target conference's body-page requirement, because browser writing later must fill to that page count with substantive content and cannot invent experiments the plan did not specify. So, while the confirmed reference is open, **count its body proportions and content floats, inspect the broader grounded literature's experimental coverage, and estimate the plan's**: (a) read the target venue's body-page limit (ACL 8, EMNLP 8, NeurIPS 9, ICLR 9–10, AAAI 7–8) and the **researcher-owned reference's real CONTENT-float count** (how many result tables + figures it carries across its body — a table-heavy empirical paper often has 5–8). Keep the required six-row setup table as a compact index, but never count it as a content float and never add a second setup/configuration float to inflate the count. Count only floats that carry a result, an analysis, or a qualitative example; (b) count what THIS plan will produce as body content-floats — one per claim, per dataset/setting breakdown of the main results table, per ablation-matrix row, plus per-layer / sensitivity / qualitative / cost analyses (again, the setup table is not one of them); (c) if the plan's float/experiment count is materially below the researcher-owned reference's, or its experimental coverage is materially thinner than the strongest directly relevant grounded papers' (e.g. the plan yields 3 floats but the owned reference has 7), the plan is **under-scoped to fill the venue's pages** — expand it NOW: add datasets, baselines (raise the baseline selection), ablation-matrix rows, network/model/seed sensitivity sweeps, and analysis axes, until the projected float count and coverage are credible. A micro / smoke plan (e.g. a deliberate ~10-case test) will NOT fill a full venue paper; when the researcher has explicitly asked for a micro run, say so plainly at the GATE ("this plan yields ~N body floats vs the owned reference's M; at full venue length the paper will fall ~K pages short unless the experiment set is scaled up") rather than letting browser writing discover the shortfall at compile time. Immediately below the visible `2. Projected Paper` heading, write a compact whole-paper **float budget** comparing only this plan's total content figures/tables with the researcher-owned reference's total content figures/tables. Ignore which sections the floats appear in. Do not append a citation or `reference` link to this numeric line; the reference is already linked in Section 1. Also retain the one-line page-fill feasibility note elsewhere in `03`.
+
+Store the auditable decision in `page_fill_contract` with
+`target_body_pages`, `section_length_shares`, `experiment_paragraph_ids`,
+`result_artifact_ids`, `evidence_blocks`, `expected_body_pages`,
+`feasibility_status`, `micro_study_override`, and `estimation_basis`.
+`section_length_shares` must cover the projected outline exactly and sum to
+1.0. Each evidence block names its kind, target paragraph IDs, experiment IDs,
+and artifact IDs. A full-length plan includes `main_comparison` and at least
+three distinct applicable analysis kinds beyond it. For a four-page short
+paper, plan at least four experiment/result paragraphs and three distinct
+result-bearing artifacts unless an explicitly authorized micro-study shortfall
+is recorded. The validator rejects an unsupported prose-only assertion that
+the scope is sufficient.
 **Visible float-budget brevity overrides the preceding detail:** render exactly
 one prominent line immediately below the `2. Projected Paper` heading with two numeric
 entries—this whole paper and the reference whole paper—each formatted as
@@ -288,7 +301,7 @@ and artifact shells. Do not turn them into extra visible web sections:
 `baseline_contract`, `repository_contract`, `experiment_contracts`,
 `metric_contract`, `decision_space_contract`, `consistency_requirements`,
 `paper_outline`, `paper_artifacts`, `required_labels`, and
-`result_requirements`. Each `paper_artifacts` entry must
+`result_requirements`, plus `page_fill_contract`. Each `paper_artifacts` entry must
 contain `id`, `kind`, `label`, `span`, `placement`, `supports`, `section_id`,
 matching `dimensions` and `visible_dimensions` for every result-bearing artifact,
 `introduced_after`, and `shell`. A table `shell` records caption, row labels,

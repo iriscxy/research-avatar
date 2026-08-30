@@ -277,12 +277,26 @@ paper's body proportions and content-float count, and the strongest grounded
 papers' experimental coverage. The plan must contain enough substantive
 experiments and result-bearing figures/tables to support a full venue paper.
 
+Serialize this decision as `page_fill_contract`, not prose alone. It must bind
+the venue body-page target to every section's approved length share, all planned
+Experiments/result paragraphs, the exact result-bearing artifact IDs, and
+distinct evidence blocks for the main comparison plus at least three applicable
+diagnostic/analysis kinds among robustness or sensitivity, ablation, failure or
+qualitative analysis, and cost or efficiency. For a normal full-length plan,
+the conservative lower page estimate must reach at least 90% of the venue body
+limit; a four-page short paper normally needs at least four experiment/result
+paragraphs and three distinct result-bearing figures or tables. These are
+minimum sufficiency checks, not instructions to duplicate evidence or add
+scientifically empty experiments.
+
 If materially under-scoped, expand datasets, baselines, ablations, model/seed
 sensitivity, robustness, qualitative analysis, or cost analysis as
 scientifically appropriate, then revisit any affected human choices. Do not
 count setup/configuration tables. If the researcher explicitly requests only a
-micro study, retain the smaller scope but state the expected float/page
-shortfall at the approval gate.
+micro study, set `micro_study_override: true`,
+`feasibility_status: declared_shortfall`, and a positive
+`expected_page_shortfall`, then state the float/page shortfall at the approval
+gate. Never label an underfilled micro plan `credible_full_length`.
 
 ## Canonical output
 

@@ -9,6 +9,7 @@ import datetime as dt
 import hashlib
 import html as html_module
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -41,6 +42,191 @@ EVIDENCE_SOURCES = {
 DATASET_STATUSES = {
     "PUBLISHED", "PUBLIC_REPOSITORY", "USER_PROVIDED_PRIVATE", "SELF_BUILT_UNPUBLISHED",
 }
+
+
+def validate_page_fill_contract(contract: dict) -> list[str]:
+    """Reject plans that defer venue-length sufficiency to manuscript writing."""
+    errors: list[str] = []
+    page_fill = contract.get("page_fill_contract")
+    if not isinstance(page_fill, dict):
+        return [
+            "page_fill_contract is required; ExpPlan must establish substantive "
+            "venue-length feasibility before approval"
+        ]
+
+    target_pages = contract.get("target", {}).get("submission_content_pages")
+    if page_fill.get("target_body_pages") != target_pages:
+        errors.append(
+            "page_fill_contract.target_body_pages must equal "
+            "target.submission_content_pages"
+        )
+    if not isinstance(target_pages, int) or target_pages <= 0:
+        return errors
+
+    outline = [item for item in contract.get("paper_outline", []) if isinstance(item, dict)]
+    outline_ids = {
+        str(item.get("id") or item.get("section_id") or "").strip()
+        for item in outline
+    }
+    shares = page_fill.get("section_length_shares")
+    if not isinstance(shares, dict) or set(shares) != outline_ids:
+        errors.append(
+            "page_fill_contract.section_length_shares must cover every projected "
+            "paper section exactly once"
+        )
+    else:
+        try:
+            share_total = sum(float(value) for value in shares.values())
+        except (TypeError, ValueError):
+            errors.append("page-fill section length shares must be numeric")
+        else:
+            if abs(share_total - 1.0) > 0.001:
+                errors.append(
+                    f"page-fill section length shares must sum to 1.0, found {share_total:.4f}"
+                )
+            for section in outline:
+                section_id = str(section.get("id") or section.get("section_id") or "")
+                try:
+                    declared = float(shares.get(section_id))
+                    planned = float(section.get("length_share"))
+                except (TypeError, ValueError):
+                    errors.append(f"{section_id}: page-fill length share is invalid")
+                    continue
+                if abs(declared - planned) > 0.001:
+                    errors.append(
+                        f"{section_id}: page-fill length share disagrees with paper_outline"
+                    )
+
+    paragraphs = {
+        str(paragraph.get("id")): paragraph
+        for section in outline
+        for paragraph in section.get("paragraphs", [])
+        if isinstance(paragraph, dict) and paragraph.get("id")
+    }
+    experiment_paragraphs = page_fill.get("experiment_paragraph_ids")
+    if not isinstance(experiment_paragraphs, list) or any(
+        str(item) not in paragraphs for item in experiment_paragraphs
+    ):
+        errors.append(
+            "page_fill_contract.experiment_paragraph_ids must name existing paragraphs"
+        )
+        experiment_paragraphs = []
+
+    artifacts = {
+        str(item.get("id")): item
+        for item in contract.get("paper_artifacts", [])
+        if isinstance(item, dict) and item.get("id")
+    }
+    result_artifact_ids = page_fill.get("result_artifact_ids")
+    if not isinstance(result_artifact_ids, list) or any(
+        str(item) not in artifacts for item in result_artifact_ids
+    ):
+        errors.append(
+            "page_fill_contract.result_artifact_ids must name existing paper artifacts"
+        )
+        result_artifact_ids = []
+    else:
+        expected_result_ids = {
+            artifact_id for artifact_id, artifact in artifacts.items()
+            if artifact.get("kind") == "table"
+            or artifact.get("shell", {}).get("data_driven") is True
+        }
+        if set(map(str, result_artifact_ids)) != expected_result_ids:
+            errors.append(
+                "page_fill_contract.result_artifact_ids must exactly cover all "
+                "result-bearing figures and tables"
+            )
+
+    micro_override = page_fill.get("micro_study_override") is True
+    minimum_result_artifacts = max(2, math.ceil(target_pages * 0.75))
+    if not micro_override and len(result_artifact_ids) < minimum_result_artifacts:
+        errors.append(
+            f"page-fill plan needs at least {minimum_result_artifacts} distinct "
+            f"result-bearing artifacts for a {target_pages}-page body; found "
+            f"{len(result_artifact_ids)}"
+        )
+    if not micro_override and len(experiment_paragraphs) < target_pages:
+        errors.append(
+            f"page-fill plan needs at least {target_pages} experiment/result "
+            f"paragraphs for a {target_pages}-page body; found {len(experiment_paragraphs)}"
+        )
+
+    experiment_ids = {
+        str(item.get("id")) for item in contract.get("experiment_contracts", [])
+        if isinstance(item, dict) and item.get("id")
+    }
+    blocks = page_fill.get("evidence_blocks")
+    allowed_kinds = {
+        "main_comparison", "robustness_or_sensitivity", "ablation",
+        "failure_or_qualitative", "cost_or_efficiency",
+    }
+    covered_kinds: set[str] = set()
+    if not isinstance(blocks, list) or not blocks:
+        errors.append("page_fill_contract.evidence_blocks must be a non-empty list")
+    else:
+        for index, block in enumerate(blocks):
+            if not isinstance(block, dict):
+                errors.append(f"page_fill_contract.evidence_blocks[{index}] must be an object")
+                continue
+            kind = str(block.get("kind", ""))
+            if kind not in allowed_kinds:
+                errors.append(f"page-fill evidence block has invalid kind: {kind}")
+            else:
+                covered_kinds.add(kind)
+            for field, registry in (
+                ("paragraph_ids", set(paragraphs)),
+                ("experiment_ids", experiment_ids),
+                ("artifact_ids", set(artifacts)),
+            ):
+                values = block.get(field)
+                if not isinstance(values, list) or not values:
+                    errors.append(f"page-fill evidence block {kind or index} lacks {field}")
+                elif any(str(value) not in registry for value in values):
+                    errors.append(
+                        f"page-fill evidence block {kind or index} references unknown {field}"
+                    )
+    if "main_comparison" not in covered_kinds:
+        errors.append("page-fill evidence blocks require a main_comparison")
+    if not micro_override and len(covered_kinds - {"main_comparison"}) < 3:
+        errors.append(
+            "page-fill evidence blocks require at least three distinct diagnostic "
+            "or analysis kinds beyond the main comparison"
+        )
+
+    expected_pages = page_fill.get("expected_body_pages")
+    if not isinstance(expected_pages, dict) or any(
+        not isinstance(expected_pages.get(field), (int, float))
+        for field in ("min", "max")
+    ):
+        errors.append("page_fill_contract.expected_body_pages requires numeric min and max")
+    else:
+        minimum = float(expected_pages["min"])
+        maximum = float(expected_pages["max"])
+        if minimum <= 0 or maximum < minimum:
+            errors.append("page-fill expected body-page range is invalid")
+        elif not micro_override and minimum < target_pages * 0.9:
+            errors.append(
+                "page-fill lower estimate must reach at least 90% of the venue body limit"
+            )
+        elif maximum > target_pages + 0.5:
+            errors.append(
+                "page-fill upper estimate exceeds the venue body limit by more than "
+                "the allowed half-page layout tolerance"
+            )
+
+    if micro_override:
+        if page_fill.get("feasibility_status") != "declared_shortfall":
+            errors.append("a micro-study page-fill override must declare a shortfall")
+        if not isinstance(page_fill.get("expected_page_shortfall"), (int, float)) or float(
+            page_fill.get("expected_page_shortfall", 0)
+        ) <= 0:
+            errors.append("a micro-study override requires a positive expected_page_shortfall")
+    elif page_fill.get("feasibility_status") != "credible_full_length":
+        errors.append("a full-length plan must set feasibility_status=credible_full_length")
+
+    if not str(page_fill.get("estimation_basis", "")).strip():
+        errors.append("page_fill_contract.estimation_basis is required")
+    return errors
 
 
 def contract_digest(contract: dict) -> str:
@@ -339,6 +525,7 @@ def validate(plan: Path) -> list[str]:
     except json.JSONDecodeError as exc:
         return [f"invalid experiment-plan-contract JSON: {exc}"]
     errors.extend(validate_projected_identifier_registry(contract))
+    errors.extend(validate_page_fill_contract(contract))
     schema_version = str(contract.get("schema_version", "1.0"))
     if schema_version != "1.2":
         errors.append("schema_version must be 1.2; legacy two-reference plans require expplan migration")
