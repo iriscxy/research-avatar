@@ -24,7 +24,7 @@ class ResearchStudioCopyTests(unittest.TestCase):
         self.assertIn('document.execCommand("copy")', app)
         self.assertIn('sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads"', index)
         self.assertNotIn("allow-same-origin", index)
-        self.assertIn("/app.js?v=20260830.1-clean-stage-shell", index)
+        self.assertIn("/app.js?v=20260903.1-claim-gates", index)
 
     def test_run_plan_button_can_request_the_parent_bridge(self):
         state = {

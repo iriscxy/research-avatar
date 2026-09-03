@@ -302,8 +302,8 @@ def validate_implementation_integrity(contract: dict) -> list[str]:
 
 
 def validate_scientific_integrity_v2(contract: dict, project_root: Path) -> list[str]:
-    """Validate independent gold and executable metric domains for integrity v2."""
-    if contract.get("scientific_integrity_version") != 2:
+    """Validate independent gold and executable metric domains for integrity v2+."""
+    if contract.get("scientific_integrity_version") not in {2, 3}:
         return []
     errors: list[str] = []
     gold = contract.get("gold_standard_contract")
@@ -312,7 +312,7 @@ def validate_scientific_integrity_v2(contract: dict, project_root: Path) -> list
         "output_schema", "fixtures", "conformance_command", "independence_statement",
     }
     if not isinstance(gold, dict) or any(gold.get(field) in (None, "", []) for field in required_gold):
-        return ["scientific_integrity_version=2 requires a complete gold_standard_contract"]
+        return ["scientific_integrity_version=2+ requires a complete gold_standard_contract"]
     if gold.get("source_type") not in {
         "OFFICIAL_BENCHMARK_LABEL", "HUMAN_ANNOTATION", "INDEPENDENT_EXECUTABLE_ORACLE"
     }:
@@ -427,6 +427,121 @@ def validate_scientific_integrity_v2(contract: dict, project_root: Path) -> list
         populations = {population_ids.get(metric_id, "") for metric_id in metric_ids}
         if len(populations) > 1 and not claim.get("measurement_contract", {}).get("population_alignment_rule"):
             errors.append(f"claims[{index}] combines metrics from different populations without alignment")
+    return errors
+
+
+def validate_dataset_claim_applicability(contract: dict) -> list[str]:
+    """Validate that integrity-v3 datasets can actually test their assigned claims.
+
+    This is deliberately a structured contract.  Dataset suitability is never
+    inferred from names or prose keywords.
+    """
+    if contract.get("scientific_integrity_version") != 3:
+        return []
+    errors: list[str] = []
+    datasets = {
+        str(item.get("name", "")).strip()
+        for item in contract.get("dataset_citations", [])
+        if isinstance(item, dict) and str(item.get("name", "")).strip()
+    }
+    claims = {
+        str(item.get("id", "")).strip()
+        for item in contract.get("claims", [])
+        if isinstance(item, dict) and str(item.get("id", "")).strip()
+    }
+    result_targets = set(target_ids(contract))
+    mappings = contract.get("dataset_claim_applicability")
+    if not isinstance(mappings, list) or not mappings:
+        return [
+            "scientific_integrity_version=3 requires a non-empty "
+            "dataset_claim_applicability contract"
+        ]
+    seen: set[tuple[str, str]] = set()
+    covered_claims: set[str] = set()
+    required_fields = {
+        "dataset_name", "claim_id", "evidence_role", "rationale",
+        "required_conditions",
+    }
+    allowed_roles = {"PRIMARY", "SECONDARY", "STRESS_TEST_ONLY"}
+    allowed_statuses = {
+        "VERIFIED_COMPATIBLE", "PENDING_DIAGNOSTIC", "KNOWN_VIOLATION",
+    }
+    allowed_failure_actions = {
+        "EXCLUDE_PRIMARY", "RECLASSIFY_STRESS_TEST", "NARROW_CLAIM", "PIVOT",
+    }
+    for index, mapping in enumerate(mappings):
+        label = f"dataset_claim_applicability[{index}]"
+        if not isinstance(mapping, dict):
+            errors.append(f"{label} must be an object")
+            continue
+        missing = [field for field in required_fields if mapping.get(field) in (None, "", [])]
+        if missing:
+            errors.append(f"{label} missing {', '.join(sorted(missing))}")
+            continue
+        dataset_name = str(mapping["dataset_name"]).strip()
+        claim_id = str(mapping["claim_id"]).strip()
+        pair = (dataset_name, claim_id)
+        if pair in seen:
+            errors.append(f"{label} duplicates dataset/claim mapping {dataset_name}/{claim_id}")
+        seen.add(pair)
+        if dataset_name not in datasets:
+            errors.append(f"{label} names unknown dataset {dataset_name}")
+        if claim_id not in claims:
+            errors.append(f"{label} names unknown claim {claim_id}")
+        role = mapping.get("evidence_role")
+        if role not in allowed_roles:
+            errors.append(f"{label}.evidence_role must be one of {sorted(allowed_roles)}")
+        conditions = mapping.get("required_conditions")
+        if not isinstance(conditions, list) or not conditions:
+            errors.append(f"{label}.required_conditions must be a non-empty list")
+            continue
+        mapping_usable = role in {"PRIMARY", "SECONDARY"}
+        for condition_index, condition in enumerate(conditions):
+            condition_label = f"{label}.required_conditions[{condition_index}]"
+            condition_fields = {
+                "condition_id", "statement", "diagnostic", "acceptance_rule",
+                "assessment_status", "failure_action",
+            }
+            if not isinstance(condition, dict) or any(
+                condition.get(field) in (None, "", []) for field in condition_fields
+            ):
+                errors.append(f"{condition_label} lacks a complete diagnostic contract")
+                mapping_usable = False
+                continue
+            status = condition.get("assessment_status")
+            if status not in allowed_statuses:
+                errors.append(
+                    f"{condition_label}.assessment_status must be one of "
+                    f"{sorted(allowed_statuses)}"
+                )
+                mapping_usable = False
+            if condition.get("failure_action") not in allowed_failure_actions:
+                errors.append(
+                    f"{condition_label}.failure_action must be one of "
+                    f"{sorted(allowed_failure_actions)}"
+                )
+            if status == "KNOWN_VIOLATION" and role == "PRIMARY":
+                errors.append(
+                    f"{label} cannot use a known assumption violation as PRIMARY evidence"
+                )
+                mapping_usable = False
+            if status == "PENDING_DIAGNOSTIC":
+                diagnostic_targets = condition.get("diagnostic_result_target_ids")
+                if not isinstance(diagnostic_targets, list) or not diagnostic_targets:
+                    errors.append(
+                        f"{condition_label} pending diagnostic requires "
+                        "diagnostic_result_target_ids"
+                    )
+                    mapping_usable = False
+                elif any(str(target) not in result_targets for target in diagnostic_targets):
+                    errors.append(f"{condition_label} references an unknown diagnostic target")
+                    mapping_usable = False
+        if mapping_usable and claim_id in claims:
+            covered_claims.add(claim_id)
+    for claim_id in sorted(claims - covered_claims):
+        errors.append(
+            f"claim {claim_id} lacks a compatible PRIMARY or SECONDARY dataset mapping"
+        )
     return errors
 PENDING_TD_RE = re.compile(
     r'<td\b[^>]*class\s*=\s*["\'][^"\']*\bpending\b[^"\']*["\'][^>]*>\s*\[PENDING\]\s*</td>',
@@ -560,9 +675,9 @@ def validate(plan: Path) -> list[str]:
                 contract.get("parent_approval_sha256", "")
             ).strip():
                 errors.append("an amended contract requires parent_approval_sha256")
-    if contract.get("scientific_integrity_version") not in {1, 2}:
+    if contract.get("scientific_integrity_version") not in {1, 2, 3}:
         errors.append(
-            "scientific_integrity_version must be 1 or 2; regenerate the plan with "
+            "scientific_integrity_version must be 1, 2, or 3; regenerate the plan with "
             "claim/metric, implementation, and evidence-source integrity contracts"
         )
     if contract.get("approval_status") not in {"pending", "approved"}:
@@ -584,6 +699,7 @@ def validate(plan: Path) -> list[str]:
         errors.append("profile_contract.structure_reference_key is required")
     project_root = plan.parent.parent if plan.parent.name == "reports" else plan.parent
     errors.extend(validate_scientific_integrity_v2(contract, project_root))
+    errors.extend(validate_dataset_claim_applicability(contract))
     profile_path = project_root / "researcher-profile/PROFILE.html"
     publications_path = project_root / "researcher-profile/publications.json"
     publication_keys: set[str] = set()
@@ -787,6 +903,8 @@ def validate(plan: Path) -> list[str]:
             "rule_id", "primary_metric_id", "operator", "support_threshold",
             "uncertainty_condition", "tie_outcome", "missing_outcome",
         }
+        if contract.get("scientific_integrity_version") == 3:
+            required_outcome.add("actions")
         if not isinstance(outcome_rule, dict) or any(
             outcome_rule.get(field) in (None, "", []) for field in required_outcome
         ):
@@ -814,6 +932,19 @@ def validate(plan: Path) -> list[str]:
                 errors.append(f"claims[{index}].outcome_rule primary metric must be DIRECT for this claim")
             if primary_mapping.get("construct_definition") != measurement.get("construct_definition"):
                 errors.append(f"claims[{index}] primary metric construct differs from the claim construct")
+            if contract.get("scientific_integrity_version") == 3:
+                actions = outcome_rule.get("actions")
+                required_actions = {"supported", "weakened", "falsified", "inconclusive"}
+                allowed_actions = {"continue", "complete", "refine", "pivot", "stopped", "blocked"}
+                if not isinstance(actions, dict) or set(actions) != required_actions:
+                    errors.append(
+                        f"claims[{index}].outcome_rule.actions must cover "
+                        "supported, weakened, falsified, and inconclusive exactly"
+                    )
+                elif any(action not in allowed_actions for action in actions.values()):
+                    errors.append(
+                        f"claims[{index}].outcome_rule.actions contains an unsupported action"
+                    )
 
     claim_ids = {
         str(claim.get("id")) for claim in contract.get("claims", [])

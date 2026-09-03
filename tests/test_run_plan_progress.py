@@ -36,6 +36,22 @@ def fixture_state(proposed="G1.1"):
 
 
 class RunPlanProgressTests(unittest.TestCase):
+    def test_claim_outcomes_are_visible_before_goal_catalogue(self):
+        state = fixture_state()
+        state["claim_registry"] = [{"id": "C1", "title": "Coverage remains calibrated"}]
+        state["claim_decisions"] = [{
+            "claim_id": "C1", "outcome": "falsified",
+            "falsifier_status": "triggered", "next_action": "pivot",
+            "evidence_summary": "Coverage remained below target while interval width increased.",
+            "primary_result_id": "R1",
+        }]
+        state["next_authorized_action"] = "Return to ExpPlan and narrow the claim."
+        rendered = render_parts_and_goals(state)
+        self.assertIn('data-claim-status-board="true"', rendered)
+        self.assertIn('data-outcome="falsified"', rendered)
+        self.assertIn("Falsifier:</strong> triggered", rendered)
+        self.assertIn("Next action: pivot", rendered)
+        self.assertLess(rendered.index("Scientific claim status"), rendered.index('class="part"'))
     def test_sequential_execution_mode_is_visible_and_keeps_one_current_goal(self):
         state = fixture_state()
         state["execution_mode"] = "sequential_all_goals"

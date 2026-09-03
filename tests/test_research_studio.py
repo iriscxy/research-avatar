@@ -569,7 +569,8 @@ class ResearchStudioTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn(".pipeline-button strong{font-size:11px", style_source)
         self.assertIn("font:750 8px var(--serif)", style_source)
-        self.assertIn("/style.css?v=20260830.1-clean-stage-shell", index_source)
+        self.assertIn("/style.css?v=20260903.1-claim-gates", index_source)
+        self.assertIn("/app.js?v=20260903.1-claim-gates", index_source)
 
     def test_live_demo_matches_the_local_six_stage_navigation(self):
         root = Path(__file__).resolve().parents[1]
@@ -654,6 +655,48 @@ class ResearchStudioTests(unittest.TestCase):
             self.assertEqual(
                 ledger_summary(path), {"rows": 3, "verified": 2, "invalid": 1}
             )
+
+    def test_completed_execution_with_falsified_claim_requires_attention(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = root / "reports"
+            reports.mkdir()
+            state = {
+                "state": "completed",
+                "goals": [{"id": "G1.1", "status": "completed"}],
+                "claim_decisions": [{
+                    "claim_id": "C1", "outcome": "falsified",
+                    "next_action": "pivot", "falsifier_status": "triggered",
+                }],
+                "next_authorized_action": "Return to ExpPlan and narrow C1.",
+            }
+            (reports / "04_RUN_PLAN.html").write_text(
+                '<script type="application/json" id="run-plan-state">'
+                + json.dumps(state) + '</script>', encoding="utf-8"
+            )
+            stage = studio.runplan_stage(root)
+        self.assertEqual(stage["status"], "attention_required")
+        self.assertEqual(stage["metrics"][2]["value"], "0 supported · 1 need action")
+        self.assertEqual(stage["message"], "Return to ExpPlan and narrow C1.")
+
+    def test_integrity_v3_claim_action_blocks_paper_writing_handoff(self):
+        blocked = {
+            "scientific_integrity_version": 3,
+            "claim_decisions": [{"claim_id": "C1", "next_action": "pivot"}],
+        }
+        allowed = {
+            "scientific_integrity_version": 3,
+            "claim_decisions": [{"claim_id": "C1", "next_action": "complete"}],
+        }
+        self.assertFalse(studio.run_claims_authorize_writing(blocked))
+        self.assertTrue(studio.run_claims_authorize_writing(allowed))
+
+    def test_attention_required_status_is_rendered_by_the_browser_shell(self):
+        root = Path(__file__).resolve().parents[1]
+        app = (root / "research_avatar/research_studio/static/app.js").read_text(encoding="utf-8")
+        style = (root / "research_avatar/research_studio/static/style.css").read_text(encoding="utf-8")
+        self.assertIn('attention_required:"Experiment complete · review claims"', app)
+        self.assertIn('[data-status="attention_required"]', style)
 
     def test_idea_selection_is_recorded_inside_canonical_report(self):
         with TemporaryDirectory() as directory:

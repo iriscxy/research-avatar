@@ -25,6 +25,13 @@ written outcome is never authoritative. When a producing Goal for a
 annotation file and rubric file must already exist or validation refuses the
 transition.
 
+Render a compact Claim-status board before the Goal catalogue. For every Claim
+show the evidence-qualified outcome, whether its falsifier was triggered, the
+primary result/evidence summary, and the next authorized action. Execution
+coverage and scientific support are separate: the page may say every run is
+finished while prominently requiring refinement or pivot, but it must never
+present that state as unqualified scientific completion.
+
 The `05` renderer must produce artifact cells, plots, provenance anchors,
 provenance payload, and generation-process cards together from the same
 validated ledger snapshot. It must render to a temporary file and publish only

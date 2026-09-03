@@ -7,6 +7,7 @@
 .pipeline-button:before{content:"";position:absolute;left:8px;top:7px;width:5px;height:5px;border-radius:50%;background:#c7d2d1}
 .pipeline-button[data-status="complete"]:before{background:var(--teal)}
 .pipeline-button[data-status="in_progress"]:before{background:var(--gold);box-shadow:0 0 0 4px var(--gold-soft)}
+.pipeline-button[data-status="attention_required"]:before{background:#b42318;box-shadow:0 0 0 4px #fee4e2}
 .pipeline-button[data-status="waiting_confirmation"]:before{background:var(--purple)}
 .pipeline-button span,.pipeline-button strong{display:block}
 .pipeline-button span{margin:0 0 2px 9px;color:#89999e;font:750 8px var(--serif)}

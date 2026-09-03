@@ -693,12 +693,32 @@ def runplan_stage(root: Path) -> dict[str, Any]:
     plan = extract_script_json(root / ARTIFACTS["runplan"][0], "run-plan-state")
     goals = plan.get("goals", []) if isinstance(plan.get("goals"), list) else []
     completed = [goal for goal in goals if goal.get("status") == "completed"]
+    claim_decisions = [
+        item for item in plan.get("claim_decisions", [])
+        if isinstance(item, dict) and item.get("claim_id")
+    ]
+    claim_counts = {
+        outcome: sum(item.get("outcome") == outcome for item in claim_decisions)
+        for outcome in ("supported", "weakened", "falsified", "inconclusive")
+    }
+    claims_requiring_action = sum(
+        claim_counts[outcome] for outcome in ("weakened", "falsified", "inconclusive")
+    )
+    execution_finished = bool(goals) and len(completed) == len(goals)
+    if not artifact["exists"]:
+        stage_status = "not_started"
+    elif not execution_finished:
+        stage_status = "in_progress"
+    elif claims_requiring_action:
+        stage_status = "attention_required"
+    else:
+        stage_status = "complete"
     proposed_id = plan.get("proposed_goal_id")
     proposed = next((goal for goal in goals if goal.get("id") == proposed_id), {})
     return {
         "id": "runplan",
         "title": "Experiment Execution",
-        "status": "in_progress" if artifact["exists"] and len(completed) < len(goals) else status_for(artifact["exists"]),
+        "status": stage_status,
         "command": (
             f"Execute {proposed_id}: {proposed.get('title', '')}"
             if proposed_id else (
@@ -709,7 +729,13 @@ def runplan_stage(root: Path) -> dict[str, Any]:
         "metrics": [
             {"label": "Goals", "value": f"{len(completed)} / {len(goals)}"},
             {"label": "Current", "value": proposed_id or plan.get("active_goal_id") or "—"},
-            {"label": "Acquisitions", "value": str(len(plan.get("acquisition_contracts", [])))},
+            {
+                "label": "Claims",
+                "value": (
+                    f"{claim_counts['supported']} supported · {claims_requiring_action} need action"
+                    if claim_decisions else "Pending"
+                ),
+            },
             {
                 "label": "State",
                 "value": str(plan.get("state") or plan.get("status") or "Pending"),
@@ -721,7 +747,14 @@ def runplan_stage(root: Path) -> dict[str, Any]:
         "artifacts": [artifact],
         "default_artifact_key": "runplan",
         "results_backend": results_artifact,
-        "message": proposed.get("instructions", plan.get("exact_next_authorized_action", "Waiting for experiment-plan approval.")),
+        "message": proposed.get(
+            "instructions",
+            plan.get(
+                "next_authorized_action",
+                plan.get("exact_next_authorized_action", "Waiting for experiment-plan approval."),
+            ),
+        ),
+        "claim_decisions": claim_decisions,
         "goals": [
             {
                 "id": goal.get("id"),
@@ -734,6 +767,19 @@ def runplan_stage(root: Path) -> dict[str, Any]:
         ],
         "proposed_goal": proposed,
     }
+
+
+def run_claims_authorize_writing(run_state: dict[str, Any]) -> bool:
+    """Return whether an integrity-v3 experiment may enter manuscript writing."""
+    if run_state.get("scientific_integrity_version") != 3:
+        return True
+    decisions = [
+        item for item in run_state.get("claim_decisions", [])
+        if isinstance(item, dict)
+    ]
+    return bool(decisions) and all(
+        item.get("next_action") in {"continue", "complete"} for item in decisions
+    )
 
 
 def ensure_paper_project_from_completed_run(root: Path) -> dict[str, Any]:
@@ -754,6 +800,7 @@ def ensure_paper_project_from_completed_run(root: Path) -> dict[str, Any]:
             isinstance(goal, dict) and goal.get("status") == "completed"
             for goal in goals
         )
+        and run_claims_authorize_writing(run_state)
     )
     if not completed or not results_path.is_file():
         return {"created": False, "reason": "run_or_results_incomplete"}
@@ -789,6 +836,7 @@ def paper_stage(root: Path) -> dict[str, Any]:
             isinstance(goal, dict) and goal.get("status") == "completed"
             for goal in run_goals
         )
+        and run_claims_authorize_writing(run_state)
         and (root / ARTIFACTS["results"][0]).is_file()
     )
     runtime = load_json(root / "paper/.paper_studio/state.json")

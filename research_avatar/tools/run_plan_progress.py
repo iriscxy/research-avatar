@@ -110,6 +110,66 @@ GOAL_COPY_ASSETS = (
     '})})();</script>'
 )
 
+CLAIM_STATUS_STYLE = (
+    '<style>.claim-status-board{margin:18px 0 24px;padding:16px;border:1px solid #bfd8d2;'
+    'border-radius:12px;background:#f6fbfa}.claim-status-board h3{margin:0 0 6px}'
+    '.claim-status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));'
+    'gap:10px;margin-top:12px}.claim-status-card{padding:12px;border:1px solid #d5e4e0;'
+    'border-radius:9px;background:#fff}.claim-status-card[data-outcome="supported"]{border-left:5px solid #087f74}'
+    '.claim-status-card[data-outcome="weakened"],.claim-status-card[data-outcome="inconclusive"]'
+    '{border-left:5px solid #b7791f}.claim-status-card[data-outcome="falsified"]'
+    '{border-left:5px solid #b42318}.claim-status-card h4{margin:0 0 7px}'
+    '.claim-status-card p{margin:5px 0}.claim-next-action{font-weight:700}</style>'
+)
+
+
+def render_claim_status(state: dict) -> str:
+    """Render one reader-facing scientific conclusion board from machine state."""
+    registry = {
+        str(item.get("id", "")): item
+        for item in state.get("claim_registry", [])
+        if isinstance(item, dict) and item.get("id")
+    }
+    decisions = {
+        str(item.get("claim_id", "")): item
+        for item in state.get("claim_decisions", [])
+        if isinstance(item, dict) and item.get("claim_id")
+    }
+    claim_ids = list(registry)
+    claim_ids.extend(claim_id for claim_id in decisions if claim_id not in registry)
+    if not claim_ids:
+        return ""
+    cards = []
+    for claim_id in claim_ids:
+        claim = registry.get(claim_id, {})
+        decision = decisions.get(claim_id, {})
+        outcome = str(decision.get("outcome") or "pending")
+        title = str(claim.get("title") or claim.get("claim") or claim_id)
+        evidence = str(decision.get("evidence_summary") or "Awaiting the registered evidence and interval.")
+        falsifier = str(decision.get("falsifier_status") or "pending")
+        action = str(decision.get("next_action") or "await evidence")
+        result_id = str(decision.get("primary_result_id") or "")
+        result_note = f" · primary result {result_id}" if result_id else ""
+        cards.append(
+            f'<article class="claim-status-card" data-claim-id="{html.escape(claim_id)}" '
+            f'data-outcome="{html.escape(outcome)}"><h4>{html.escape(claim_id)} · '
+            f'{html.escape(outcome)}</h4><p>{html.escape(title)}</p>'
+            f'<p>{html.escape(evidence)}</p><p><strong>Falsifier:</strong> '
+            f'{html.escape(falsifier + result_note)}</p><p class="claim-next-action">'
+            f'Next action: {html.escape(action)}</p></article>'
+        )
+    next_action = str(state.get("next_authorized_action") or "Await the registered claim decision.")
+    return (
+        CLAIM_STATUS_STYLE
+        + '<div class="claim-status-board" data-claim-status-board="true">'
+        '<h3>Scientific claim status</h3>'
+        '<p>Experiment completion records whether the work ran; these decisions record what the evidence supports.</p>'
+        f'<p><strong>Authorized next step:</strong> {html.escape(next_action)}</p>'
+        '<div class="claim-status-grid">'
+        + "".join(cards)
+        + '</div></div>'
+    )
+
 
 def goal_command(goal: dict) -> str:
     existing = str(goal.get("goal_command", "")).strip()
@@ -196,7 +256,8 @@ def render_parts_and_goals(state: dict, completed_artifacts: dict[str, list[str]
     chunks = [
         '<section data-report-section="parts-and-goals"><h2>4. Parts and Goals</h2>'
         f'<p class="execution-mode" data-execution-mode="{execution_mode}">'
-        f'{html.escape(mode_text)}</p>'
+        f'{html.escape(mode_text)}</p>',
+        render_claim_status(state),
     ]
     current_count = 0
     for part in parts:

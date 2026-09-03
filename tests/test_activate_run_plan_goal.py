@@ -9,8 +9,38 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
 
+from research_avatar.tools.activate_run_plan_goal import activation_issues
+
 
 class ActivateRunPlanGoalTests(unittest.TestCase):
+    def test_v3_claim_gate_blocks_successor_activation(self):
+        state = {
+            "scientific_integrity_version": 3,
+            "goals": [
+                {"id": "G1.1", "status": "completed"},
+                {"id": "G2.1", "status": "proposed", "depends_on": ["G1.1"]},
+            ],
+            "gate_decisions": [{"goal_id": "G1.1", "decision": "pivot"}],
+        }
+        self.assertEqual(
+            activation_issues(state, "G2.1"),
+            ["claim gate G1.1 requires pivot; G2.1 cannot start"],
+        )
+
+    def test_v3_successor_requires_completed_dependency_gate(self):
+        state = {
+            "scientific_integrity_version": 3,
+            "goals": [
+                {"id": "G1.1", "status": "completed"},
+                {"id": "G2.1", "status": "proposed", "depends_on": ["G1.1"]},
+            ],
+            "gate_decisions": [],
+        }
+        self.assertEqual(
+            activation_issues(state, "G2.1"),
+            ["completed dependency G1.1 lacks a gate decision"],
+        )
+
     def test_activation_replaces_balanced_section_with_nested_result_snapshot(self):
         state = {
             "state": "goal_proposed",

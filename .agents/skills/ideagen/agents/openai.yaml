@@ -2,3 +2,5 @@ interface:
   display_name: "Research Idea Generation"
   short_description: "Generate personalized and literature-grounded research ideas"
   default_prompt: "Use $ideagen to propose research ideas grounded in my profile and literature survey."
+policy:
+  allow_implicit_invocation: false

@@ -6597,7 +6597,7 @@ def execution_record_contradiction_issues(text: str) -> list[str]:
     issues: list[str] = []
     if re.search(r"\bnonzero\b[^.\n]{0,45}\b0(?:\.0+)?\b", text, re.I):
         issues.append("describes an exact zero value as nonzero")
-    if metrics.get("scientific_integrity_version") == 2:
+    if metrics.get("scientific_integrity_version") in {2, 3}:
         reference_alias = r"(?:reference|conformance|RevocationCascade)"
         reference_superiority = re.search(
             rf"\b{reference_alias}[^.\n]{{0,100}}\b"
@@ -8119,7 +8119,7 @@ A label-only response can establish a valid selected label and inverse-mapped se
 answer, but it cannot establish answer-text agreement. Mention text-label cross-field
 validation only for a condition whose executed schema contains both fields. Never say
 that every accepted response passed a shared text-label check when the schemas differ."""
-    if active_metrics.get("scientific_integrity_version") == 2:
+    if active_metrics.get("scientific_integrity_version") in {2, 3}:
         instructions += """ The scientific-integrity contract uses an independent gold
 oracle. Any implementation that is defined as a reference or conformance control must
 be described only as a check that the executable benchmark agrees with that separate

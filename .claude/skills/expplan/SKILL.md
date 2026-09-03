@@ -52,253 +52,53 @@ Resolve these gates in order:
 Stop for explicit confirmation at each gate. Read these detailed procedures only at their corresponding stage:
 
 - steps 1–2: [`references/venue-and-reference.md`](references/venue-and-reference.md);
-- steps 3–4: [`references/baselines-datasets.md`](references/baselines-datasets.md);
+- step 3: [`references/baselines.md`](references/baselines.md);
+- step 4: [`references/datasets.md`](references/datasets.md);
 - step 5: [`references/repositories.md`](references/repositories.md).
 
 ## Reference paper and paragraph alignment
 
-Use exactly one reference paper, authored by the current researcher and
-verified in `publications.json`. Rank viable full texts by argumentative
-similarity: contribution type, section progression, experiment organization,
-paragraph-to-paragraph reasoning, and figure/table rhythm. Topic overlap alone
-is insufficient.
+Use exactly one researcher-authored reference paper with a verified Code Agent
+transcript. It controls argumentative moves and paragraph transitions, not the
+new paper's scientific content. Map every target paragraph to one or more
+complete source paragraphs by rhetorical function, and persist the full
+analysis in `structure_reference_analysis` and `paper_outline`.
 
-Accept a local full-text transcript only when its `publications.json` record
-sets `fulltext_extractor` to `code_agent`. Otherwise stop for
-`/profileconstruct`; never derive source paragraphs from `pdftotext`, OCR, a
-separate LLM API, or an unverified legacy TXT.
-
-After confirmation, the executing code agent analyzes the complete verified
-transcript and current scientific obligations in one coherent pass. It must
-return:
-
-- every natural paragraph of the reference paper, with stable source paragraph
-  ID, heading, complete paragraph text, rhetorical purpose, relation to its
-  neighbors, and any figure/table introduced or interpreted;
-- the target paper's section order and paragraph count;
-- one concrete planning sentence, rhetorical role, and neighbor relation for
-  every target paragraph;
-- an explicit mapping from every target paragraph to the most relevant one or
-  more reference paragraphs, including their complete text and an adaptation
-  note explaining which logical move is being imitated.
-
-Paragraph counts need not match. A source paragraph may guide several target
-paragraphs, and several source paragraphs may guide one target paragraph when
-the target must compress the logic. Every target paragraph must still have a
-non-empty reference mapping. Never copy the reference paper's scientific
-claims, method, result, or wording into the new paper; imitate only the
-argumentative move and transition logic.
-
-Before serialization, reject any source record that begins or ends mid-sentence,
-contains a page/column boundary fragment, or combines text from different
-columns in the wrong order. Mapping is rhetorical rather than sequential: do
-not assign source paragraphs by cursor position or round-robin order. Select
-each source paragraph because its argumentative function matches the target
-paragraph, and state that function in the adaptation note.
-
-Persist the complete one-shot response in `structure_reference_analysis` and
-the per-target mappings in `paper_outline`. This is the canonical input for
-later paragraph-by-paragraph browser writing; do not create a separate
-paper-plan file.
-
-If no owned full text is available, stop and report what is missing. Never
-substitute an external author or synthetic paper.
+Read [`references/venue-and-reference.md`](references/venue-and-reference.md)
+while selecting, extracting, checking, and mapping the reference paper.
 
 ## Scientific design
 
-Work backward from testable claims:
+Work backward from falsifiable Claims and deterministic acquisition paths.
+Keep measurements, gold state, dataset applicability, method conformance,
+outcome decisions, and human evidence mechanically auditable. New plans use
+`scientific_integrity_version=3`.
 
-- Give each claim a stable ID, precise scope, decisive falsifier, and a chain
-  from observable → raw field → computation → metric.
-- Distinguish direct measurements from proxies. Narrow unsupported claims or
-  add a companion direct test/control.
-- Ground baselines, datasets, metrics, and protocols in retrieved experimental
-  sections and result tables, not memory or titles.
-- Mark variables `DIRECT`, `ADAPTED`, or `PROPOSED`; proposed variables need a
-  feasibility check before supporting a headline claim.
-- Include claim-complete baselines, ablations, robustness/sensitivity, failure
-  analysis, and cost evidence.
-- Record result-changing choices as `SEARCHED`, `FIXED_BY_SOURCE`,
-  `FIXED_BY_DESIGN`, or `NOT_APPLICABLE`. `/runplan` owns execution splits and
-  dev/final freezing; `/expplan` does not choose train/dev/test splits.
-- Give every result target exactly one source action: `RUN_LOCAL` or explicitly
-  approved `REUSE_REPORTED`.
-- Set `scientific_integrity_version=2`. Every metric records a unit, evidence
-  source (`BENCHMARK_LABEL`, `MODEL_OUTPUT`, `SYSTEM_TRACE`,
-  `HUMAN_ANNOTATION`, `LLM_JUDGE`, or `DERIVED`), raw input fields, executable
-  calculation, implementation entrypoint, and protocol checks. Claim-side
-  `metric_ids` and metric-side `claim_mappings` must be exact inverses; never
-  bind every metric to every claim as a convenience.
-- Register a `gold_standard_contract` whenever any metric compares predictions
-  with gold state. The gold source must be an official benchmark label, real
-  human annotation, or an independent executable oracle. Its implementation
-  entrypoint, input schema, output schema, fixtures, and conformance command
-  must be distinct from every evaluated method. A method may be a reference
-  implementation of the specification, but its output can never generate the
-  labels used to claim that the same method is superior. Conformance of a
-  reference implementation is not an empirical performance contribution.
-- Give every metric a structured numeric `valid_range`, `sampling_unit`,
-  `comparison_population_id`, `input_schema`, and structured aggregation with
-  estimator, resampling unit, interval, and repetitions. Difference metrics
-  must admit the full signed domain. Timing metrics consume saved timing fields
-  and have no arbitrary accuracy-like upper bound. Comparisons may share a
-  claim only when their population IDs match, or when an approved alignment
-  rule makes the populations commensurate.
-- Give every claim a deterministic `outcome_rule`. A tie, missing value,
-  interval crossing the registered null, or failure to meet the registered
-  margin is `inconclusive` or `weakened` as specified, never automatically
-  `supported` by an LLM judgment.
-- A human-named construct requires a real `HUMAN_ANNOTATION` contract with
-  annotator count, item count, blinding, rubric, annotation file, and agreement
-  calculation. An LLM judge is `LLM_JUDGE`, never “human agreement.”
-- Every baseline and proposed method has an `implementation_verification`
-  record naming the protocol source, required algorithmic components, and
-  conformance tests. `method_name_in_model_prompt` must be false: prompting a
-  model with a baseline name is not an implementation of that baseline.
-- Represent a project-created unpublished dataset as
-  `SELF_BUILT_UNPUBLISHED`, with its planned collection/versioning contract and
-  no external dataset URL. Never fabricate a publication or repository link.
-- Every published or public benchmark must carry a structured
-  `protocol_contract` naming the official split source, prompt or input source,
-  scorer source, a small conformance fixture, and its executable conformance
-  command. A title or prose statement that the protocol is followed is not
-  protocol evidence.
+Read [`references/scientific-integrity.md`](references/scientific-integrity.md)
+while defining Claims, metrics, protocols, evidence sources, and outcome gates.
 
 ## Projected paper
 
-Design the projected paper inside `reports/03_EXPERIMENT_PLAN.html`. Include:
+Design the complete target paper inside `03`: title, projected abstract, every
+section/subsection and paragraph, reference-aligned rhetorical moves,
+reproduction-grade Method design, compact Experimental Setup, inline result
+shells, artifact ledger, and a page-fill contract. The visible report remains
+paper-shaped; machine registries stay in the embedded contract.
 
-- a working title and `PROJECTED — not results` abstract;
-- every intended section/subsection and every planned paragraph;
-- stable paragraph IDs, one concrete planning sentence, rhetorical role,
-  previous/next relations, claims/evidence, artifact bindings, and the required
-  reference-paragraph mapping described above;
-- explicit subsection boundaries: on the first paragraph of each Method,
-  Experiments/Evaluation, and Discussion/Analysis subsection, set a concise
-  `heading` and `heading_style: subsection`; continuation paragraphs leave both
-  fields empty so Paper Studio renders each heading exactly once;
-- paper-shaped figure/table shells at their insertion points;
-- every Discussion/Analysis paragraph that interprets an experimental result
-  must bind and cite the exact existing figure or table that supplies that
-  result. Keep the float at its first owning Experiments paragraph, but allow
-  later Discussion paragraphs to reference it again; never discuss an
-  unbound result ledger or rely on section-wide implicit evidence;
-- for every count-only non-experimental figure, an explicit `shell.figure_type`
-  chosen from `motivation_contrast`, `model_architecture`, `method_workflow`, or
-  `agent_interaction`; this approved field is authoritative downstream, so never
-  leave Paper Studio to infer the type from a title, caption, or keyword;
-- artifact ledger, implementation plan, budget, and stop/refine/pivot criteria.
+Use one authoritative symbol registry and one model-design specification.
+Conceptual figures remain count-only at this stage, with an explicit
+`figure_type`; every empirical table cell or plotted value has exactly one
+result requirement. Discussion paragraphs bind the exact result artifact they
+interpret. Scope the evidence so the planned paper can honestly fill the venue
+limit without duplicate or scientifically empty experiments.
 
-The visible report is the projected paper plan, not an experiment registry. Use
-only two top-level reader-facing sections: the venue/reference and the
-projected paper. Inside the projected-paper structure, render sections in the
-paper's actual order. Never prepend a free-floating `5.1 Setup`, `5.2 Results`,
-or other manuscript subsection number before Abstract/Introduction. Put the
-dataset, model, protocol, metrics, baseline-selection rationale, and the
-per-method implementation table inside the planned **Experiments** section;
-put fillable result tables and figure source tables at their actual experiment
-paragraphs. Keep claims, variables, decisions, budgets, and approval state in
-the embedded contract unless they are expressed through that paper structure.
-
-Render **Experimental Setup** in a fixed compact format, never as long prose.
-Use a six-row `setup-table` with exactly: `Dataset`, `Model`, `Baselines`,
-`Proposed method`, `Noise and runs`, and `Metrics`. State the dataset and
-baseline counts explicitly. Follow it with the two-column baseline/method table;
-each method gets one concise row covering selection purpose, implementation,
-and its paper citation when applicable. Keep detailed metric definitions,
-provenance, and acquisition contracts in the hidden JSON rather than expanding
-the visible setup.
-
-Render a detailed **Model Design** block inside the projected paper's Method
-section. This is manuscript-facing design guidance, not an experiment-setup
-row: specify the real input/output flow, named modules, stage boundaries,
-trainable versus frozen components, objective/loss construction, update or
-weighting rule, and inference path. Include the equations or algorithmic rules
-needed to remove ambiguity, then bind each material component to an ablation,
-diagnostic, or other falsifiable artifact. A list of subsection names, a single
-high-level method sentence, or a Method overview caption is insufficient.
-Store the same design under `grounding.model_design` so browser writing receives
-one authoritative model specification.
-
-Store notation once as a structured `symbol_registry`; Method equations,
-algorithm steps, figure prompts, captions, and Paper Studio consume those same
-symbol IDs. A figure may not introduce an alternative glyph or rename a
-threshold independently.
-
-The block must be **concise but reproduction-grade**. A competent implementer
-should be able to reconstruct the disclosed model without reopening scattered
-plan fields. In one compact 8--14-row table or an equivalent 250--500-word
-summary, define every symbol and give: an executable end-to-end data flow;
-ordered training/inference algorithm steps; exact losses, normalizations,
-aggregation and update rules; candidate construction or sampling; trainable,
-frozen, teacher and reference boundaries; preprocessing and model-defining
-hyperparameters disclosed by the sources; and the implementation choices that
-remain unknown. Do not spend this space repeating motivation, results, or
-module-level rationale. Never invent a missing value: an explicit `unknown`
-entry is part of a reproducible specification because it identifies what a
-replicator must resolve. Record a `reproducibility_status` (`complete` or
-`partial_due_to_source_omissions`) and mirror the algorithm, objectives,
-configuration, unknowns, and status under `grounding.model_design`.
-
-This requirement also applies when `/expplan` reconstructs an experiment plan
-from one goal paper. In that mode, derive the model design from the goal paper's
-verified method text and figures, preserve uncertainty where implementation
-details are missing, and never fill a gap from the separate structural
-reference. The structural reference controls rhetoric only; the goal paper is
-the authority for reconstructed model content. Audit the one-goal paper for
-equations, algorithms, implementation details, appendices, captions, and method
-figures before assigning `reproducibility_status`; source omissions must appear
-in the visible block as a compact unknowns row.
-
-The target architecture follows the reference paper's logic but may compress,
-expand, merge, or reuse its moves according to the current project's evidence.
 Read [`references/projected-paper.md`](references/projected-paper.md) while
-building paragraph records and evidence shells.
-
-### Figure 1 hard rule
-
-Introduction Figure 1 is a motivation figure by default. It must make the
-problem and evidence gap understandable before revealing the method: show a
-concrete failure/counterexample, why the existing observable is misleading,
-and the behavioral or evidentiary criterion therefore needed. It is count-only
-during `/expplan`; do not invent quantitative findings or draw final artwork.
-Attach it to the Introduction gap paragraph unless the researcher explicitly
-approves another role.
-Set its `shell.figure_type` to `motivation_contrast`. A distinct figure that
-exposes modules and operator-level interfaces uses `model_architecture`; an
-ordered training, inference, or measurement process uses `method_workflow`;
-an actor/tool/environment exchange uses `agent_interaction`. Choose by the
-figure's scientific job, and keep the chosen type explicit in the contract.
-
-### Page-fill hard rule
-
-Before approval, compare the target venue's body-page limit, the reference
-paper's body proportions and content-float count, and the strongest grounded
-papers' experimental coverage. The plan must contain enough substantive
-experiments and result-bearing figures/tables to support a full venue paper.
-
-Serialize this decision as `page_fill_contract`, not prose alone. It must bind
-the venue body-page target to every section's approved length share, all planned
-Experiments/result paragraphs, the exact result-bearing artifact IDs, and
-distinct evidence blocks for the main comparison plus at least three applicable
-diagnostic/analysis kinds among robustness or sensitivity, ablation, failure or
-qualitative analysis, and cost or efficiency. For a normal full-length plan,
-the conservative lower page estimate must reach at least 97.5% of the venue body
-limit and `minimum_last_page_fill` must be 0.80--0.98 (use 0.85 by default), so
-later PDF validation measures physical occupancy rather than page number alone;
-a four-page short paper normally needs at least four experiment/result
-paragraphs and three distinct result-bearing figures or tables. These are
-minimum sufficiency checks, not instructions to duplicate evidence or add
-scientifically empty experiments.
-
-If materially under-scoped, expand datasets, baselines, ablations, model/seed
-sensitivity, robustness, qualitative analysis, or cost analysis as
-scientifically appropriate, then revisit any affected human choices. Do not
-count setup/configuration tables. If the researcher explicitly requests only a
-micro study, set `micro_study_override: true`,
-`feasibility_status: declared_shortfall`, and a positive
-`expected_page_shortfall`, then state the float/page shortfall at the approval
-gate. Never label an underfilled micro plan `credible_full_length`.
+building the paragraph architecture and model design. Read
+[`references/artifact-shells.md`](references/artifact-shells.md) only while
+defining figures, tables, source cells, and fixtures. Read
+[`references/page-fill-and-contract.md`](references/page-fill-and-contract.md)
+only while checking venue coverage, serializing the contract, and presenting
+the approval gate.
 
 ## Canonical output
 

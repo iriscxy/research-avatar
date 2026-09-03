@@ -131,6 +131,13 @@ researcher's selected project. If no anomaly remains, render a compact "not
 triggered" checkpoint and still refresh the handoff file so a stale anomaly
 cannot be reused.
 
+For scientific-integrity-v3 plans, execution coverage is not scientific
+success. At every Goal boundary, mechanically evaluate every newly decidable
+Claim, apply its preregistered outcome-to-action mapping, and stop before any
+successor when the action is not `continue`. Keep the Claim decision visible in
+`04`, not only in embedded state; the strict validator must reject a completed
+queue that crossed a `refine`, `pivot`, `stopped`, or `blocked` boundary.
+
 Automatic mode advances only on `continue`. Stop on `refine`, `pivot`,
 `stopped`, `blocked`, validation failure, exhausted budget, or a new
 researcher-controlled decision. Manual mode proposes the next goal and stops.

@@ -151,6 +151,92 @@ def scientific_contract() -> dict:
 
 
 class GengsenRegressionTests(unittest.TestCase):
+    def test_expplan_v3_rejects_primary_dataset_with_known_assumption_violation(self):
+        contract = {
+            "scientific_integrity_version": 3,
+            "dataset_citations": [{"name": "Airfoil"}],
+            "claims": [{"id": "C1"}],
+            "result_requirements": [{"cell_ids": ["overlap-check"]}],
+            "dataset_claim_applicability": [{
+                "dataset_name": "Airfoil",
+                "claim_id": "C1",
+                "evidence_role": "PRIMARY",
+                "rationale": "Tests target-domain coverage.",
+                "required_conditions": [{
+                    "condition_id": "support-overlap",
+                    "statement": "Source and target supports overlap.",
+                    "diagnostic": "Compute the registered overlap statistic.",
+                    "acceptance_rule": "overlap >= 0.2",
+                    "assessment_status": "KNOWN_VIOLATION",
+                    "failure_action": "RECLASSIFY_STRESS_TEST",
+                }],
+            }],
+        }
+        errors = EXPPLAN_VALIDATOR.validate_dataset_claim_applicability(contract)
+        self.assertTrue(any("cannot use a known assumption violation" in item for item in errors))
+        self.assertTrue(any("lacks a compatible" in item for item in errors))
+
+    def test_expplan_v3_accepts_traceable_pending_dataset_diagnostic(self):
+        contract = {
+            "scientific_integrity_version": 3,
+            "dataset_citations": [{"name": "ShiftBench"}],
+            "claims": [{"id": "C1"}],
+            "result_requirements": [{"cell_ids": ["overlap-check"]}],
+            "dataset_claim_applicability": [{
+                "dataset_name": "ShiftBench",
+                "claim_id": "C1",
+                "evidence_role": "SECONDARY",
+                "rationale": "Conditional evidence after overlap verification.",
+                "required_conditions": [{
+                    "condition_id": "support-overlap",
+                    "statement": "Source and target supports overlap.",
+                    "diagnostic": "Compute the registered overlap statistic.",
+                    "acceptance_rule": "overlap >= 0.2",
+                    "assessment_status": "PENDING_DIAGNOSTIC",
+                    "failure_action": "RECLASSIFY_STRESS_TEST",
+                    "diagnostic_result_target_ids": ["overlap-check"],
+                }],
+            }],
+        }
+        self.assertEqual(
+            EXPPLAN_VALIDATOR.validate_dataset_claim_applicability(contract), []
+        )
+
+    def test_runplan_v3_falsified_claim_blocks_later_goals_and_completion(self):
+        contract = {
+            "scientific_integrity_version": 3,
+            "claims": [{
+                "id": "C1",
+                "measurement_contract": {"outcome_rule": {"actions": {
+                    "supported": "continue", "weakened": "refine",
+                    "falsified": "pivot", "inconclusive": "refine",
+                }}},
+            }],
+        }
+        state = {
+            "state": "completed",
+            "goals": [
+                {"id": "G1.1", "status": "completed"},
+                {"id": "G2.1", "status": "completed"},
+            ],
+            "claim_decisions": [{
+                "claim_id": "C1", "outcome": "falsified",
+                "falsifier_status": "triggered", "next_action": "pivot",
+                "evidence_summary": "The interval lies entirely beyond the failure boundary.",
+                "primary_result_id": "R1",
+            }],
+            "gate_decisions": [{
+                "goal_id": "G1.1", "decision": "pivot",
+                "claim_outcomes": {"C1": "falsified"},
+                "rationale": "The preregistered falsifier fired.",
+            }],
+            "next_authorized_action": "Return to ExpPlan.",
+        }
+        rows = [{"result_id": "R1", "goal_id": "G1.1"}]
+        errors = RUNPLAN_VALIDATOR.validate_claim_gate_control(state, contract, rows)
+        self.assertTrue(any("later goals advanced" in item for item in errors))
+        self.assertTrue(any("cannot be completed" in item for item in errors))
+
     def test_scope_gate_relabels_evaluation_only_scope(self):
         old = '<article data-idea-id="I1"><h2>Multimodal Temporal Authority Memory</h2></article>'
         self.assertTrue(validate_ideagen_report.validate(old))

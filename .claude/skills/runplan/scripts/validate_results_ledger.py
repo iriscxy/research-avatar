@@ -140,6 +140,120 @@ def evaluate_outcome_rule(rule: dict[str, object], point: float, lower: float, u
     raise ValueError(f"unsupported outcome-rule operator: {operator}")
 
 
+def validate_claim_gate_control(
+    state: dict[str, object],
+    experiment_contract: dict[str, object],
+    rows: list[dict[str, str]],
+) -> list[str]:
+    """Make claim outcomes, rather than filled cells, authorize goal progression."""
+    if experiment_contract.get("scientific_integrity_version") != 3:
+        return []
+    errors: list[str] = []
+    claims = {
+        str(item.get("id", "")): item
+        for item in experiment_contract.get("claims", [])
+        if isinstance(item, dict) and item.get("id")
+    }
+    decisions = {
+        str(item.get("claim_id", "")): item
+        for item in state.get("claim_decisions", [])
+        if isinstance(item, dict) and item.get("claim_id")
+    }
+    rows_by_id = {row.get("result_id", ""): row for row in rows}
+    goals = [item for item in state.get("goals", []) if isinstance(item, dict)]
+    goal_order = {str(goal.get("id", "")): index for index, goal in enumerate(goals)}
+    gates = {
+        str(item.get("goal_id", "")): item
+        for item in state.get("gate_decisions", [])
+        if isinstance(item, dict) and item.get("goal_id")
+    }
+    expected_by_goal: dict[str, dict[str, str]] = {}
+    status_by_outcome = {
+        "supported": "not_triggered",
+        "weakened": "unresolved",
+        "falsified": "triggered",
+        "inconclusive": "unresolved",
+    }
+    action_priority = {
+        "complete": 0,
+        "continue": 1,
+        "refine": 2,
+        "blocked": 3,
+        "pivot": 4,
+        "stopped": 5,
+    }
+    for claim_id, decision in decisions.items():
+        claim = claims.get(claim_id)
+        if claim is None:
+            errors.append(f"claim decision names unknown claim {claim_id}")
+            continue
+        outcome = str(decision.get("outcome", ""))
+        rule = claim.get("measurement_contract", {}).get("outcome_rule", {})
+        actions = rule.get("actions", {}) if isinstance(rule, dict) else {}
+        expected_action = actions.get(outcome) if isinstance(actions, dict) else None
+        if expected_action not in action_priority:
+            errors.append(f"claim decision {claim_id} has no preregistered action for {outcome}")
+            continue
+        expected_falsifier_status = status_by_outcome.get(outcome)
+        if decision.get("falsifier_status") != expected_falsifier_status:
+            errors.append(
+                f"claim decision {claim_id} falsifier_status disagrees with outcome {outcome}"
+            )
+        if decision.get("next_action") != expected_action:
+            errors.append(
+                f"claim decision {claim_id} next_action must be {expected_action}"
+            )
+        if not str(decision.get("evidence_summary", "")).strip():
+            errors.append(f"claim decision {claim_id} lacks evidence_summary")
+        primary = rows_by_id.get(str(decision.get("primary_result_id", "")))
+        if primary is None:
+            continue
+        goal_id = str(primary.get("goal_id", ""))
+        if not goal_id:
+            errors.append(f"claim decision {claim_id} primary result lacks goal_id")
+            continue
+        expected_by_goal.setdefault(goal_id, {})[claim_id] = str(expected_action)
+
+    for goal_id, claim_actions in expected_by_goal.items():
+        gate = gates.get(goal_id)
+        if gate is None:
+            errors.append(f"claim-producing goal {goal_id} lacks a gate decision")
+            continue
+        expected_outcomes = {
+            claim_id: str(decisions[claim_id].get("outcome", ""))
+            for claim_id in claim_actions
+        }
+        if gate.get("claim_outcomes") != expected_outcomes:
+            errors.append(f"goal {goal_id} gate does not expose its exact claim outcomes")
+        expected_action = max(
+            claim_actions.values(), key=lambda action: action_priority[action]
+        )
+        if gate.get("decision") != expected_action:
+            errors.append(
+                f"goal {goal_id} gate decision must be {expected_action}, not {gate.get('decision')}"
+            )
+        if not str(gate.get("rationale", "")).strip():
+            errors.append(f"goal {goal_id} gate lacks a visible rationale")
+        if expected_action not in {"continue", "complete"}:
+            boundary = goal_order.get(goal_id, -1)
+            advanced = [
+                str(goal.get("id", ""))
+                for goal in goals[boundary + 1:]
+                if goal.get("status") in {"running", "completed", "proposed"}
+            ]
+            if advanced:
+                errors.append(
+                    f"goal {goal_id} requires {expected_action}; later goals advanced: {advanced}"
+                )
+            if state.get("state") == "completed" or state.get("status") == "completed":
+                errors.append(
+                    f"run plan cannot be completed while claim gate {goal_id} requires {expected_action}"
+                )
+    if expected_by_goal and not str(state.get("next_authorized_action", "")).strip():
+        errors.append("claim-evaluated run plan lacks next_authorized_action")
+    return errors
+
+
 def validate_human_annotation_files(evidence: dict[str, object], goal_status: str) -> list[str]:
     """Refuse active human-metric execution without real annotation and rubric files."""
     if goal_status not in {"running", "completed"}:
@@ -758,6 +872,12 @@ def validate(args: argparse.Namespace) -> list[str]:
             errors.append("source experiment plan lacks embedded contract")
         else:
             experiment_contract = json.loads(contract_match.group(1))
+            if experiment_contract.get("scientific_integrity_version") == 3 and state.get(
+                "scientific_integrity_version"
+            ) != 3:
+                errors.append(
+                    "run-plan state must preserve scientific_integrity_version=3"
+                )
             source_approval = state.get("source_plan_approval", {})
             if not isinstance(source_approval, dict):
                 errors.append("run-plan source_plan_approval must be an object")
@@ -813,7 +933,7 @@ def validate(args: argparse.Namespace) -> list[str]:
             errors.extend(validate_implementation_conformance(experiment_contract, state))
             errors.extend(validate_protocol_conformance(experiment_contract, state))
             errors.extend(validate_decision_handoff(experiment_contract, state))
-            if experiment_contract.get("scientific_integrity_version") == 2:
+            if experiment_contract.get("scientific_integrity_version") in {2, 3}:
                 errors.extend(validate_reideation_checkpoint(state))
             runplan_text = args.plan.read_text(encoding="utf-8")
             runplan_visible = re.sub(r'<script\b.*?</script>', '', runplan_text, flags=re.S)
@@ -1160,6 +1280,7 @@ def validate(args: argparse.Namespace) -> list[str]:
                         )
                 except (OSError, ValueError, KeyError, TypeError) as exc:
                     errors.append(f"claim decision {claim_id} cannot be mechanically recomputed: {exc}")
+            errors.extend(validate_claim_gate_control(state, experiment_contract, rows))
     return errors
 
 

@@ -8,11 +8,11 @@ Summarize BEFORE surveying so generation targets its gaps. Fetch (`research_avat
 3. **Do NOT duplicate the survey's appendix in the idea report.** The full categorized paper list lives in `01_LIT_SURVEY.html`. In `02_IDEA_REPORT.html`, open with a **short Literature Landscape** (a few sentences summarizing the survey's debates + gaps) that **links to `01_LIT_SURVEY.html`** ("See the literature survey for the complete evidence list"), and per idea cite only the **closest 1–3 papers** (direct `<a href>`) needed to justify its novelty verdict. **Anti-hallucination still applies:** cite only papers that appear (verified) in the survey or that you separately retrieved for a novelty check; unverifiable → `[UNVERIFIED]`, never fabricate.
 4. **Novelty top-ups are allowed.** A3/A4 may run a few *targeted* searches to pin the closest concurrent work for a specific candidate (last 3–6 months) — that is a novelty check, not a re-survey. Keep it narrow.
 
-When the wildcard is on, first build the **Route Gravity Map** from the survey grounding — the seven field defaults, each citing survey evidence (D0 in `references/disruptive-branch.md`).
+When the wildcard is on, first build the **Route Gravity Map** from the survey grounding — the seven field defaults, each citing survey evidence (D0 in `disruptive-branch.md`).
 
 ## A2 — Blind disruptive incubation (wildcard `on` only)
 
-When the wildcard is on, run **D0–D3** from `references/disruptive-branch.md` here — immediately after the survey grounding and **before** reading any prior idea report or drafting standard candidates — and hold the surviving seeds unranked until D4 restores the literature.
+When the wildcard is on, run **D0–D3** from `disruptive-branch.md` here — immediately after the survey grounding and **before** reading any prior idea report or drafting standard candidates — and hold the surviving seeds unranked until D4 restores the literature.
 
 
 
@@ -28,7 +28,7 @@ Generate 6 candidates through the chosen mode, seeded by the profile AND the sur
 
 
 
-For the disruptive wildcard, generate per the blind-synthesis sequence in `references/disruptive-branch.md` (D1–D3: quarantine prior solution wording · ≥4 drift operators · generate from a documented anomaly · one irreducible mechanism), not by extending the paper list or asking for "more novel" variants.
+For the disruptive wildcard, generate per the blind-synthesis sequence in `disruptive-branch.md` (D1–D3: quarantine prior solution wording · ≥4 drift operators · generate from a documented anomaly · one irreducible mechanism), not by extending the paper list or asking for "more novel" variants.
 
 **Ethics output rule.** If the ethics triage flags at least one candidate, add a rightmost column to the ranked-idea table. Each flagged row must show the level plus a compact reason, such as `HIGH — opinion manipulation at population scale`; unflagged rows must say `No material issue identified`, not a warning prompt. In the idea-cards section, add the full **Ethics assessment** subsection inside the same card that contains that idea's pitch, method, hypothesis, and qualitative record. The assessment must not be moved to a global ethics section or a separate standalone card. If nothing is flagged, do not add an ethics column, ethics subsection, or ethics-related question anywhere in the report.
 
@@ -68,7 +68,7 @@ invented publication link. A self-built unpublished dataset instead records
 its planned collection, versioning, access, and release status.
 
 
-For every disruptive seed surviving A2, run the **absorbability test** (D4 in `references/disruptive-branch.md`): if the closest work could absorb it as one module/loss/prompt/data-slice/benchmark-axis/scale-run without changing its central causal story, label it `incremental/absorbed` and drop it from wildcard eligibility (retain in the audit). This is where paper titles and prior ideas are reintroduced and the closest collision is recorded.
+For every disruptive seed surviving A2, run the **absorbability test** (D4 in `disruptive-branch.md`): if the closest work could absorb it as one module/loss/prompt/data-slice/benchmark-axis/scale-run without changing its central causal story, label it `incremental/absorbed` and drop it from wildcard eligibility (retain in the audit). This is where paper titles and prior ideas are reintroduced and the closest collision is recorded.
 
 ## A5 — Objective gate · qualitative review · ranking
 Separate the objective filter from the qualitative ranking; do **not** use numeric scores, weighted totals, or a novelty scorecard.
@@ -88,4 +88,4 @@ Encode each selectable card with matching `data-scope-necessity`, `data-scope-ac
 4. **Build a tiered decision slate.** Exclude `already exists` and `[UNVERIFIED]` from pick options. Tier A contains `novel` recommendations; Tier B contains selectable `differentiable` candidates with a concrete difference, viable test, and reforge path. Tier B is never a default recommendation—even when Tier A is empty—and must be explicitly chosen as incremental/framing work. Move absorbable application swaps, unresolved mashups, and weak differences to **Needs reforge — not selectable**. If no Tier A survives, state **no high-confidence novel recommendation**; never promote Tier B to fill rank 1.
 
 
-For the disruptive pool, rank separately per **D5** in `references/disruptive-branch.md` (two-stage novelty-incubation → reality-reentry; visible **Disruptive score** = arithmetic mean of Paradigm break · Evidence plausibility · Falsifiability · Leverage/option value; feasibility risk only as tie-breaker; vague/cross-domain/expensive never earns points). Select exactly the highest-scoring eligible survivor as `D1`; do not expose lower-scoring survivors as extra cards.
+For the disruptive pool, rank separately per **D5** in `disruptive-branch.md` (two-stage novelty-incubation → reality-reentry; visible **Disruptive score** = arithmetic mean of Paradigm break · Evidence plausibility · Falsifiability · Leverage/option value; feasibility risk only as tie-breaker; vague/cross-domain/expensive never earns points). Select exactly the highest-scoring eligible survivor as `D1`; do not expose lower-scoring survivors as extra cards.

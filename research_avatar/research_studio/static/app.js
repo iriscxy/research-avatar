@@ -18,7 +18,7 @@ const stageStorageKey = "research-studio.active-stage";
 const artifactSandbox = "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads";
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
-const statusLabel = status => ({complete:"Complete",in_progress:"In progress",waiting_confirmation:"Awaiting confirmation",not_started:"Not started"}[status] || status);
+const statusLabel = status => ({complete:"Complete",attention_required:"Experiment complete · review claims",in_progress:"In progress",waiting_confirmation:"Awaiting confirmation",not_started:"Not started"}[status] || status);
 const isRunnableCommand = value => value.startsWith("$") || value.startsWith("python3 -m ");
 
 async function copyText(value) {

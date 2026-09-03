@@ -25,6 +25,46 @@ except ModuleNotFoundError:  # Direct ``python research_avatar/tools/activate_ru
 STATE_RE = re.compile(r'<script type="application/json" id="run-plan-state">(.*?)</script>', re.S)
 
 
+def activation_issues(state: dict, goal_id: str) -> list[str]:
+    """Return deterministic reasons why a proposed Goal cannot start."""
+    goals = [item for item in state.get("goals", []) if isinstance(item, dict)]
+    by_id = {str(item.get("id", "")): item for item in goals}
+    target = by_id.get(goal_id)
+    if target is None:
+        return [f"{goal_id} is absent from run-plan state"]
+    errors = [
+        f"dependency {dependency} is not completed"
+        for dependency in target.get("depends_on", [])
+        if by_id.get(str(dependency), {}).get("status") != "completed"
+    ]
+    if state.get("scientific_integrity_version") == 3:
+        target_index = goals.index(target)
+        earlier_ids = {str(item.get("id", "")) for item in goals[:target_index]}
+        gates = {
+            str(gate.get("goal_id", "")): gate
+            for gate in state.get("gate_decisions", [])
+            if isinstance(gate, dict) and gate.get("goal_id")
+        }
+        for dependency in target.get("depends_on", []):
+            dependency_id = str(dependency)
+            if (
+                by_id.get(dependency_id, {}).get("status") == "completed"
+                and dependency_id not in gates
+            ):
+                errors.append(
+                    f"completed dependency {dependency_id} lacks a gate decision"
+                )
+        for gate in gates.values():
+            if not isinstance(gate, dict) or str(gate.get("goal_id", "")) not in earlier_ids:
+                continue
+            if gate.get("decision") != "continue":
+                errors.append(
+                    f"claim gate {gate.get('goal_id')} requires {gate.get('decision')}; "
+                    f"{goal_id} cannot start"
+                )
+    return errors
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("goal_id")
@@ -42,6 +82,9 @@ def main() -> None:
     target = next((goal for goal in state["goals"] if goal["id"] == args.goal_id), None)
     if target is None or target["status"] not in ("proposed", "running"):
         raise ValueError(f"{args.goal_id} is not activatable")
+    issues = activation_issues(state, args.goal_id)
+    if issues:
+        raise ValueError("; ".join(issues))
     target["status"] = "running"
     state["state"] = "goal_running"
     state["active_goal"] = args.goal_id

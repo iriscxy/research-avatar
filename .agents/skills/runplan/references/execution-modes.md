@@ -126,6 +126,15 @@ authorized sequential queue—owns exactly one goal. Its command and
    the queue on `refine`, `pivot`, `stopped`, `blocked`, validation failure, or
    any need for a new researcher-controlled choice.
 
+   For scientific-integrity-v3 plans, recompute every newly decidable Claim
+   before unlocking a successor. Store its evidence summary, exact outcome,
+   falsifier status, primary result, and preregistered next action in
+   `claim_decisions`; copy those exact Claim outcomes into the producing Goal's
+   `gate_decisions` entry. The most restrictive Claim action is the Goal
+   action. A `refine`, `pivot`, `stopped`, or `blocked` action makes every later
+   Goal transition invalid even when all artifact cells are filled. Never mark
+   the RunPlan completed merely because acquisition coverage is complete.
+
 If evidence requires a new claim, metric, dataset, baseline, or search space,
 record `pivot` and return to `$expplan` for amendment and approval. `refine` may
 use only execution variables and budgets already authorized by the approved

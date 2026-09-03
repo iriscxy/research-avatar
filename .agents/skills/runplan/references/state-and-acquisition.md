@@ -29,6 +29,15 @@ approximate; do not present queue time or unknown hardware throughput as fact.
   least `id`, `artifact_id`, `target_id`, `source_type`, and `producing_goal`
   so the validator can reject a nonexistent or mismatched route. Do not create
   `RUN_STATE.json` or another sidecar state file.
+  Copy `scientific_integrity_version` unchanged from the approved Experiment
+  Plan so downstream gates cannot silently treat a v3 run as a legacy run.
+
+  Copy the approved Claims into `claim_registry`. Once evidence makes a Claim
+  decidable, `claim_decisions` records `claim_id`, `rule_id`,
+  `evaluation_mode=deterministic_rule`, `outcome`, `metric_result_ids`,
+  `primary_result_id`, confidence-interval locators, `evidence_summary`,
+  `falsifier_status`, and `next_action`. The visible page renders these records
+  as one Claim-status board; they must not exist only inside hidden JSON.
 - `code/RESULTS_LEDGER.csv`: the canonical, append-only index of every real
   numeric/text result. Keep one result per row with its metric/value, approved
   artifact/target ID when paper-facing, acquisition contract ID, source type,
