@@ -81,6 +81,13 @@ class ReviewRegressions(unittest.TestCase):
             shutil.rmtree(project)
             self.assertEqual(billing.account_total(root, 'a' * 64), 1.25)
 
+    def test_metering_identifies_its_client_to_cloudflare(self):
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = b'{"ok":true,"amount":123}'
+        with patch.dict(os.environ, {'ONLINE_STUDIO_USAGE_URL': 'https://example.invalid/internal/account-usage', 'DEEPSEEK_API_KEY': 'synthetic-key'}), patch.object(billing.urllib.request, 'urlopen', return_value=response) as request:
+            self.assertEqual(billing._remote('a' * 64, []), 123)
+            self.assertEqual(request.call_args.args[0].get_header('User-agent'), 'ResearchAvatar-AccountUsage/1.0')
+
     def test_durable_remote_total_survives_empty_local_container(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {'ONLINE_STUDIO_USAGE_URL': 'https://example.invalid/internal/account-usage'}), patch.object(billing, '_remote', return_value=30_000_000) as remote:
             self.assertEqual(billing.account_total(Path(tmp), 'a' * 64), 30)

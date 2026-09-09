@@ -26,7 +26,7 @@ cost of concurrent in-flight calls.
 
 ## Validation
 
-- Full suite: 690 tests, 13 skipped, no failures.
+- Full suite: 691 tests, 13 skipped, no failures.
 - New regressions cover unsafe tables, placeholder API access, restricted TeX
   environments, stale title responses, quota reset, immediate charge persistence,
   fresh-container D1 totals, retry outboxes, and concurrent session reservations.
@@ -51,3 +51,8 @@ cannot update account totals.
 Keep it when deleting temporary projects. Hosted D1 is authoritative across container
 replacements. A billing outage retains pending records and blocks new chargeable
 work until synchronization succeeds.
+
+Production metering uses the explicit `ResearchAvatar-AccountUsage/1.0` client
+identifier. Cloudflare rejected Python's default agent with error 1010 during
+release verification; the explicit service identifier was verified against the
+deployed authenticated endpoint. Authentication and request bounds remain enforced.

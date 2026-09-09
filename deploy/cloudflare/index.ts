@@ -187,6 +187,7 @@ export class OnlineStudioContainerV57 extends OnlineStudioContainer {}
 export class OnlineStudioContainerV58 extends OnlineStudioContainer {}
 export class OnlineStudioContainerV59 extends OnlineStudioContainer {}
 export class OnlineStudioContainerV60 extends OnlineStudioContainer {}
+export class OnlineStudioContainerV61 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({

@@ -55,6 +55,7 @@ def _remote(account: str, rows: list[tuple[str, int]]) -> int:
         raise UsageUnavailable("Account usage service is not configured.")
     request = urllib.request.Request(url, method="POST", headers={
         "Content-Type": "application/json", "Authorization": "Bearer " + key,
+        "User-Agent": "ResearchAvatar-AccountUsage/1.0",
     }, data=json.dumps({"account": account, "projects": [
         {"id": project, "amount": amount} for project, amount in rows
     ]}).encode())
