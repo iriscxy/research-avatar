@@ -21,10 +21,10 @@
           <div class="model-input-row">
             <input id="model" list="model-suggestions" value="gpt-5-nano" autocomplete="off" spellcheck="false" disabled>
             <datalist id="model-suggestions"></datalist>
-            <button id="model-apply" class="secondary compact" disabled>application</button>
+            <button id="model-apply" class="secondary compact" disabled>Apply</button>
           </div>
         </div>
-        <button id="runtime-key-open" class="ghost" disabled>Safe API key rotation.</button>
+        <button id="runtime-key-open" class="ghost" disabled>Update API key</button>
         <p class="terminal-help-hint">Features not provided by the webpage or other requests should be run with Code Agent in the local terminal.</p>
       </div>
     </aside>
@@ -37,9 +37,9 @@
         </div>
         <div class="status-row">
           <div class="view-switch" aria-label="Workspace">
-            <button id="writing-view" class="active" disabled>body text</button>
-            <button id="figures-view" disabled>figure</button>
-            <button id="tables-view" disabled>table</button>
+            <button id="writing-view" class="active" disabled>Prose</button>
+            <button id="figures-view" disabled>Figures</button>
+            <button id="tables-view" disabled>Tables</button>
           </div>
           <button id="compile" class="secondary" disabled>Compile PDF.</button>
           <button id="reset-generated" class="reset-generated-trigger" disabled>Clear generated content</button>
@@ -388,7 +388,7 @@
     <form id="runtime-key-form">
       <button id="runtime-key-close" class="agent-chat-close" type="button" aria-label="Disable security key input">×</button>
       <span class="eyebrow dark">SECURE RUNTIME KEY</span>
-      <h3>Safe API key rotation.</h3>
+      <h3>Update API key</h3>
       <p>Keys are written only to the current Paper Studio process memory and are not stored in chat history browser storage or project files.</p>
       <label for="runtime-key-provider">Service provider</label>
       <select id="runtime-key-provider" name="provider">

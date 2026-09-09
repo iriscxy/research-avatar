@@ -12121,6 +12121,9 @@ def finalize_automatic_mechanism_figure(figure_id: str) -> None:
                 "message": compile_result.message,
                 "updated_at": int(time.time()),
             }
+            figure_state["last_message"] = (
+                "The mechanism diagram has been inserted and the paper PDF compiled successfully."
+            )
             pending = pending_batch_artifacts(state)
             full_job = state.get("full_draft_job") or {}
             if (

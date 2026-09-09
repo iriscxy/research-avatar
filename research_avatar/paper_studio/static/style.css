@@ -83,3 +83,13 @@ progress.figure-progress-track::-moz-progress-bar{background:var(--teal)}
   .preview-head{height:auto;min-height:58px;align-items:flex-start;flex-direction:column;gap:8px}
   .preview-head .preview-tools{width:100%;max-width:100%;overflow-x:auto;padding-bottom:2px}
 }
+
+/* Keep the toolbar within tablet-width workspaces and PDF scrolling local. */
+@media(min-width:721px) and (max-width:1050px){
+  .topbar{height:auto;min-height:90px;flex-direction:column;align-items:stretch;gap:10px;padding:14px 18px}
+  .status-row{flex-wrap:wrap}
+  .editor,.preview,.figure-sequence,.figure-detail{min-width:0}
+  .preview-head{height:auto;min-height:58px;flex-wrap:wrap;gap:8px}
+  .preview-head .preview-tools{flex-wrap:wrap}
+}
+.pdf-pages{overscroll-behavior:contain}

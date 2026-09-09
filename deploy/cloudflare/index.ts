@@ -179,6 +179,8 @@ export class OnlineStudioContainerV56 extends OnlineStudioContainer {}
 // Runtime packaging repair: the online gateway imports figure_contract, which
 // must be present in both application and site-packages roots in the image.
 export class OnlineStudioContainerV57 extends OnlineStudioContainer {}
+// PDF navigation, responsive layout, and read-only demo interaction fixes.
+export class OnlineStudioContainerV58 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({

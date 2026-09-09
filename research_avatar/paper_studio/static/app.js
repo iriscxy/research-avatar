@@ -88,6 +88,7 @@ let fullDraftRequestBusy = false;
 let queuedFullDraftStart = false;
 let queuedSectionDraftStart = "";
 let pdfLocateRequestId = 0;
+let pdfResizeObserver = null;
 let proseBaselineKey = "";
 let proseBaselineText = "";
 const mechanismPreviewModes = new Map();
@@ -671,19 +672,19 @@ function renderStructureBlueprint(section) {
 function capturePdfPosition(pages) {
   const pageElements = [...pages.querySelectorAll(".pdf-page")];
   if (!pageElements.length || !pages.clientHeight) return null;
-  const center = pages.scrollTop + pages.clientHeight / 2;
+  const center = pages.getBoundingClientRect().top + pages.clientTop + pages.clientHeight / 2;
   const page = pageElements.find((item) => (
-    center >= item.offsetTop && center <= item.offsetTop + item.offsetHeight
+    center >= item.getBoundingClientRect().top && center <= item.getBoundingClientRect().bottom
   )) || pageElements.reduce((closest, item) => (
-    Math.abs(item.offsetTop + item.offsetHeight / 2 - center)
-      < Math.abs(closest.offsetTop + closest.offsetHeight / 2 - center)
+    Math.abs(item.getBoundingClientRect().top + item.offsetHeight / 2 - center)
+      < Math.abs(closest.getBoundingClientRect().top + closest.offsetHeight / 2 - center)
       ? item
       : closest
   ));
   return {
     page: page.dataset.page,
     ratio: page.offsetHeight
-      ? (center - page.offsetTop) / page.offsetHeight
+      ? (center - page.getBoundingClientRect().top) / page.offsetHeight
       : 0,
   };
 }
@@ -693,7 +694,9 @@ function restorePdfPosition(pages, position) {
   requestAnimationFrame(() => {
     const page = pages.querySelector(`[data-page="${position.page}"]`);
     if (!page) return;
-    const center = page.offsetTop + position.ratio * page.offsetHeight;
+    const top = page.getBoundingClientRect().top - pages.getBoundingClientRect().top
+      - pages.clientTop + pages.scrollTop;
+    const center = top + position.ratio * page.offsetHeight;
     pages.scrollTop = Math.max(0, center - pages.clientHeight / 2);
     updatePdfPageIndicator();
   });
@@ -744,6 +747,9 @@ function renderPdf() {
         const image = document.createElement("img");
         image.alt = `Paper PDF page ${pageNumber} page`;
         image.draggable = false;
+        image.width = Number(state.pdf.page_width_pt) || 612;
+        image.height = Number(state.pdf.page_height_pt) || 792;
+        image.onload = updatePdfPageIndicator;
         image.src = studioPath(`/paper-page/${pageNumber}.svg?v=${state.pdf.version}`);
         page.appendChild(image);
         page.ondblclick = (event) => locatePdfEditTarget(event, page);
@@ -766,13 +772,21 @@ function renderPdf() {
         thumbnail.appendChild(image);
         thumbnail.onclick = () => {
           const target = pages.querySelector(`[data-page="${pageNumber}"]`);
-          if (target) target.scrollIntoView({behavior: "smooth", block: "start"});
+          if (target) pages.scrollTo({
+            top: pages.scrollTop + target.getBoundingClientRect().top
+              - pages.getBoundingClientRect().top - pages.clientTop,
+            behavior: "smooth",
+          });
         };
         navigationRoot.appendChild(thumbnail);
       }
       navigationRoot.dataset.signature = signature;
     }
     pages.onscroll = updatePdfPageIndicator;
+    if (!pdfResizeObserver) {
+      pdfResizeObserver = new ResizeObserver(updatePdfPageIndicator);
+      pdfResizeObserver.observe(pages);
+    }
     requestAnimationFrame(updatePdfPageIndicator);
   } else {
     download.hidden = true;
@@ -1022,6 +1036,8 @@ function updateFigureButtonStates() {
   document.querySelectorAll(".data-panel button").forEach((control) => {
     control.disabled = running || !figure.ready;
   });
+  // Preview load callbacks also refresh these controls after render() returns.
+  applyReadOnlyDemoRestrictions();
 }
 
 function renderSingleDataFigure(figure) {
@@ -1618,7 +1634,13 @@ function renderFigures() {
     downloads.appendChild(link);
   });
   downloads.hidden = placeholderOnly;
-  $("figure-message").textContent = placeholderOnly ? "" : (figure.last_message || "");
+  const figureMessage = figure.last_message || "";
+  $("figure-message").textContent = placeholderOnly ? "" : (
+    figure.status === "approved" && state.compile?.status === "ok"
+      && figureMessage === "The mechanism diagram has been automatically generated, inserted, and is awaiting PDF compilation."
+      ? "The mechanism diagram has been inserted and the paper PDF compiled successfully."
+      : figureMessage
+  );
   ensureFigurePolling();
   if (
     mechanism
@@ -1656,11 +1678,13 @@ function renderFigures() {
 
 const DEMO_READ_ONLY_CONTROL_IDS = [
   "generate", "accept", "candidate", "comment", "reset-generated",
+  "full-draft-start", "full-draft-cancel", "section-draft-start",
   "compile", "model", "model-apply", "runtime-key-open",
   "title-generate", "title-save", "paper-title", "title-gpt-prompt",
   "figure-prompt", "draw-prompt", "prompt-instruction", "figure-draw",
   "figure-cancel", "figure-build", "single-data-prompt", "single-data-generate",
-  "data-layout-prompt", "data-approve", "figure-caption-prompt",
+  "data-layout-prompt", "data-compose", "data-approve", "figure-caption-prompt",
+  "figure-caption-save",
   "figure-caption-generate", "figure-placement", "figure-layout-mode",
   "figure-approve", "table-agent-prompt", "table-agent-edit", "table-prompt",
   "table-generate", "table-latex", "table-save", "table-approve",
@@ -1682,7 +1706,7 @@ function applyReadOnlyDemoRestrictions() {
     const element = $(id);
     if (element) element.disabled = true;
   });
-  document.querySelectorAll(".figure-card, .figure-actions button")
+  document.querySelectorAll(".figure-actions button, .data-panel-actions button")
     .forEach((element) => { element.disabled = true; });
 }
 
@@ -1899,6 +1923,16 @@ function render() {
 
 function renderFullDraft() {
   const card = $("full-draft-card");
+  if (state.demo_mode) {
+    card.classList.remove("is-running", "is-failed", "has-pending-artifacts", "is-completed");
+    $("full-draft-summary").textContent = "Read-only demo. Explore paragraphs, figures, tables, and the compiled PDF. Generation and editing are available in your own project.";
+    $("full-draft-summary").title = "Read-only demo";
+    $("full-draft-start").textContent = "Read-only demo";
+    $("full-draft-start").disabled = true;
+    $("full-draft-cancel").hidden = true;
+    $("full-draft-progress-row").hidden = true;
+    return;
+  }
   const draft = state.full_draft || {};
   const job = draft.job || null;
   const running = Boolean(job && job.status === "running");
@@ -1969,11 +2003,17 @@ function renderFullDraft() {
 
   const progressRow = $("full-draft-progress-row");
   progressRow.hidden = !job;
+  // A finalization-only job has no paragraph targets. Show manuscript progress
+  // in that case instead of presenting a completed paper as 0 / 0.
+  const progressTotal = Number(job && job.total) || total;
+  const progressCompleted = Number(job && job.total) > 0
+    ? Number(job.completed || 0)
+    : Math.max(0, total - pending);
   $("full-draft-progress").value = Number((job && job.progress) || 0);
   $("full-draft-progress-text").textContent = job
     ? failed
-      ? `${Number(job.completed || 0)} / ${Number(job.total || pending)} · Draft paused; details are shown above.`
-      : `${Number(job.completed || 0)} / ${Number(job.total || pending)} · ${job.progress_message || job.status}`
+      ? `${progressCompleted} / ${progressTotal} · Draft paused; details are shown above.`
+      : `${progressCompleted} / ${progressTotal} · ${job.progress_message || job.status}`
     : "";
 
   ["candidate", "comment", "generate", "section-draft-start", "accept", "paper-title", "title-gpt-prompt", "title-generate", "title-save", "model", "reset-generated"].forEach((id) => {

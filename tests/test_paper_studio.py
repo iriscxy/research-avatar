@@ -6494,15 +6494,17 @@ args = parser.parse_args()
 
     def test_read_only_demo_control_list_covers_every_mutating_action(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
+        controls = source.split("const DEMO_READ_ONLY_CONTROL_IDS = [", 1)[1].split("];", 1)[0]
         for control_id in (
             "generate", "accept", "comment", "reset-generated",
             "title-generate", "title-save", "figure-approve", "table-generate",
-            "table-approve",
+            "table-approve", "full-draft-start", "full-draft-cancel",
+            "section-draft-start", "data-compose", "figure-caption-save",
         ):
-            self.assertIn(f'"{control_id}"', source)
+            self.assertIn(f'"{control_id}"', controls)
         self.assertIn("const DEMO_READ_ONLY_CONTROL_IDS = [", source)
         self.assertIn(
-            'document.querySelectorAll(".figure-card, .figure-actions button")',
+            'document.querySelectorAll(".figure-actions button, .data-panel-actions button")',
             source,
         )
         self.assertIn(
