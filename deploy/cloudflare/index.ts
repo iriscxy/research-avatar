@@ -19,6 +19,7 @@ interface Env {
   // Set with `wrangler secret put`; never add the secret value to the plain
   // envVars literal below, which is baked into the deployed Worker bundle.
   DEEPSEEK_API_KEY?: string;
+  ONLINE_STUDIO_USAGE_URL?: string;
 }
 
 interface User {
@@ -43,6 +44,9 @@ export class OnlineStudioContainer extends Container<Env> {
     super(ctx, env);
     // Inject the encrypted Worker secret only at container construction time.
     // DeepSeek powers both PDF text ordering and manuscript writing.
+    if (env.ONLINE_STUDIO_USAGE_URL) {
+      this.envVars = { ...this.envVars, ONLINE_STUDIO_USAGE_URL: env.ONLINE_STUDIO_USAGE_URL };
+    }
     if (env.DEEPSEEK_API_KEY) {
       this.envVars = { ...this.envVars, DEEPSEEK_API_KEY: env.DEEPSEEK_API_KEY };
     }
@@ -182,6 +186,7 @@ export class OnlineStudioContainerV57 extends OnlineStudioContainer {}
 // PDF navigation, responsive layout, and read-only demo interaction fixes.
 export class OnlineStudioContainerV58 extends OnlineStudioContainer {}
 export class OnlineStudioContainerV59 extends OnlineStudioContainer {}
+export class OnlineStudioContainerV60 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
   const headers = new Headers({
@@ -592,11 +597,60 @@ async function proxyIdentified(
   return studioContainer(env).fetch(forwarded);
 }
 
+// The container holds this secret; browser identities are never sufficient to
+// modify billing. Per-project high-water marks make retries idempotent.
+async function accountUsage(request: Request, env: Env): Promise<Response> {
+  const provided = request.headers.get("authorization") || "";
+  if (!env.DEEPSEEK_API_KEY || !safeEqual(
+    new TextEncoder().encode(provided),
+    new TextEncoder().encode("Bearer " + env.DEEPSEEK_API_KEY),
+  )) return json({ ok: false, error: "Unauthorized" }, 401);
+  try {
+    // Bound actual streamed bytes, including requests without Content-Length.
+    const reader = request.body?.getReader();
+    if (!reader) throw new Error("Empty request");
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > 65536) { await reader.cancel(); throw new Error("Request too large"); }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+    const body = JSON.parse(new TextDecoder().decode(bytes));
+    if (!/^[a-f0-9]{64}$/.test(body.account) || !Array.isArray(body.projects) || body.projects.length > 250) {
+      throw new Error("Invalid usage request");
+    }
+    const statements = body.projects.map((item: { id: string; amount: number }) => {
+      if (!/^[a-f0-9]{64}$/.test(item.id) || !Number.isSafeInteger(item.amount) || item.amount < 0) {
+        throw new Error("Invalid usage record");
+      }
+      return env.AUTH_DB.prepare(`INSERT INTO account_usage(account_id, project_id, amount)
+        VALUES (?, ?, ?) ON CONFLICT(account_id, project_id) DO UPDATE
+        SET amount=MAX(account_usage.amount, excluded.amount)`)
+        .bind(body.account, item.id, item.amount);
+    });
+    statements.push(env.AUTH_DB.prepare("SELECT COALESCE(SUM(amount), 0) AS amount FROM account_usage WHERE account_id=?").bind(body.account));
+    const results = await env.AUTH_DB.batch(statements);
+    return json({ ok: true, amount: results[results.length - 1].results[0].amount });
+  } catch {
+    return json({ ok: false, error: "Account usage could not be saved." }, 503);
+  }
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const url = new URL(request.url);
       const path = url.pathname;
+      if (path === "/internal/account-usage") {
+        if (request.method !== "POST") return json({ ok: false }, 405);
+        return accountUsage(request, env);
+      }
       if (request.method === "POST" && path === "/api/auth/signup") {
         return signup(request, env);
       }

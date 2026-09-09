@@ -33,6 +33,7 @@ import unicodedata
 import zipfile
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
+from contextlib import contextmanager
 from http import HTTPStatus
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -40,8 +41,9 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Callable
 
+from research_avatar.paper_studio.account_usage import account_total, persist_project_cost, UsageUnavailable
 from research_avatar.figure_contract import MECHANISM_FIGURE_TYPES
-from research_avatar.paper_studio.api_usage import append_usage, usage_record, usage_summary
+from research_avatar.paper_studio.api_usage import append_usage, usage_record, usage_summary, usage_scope, scoped_usage_file, ensure_ledger_budget
 from research_avatar.paper_structure import (
     PaperStructureError,
     materialize_reference_contexts,
@@ -220,6 +222,7 @@ class Session:
     kind: str = "user"
     created_at: float = field(default_factory=time.time)
     last_access: float = field(default_factory=time.time)
+    lifecycle_lock: Any = field(default_factory=threading.RLock, repr=False)
 
 
 @dataclass
@@ -238,6 +241,8 @@ class OnboardingJob:
 
 SESSIONS: dict[str, Session] = {}
 SESSIONS_LOCK = threading.RLock()
+SESSION_RECOVERY_LOCK = threading.Lock()
+SESSION_START_RESERVATIONS = 0
 ONBOARDING_JOBS: dict[str, OnboardingJob] = {}
 ONBOARDING_JOBS_LOCK = threading.RLock()
 DEMO_SESSION: Session | None = None
@@ -978,6 +983,8 @@ Requirements:
         "temperature": 0.0,
         "max_tokens": 16000,
     }
+    if scoped_usage_file() is not None:
+        ensure_ledger_budget(scoped_usage_file())
     request = urllib.request.Request(
         os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
         + "/chat/completions",
@@ -1001,6 +1008,10 @@ Requirements:
         raise OnlineStudioError(f"LLM read {name} When API connection fails:{reason}") from exc
     except json.JSONDecodeError as exc:
         raise OnlineStudioError(f"LLM read {name} Invalid JSON was returned.") from exc
+    if scoped_usage_file() is not None:
+        append_usage(scoped_usage_file(), usage_record(
+            body, provider="deepseek", requested_model=model, operation="reference_pdf_transcription",
+        ))
     choices = body.get("choices") or []
     transcript = (
         str((choices[0].get("message") or {}).get("content") or "").strip()
@@ -2463,6 +2474,8 @@ FULL PAPERS:
         "response_format": {"type": "json_object"},
     }
     base_url = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
+    if scoped_usage_file() is not None:
+        ensure_ledger_budget(scoped_usage_file())
     request = urllib.request.Request(
         base_url + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
@@ -2554,6 +2567,8 @@ not a possible reference paper. Target venue: {venue}.
         "max_tokens": 1200,
         "response_format": {"type": "json_object"},
     }
+    if scoped_usage_file() is not None:
+        ensure_ledger_budget(scoped_usage_file())
     request = urllib.request.Request(
         os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
         + "/chat/completions",
@@ -2658,6 +2673,8 @@ def _design_lightweight_structure_online(
         "max_tokens": 16000,
         "response_format": {"type": "json_object"},
     }
+    if scoped_usage_file() is not None:
+        ensure_ledger_budget(scoped_usage_file())
     request = urllib.request.Request(
         os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
@@ -4017,6 +4034,7 @@ def _start_worker(
     environment.update(
         {
             "RESEARCH_AVATAR_ROOT": str(root),
+            "ONLINE_STUDIO_DATA_ROOT": str(DATA_ROOT),
             "PAPER_STUDIO_PROVIDER": provider,
             "PAPER_STUDIO_MODEL": model,
             # The public Demo is the completed local/full Paper Studio surface
@@ -4115,21 +4133,15 @@ def user_project_root(user_id: str) -> Path:
 
 
 def user_cumulative_cost_usd(user_id: str) -> float:
-    """Sum estimated cost across every session this user has ever created.
-
-    Each session is its own subprocess with its own project-scoped usage
-    ledger (paper/.paper_studio/api_usage.jsonl); this walks all of a
-    user's session directories under their stable per-user root so the
-    spend cap holds across sessions, not just within one.
-    """
-    total = 0.0
-    root = user_project_root(user_id)
-    if not root.is_dir():
-        return total
-    for ledger in root.glob("*/paper/.paper_studio/api_usage.jsonl"):
-        summary = usage_summary(ledger)
-        total += float(summary.get("estimated_cost_usd") or 0.0)
-    return total
+    """Backfill legacy project ledgers into an independent, monotonic account ledger."""
+    account = hashlib.sha256(user_id.encode()).hexdigest()
+    for ledger in user_project_root(user_id).glob("*/paper/.paper_studio/api_usage.jsonl"):
+        persist_project_cost(DATA_ROOT, account, ledger.parents[2],
+                             float(usage_summary(ledger).get("estimated_cost_usd") or 0.0))
+    try:
+        return account_total(DATA_ROOT, account)
+    except UsageUnavailable as exc:
+        raise OnlineStudioError(str(exc)) from exc
 
 
 def require_under_spend_cap(user_id: str) -> None:
@@ -4141,16 +4153,32 @@ def require_under_spend_cap(user_id: str) -> None:
         )
 
 
-def create_session(
+@contextmanager
+def session_start_slot():
+    """Reserve capacity before analysis or process startup, releasing on every exit."""
+    global SESSION_START_RESERVATIONS
+    with SESSIONS_LOCK:
+        active = sum(item.process.poll() is None for item in SESSIONS.values())
+        if active + SESSION_START_RESERVATIONS >= MAX_ACTIVE_SESSIONS:
+            raise OnlineStudioError("Current online writing session is full; please try again later.")
+        SESSION_START_RESERVATIONS += 1
+    try:
+        yield
+    finally:
+        with SESSIONS_LOCK:
+            SESSION_START_RESERVATIONS -= 1
+
+
+def create_session(payload: dict[str, Any], *, user_id: str,
+                   progress: Callable[[str, str, int], None] | None = None) -> Session:
+    with session_start_slot():
+        return _create_session(payload, user_id=user_id, progress=progress)
+
+
+def _create_session(
     payload: dict[str, Any], *, user_id: str,
     progress: Callable[[str, str, int], None] | None = None,
 ) -> Session:
-    with SESSIONS_LOCK:
-        active_sessions = sum(
-            session.process.poll() is None for session in SESSIONS.values()
-        )
-    if active_sessions >= MAX_ACTIVE_SESSIONS:
-        raise OnlineStudioError("Current online writing session is full; please try again later.")
     require_under_spend_cap(user_id)
     api_key = shared_deepseek_api_key()
     provider = SHARED_PROVIDER
@@ -4161,55 +4189,57 @@ def create_session(
     if progress is not None:
         progress("validation", "Validating uploaded file…", 5)
     try:
-        if mode in {"materials", "lightweight"}:
-            project_brief_files = _decode_document_files(
-                payload.get("project_brief_files"),
-                label="Current work description",
-                required=True,
-                max_files=1,
-            )
-            if progress is not None:
-                progress(
-                    "reference_pdf",
-                    "Extracting and organizing the structure reference paper PDFs with DeepSeek.",
-                    8,
+        with usage_scope(root / "paper/.paper_studio/api_usage.jsonl"):
+            if mode in {"materials", "lightweight"}:
+                project_brief_files = _decode_document_files(
+                    payload.get("project_brief_files"),
+                    label="Current work description",
+                    required=True,
+                    max_files=1,
                 )
-            reference_paper_files = _decode_document_files(
-                payload.get("reference_paper_files"),
-                label="Structure reference paper",
-                required=True,
-                max_files=1,
-            )
-            _write_lightweight_workspace(
-                root,
-                venue=str(payload.get("venue") or ""),
-                project_name=str(payload.get("project_name") or ""),
-                title=str(payload.get("title") or ""),
-                scholar_files=[],
-                project_brief_files=project_brief_files,
-                # The hosted flow deliberately does not accept or analyze
-                # experiment results. Experiments onward remain plan-only.
-                results_files=[],
-                reference_paper_files=reference_paper_files,
-                api_key=api_key,
-                model=model,
-                progress=progress,
-            )
-        else:
-            files = _decode_html_files(payload.get("files")) if payload.get("files") else []
-            archive = _decode_evidence_archive(payload.get("evidence_archive"))
-            _write_workspace(
-                root,
-                files=files,
-                archive=archive,
-                api_key=api_key,
-                model=model,
-            )
-        if progress is not None:
-            progress("worker", "Starting Paper Studio service…", 96)
-        process, port = _start_worker(root, provider, model, api_key)
+                if progress is not None:
+                    progress(
+                        "reference_pdf",
+                        "Extracting and organizing the structure reference paper PDFs with DeepSeek.",
+                        8,
+                    )
+                reference_paper_files = _decode_document_files(
+                    payload.get("reference_paper_files"),
+                    label="Structure reference paper",
+                    required=True,
+                    max_files=1,
+                )
+                _write_lightweight_workspace(
+                    root,
+                    venue=str(payload.get("venue") or ""),
+                    project_name=str(payload.get("project_name") or ""),
+                    title=str(payload.get("title") or ""),
+                    scholar_files=[],
+                    project_brief_files=project_brief_files,
+                    # The hosted flow deliberately does not accept or analyze
+                    # experiment results. Experiments onward remain plan-only.
+                    results_files=[],
+                    reference_paper_files=reference_paper_files,
+                    api_key=api_key,
+                    model=model,
+                    progress=progress,
+                )
+            else:
+                files = _decode_html_files(payload.get("files")) if payload.get("files") else []
+                archive = _decode_evidence_archive(payload.get("evidence_archive"))
+                _write_workspace(
+                    root,
+                    files=files,
+                    archive=archive,
+                    api_key=api_key,
+                    model=model,
+                )
+            if progress is not None:
+                progress("worker", "Starting Paper Studio service…", 96)
+            process, port = _start_worker(root, provider, model, api_key)
     except Exception:
         if root.exists():
+            user_cumulative_cost_usd(user_id)
             shutil.rmtree(root)
         raise
     session = Session(session_id, user_id, root, provider, model, process, port, api_key)
@@ -4354,28 +4384,23 @@ def _ensure_session_alive(session: Session) -> bool:
     only if something actually
     restarts the child. This is that something.
     """
-    if session.process.poll() is None:
-        return True
-    if not session.api_key:
-        return False
-    try:
-        process, port = _start_worker(
-            session.root,
-            session.provider,
-            session.model,
-            session.api_key,
-            demo_mode=(session.kind == "demo"),
-        )
-    except Exception:
-        return False
-    with SESSIONS_LOCK:
+    with session.lifecycle_lock:
         if session.process.poll() is None:
-            # Another thread already respawned this session first.
-            process.terminate()
             return True
-        session.process = process
-        session.port = port
-    return True
+        if not session.api_key:
+            return False
+        try:
+            with session_start_slot():
+                process, port = _start_worker(
+                    session.root, session.provider, session.model, session.api_key,
+                    demo_mode=(session.kind == "demo"),
+                )
+                with SESSIONS_LOCK:
+                    session.process = process
+                    session.port = port
+        except Exception:
+            return False
+        return True
 
 
 def _record_session_access(session: Session, now: float | None = None) -> None:
@@ -4406,10 +4431,18 @@ def _project_last_access(root: Path) -> float | None:
 
 
 def _terminate_session(session: Session, *, delete_content: bool) -> None:
-    if session.process.poll() is None:
-        session.process.terminate()
-    if delete_content and session.kind == "user":
-        shutil.rmtree(session.root, ignore_errors=True)
+    with session.lifecycle_lock:
+        if session.process.poll() is None:
+            session.process.terminate()
+            try:
+                session.process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                session.process.kill()
+                session.process.wait(timeout=3)
+        if delete_content and session.kind == "user":
+            # Wait until no writer can append another charge before deleting.
+            user_cumulative_cost_usd(session.user_id)
+            shutil.rmtree(session.root, ignore_errors=True)
 
 
 def _expire_session(session: Session, *, now: float | None = None) -> bool:
@@ -4466,31 +4499,24 @@ def _session_from_cookie(
                 persisted_access is None
                 or time.time() - persisted_access > SESSION_IDLE_SECONDS
             ):
+                user_cumulative_cost_usd(user_id)
                 shutil.rmtree(root, ignore_errors=True)
                 return None
-            try:
-                api_key = shared_deepseek_api_key()
-                process, port = _start_worker(
-                    root, SHARED_PROVIDER, PROVIDERS[SHARED_PROVIDER][1], api_key
-                )
-            except Exception:
-                return None
-            recovered = Session(
-                session_id,
-                user_id,
-                root,
-                SHARED_PROVIDER,
-                PROVIDERS[SHARED_PROVIDER][1],
-                process,
-                port,
-                api_key,
-                last_access=persisted_access,
-            )
-            with SESSIONS_LOCK:
-                existing = SESSIONS.setdefault(session_id, recovered)
-            if existing is not recovered:
-                process.terminate()
-            session = existing
+            with SESSION_RECOVERY_LOCK:
+                with SESSIONS_LOCK:
+                    session = SESSIONS.get(session_id)
+                if session is None:
+                    try:
+                        with session_start_slot():
+                            api_key = shared_deepseek_api_key()
+                            process, port = _start_worker(root, SHARED_PROVIDER, PROVIDERS[SHARED_PROVIDER][1], api_key)
+                            session = Session(session_id, user_id, root, SHARED_PROVIDER,
+                                              PROVIDERS[SHARED_PROVIDER][1], process, port, api_key,
+                                              last_access=persisted_access)
+                            with SESSIONS_LOCK:
+                                SESSIONS[session_id] = session
+                    except Exception:
+                        return None
     if session is None:
         return None
     if not _ensure_session_alive(session):
@@ -4565,6 +4591,7 @@ def reset_session(header: str | None, *, user_id: str) -> bool:
             session_id.encode("utf-8")
         ).hexdigest()
         existed = root.exists()
+        user_cumulative_cost_usd(user_id)
         shutil.rmtree(root, ignore_errors=True)
         return existed
     return False
@@ -4602,6 +4629,10 @@ def _reap_expired_projects(*, now: float | None = None) -> int:
                 last_access is not None
                 and timestamp - last_access > SESSION_IDLE_SECONDS
             ):
+                ledger = project_root / "paper/.paper_studio/api_usage.jsonl"
+                persist_project_cost(DATA_ROOT, owner_root.name, project_root,
+                                     float(usage_summary(ledger).get("estimated_cost_usd") or 0.0))
+                account_total(DATA_ROOT, owner_root.name)
                 shutil.rmtree(project_root, ignore_errors=True)
                 removed += 1
     return removed
@@ -4610,8 +4641,11 @@ def _reap_expired_projects(*, now: float | None = None) -> int:
 def _reap_sessions() -> None:
     while True:
         time.sleep(60)
-        _reap_expired_sessions()
-        _reap_expired_projects()
+        try:
+            _reap_expired_sessions()
+            _reap_expired_projects()
+        except (OnlineStudioError, UsageUnavailable):
+            continue
         job_cutoff = time.time() - 1800
         with ONBOARDING_JOBS_LOCK:
             for job_id in [
@@ -4770,6 +4804,12 @@ class Handler(BaseHTTPRequestHandler):
         return cookie
 
     def do_GET(self) -> None:  # noqa: N802
+        try:
+            self._do_GET()
+        except (OnlineStudioError, UsageUnavailable) as exc:
+            self._json({"ok": False, "error": str(exc)}, 503)
+
+    def _do_GET(self) -> None:
         path = self.path.split("?", 1)[0]
         if path == "/":
             self._bytes((STATIC / "index.html").read_bytes(), "text/html; charset=utf-8")
@@ -4947,6 +4987,12 @@ class Handler(BaseHTTPRequestHandler):
                     self._proxy(session, upstream)
 
     def do_POST(self) -> None:  # noqa: N802
+        try:
+            self._do_POST()
+        except (OnlineStudioError, UsageUnavailable) as exc:
+            self._json({"ok": False, "error": str(exc)}, 503)
+
+    def _do_POST(self) -> None:
         path = self.path.split("?", 1)[0]
         if path in {"/api/auth/signup", "/api/auth/login"}:
             try:
@@ -5126,6 +5172,7 @@ class Handler(BaseHTTPRequestHandler):
         if (
             session.kind == "user"
             and self.command not in {"GET", "HEAD"}
+            and path.split("?", 1)[0] != "/api/full-draft/cancel"
             and user_cumulative_cost_usd(session.user_id) * USD_TO_RMB_RATE >= USER_SPEND_CAP_RMB
         ):
             self._json(

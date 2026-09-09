@@ -37,6 +37,7 @@ from typing import Any
 
 from research_avatar.survey_bibliography import verified_survey_bibliography
 
+from .account_usage import ensure_ledger_budget
 from .api_usage import append_usage, usage_record, usage_summary
 
 
@@ -3797,6 +3798,9 @@ def compile_table_preview(
     table_id: str, latex: str, output_dir: Path | None = None
 ) -> dict[str, Path]:
     """Compile the actual table LaTeX and rasterize that PDF for the browser."""
+    issues = online_latex_security_issues(latex)
+    if issues:
+        raise StudioError("Unsafe online table LaTeX: " + ", ".join(issues))
     for command in ("pdflatex", "pdfcrop", "pdftoppm"):
         if not shutil_which(command):
             raise StudioError(f"Cannot generate LaTeX table preview: missing {command}.")
@@ -3835,11 +3839,13 @@ def compile_table_preview(
                 ],
                 cwd=build_dir,
                 timeout=120,
+                environment=latex_compile_environment(),
             )
             run_checked(
                 ["pdfcrop", "--margins", "8", "preview.pdf", "cropped.pdf"],
                 cwd=build_dir,
                 timeout=120,
+                environment=latex_compile_environment(),
             )
             run_checked(
                 [
@@ -4889,6 +4895,9 @@ def validate_table_latex_source(
     table_id: str, latex: str, *, layout_mode: str | None = None
 ) -> str:
     source = latex.strip()
+    issues = online_latex_security_issues(source)
+    if issues:
+        raise StudioError("Unsafe online table LaTeX: " + ", ".join(issues))
     definition = TABLES[table_id]
     if not source:
         raise StudioError("Table LaTeX cannot be empty.")
@@ -7132,6 +7141,7 @@ def post_openai(
     payload: dict[str, Any], *, provider: str | None = None, operation: str = "paper_text"
 ) -> dict[str, Any]:
     """Call the selected text LLM and normalize it to a Responses-style record."""
+    ensure_ledger_budget(API_USAGE_FILE)
     provider = (provider or active_llm_provider()).strip().lower()
     config = provider_configuration(provider)
     api_key = os.environ.get(config["environment_variable"])
@@ -9793,6 +9803,18 @@ def section_budget_guidance(section: str) -> str:
     return " ".join(parts)
 
 
+def latex_compile_environment() -> dict[str, str]:
+    """Use the same restricted, credential-free environment for all online TeX."""
+    environment = {**os.environ, "LC_ALL": "C", "LANG": "C"}
+    if ONLINE_PROJECT_MODE:
+        # An allowlist also excludes future credentials and TeX search-path
+        # overrides rather than relying on a list of today's secret names.
+        allowed = {"PATH", "HOME", "TMPDIR", "TMP", "TEMP", "SYSTEMROOT", "LANG", "LC_ALL"}
+        environment = {key: value for key, value in environment.items() if key in allowed}
+        environment.update(openin_any="p", openout_any="p", shell_escape="0")
+    return environment
+
+
 def compile_paper() -> CompileResult:
     with COMPILE_LOCK:
         main = PAPER / "main.tex"
@@ -9806,16 +9828,7 @@ def compile_paper() -> CompileResult:
             return CompileResult(False, "\n".join(entrypoint_errors))
         if not shutil_which("latexmk"):
             return CompileResult(False, "latexmk is not available on PATH.")
-        compile_environment = {
-            **os.environ,
-            "LC_ALL": "C",
-            "LANG": "C",
-        }
-        if ONLINE_PROJECT_MODE:
-            # Kpathsea paranoid mode confines TeX reads/writes to the paper tree.
-            compile_environment.update(
-                {"openin_any": "p", "openout_any": "p", "shell_escape": "0"}
-            )
+        compile_environment = latex_compile_environment()
         command = [
             "latexmk",
             "-pdf",
@@ -11015,6 +11028,7 @@ def run_checked(
     cwd: Path,
     timeout: int = 360,
     job_token: str | None = None,
+    environment: dict[str, str] | None = None,
 ) -> str:
     if job_token is None:
         try:
@@ -11024,6 +11038,7 @@ def run_checked(
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                **({"env": environment} if environment is not None else {}),
             )
         except subprocess.TimeoutExpired as exc:
             raise StudioError("Plot command timed out.") from exc
@@ -14004,16 +14019,21 @@ class Handler(BaseHTTPRequestHandler):
             current_title=current_title,
             previous_response_id=editor.get("previous_response_id"),
         )
-        editor.update(
-            {
-                "prompt": prompt,
-                "candidate": candidate,
-                "previous_response_id": response_id,
-                "last_message": "GPT candidate Not saved yet; can continue editing, confirm before writing to LaTeX.",
-            }
-        )
-        state["model"] = model
-        save_state(state)
+        with FULL_DRAFT_JOB_LOCK:
+            state = load_state()
+            if draft_batch_running(state):
+                raise StudioError("Batch writing started during title generation; this title candidate was discarded.")
+            editor = state["title_editor"]
+            editor.update(
+                {
+                    "prompt": prompt,
+                    "candidate": candidate,
+                    "previous_response_id": response_id,
+                    "last_message": "GPT candidate Not saved yet; can continue editing, confirm before writing to LaTeX.",
+                }
+            )
+            state["model"] = model
+            save_state(state)
         self.send_json({"ok": True, "state": public_state(state)})
 
     def handle_title_save(self, body: dict[str, Any]) -> None:
@@ -15315,6 +15335,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_table_save(self, body: dict[str, Any]) -> None:
         table_id = self.require_table(body)
+        if is_hosted_placeholder_artifact(table_id):
+            raise StudioError(ONLINE_PLACEHOLDER_TABLE_MESSAGE)
         state = load_state()
         source = self.validate_table_latex(table_id, str(body.get("latex", "")))
         compile_table_preview(table_id, source)

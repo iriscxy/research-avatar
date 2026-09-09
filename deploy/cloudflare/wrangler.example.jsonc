@@ -8,9 +8,10 @@
   "version_metadata": {
     "binding": "CF_VERSION_METADATA"
   },
+  "vars": {"ONLINE_STUDIO_USAGE_URL": "https://research-avatar-studio.yingtaomj.workers.dev/internal/account-usage"},
   "containers": [
     {
-      "class_name": "OnlineStudioContainerV59",
+      "class_name": "OnlineStudioContainerV60",
       "image": "registry.cloudflare.com/CLOUDFLARE_ACCOUNT_ID/research-avatar-studio-onlinestudiocontainer:REPLACE_WITH_IMAGE_TAG",
       "instance_type": "standard-1",
       "max_instances": 6,
@@ -23,7 +24,7 @@
     "bindings": [
       {
         "name": "ONLINE_STUDIO",
-        "class_name": "OnlineStudioContainerV59"
+        "class_name": "OnlineStudioContainerV60"
       }
     ]
   },
@@ -305,6 +306,10 @@
     {
       "tag": "v60",
       "new_sqlite_classes": ["OnlineStudioContainerV59"]
+    },
+    {
+      "tag": "v61",
+      "new_sqlite_classes": ["OnlineStudioContainerV60"]
     }
   ]
 }

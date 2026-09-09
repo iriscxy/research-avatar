@@ -65,3 +65,16 @@ vm.runInContext('renderTitleEditor()', context);
 assert.equal(control('paper-title').disabled, true);
 assert.equal(control('title-gpt-prompt').disabled, true);
 console.log('Paper Studio UI state regressions passed');
+
+// Untrusted section titles must stay text; parsing them as HTML is a regression.
+const titlePayload = '<img src=x onerror="document.title=\'QA-XSS-MARKER\'">';
+const sectionChildren = [];
+const sectionsRoot = { set innerHTML(value) { assert.equal(value, ''); }, appendChild(child) { sectionChildren.push(child); } };
+const sectionContext = vm.createContext({
+  state: { sections: { qa: { title: titlePayload } } }, activeSection: 'qa', activeView: 'writing',
+  $: () => sectionsRoot,
+  document: { createElement(tag) { return { tag, children: [], appendChild(child) { this.children.push(child); }, set innerHTML(_value) { throw new Error('Section content must not be parsed as HTML'); } }; } },
+});
+vm.runInContext(definition('renderSections') + '\nrenderSections()', sectionContext);
+assert.equal(sectionChildren[0].textContent, titlePayload);
+assert.equal(sectionChildren[0].children[0].tag, 'span');

@@ -569,7 +569,10 @@ function renderSections() {
     const button = document.createElement("button");
     button.className = "section-button" + (key === activeSection ? " active" : "");
     const dot = section.conversation_active ? "active" : "";
-    button.innerHTML = `${section.title}<span class="dot ${dot}"></span>`;
+    button.textContent = section.title;
+    const indicator = document.createElement("span");
+    indicator.className = `dot ${dot}`;
+    button.appendChild(indicator);
     button.onclick = () => {
       activeSection = key;
       activeView = "writing";

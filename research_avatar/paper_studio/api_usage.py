@@ -4,9 +4,29 @@ from __future__ import annotations
 
 import json
 import threading
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from research_avatar.paper_studio.account_usage import persist_ledger_total, ensure_ledger_budget
+
+
+_SCOPED_LEDGER = ContextVar("online_onboarding_ledger", default=None)
+
+
+@contextmanager
+def usage_scope(path: Path):
+    token = _SCOPED_LEDGER.set(path)
+    try:
+        yield
+    finally:
+        _SCOPED_LEDGER.reset(token)
+
+
+def scoped_usage_file() -> Path | None:
+    return _SCOPED_LEDGER.get()
 
 
 PRICING_AS_OF = "2026-08-16"
@@ -119,6 +139,7 @@ def append_usage(path: Path, record: dict[str, Any]) -> None:
     with _LOCK, path.open("a", encoding="utf-8") as handle:
         handle.write(line)
         handle.flush()
+    persist_ledger_total(path, usage_summary(path)["estimated_cost_usd"])
 
 
 def summarize_records(records: list[dict[str, Any]]) -> dict[str, Any]:
