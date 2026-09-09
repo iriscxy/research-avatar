@@ -3,6 +3,7 @@ import io
 import os
 import re
 import signal
+import shutil
 import subprocess
 import threading
 import time
@@ -65,6 +66,23 @@ from research_avatar.paper_studio.server import (
 
 
 class PaperStudioTests(unittest.TestCase):
+    def test_abstract_title_cleanup_only_removes_exact_standalone_titles(self):
+        with (
+            patch.object(studio, "PROJECT_METADATA", {"initial_title": "Original QA Title"}),
+            patch.object(studio, "manuscript_title_display", return_value="Revised QA Title"),
+        ):
+            for title in ("Original QA Title", "Revised QA Title", r"\textbf{Original QA Title}"):
+                self.assertEqual(studio.strip_redundant_abstract_title(title + "\n\nWe evaluate title normalization."), "We evaluate title normalization.")
+            for prose in ("Original QA Title is our working name.\nWe evaluate it.", "Original QA Title", "A different heading\nWe evaluate it."):
+                self.assertEqual(studio.strip_redundant_abstract_title(prose), prose)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js is required for UI state tests")
+    def test_ui_title_and_background_job_control_states(self):
+        subprocess.run(
+            ["node", str(studio.ROOT / "tests/paper_studio_ui_state.cjs")],
+            check=True, capture_output=True, text=True,
+        )
+
     def test_http_server_accepts_browser_asset_bursts(self):
         self.assertGreaterEqual(studio.StudioHTTPServer.request_queue_size, 32)
 

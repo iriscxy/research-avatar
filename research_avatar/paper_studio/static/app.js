@@ -523,6 +523,10 @@ function updateTitleSaveButton() {
   $("title-save").disabled = titleBusy || !changed;
   $("title-save").textContent = changed ? "Confirm writing to LaTeX" : "Written to PDF";
   $("title-save").title = changed ? "Update LaTeX after confirmation and recompile the PDF." : "The current title has been written into the PDF.";
+  if (!changed && !state?.pdf?.exists) {
+    $("title-save").textContent = "Current title";
+    $("title-save").title = "The title is saved in the manuscript; compile the paper to create a PDF.";
+  }
 }
 
 function setTitleBusy(busy, message = "") {
@@ -545,6 +549,8 @@ function renderTitleEditor(force = false) {
   const editor = state.title_editor || {};
   const titleInput = $("paper-title");
   const promptInput = $("title-gpt-prompt");
+  titleInput.disabled = titleBusy;
+  promptInput.disabled = titleBusy;
   $("title-current-summary").textContent = editor.current_title || "Title not found.";
   renderTitleDraftInput(titleInput, "title", editor.candidate || editor.current_title || "", force);
   renderTitleDraftInput(promptInput, "prompt", editor.prompt || "", force);
@@ -1038,6 +1044,7 @@ function updateFigureButtonStates() {
   });
   // Preview load callbacks also refresh these controls after render() returns.
   applyReadOnlyDemoRestrictions();
+  applyDraftJobRestrictions();
 }
 
 function renderSingleDataFigure(figure) {
@@ -1710,6 +1717,21 @@ function applyReadOnlyDemoRestrictions() {
     .forEach((element) => { element.disabled = true; });
 }
 
+function applyDraftJobRestrictions() {
+  const running = [state?.full_draft?.job, state?.section_draft?.job]
+    .some((job) => job?.status === "running");
+  if (!running) return;
+  // A workspace switch or a preview load must not unlock mutations while a
+  // background writer owns the manuscript. Navigation and export remain usable.
+  DEMO_READ_ONLY_CONTROL_IDS.filter((id) => id !== "full-draft-cancel")
+    .forEach((id) => {
+      const element = $(id);
+      if (element) element.disabled = true;
+    });
+  document.querySelectorAll(".figure-actions button, .data-panel-actions button")
+    .forEach((element) => { element.disabled = true; });
+}
+
 function render() {
   syncProseDraftProject();
   syncTitleDraftProject();
@@ -1797,6 +1819,7 @@ function render() {
     $("section-title").textContent = activeView === "tables" ? "Tables" : "Figures";
     renderFigures();
     applyReadOnlyDemoRestrictions();
+    applyDraftJobRestrictions();
     return;
   }
   $("section-kicker").textContent = "SECTION";
@@ -1854,6 +1877,9 @@ function render() {
   $("candidate").disabled = planningOnly;
   $("comment").disabled = planningOnly;
   $("generate").disabled = !paragraph || planningOnly;
+  $("generate").textContent = candidate || paragraph?.accepted_text
+    ? "Revise paragraph"
+    : "Generate paragraph";
   const gate = $("gate");
   gate.textContent = planningOnly
     ? "Experiment results not uploaded: starting from Experiments only display the main idea of each section, writing task, and pending experiments, without invoking LLM to generate the main text."
@@ -1919,6 +1945,7 @@ function render() {
       ? `One click generate current Section (${sectionPending} Paragraph to be completed).`
       : "The current section is complete.";
   applyReadOnlyDemoRestrictions();
+  applyDraftJobRestrictions();
 }
 
 function renderFullDraft() {
@@ -2306,7 +2333,7 @@ async function acceptCurrent() {
     }
     const revisingAccepted = Boolean(paragraph.accepted_text);
     acceptedParagraphId = paragraph.id;
-    setBusy(true, "Verifying citations; if missing will fetch online update BibTeX then write into LaTeX and compile.");
+    setBusy(true, "Checking the paragraph, writing LaTeX, and compiling the PDF…");
     const payload = await request("/api/accept", {
       method: "POST",
       body: JSON.stringify({

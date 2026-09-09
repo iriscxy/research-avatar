@@ -152,6 +152,9 @@ class OnlineStudioError(RuntimeError):
 _EXPORT_EXCLUDED_DIR_NAMES = {"__pycache__", ".git"}
 _EXPORT_EXCLUDED_FILE_SUFFIXES = {".pyc", ".pyo"}
 _EXPORT_EXCLUDED_FILE_NAMES = {".DS_Store"}
+_EXPORT_LATEX_BUILD_ENDINGS = (
+    ".aux", ".bbl", ".blg", ".fdb_latexmk", ".fls", ".out", ".synctex.gz",
+)
 
 
 def _project_zip_bytes(root: Path) -> bytes:
@@ -170,6 +173,14 @@ def _project_zip_bytes(root: Path) -> bytes:
         if _EXPORT_EXCLUDED_DIR_NAMES.intersection(relative_parts[:-1]):
             continue
         if path.suffix in _EXPORT_EXCLUDED_FILE_SUFFIXES or path.name in _EXPORT_EXCLUDED_FILE_NAMES:
+            continue
+        if (
+            len(relative_parts) == 2 and relative_parts[0] == "paper"
+            and path.name.startswith("main.")
+            and path.name.endswith(_EXPORT_LATEX_BUILD_ENDINGS)
+        ):
+            # Compiler dependency caches contain server-specific paths and can
+            # make a downloaded project incorrectly appear already built.
             continue
         try:
             size = path.stat().st_size

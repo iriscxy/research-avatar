@@ -2496,9 +2496,9 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
-        self.assertIn('"class_name": "OnlineStudioContainerV58"', wrangler)
+        self.assertIn('"class_name": "OnlineStudioContainerV59"', wrangler)
         self.assertIn('"regions": ["APAC"]', wrangler)
-        self.assertIn("export class OnlineStudioContainerV58", worker)
+        self.assertIn("export class OnlineStudioContainerV59", worker)
         self.assertNotIn('getContainer(env.ONLINE_STUDIO, "public-studio-', worker)
 
     def test_cloudflare_worker_forwards_only_deepseek_secret_to_container(self):
@@ -2734,6 +2734,8 @@ class OnlineStudioTests(unittest.TestCase):
             root = Path(directory)
             (root / "paper").mkdir()
             (root / "paper/main.tex").write_text("paper", encoding="utf-8")
+            for ending in online._EXPORT_LATEX_BUILD_ENDINGS:
+                (root / ("paper/main" + ending)).write_text("server build cache", encoding="utf-8")
             (root / "scripts/__pycache__").mkdir(parents=True)
             (root / "scripts/__pycache__/tool.cpython-312.pyc").write_bytes(b"\x00")
             (root / "scripts/tool.pyc").write_bytes(b"\x00")

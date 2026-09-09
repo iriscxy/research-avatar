@@ -9067,6 +9067,8 @@ evidence.{(
     # emit biblatex macros or fresh TeX punctuation. Send its final output
     # through the same canonical ingestion boundary as every other response.
     text = normalize_latex_ready_text(text)
+    if section_meta.get("render") == "abstract":
+        text = strip_redundant_abstract_title(text)
     for managed_label in (
         str(section_meta.get("start_label") or ""),
         str(section_meta.get("end_label") or ""),
@@ -9170,6 +9172,8 @@ evidence.{(
                 "GPT After correction, still contains LaTeX risk characters."
                 + "; ".join(remaining_issues)
             )
+    if section_meta.get("render") == "abstract":
+        text = strip_redundant_abstract_title(text)
     final_reference_error = artifact_reference_error(text, bound_artifacts)
     if final_reference_error:
         raise StudioError(final_reference_error)
@@ -9238,6 +9242,27 @@ def normalize_plain_title(title: str) -> str:
     if "\\" in normalized or "{" in normalized or "}" in normalized:
         raise StudioError("Please enter the title as plain text, do not include LaTeX commands or curly braces.")
     return normalized
+
+
+def strip_redundant_abstract_title(text: str) -> str:
+    """Remove an exact standalone manuscript title echoed before an abstract."""
+    titles = {
+        str(PROJECT_METADATA.get("initial_title") or ""),
+        str(PROJECT_METADATA.get("name") or ""),
+    }
+    try:
+        titles.add(manuscript_title_display())
+    except StudioError:
+        pass
+    first, separator, remainder = text.strip().partition("\n")
+    if not separator or not remainder.strip():
+        return text
+    title_line = re.sub(r"^#{1,6}\s+", "", first.strip())
+    title_line = re.sub(r"^\\(?:textbf|emph)\{([^{}]*)\}$", r"\1", title_line)
+    canonical = lambda value: re.sub(r"\s+", " ", value).strip().casefold()
+    if canonical(title_line) in {canonical(title) for title in titles if title}:
+        return remainder.lstrip()
+    return text
 
 
 def latex_escape_title(title: str) -> str:
