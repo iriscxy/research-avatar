@@ -19,6 +19,7 @@ import os
 import re
 import secrets
 import shutil
+import signal
 import socket
 import sqlite3
 import subprocess
@@ -5235,6 +5236,11 @@ class Handler(BaseHTTPRequestHandler):
         self._write_body(data)
 
 
+def _handle_shutdown_signal(signum: int, frame: Any) -> None:
+    """Exit through main's cleanup even when Python is container PID 1."""
+    raise SystemExit(0)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the private Online Paper Studio gateway.")
     parser.add_argument("--host", default="127.0.0.1")
@@ -5248,11 +5254,13 @@ def main() -> None:
     server = OnlineServer((args.host, args.port), Handler)
     print(f"Online Paper Studio: http://{args.host}:{args.port}")
     print(f"Session data: {DATA_ROOT}")
+    previous_sigterm = signal.signal(signal.SIGTERM, _handle_shutdown_signal)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nOnline Paper Studio stopped.")
     finally:
+        signal.signal(signal.SIGTERM, previous_sigterm)
         server.server_close()
         with SESSIONS_LOCK:
             for session in SESSIONS.values():

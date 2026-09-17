@@ -6,7 +6,8 @@ const esbuild = require('../deploy/cloudflare/node_modules/esbuild');
 const source = fs.readFileSync(path.join(__dirname, '../deploy/cloudflare/index.ts'), 'utf8');
 const compiled = esbuild.transformSync(source, { loader: 'ts', format: 'cjs' }).code;
 const moduleObject = { exports: {} };
-const context = { module: moduleObject, exports: moduleObject.exports, require: () => ({ Container: class {} }), Request, Response, Headers, URL, console, TextEncoder, TextDecoder, crypto: require('node:crypto').webcrypto };
+const containerNames = [];
+const context = { module: moduleObject, exports: moduleObject.exports, require: () => ({ Container: class {}, getContainer(_namespace, name) { containerNames.push(name); return { fetch: async () => new Response('ok') }; } }), Request, Response, Headers, URL, console, TextEncoder, TextDecoder, crypto: require('node:crypto').webcrypto };
 vm.runInNewContext(compiled, context);
 const worker = moduleObject.exports.default;
 const amounts = new Map();
@@ -39,5 +40,9 @@ const call = (body, authorized = true) => worker.fetch(new Request('https://exam
   assert.equal((await (await call({ account: 'c'.repeat(64), projects: [] })).json()).amount, 0);
   assert.equal((await call({ account, projects: [{ id: project, amount: -1 }] })).status, 503);
   assert.equal((await call({ account, projects: [], padding: 'x'.repeat(70_000) })).status, 503);
+  for (const version of ['first-release', 'next-release']) {
+    await worker.fetch(new Request('https://example.invalid/api/online/health'), { ...env, CF_VERSION_METADATA: { id: version }, ONLINE_STUDIO_INSTANCE_NAME: 'existing-production-instance' });
+  }
+  assert.deepEqual(containerNames, ['existing-production-instance', 'existing-production-instance']);
   console.log('Worker usage authentication, bounds, isolation and retries passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -20,6 +20,7 @@ interface Env {
   // envVars literal below, which is baked into the deployed Worker bundle.
   DEEPSEEK_API_KEY?: string;
   ONLINE_STUDIO_USAGE_URL?: string;
+  ONLINE_STUDIO_INSTANCE_NAME?: string;
 }
 
 interface User {
@@ -37,7 +38,7 @@ export class OnlineStudioContainer extends Container<Env> {
     ONLINE_STUDIO_PUBLIC_REGISTRATION: "1",
     ONLINE_STUDIO_TRUST_PROXY_AUTH: "1",
     ONLINE_STUDIO_IDLE_SECONDS: "14400",
-    ONLINE_STUDIO_MAX_SESSIONS: "10",
+    ONLINE_STUDIO_MAX_SESSIONS: "2",
   };
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -53,140 +54,7 @@ export class OnlineStudioContainer extends Container<Env> {
   }
 }
 
-// V2 through V29 (one per past rollout) were retired via a "v31"
-// deleted_classes migration in wrangler.jsonc/wrangler.example.jsonc --
-// each was an empty pass-through subclass with no traffic once superseded,
-// so their Durable Object storage was safe to reclaim. The base
-// OnlineStudioContainer class stays: V30 still extends it, and
-// deleted_classes only tears down the Durable Object namespace/data, not
-// the source class other exports depend on.
-
-// Table-generate-race release: a real user reported clicking into a second
-// table right after the first left it stuck "pending" forever.
-// scheduleAutomaticTableGenerate marked a table "attempted" before learning
-// whether the shared figureRequestBusy lock (still held by another
-// in-flight table/figure request) silently dropped its own call -- so it
-// could never retry. Now un-marks it and lets a later render retry once
-// the lock clears. Rotate proactively per the established pattern.
-export class OnlineStudioContainerV30 extends OnlineStudioContainer {}
-
-// Shared-DeepSeek-key release: updating a class's image tag alone does not
-// restart already-running instances of that class -- they keep serving the
-// previous image until sleepAfter (2h) or a natural cycle. Rotating to a
-// fresh class forces Cloudflare to start new instances immediately, so the
-// shared-key/spend-cap/demo-view-only changes actually go live right away.
-export class OnlineStudioContainerV31 extends OnlineStudioContainer {}
-
-// The DEEPSEEK_API_KEY secret was only just set (wrangler secret put) and
-// OnlineStudioContainer's constructor only merges it into envVars once, at
-// construction time -- already-running V31 instances started before the
-// secret existed. Rotate again so the next instances actually pick it up.
-export class OnlineStudioContainerV32 extends OnlineStudioContainer {}
-
-// Demo double-click-to-source-line release: DEMO_SAFE_WRITE_PATHS lets
-// /api/pdf/locate through the demo's read-only gate.
-export class OnlineStudioContainerV33 extends OnlineStudioContainer {}
-
-// Compile-lock release: compile_paper() now serializes concurrent
-// latexmk/bibtex runs instead of letting them race on the same
-// main.aux/main.bbl. Also gives the shared Demo session a clean directory,
-// clearing any corruption left by the race this fixes.
-export class OnlineStudioContainerV34 extends OnlineStudioContainer {}
-
-// The V34 image still had the actual bug: a stale main.aux/main.bbl left
-// over from local latexmk testing in the tracked demo project directory
-// got baked into the image (see the .dockerignore fix), so every fresh
-// Demo session's first compile still hit "missing \item" regardless of
-// the compile lock. This rotation ships the image built after cleaning
-// those artifacts and closing the .dockerignore gap that let it recur.
-export class OnlineStudioContainerV35 extends OnlineStudioContainer {}
-
-// Rotated the DEEPSEEK_API_KEY secret (previous key was revoked/expired).
-// Same as before: already-running instances were constructed with the old
-// value baked into envVars, so a fresh class is needed to pick up the new
-// secret.
-export class OnlineStudioContainerV36 extends OnlineStudioContainer {}
-
-// Raised ONLINE_STUDIO_MAX_SESSIONS 2 -> 10: the old cap counted any
-// session with a live child process, not just active ones, and my own
-// verification testing alone was enough to fill it and block a real user.
-export class OnlineStudioContainerV37 extends OnlineStudioContainer {}
-
-// Landing page no longer auto-redirects into /studio; Paper Studio's
-// sidebar now shows the project's structural reference paper.
-export class OnlineStudioContainerV38 extends OnlineStudioContainer {}
-
-// Dropped the technical scaffold subtitle now that the sidebar shows the
-// reference paper directly.
-export class OnlineStudioContainerV39 extends OnlineStudioContainer {}
-
-// Online-authoring boundary release: keep prose, editable tables, and Python
-// data figures interactive; render mechanism and unsupported figure kinds as
-// inert caption/label placeholders until the project is exported locally.
-export class OnlineStudioContainerV40 extends OnlineStudioContainer {}
-
-// Placeholder phase/cachebuster release. A fresh class guarantees Cloudflare
-// starts this image instead of retaining an already-running V40 instance.
-export class OnlineStudioContainerV41 extends OnlineStudioContainer {}
-
-// Read-only demo and sidebar-cleanup release: the public demo embeds the exact
-// Paper Studio UI but exposes no editable fields, write actions, or escape link;
-// both local and online Studio sidebars also omit the scaffold subtitle and
-// reference-paper author line.
-export class OnlineStudioContainerV42 extends OnlineStudioContainer {}
-
-// Full-fidelity demo release: demo sessions expose the completed local
-// Paper Studio artifact set (real mechanism/data figures and tables) while
-// the gateway and UI keep the entire surface read-only.
-export class OnlineStudioContainerV43 extends OnlineStudioContainer {}
-
-// Immersive embedded-writing release: the Demo keeps Paper Studio inside the
-// six-stage Research Studio shell, compresses navigation, and gives the editor
-// the rest of the viewport instead of opening a separate page.
-export class OnlineStudioContainerV44 extends OnlineStudioContainer {}
-export class OnlineStudioContainerV45 extends OnlineStudioContainer {}
-
-// Unified-workflow release: rotating the class is required because updating
-// an image tag does not restart a live Container instance. Without this, the
-// Worker reports a successful deploy while continuing to serve stale assets.
-export class OnlineStudioContainerV46 extends OnlineStudioContainer {}
-
-// Runtime-module recovery: V46 was provisioned from an image that exited
-// before binding its port. A fresh class avoids routing through that failed
-// application's stuck image rollout and starts only the verified image.
-export class OnlineStudioContainerV47 extends OnlineStudioContainer {}
-
-// DeepSeek-only PDF extraction release: the hosted service intentionally has
-// no OpenAI secret; layout extraction plus semantic ordering uses DeepSeek.
-export class OnlineStudioContainerV48 extends OnlineStudioContainer {}
-
-// DeepSeek PDF pipeline image release: rotate again so the container runs the
-// image containing layout extraction and no longer checks for an OpenAI key.
-export class OnlineStudioContainerV49 extends OnlineStudioContainer {}
-export class OnlineStudioContainerV50 extends OnlineStudioContainer {}
-export class OnlineStudioContainerV51 extends OnlineStudioContainer {}
-// Demo-paper and embedded-language release. Rotate the class so an existing
-// V51 instance cannot continue serving its previous image and static assets.
-export class OnlineStudioContainerV52 extends OnlineStudioContainer {}
-// Demo metrics packaging release. V52 was built without the metrics file that
-// its bundled paper_studio.json requires, so a fresh class is mandatory.
-export class OnlineStudioContainerV53 extends OnlineStudioContainer {}
-// DeepSeek-only APAC placement release. Rotate the class so traffic cannot
-// remain attached to an already-running V53 instance in Europe or America.
-export class OnlineStudioContainerV54 extends OnlineStudioContainer {}
-// Read-only editor-navigation release. Rotate to ship the Paper Studio bundle
-// that hides its nested language control and permits transient PDF navigation.
-export class OnlineStudioContainerV55 extends OnlineStudioContainer {}
-// Automatic figure completion and venue-length release. Rotate the class so
-// live V55 instances cannot keep serving the previous Paper Studio bundle.
-export class OnlineStudioContainerV56 extends OnlineStudioContainer {}
-// Runtime packaging repair: the online gateway imports figure_contract, which
-// must be present in both application and site-packages roots in the image.
-export class OnlineStudioContainerV57 extends OnlineStudioContainer {}
-// PDF navigation, responsive layout, and read-only demo interaction fixes.
-export class OnlineStudioContainerV58 extends OnlineStudioContainer {}
-export class OnlineStudioContainerV59 extends OnlineStudioContainer {}
-export class OnlineStudioContainerV60 extends OnlineStudioContainer {}
+// Keep the existing production class stable; retire old classes with migrations.
 export class OnlineStudioContainerV61 extends OnlineStudioContainer {}
 
 function json(payload: unknown, status = 200, cookie?: string): Response {
@@ -571,10 +439,10 @@ function identityHeaders(request: Request, user: User | null): Headers {
 }
 
 function studioContainer(env: Env) {
-  // A named container can survive a Worker/image deployment. Scope the name to
-  // the immutable Worker version so every release starts from the matching
-  // bundled demo project instead of serving a stale prior image indefinitely.
-  return getContainer(env.ONLINE_STUDIO, `public-studio-${env.CF_VERSION_METADATA.id}`);
+  // Keep one stable instance across Worker releases. Image changes are applied
+  // by the container application's rollout; a new DO per release leaves old
+  // instances running and charging independently of the new release.
+  return getContainer(env.ONLINE_STUDIO, env.ONLINE_STUDIO_INSTANCE_NAME || "public-studio");
 }
 
 async function proxy(request: Request, env: Env, user: User | null): Promise<Response> {

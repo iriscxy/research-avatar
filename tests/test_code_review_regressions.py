@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import tempfile
 import threading
@@ -18,6 +19,25 @@ from research_avatar.paper_studio.api_usage import append_usage
 
 
 class ReviewRegressions(unittest.TestCase):
+    def test_gateway_sigterm_exits_through_server_and_worker_cleanup(self):
+        server = MagicMock()
+        child = MagicMock()
+        child.process.poll.return_value = None
+        handlers = {}
+
+        def install(signum, handler):
+            handlers[signum] = handler
+            return signal.SIG_DFL
+
+        server.serve_forever.side_effect = lambda: handlers[signal.SIGTERM](signal.SIGTERM, None)
+        with tempfile.TemporaryDirectory() as tmp, patch.object(online, 'DATA_ROOT', Path(tmp)), patch.object(online, 'OnlineServer', return_value=server), patch.object(online.threading, 'Thread'), patch.object(online.signal, 'signal', side_effect=install), patch.object(online.sys, 'argv', ['online-studio']), patch.dict(online.SESSIONS, {'qa': child}, clear=True), patch.object(online, 'DEMO_SESSION', None):
+            with self.assertRaises(SystemExit) as stopped:
+                online.main()
+        self.assertEqual(stopped.exception.code, 0)
+        server.server_close.assert_called_once()
+        child.process.terminate.assert_called_once()
+        self.assertEqual(handlers[signal.SIGTERM], signal.SIG_DFL)
+
     def test_online_table_rejects_file_reads_before_starting_any_tool(self):
         source = r'\begin{table}\caption{QA}\label{tab:qa}\input{/tmp/qa-marker}\end{table}'
         with patch.object(studio, 'ONLINE_PROJECT_MODE', True), patch.object(studio, 'TABLES', {'TQA': {'label': 'tab:qa'}}), patch.object(studio, 'run_checked') as run:

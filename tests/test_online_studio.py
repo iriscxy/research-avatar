@@ -2486,14 +2486,17 @@ class OnlineStudioTests(unittest.TestCase):
             server.server_close()
             thread.join(timeout=5)
 
-    def test_cloudflare_release_uses_version_scoped_container(self):
-        """A deploy must not keep serving the prior image's demo snapshot."""
+    def test_cloudflare_release_reuses_a_single_bounded_container(self):
+        """Releases must not create independently billable container instances."""
         root = Path(__file__).resolve().parents[1]
         worker = (root / "deploy/cloudflare/index.ts").read_text(encoding="utf-8")
         wrangler = (root / "deploy/cloudflare/wrangler.example.jsonc").read_text(
             encoding="utf-8"
         )
-        self.assertIn("env.CF_VERSION_METADATA.id", worker)
+        self.assertNotIn("env.CF_VERSION_METADATA.id", worker)
+        self.assertIn('getContainer(env.ONLINE_STUDIO, env.ONLINE_STUDIO_INSTANCE_NAME || "public-studio")', worker)
+        self.assertIn('"instance_type": "basic"', wrangler)
+        self.assertIn('"max_instances": 1', wrangler)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
         self.assertIn('"class_name": "OnlineStudioContainerV61"', wrangler)

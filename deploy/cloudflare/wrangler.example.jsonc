@@ -8,13 +8,16 @@
   "version_metadata": {
     "binding": "CF_VERSION_METADATA"
   },
-  "vars": {"ONLINE_STUDIO_USAGE_URL": "https://research-avatar-studio.yingtaomj.workers.dev/internal/account-usage"},
+  "vars": {
+    "ONLINE_STUDIO_INSTANCE_NAME": "public-studio-ef9e705f-a0ff-4051-a590-7aea8af80841",
+    "ONLINE_STUDIO_USAGE_URL": "https://research-avatar-studio.yingtaomj.workers.dev/internal/account-usage"
+  },
   "containers": [
     {
       "class_name": "OnlineStudioContainerV61",
       "image": "registry.cloudflare.com/CLOUDFLARE_ACCOUNT_ID/research-avatar-studio-onlinestudiocontainer:REPLACE_WITH_IMAGE_TAG",
-      "instance_type": "standard-1",
-      "max_instances": 6,
+      "instance_type": "basic",
+      "max_instances": 1,
       "constraints": {
         "regions": ["APAC"]
       }
@@ -314,6 +317,42 @@
     {
       "tag": "v62",
       "new_sqlite_classes": ["OnlineStudioContainerV61"]
+    },
+    {
+      "tag": "v63",
+      "deleted_classes": [
+        "OnlineStudioContainerV30",
+        "OnlineStudioContainerV31",
+        "OnlineStudioContainerV32",
+        "OnlineStudioContainerV33",
+        "OnlineStudioContainerV34",
+        "OnlineStudioContainerV35",
+        "OnlineStudioContainerV36",
+        "OnlineStudioContainerV37",
+        "OnlineStudioContainerV38",
+        "OnlineStudioContainerV39",
+        "OnlineStudioContainerV40",
+        "OnlineStudioContainerV41",
+        "OnlineStudioContainerV42",
+        "OnlineStudioContainerV43",
+        "OnlineStudioContainerV44",
+        "OnlineStudioContainerV45",
+        "OnlineStudioContainerV46",
+        "OnlineStudioContainerV47",
+        "OnlineStudioContainerV48",
+        "OnlineStudioContainerV49",
+        "OnlineStudioContainerV50",
+        "OnlineStudioContainerV51",
+        "OnlineStudioContainerV52",
+        "OnlineStudioContainerV53",
+        "OnlineStudioContainerV54",
+        "OnlineStudioContainerV55",
+        "OnlineStudioContainerV56",
+        "OnlineStudioContainerV57",
+        "OnlineStudioContainerV58",
+        "OnlineStudioContainerV59",
+        "OnlineStudioContainerV60"
+      ]
     }
   ]
 }
