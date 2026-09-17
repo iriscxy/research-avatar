@@ -108,7 +108,7 @@ def ensure_ledger_budget(path: Path) -> None:
         return
     if len(parts) != 6 or parts[0] != "projects":
         return
-    cap = float(os.environ.get("ONLINE_STUDIO_SPEND_CAP_RMB", "200"))
+    cap = float(os.environ.get("ONLINE_STUDIO_SPEND_CAP_RMB", "5"))
     rate = float(os.environ.get("ONLINE_STUDIO_USD_TO_RMB_RATE", "7.2"))
     if account_total(root, parts[1]) * rate >= cap:
         raise UsageUnavailable("Account usage limit reached; export your project to continue locally.")

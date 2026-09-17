@@ -50,12 +50,24 @@ class ApiUsageTests(unittest.TestCase):
             operation="test",
         )
         self.assertEqual(record["input_tokens"], 12)
-        # 10 uncached-input * 0.44 + 2 cached-input * 0.014 + 3 output * 1.32,
+        # 10 uncached-input * 0.30 + 2 cached-input * 0.006 + 3 output * 1.20,
         # per-million-token peak rates from api_usage.DEEPSEEK_PRICING.
-        self.assertAlmostEqual(record["estimated_cost_usd"], 8.388e-6)
+        self.assertAlmostEqual(record["estimated_cost_usd"], 6.612e-6)
+        self.assertEqual(record["pricing_as_of"], "2026-09-17")
         summary = summarize_records([record])
         self.assertTrue(summary["is_complete_estimate"])
         self.assertEqual(summary["unpriced_calls"], 0)
+
+    def test_current_and_legacy_flash_names_share_pricing(self):
+        for model in ("deepseek-flash", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp"):
+            with self.subTest(model=model):
+                record = usage_record(
+                    {"model": model, "usage": {"prompt_tokens": 1_000_000,
+                     "prompt_tokens_details": {"cached_tokens": 500_000},
+                     "completion_tokens": 100_000}},
+                    provider="deepseek", requested_model="deepseek-v4-flash", operation="test",
+                )
+                self.assertEqual(record["estimated_cost_usd"], 0.273)
 
     def test_unrecognized_deepseek_model_stays_an_explicit_unpriced_call(self):
         record = usage_record(

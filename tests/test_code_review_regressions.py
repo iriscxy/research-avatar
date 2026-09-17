@@ -19,6 +19,25 @@ from research_avatar.paper_studio.api_usage import append_usage
 
 
 class ReviewRegressions(unittest.TestCase):
+    def test_default_five_rmb_allowance_applies_before_each_model_call(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {
+            'ONLINE_STUDIO_DATA_ROOT': tmp, 'ONLINE_STUDIO_USAGE_URL': '',
+            'ONLINE_STUDIO_USD_TO_RMB_RATE': '7.2',
+        }):
+            os.environ.pop('ONLINE_STUDIO_SPEND_CAP_RMB', None)
+            root = Path(tmp)
+            account = 'a' * 64
+            project = root / 'projects' / account / 'qa-session'
+            ledger = project / 'paper/.paper_studio/api_usage.jsonl'
+            billing.persist_project_cost(root, account, project, 0.69)
+            billing.ensure_ledger_budget(ledger)
+            billing.persist_project_cost(root, account, project, 0.70)
+            with self.assertRaises(billing.UsageUnavailable):
+                billing.ensure_ledger_budget(ledger)
+            # A different project cannot bypass the same account allowance.
+            with self.assertRaises(billing.UsageUnavailable):
+                billing.ensure_ledger_budget(root / 'projects' / account / 'new/paper/.paper_studio/api_usage.jsonl')
+
     def test_gateway_sigterm_exits_through_server_and_worker_cleanup(self):
         server = MagicMock()
         child = MagicMock()

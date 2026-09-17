@@ -48,19 +48,23 @@ OPENAI_PRICING: dict[str, dict[str, Any]] = {
         "source": "https://developers.openai.com/api/docs/models/gpt-4o-mini",
     },
 }
-# DeepSeek publishes off-peak (01:00-04:00 and 06:00-10:00 UTC) rates at half
-# of peak; peak rates are used here so a spend cap computed from this table
-# never underestimates a real bill.
+# DeepSeek peak hours are 01:00-04:00 and 06:00-10:00 UTC on weekdays.
+# Use published peak rates for a conservative estimate even during off-peak
+# hours, when the provider charges half as much.
 DEEPSEEK_PRICING: dict[str, dict[str, Any]] = {
-    "deepseek-v4-flash": {
-        "input": 0.44, "cached_input": 0.014, "output": 1.32,
+    "deepseek-flash": {
+        "input": 0.30, "cached_input": 0.006, "output": 1.20,
         "source": "https://api-docs.deepseek.com/quick_start/pricing",
+        "as_of": "2026-09-17",
     },
     "deepseek-v4-pro": {
         "input": 1.32, "cached_input": 0.044, "output": 3.96,
         "source": "https://api-docs.deepseek.com/quick_start/pricing",
+        "as_of": "2026-09-17",
     },
 }
+# Retired Flash names are served and billed as the current Flash model.
+DEEPSEEK_PRICING["deepseek-v4-flash"] = DEEPSEEK_PRICING["deepseek-flash"]
 _LOCK = threading.RLock()
 
 
@@ -128,7 +132,7 @@ def usage_record(
         "response_id": str(response.get("id") or ""),
         **tokens,
         "estimated_cost_usd": estimated_cost_usd,
-        "pricing_as_of": PRICING_AS_OF if price else None,
+        "pricing_as_of": price.get("as_of", PRICING_AS_OF) if price else None,
         "pricing_source": price["source"] if price else None,
     }
 

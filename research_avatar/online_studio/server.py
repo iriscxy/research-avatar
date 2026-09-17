@@ -96,7 +96,7 @@ PROVIDERS = {
 # right for a soft-landing spend cap, not exact billing reconciliation.
 SHARED_PROVIDER = "deepseek"
 USD_TO_RMB_RATE = float(os.environ.get("ONLINE_STUDIO_USD_TO_RMB_RATE", "7.2"))
-USER_SPEND_CAP_RMB = float(os.environ.get("ONLINE_STUDIO_SPEND_CAP_RMB", "200"))
+USER_SPEND_CAP_RMB = float(os.environ.get("ONLINE_STUDIO_SPEND_CAP_RMB", "5"))
 DEFAULT_SECTIONS = (
     ("abstract", "Abstract", "abstract", "Summarize the problem, approach, evidence, and main conclusion in one self-contained paragraph."),
     ("introduction", "Introduction", "section", "Motivate the research problem, identify the precise gap, and state the paper's contributions without overclaiming."),
@@ -4149,7 +4149,7 @@ def require_under_spend_cap(user_id: str) -> None:
     spent_rmb = user_cumulative_cost_usd(user_id) * USD_TO_RMB_RATE
     if spent_rmb >= USER_SPEND_CAP_RMB:
         raise OnlineStudioError(
-            f"Current account sharing limit has been reached. {USER_SPEND_CAP_RMB:.0f} Units),"
+            f"Your cumulative free AI allowance of RMB {USER_SPEND_CAP_RMB:g} has been reached. "
             "Temporarily unable to create or continue writing sessions."
         )
 
@@ -5179,7 +5179,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(
                 {
                     "ok": False,
-                    "error": f"Current account sharing limit has been reached. {USER_SPEND_CAP_RMB:.0f} Units),"
+                    "error": f"Your cumulative free AI allowance of RMB {USER_SPEND_CAP_RMB:g} has been reached. "
                     "Writing session has been switched to read-only.",
                 },
                 402,

@@ -39,6 +39,7 @@ export class OnlineStudioContainer extends Container<Env> {
     ONLINE_STUDIO_TRUST_PROXY_AUTH: "1",
     ONLINE_STUDIO_IDLE_SECONDS: "14400",
     ONLINE_STUDIO_MAX_SESSIONS: "2",
+    ONLINE_STUDIO_SPEND_CAP_RMB: "5",
   };
 
   constructor(ctx: DurableObjectState, env: Env) {

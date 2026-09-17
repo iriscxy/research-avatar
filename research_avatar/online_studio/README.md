@@ -78,7 +78,12 @@ Online sessions use one server-held DeepSeek key and currently default to
 from `DEEPSEEK_API_KEY`, stays in the gateway and child-process environment, and
 is never written to project files, returned to the browser, placed in browser
 storage, or included in an export. A cumulative per-user shared-key cap defaults
-to RMB 200 (`ONLINE_STUDIO_SPEND_CAP_RMB`).
+to RMB 5 (`ONLINE_STUDIO_SPEND_CAP_RMB`), with no monthly reset. Existing
+account usage counts toward this allowance. The cap uses estimated AI costs
+at published peak token rates and a fixed USD-to-RMB rate of 7.2; Cloudflare
+hosting costs are separate. New rates apply to future calls without rewriting
+historical charges. In-flight calls can finish above the allowance before the
+next call is blocked.
 
 The first screen supports local email/password registration and login. Passwords
 are stored as salted PBKDF2-HMAC-SHA256 digests; opaque login tokens are stored

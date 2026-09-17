@@ -2838,16 +2838,20 @@ class OnlineStudioTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(
             online, "DATA_ROOT", Path(directory)
         ):
-            # USER_SPEND_CAP_RMB=200 / USD_TO_RMB_RATE=7.2 -> ~27.8 USD trips it.
+            # RMB 5 / 7.2: USD 0.69 is below the cap; USD 0.70 exceeds it.
             ledger = (
                 online.user_project_root("over-cap-user")
                 / "session-a/paper/.paper_studio/api_usage.jsonl"
             )
             ledger.parent.mkdir(parents=True)
             ledger.write_text(
-                json.dumps({"estimated_cost_usd": 30.0}) + "\n", encoding="utf-8"
+                json.dumps({"estimated_cost_usd": 0.69}) + "\n", encoding="utf-8"
             )
-            with self.assertRaises(online.OnlineStudioError):
+            online.require_under_spend_cap("over-cap-user")
+            ledger.write_text(
+                json.dumps({"estimated_cost_usd": 0.70}) + "\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(online.OnlineStudioError, "RMB 5"):
                 online.require_under_spend_cap("over-cap-user")
             online.require_under_spend_cap("fresh-user")
 
