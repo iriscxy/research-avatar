@@ -1,46 +1,43 @@
 # Research Avatar: A Personalized Research Assistant
 
-Research Avatar is a lightweight, personalized research assistant for experienced researchers. It is not a fully autonomous AutoResearch system and does not replace research judgment.
-
-> **Let the assistant accelerate mechanical work while you retain control of important research decisions. Every acceleration step is adapted to your research taste, writing style, and experimental habits.**
-
----
-
-[Online paper writing: register, upload, and start writing](https://research-avatar-studio.yingtaomj.workers.dev/)
+Research Avatar gives experienced researchers personalized assistance that speeds up mechanical work while keeping key decisions yours, not a fully autonomous AutoResearch system. Every step follows your research taste, writing style, and experiment habits, learned from your Scholar profile. Try it online: [register, upload, and start writing](https://research-avatar-studio.yingtaomj.workers.dev/)
 
 ---
 
 ## Highlights
 
-- **Researcher control:** The system reads a researcher profile, the researcher selects the overall direction, and the assistant executes the approved work.
-- **Personalization:** Configuration is grounded in the researcher's own profile rather than generic defaults.
-- **Experiments:** The system derives experiments from paper requirements, decomposes them into verifiable goals, and keeps every reported number traceable.
-- **Paper writing:** An interactive workspace follows the researcher's writing style and produces editable figures and tables.
-
-### How it differs from AutoResearch
-
-| Dimension | Common open-source AutoResearch focus | Research Avatar focus |
+| | Common open-source AutoResearch | Research Avatar |
 |---|---|---|
-| Human-agent roles | End-to-end automated exploration | **The researcher approves the global plan before automatic execution** |
-| Personalization | Task context and generic configuration | **Scholar profile plus working habits** |
-| Literature review | Large collections of papers, abstracts, and isolated observations | **A concise field map organized around four decision-relevant dimensions** |
-| Idea generation | Generic brainstorming from a topic | **Ideas tailored to the researcher's profile (research lineage, past publications) and the field map** |
-| Experiment organization | Search and execution from a task objective | **Ordered, independently verifiable goals** |
-| Paper output | Automatic synthesis of intermediate results | **Writing adapted to the researcher's personal style** |
+| 🧑‍🔬 **Human-agent roles** | End-to-end automated exploration | You approve the global plan before automatic execution |
+| 💡 **Idea generation** | Generic brainstorming from a topic | Ideas tailored to your profile and the field map |
+| 🧪 **Experiment organization** | Search and execution from a task objective | Verifiable goals executed through your coding agent's `/goal`, improving as the agent does; every number traceable |
+| ✍️ **Paper output** | Automatic synthesis of intermediate results | Writing adapted to your personal style |
 
 ---
 
-## Prerequisites
+## See it in action
 
-Before first use, manually save the complete HTML of a Google Scholar profile. Then provide its local path to `$profileconstruct`, for example:
+**1. Researcher profile.** Your research lineage and current frontier are extracted from your own publications, and every later stage builds on them.
 
-```text
-$profileconstruct using ~/Downloads/scholar_profile.html
-```
+![Research lineage extracted from the researcher's publications](docs/images/real-1-profile.png)
 
-You may use your own Scholar page or the page of a researcher whose research taste and paper organization you want to study.
+**2. Idea selection.** Each candidate is screened against the closest published work, with a concrete difference, the strongest objection, and a confidence level; you make the final choice.
 
-Paper writing requires an LLM API. Configure the selected provider in a local terminal before use:
+![Decision slate with linked closest work](docs/images/real-3-ideas.png)
+
+**3. Experiment plan.** Every projected figure comes with the source table that experiments must fill; no value is shown until it is measured.
+
+![Projected figure and its pending source table](docs/images/real-4-experiment-plan.png)
+
+**4. Paper writing.** Draft paragraph by paragraph, with the writing plan matched from the reference paper beside each paragraph and a live LaTeX PDF on the right.
+
+![Paper Studio writing workspace](docs/images/real-paper-writing.png)
+
+---
+
+## Tutorial
+
+**1. Prepare your inputs.** Save the complete HTML of a Google Scholar profile. You may use your own page, or that of a researcher whose research taste and paper organization you want to study. Paper writing also needs an LLM API key; set the one for your provider in a local terminal:
 
 ```bash
 # Required for OpenAI
@@ -50,17 +47,24 @@ export OPENAI_API_KEY="your API key"
 export DEEPSEEK_API_KEY="your API key"
 ```
 
+**2. Build your profile.** In a coding agent, run:
+
+```text
+$profileconstruct using ~/Downloads/scholar_profile.html
+```
+
+**3. Run the workflow.** Invoke the stages in order from the same coding agent:
+
+`$researchlit "research topic"` -> `$ideagen` -> `$expplan` -> `$runplan`
+
+Each stage stops for your approval before the next one starts.
+
+**4. Follow along and write.** Open <http://127.0.0.1:8780> to inspect every stage. When the experiments are done, continue in the paper-writing workspace on the same page.
+
 ---
 
-## Recommended workflow
-
-Invoke the following research workflow from a coding agent in a terminal:
-
-`$profileconstruct` -> `$researchlit` -> `$ideagen` -> `$expplan` -> `$runplan`
-
-Each stage is visualized at <http://127.0.0.1:8780>. After completing the workflow, continue drafting in the paper-writing workspace on the same page.
-
-## Implementation
+<details>
+<summary><h2>Implementation</h2></summary>
 
 ### Personalization
 
@@ -94,6 +98,8 @@ The researcher chooses the Scholar profile. Local working habits still come from
 3. **Personalized writing style.** Follow the target venue, the researcher's Writing Style, and document-level citation and logic checks.
 4. **Publication-ready figure prompts.** Design a composition and convert it into editable PowerPoint and PDF artifacts.
 5. **Real experimental figures and tables.** Read only traceable data under `results/`.
+
+</details>
 
 ---
 

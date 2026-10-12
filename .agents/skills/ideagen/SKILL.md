@@ -77,6 +77,10 @@ exact Survey Gap/Opening or Live Debate and one literature-family
 `failure_boundary`. Render these links in the candidate card. A generic claim
 that the idea is "grounded in the survey" is not traceability.
 
+Every paper named anywhere in the report, including the decision slate and
+novelty-evidence tables, must be a direct `<a href>` to its source; render plain
+text only for self-built unpublished datasets or when no verified link exists.
+
 When a completed RunPlan records a verified baseline implementation anomaly,
 read `reports/.build/reideation_input.json`, generated from its
 `reideation_checkpoint`, as optional empirical grounding. Require the evidence

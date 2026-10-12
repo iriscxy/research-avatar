@@ -162,8 +162,8 @@ const projectedPaperStructure = () => {
           <g stroke="#6f858d" stroke-width="1.4"><line x1="52" y1="30" x2="52" y2="205"/><line x1="52" y1="205" x2="336" y2="205"/></g>
           <polyline points="82,168 156,122 230,88 304,66" fill="none" stroke="#15917e" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="7 5"/>
           <g fill="#fff" stroke="#15917e" stroke-width="2.5"><circle cx="82" cy="168" r="5"/><circle cx="156" cy="122" r="5"/><circle cx="230" cy="88" r="5"/><circle cx="304" cy="66" r="5"/></g>
-          <g fill="#60767e" font-size="11" text-anchor="middle"><text x="82" y="222">1</text><text x="156" y="222">2</text><text x="230" y="222">3</text><text x="304" y="222">4</text><text x="194" y="242">纳入的随机排列数量</text></g>
-          <text x="14" y="120" fill="#60767e" font-size="11" transform="rotate(-90 14 120)" text-anchor="middle">一致题目比例</text>
+          <g fill="#60767e" font-size="11" text-anchor="middle"><text x="82" y="222">1</text><text x="156" y="222">2</text><text x="230" y="222">3</text><text x="304" y="222">4</text><text x="194" y="242">${t("纳入的随机排列数量", "Random permutations included")}</text></g>
+          <text x="14" y="120" fill="#60767e" font-size="11" transform="rotate(-90 14 120)" text-anchor="middle">${t("一致题目比例", "Consistent-answer rate")}</text>
         </svg>
         <figcaption><strong>${t("F2 · 排列一致率", "F2 · Permutation consistency")}</strong><span>预览图 · 合成示意数据，不是实验结果；实验完成后由左侧真实数据重新绘制</span></figcaption>
       </figure>
