@@ -24,6 +24,7 @@ Research Avatar is a lightweight, personalized research assistant for experience
 | Human-agent roles | End-to-end automated exploration | **The researcher approves the global plan before automatic execution** |
 | Personalization | Task context and generic configuration | **Scholar profile plus working habits** |
 | Literature review | Large collections of papers, abstracts, and isolated observations | **A concise field map organized around four decision-relevant dimensions** |
+| Idea generation | Generic brainstorming from a topic, with ideas disconnected from the researcher | **Ideas tailored to the researcher's profile (research lineage, past publications) and the field map, with novelty verified; the researcher selects one** |
 | Experiment organization | Search and execution from a task objective | **Ordered, independently verifiable goals** |
 | Paper output | Automatic synthesis of intermediate results | **Writing adapted to the researcher's personal style** |
 
@@ -102,7 +103,7 @@ The researcher chooses the Scholar profile. Local working habits still come from
 |---|---|
 | `$profileconstruct` | Create or refresh the researcher profile from Google Scholar and available session history |
 | `$researchlit "research topic"` | Retrieve and verify literature from several angles and create a structured survey |
-| `$ideagen` | Generate and verify candidate ideas from the approved evidence base |
+| `$ideagen` | Generate ideas tailored to your profile (research lineage, past publications) and the literature field map, then verify novelty |
 | `$expplan` | Plan the Projected Paper paragraph by paragraph and derive its experimental contracts |
 | `$runplan` | Decompose the experiment into dependency-ordered executable goals |
 
