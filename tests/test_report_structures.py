@@ -5,6 +5,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from research_avatar.tools.validate_report_structure import REPORT_STRUCTURES, validate
+from research_avatar.tools.render_profile_report import render as render_profile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -119,6 +120,43 @@ class ReportStructureTests(unittest.TestCase):
     def test_canonical_profile_html_matches_its_fixed_structure(self):
         self.assertEqual(validate("profile", ROOT / "researcher-profile/PROFILE.html"), [])
 
+    def test_profile_renderer_uses_direct_organization_headings(self):
+        model = {
+            "name": "Test Researcher",
+            "refreshed": "today",
+            "stats": ["15 papers"],
+            "writing_style_papers": [f"paper{i}" for i in range(15)],
+            "identity": {
+                "niche_subfields": ["Test area"], "dominant_methods": "Test methods",
+                "active_venues": "Test venue", "signature_works": ["Paper"],
+            },
+            "lineage": [{"year": "2026", "title": "Test turn", "text": "A concise test research trajectory."}],
+            "idea_profile": "Idea differences.",
+            "writing": {
+                "abstract_profile": "Abstract tendencies.",
+                "introduction_profile": "Introduction tendencies.",
+                "section_profiles": [{
+                    "organization": "Related Work",
+                    "section_names": ["2 Related Work", "Related Works"],
+                    "profile": "Related-work tendencies.",
+                    "papers": ["paper0"],
+                }],
+            },
+        }
+        rendered = render_profile(model)
+        self.assertIn("<h3>Abstract</h3>", rendered)
+        self.assertIn("<h3>Introduction</h3>", rendered)
+        self.assertIn("<h3>Related Work</h3>", rendered)
+        self.assertIn('data-section-names="2 Related Work | Related Works"', rendered)
+        self.assertNotIn("2 Related Work; Related Works", rendered)
+        self.assertNotIn("Section-specific writing profiles", rendered)
+        self.assertNotIn("Observed section names:", rendered)
+        self.assertIn('data-research-profile="idea"', rendered)
+        self.assertNotIn("Experiment Profile", rendered)
+        for title in ("3. Idea Profile", "4. Writing Profile"):
+            self.assertIn(f"<h2>{title}</h2>", rendered)
+        self.assertNotIn("Research Environment", rendered)
+
     def test_demo_names_every_fixed_visible_slot(self):
         source = (ROOT / "research_avatar/web/demo/app.js").read_text(encoding="utf-8")
         structures = json.loads(
@@ -127,9 +165,9 @@ class ReportStructureTests(unittest.TestCase):
         english_structures = json.loads(
             (ROOT / "research_avatar/web/demo/report-structures.en.json").read_text(encoding="utf-8")
         )
-        self.assertIn("<span>Content summary</span>", source)
-        self.assertNotIn("HTML Content summary", source)
-        self.assertNotIn("Feature demonstration", source)
+        self.assertIn("<span>内容总结</span>", source)
+        self.assertNotIn("HTML 内容总结", source)
+        self.assertNotIn("功能展示", source)
         demo_keys = {
             "profile": "profile",
             "literature": "literature",

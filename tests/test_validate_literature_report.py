@@ -40,6 +40,11 @@ class LiteratureEvidenceTests(unittest.TestCase):
                  "paper_ids": ["P1"]}
                 for index in range(1, 5)
             ],
+            "research_questions": [
+                {"id": f"Q{index}", "question": f"How does memory behave under condition {index}?",
+                 "origin": "neutral", "gap_id": "G1"}
+                for index in range(1, 5)
+            ],
             "gap_falsification": {
                 "queries": ["counter one", "counter two", "counter three"],
                 "closest_collision_id": "P1",

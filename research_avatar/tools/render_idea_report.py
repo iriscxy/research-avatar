@@ -7,6 +7,7 @@ import argparse
 import html
 import json
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -19,12 +20,23 @@ from research_avatar.tools.validate_report_structure import validate as validate
 
 
 STYLE = """
-:root{--ink:#17323e;--muted:#667b83;--line:#dce8e5;--teal:#087f70;--soft:#eef8f5;--amber:#9a6511;--red:#9a3e3e}
-*{box-sizing:border-box}body{margin:0;background:#fff;color:var(--ink);font:15px/1.65 Inter,system-ui,sans-serif}header,main,footer{max-width:1180px;margin:auto;padding:30px}
-header{padding-top:54px}h1{margin:.2em 0;font:750 46px/1.1 Georgia,serif}h2{margin-top:52px;font:700 30px/1.2 Georgia,serif}h3{margin-bottom:7px}.kicker,.eyebrow{color:var(--teal);font-size:12px;font-weight:850;letter-spacing:.09em;text-transform:uppercase}.sub,.note,footer{color:var(--muted)}
-.toc{position:sticky;top:0;z-index:3;display:flex;gap:24px;padding:13px 30px;border-block:1px solid var(--line);background:#fffffff2}.toc a,a{color:#075f73}.lead,.callout{padding:17px 20px;border-left:4px solid var(--teal);background:var(--soft);border-radius:5px}.warning{border-color:var(--amber);background:#fff8e8}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:16px}.card{border:1px solid var(--line);border-radius:12px;padding:19px;box-shadow:0 5px 18px #17323e0b}.card dl{display:grid;grid-template-columns:130px 1fr;gap:7px 12px}.card dt{font-weight:800}.card dd{margin:0}.badge{display:inline-block;padding:4px 9px;border-radius:999px;background:var(--soft);color:var(--teal);font-weight:800;font-size:12px}.blocked{background:#fff1f1;color:var(--red)}
-table{width:100%;border-collapse:collapse;margin:17px 0;font-size:13px}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f4f8f7}.pick{padding:18px;border:1px solid var(--line);border-radius:10px;margin:10px 0}footer{border-top:1px solid var(--line);margin-top:50px}@media(max-width:700px){header,main,footer{padding:20px}h1{font-size:35px}.toc{overflow:auto}.card dl{grid-template-columns:1fr}}
+:root{--ink:#18201d;--muted:#5e6a64;--paper:#fffdf5;--card:#fffefa;--line:#d8d5cb;--accent:#b45309;--accent2:#c65d32;--soft:#fffbeb;--warn:#fff4e5}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+header,main,footer{max-width:1100px;margin:auto;padding:24px max(4vw,24px)}header{padding-top:36px}h1{margin:0 0 4px;font:700 1.7rem/1.2 Georgia,serif;color:var(--accent)}.sub,.note,footer{color:var(--muted);font-size:.9rem}
+h2{margin:44px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--accent);font:700 1.5rem/1.2 Georgia,serif}a{color:var(--accent)}
+.toc{display:flex;gap:18px;padding:12px max(4vw,24px) 12px calc(max(0px,(100vw - 1100px)/2) + max(4vw,24px));border-block:1px solid var(--line)}.toc a{color:var(--muted);font-weight:700;font-size:.85rem;text-decoration:none}
+.lead,.callout{padding:12px 16px;border-left:4px solid var(--accent);background:var(--soft);border-radius:5px}.warning{border-color:var(--accent2);background:var(--warn)}
+.cards{display:grid;grid-template-columns:1fr;gap:12px}.card{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:0}.card-details>summary{cursor:pointer;list-style:none;position:relative;padding:14px 40px 14px 18px}.card-details>summary::-webkit-details-marker{display:none}
+.card-details>summary::after{content:'\\25B8';position:absolute;right:16px;top:14px;color:var(--accent2);font-size:18px;transition:transform .15s}.card-details[open]>summary::after{transform:rotate(90deg)}
+.card h3{margin:.2em 0 .4em;color:var(--accent)}.eyebrow{color:var(--accent2);font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.badge{display:inline-block;margin-right:6px;padding:2px 9px;border-radius:999px;background:var(--soft);color:var(--accent);font-weight:700;font-size:.78rem}.blocked{background:#fbe9e4;color:#9a3e3e}
+.card-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);column-gap:30px;margin:0 18px;padding:12px 0 16px;border-top:1px solid var(--line)}.card-body>.col{grid-column:1}.card-body>dl{grid-column:2;grid-row:1/span 6;margin:0;align-self:start}
+.card dl{display:grid;grid-template-columns:130px 1fr;gap:7px 14px}.card dt{font-weight:700;color:var(--muted)}.card dd{margin:0}
+table{width:100%;table-layout:auto;border-collapse:collapse;margin:14px 0;font-size:.82rem;line-height:1.45;background:var(--card)}td{overflow-wrap:break-word;hyphens:manual}table.slate th:nth-child(-n+2),table.slate td:nth-child(-n+2),table.slate th:last-child,table.slate td:last-child{white-space:nowrap}table.slate th,table.slate td{padding:9px 6px}table.slate th{font-size:.76rem}table.slate th:nth-child(3){width:21%}table.slate th:nth-child(5){width:15%}table.slate th:nth-child(6),table.slate th:nth-child(7){width:22%}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:var(--soft)}
+.pick{padding:12px 16px;border:1px solid var(--line);border-radius:10px;margin:10px 0;background:var(--card)}footer{border-top:1px solid var(--line);margin-top:40px}
+@media(max-width:900px){.card-body{display:block}.card-body>dl{margin-top:12px}}
 """
+
+
 
 
 def esc(value: object) -> str:
@@ -36,9 +48,9 @@ def links(items: list[dict]) -> str:
 
 
 def card(candidate: dict, selected_id: str = "") -> str:
-    selectable = candidate["selectable"]
+    """One idea as the four fields its isolated context generated, verbatim and unfolded."""
     attrs = ""
-    if selectable:
+    if candidate["selectable"]:
         attrs = (
             f' data-idea-id="{esc(candidate["id"])}" data-novelty-status="{esc(candidate["novelty_attribute"])}"'
             f' data-idea-tier="{esc(candidate["tier"])}" data-default-pick="false"'
@@ -47,65 +59,88 @@ def card(candidate: dict, selected_id: str = "") -> str:
         )
     if candidate["id"] == selected_id:
         attrs += ' data-selected="true"'
-    steps = "".join(f"<li>{esc(step)}</li>" for step in candidate["steps"])
-    status_class = "badge" if selectable else "badge blocked"
-    selected_badge = '<span class="badge">Selected</span> ' if candidate["id"] == selected_id else ""
-    grounding = "".join(
-        f'<li><a href="01_LIT_SURVEY.html#{esc(item["anchor"])}">{esc(item["kind"])}: '
-        f'{esc(item["title"])}</a> — {esc(item["failure_boundary"])}</li>'
-        for item in candidate["source_grounding"]
+    output = candidate["generation"]["output"]
+    question = candidate.get("research_question")
+    question_html = (
+        f'<p data-candidate-question="true"><b>Sub-question.</b> {esc(question["question"])}</p>' if question else ""
     )
-    return f'''<article class="card"{attrs}><div class="eyebrow">{esc(candidate["id"])} · {esc(candidate["contribution_type"])}</div>
-<h3>{esc(candidate["title"])}</h3><span class="{status_class}">{esc(candidate["novelty_status"])}</span>
-{selected_badge}
-<p><b>Plain-language summary.</b> {esc(candidate["summary"])}</p>
-<p><b>One mechanism.</b> {esc(candidate["mechanism"])}</p><ol>{steps}</ol>
-<p><b>Survey origin and failure boundary.</b></p><ul>{grounding}</ul>
-<dl><dt>Hypothesis</dt><dd>{esc(candidate["hypothesis"])}</dd><dt>Falsifier</dt><dd>{esc(candidate["falsifier"])}</dd>
-<dt>Closest work</dt><dd>{links(candidate["closest_sources"])}</dd><dt>Concrete difference</dt><dd>{esc(candidate["difference"])}</dd>
-<dt>Own-work overlap</dt><dd>{esc(candidate["own_work_overlap"])}</dd><dt>Scope necessity</dt><dd>{esc(candidate["scope_text"])}</dd>
-<dt>Feasibility</dt><dd>{esc(candidate["feasibility"])}</dd><dt>Reviewer risk</dt><dd>{esc(candidate["reviewer_risk"])}</dd>
-<dt>Devil's advocate</dt><dd>{esc(candidate["objection"])}</dd><dt>Effort</dt><dd>{esc(candidate["effort"])}</dd></dl></article>'''
+    return (
+        f'<article class="card" id="idea-{esc(candidate["id"])}"{attrs}><div class="eyebrow">{esc(candidate["id"])}</div>'
+        f'<h3>{esc(output["title"])}</h3>{question_html}'
+        f'<p><b>Research focus.</b> {esc(output["research_focus"])}</p>'
+        f'<p><b>Method.</b> {esc(output["method"])}</p>'
+        f'<p><b>Validation.</b> {esc(output["validation"])}</p></article>'
+    )
+
+
+def question_lead(model: dict) -> str:
+    direction = model.get("research_direction")
+    if direction:
+        return (
+            f'<div class="lead" data-research-direction="{esc(direction["id"])}" data-question-origin="{esc(direction["origin"])}" '
+            f'data-setting="{esc(model["setting"])}"><b>Research question:</b> {esc(direction["title"])}'
+            + (f' · <b>Angle:</b> {esc(model["angle"]["title"])}' if model.get("angle") else "")
+            + '</div>'
+        )
+    question = model["research_question"]
+    return (
+        f'<div class="lead" data-research-question="{esc(question["id"])}" data-question-origin="{esc(question["origin"])}" '
+        f'data-setting="{esc(model["setting"])}"><b>Research question {esc(question["id"])}.</b> {esc(question["question"])}</div>'
+    )
+
+
+def camel_wbr(text: str) -> str:
+    return re.sub(r"(?<=[a-z])(?=[A-Z])", "<wbr>", text)
 
 
 def render(model: dict) -> str:
     rows = "".join(
-        f'<tr><td>{esc(c["id"])}</td><td>{esc(c["tier"])}</td><td>{esc(c["summary"])}</td>'
-        f'<td>{esc(c["novelty_status"])}</td><td>{esc(c["scope_necessity"])}</td>'
-        f'<td>{esc(c["closest_sources"][0]["title"])}</td><td>{esc(c["difference"])}</td>'
+        f'<tr><td><a href="#idea-{esc(c["id"])}">{esc(c["id"])}</a></td><td>{esc(c["tier"])}</td><td><b>{camel_wbr(esc(c["title"]))}</b><br>{esc(c["summary"])}</td>'
+        f'<td>{esc(c["novelty_status"])}</td>'
+        f'<td>{links(c["closest_sources"][:1])}</td><td>{esc(c["difference"])}</td>'
         f'<td>{esc(c["objection"])}</td><td>{esc(c["confidence"])}</td></tr>'
         for c in model["candidates"]
     )
+    has_tier_a = any(c["tier"] == "A" and c["selectable"] for c in model["candidates"])
+    if has_tier_a:
+        ranking_callout = f'<div class="callout"><b>Ranking note.</b><p>{esc(model["ranking_note"])}</p></div>'
+    else:
+        ranking_callout = f'<div class="callout warning"><b>No high-confidence novel recommendation.</b><p>{esc(model["ranking_note"])}</p></div>'
     selection = model.get("selection") or {}
     selected_id = str(selection.get("selected_id", ""))
     cards = "".join(card(candidate, selected_id) for candidate in model["candidates"])
-    picks = "".join(
-        f'<div class="pick"><b>{esc(c["id"])} — {esc(c["title"])}</b><p>{esc(c["summary"])}</p></div>'
-        for c in model["candidates"] if c["selectable"]
-    )
     audit = {"grounding_contract_version": 1, "candidates": [
         {**c["audit"], "source_grounding": c["source_grounding"]}
         for c in model["candidates"] if c["selectable"]
     ]}
     audit_json = json.dumps(audit, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
     selection_json = json.dumps(selection, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
-    selection_banner = ""
+    generation = {
+        **({"research_direction": model["research_direction"]} if model.get("research_direction")
+           else {"research_question": model["research_question"]}),
+        "setting": model["setting"],
+        "candidates": [{"id": c["id"], **c["generation"],
+                        **({"research_question": c["research_question"]} if c.get("research_question") else {})}
+                       for c in model["candidates"]],
+    }
+    generation_json = json.dumps(generation, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+    selection_banner = '<p data-selection-pending="true">No idea selected yet.</p>'
     if selected_id:
         selected = next((c for c in model["candidates"] if c["id"] == selected_id), None)
         if selected:
             selection_banner = (
                 f'<div class="lead" data-selected-idea="{esc(selected_id)}"><b>Selected: '
-                f'{esc(selected_id)} — {esc(selected["title"])}</b><p>{esc(selection.get("reason", ""))}</p></div>'
+                f'{esc(selected_id)} — {esc(selected["generation"]["output"]["title"])}</b></div>'
             )
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{esc(model["title"])}</title><style>{STYLE}</style></head><body>
-<header><div class="kicker">Research Idea Selection · Benchmark Lens</div><h1>{esc(model["title"])}</h1><p class="sub">{esc(model["subtitle"])}</p></header>
-<nav class="toc"><a href="#literature-landscape">Landscape</a><a href="#ranked-slate">Decision slate</a><a href="#candidate-cards">Candidate cards</a><a href="#human-selection">Selection</a></nav>
-<main data-idea-branch="standard" data-disruptive-wildcard="off">
-<section id="literature-landscape" data-report-section="literature-landscape"><h2>1. Literature Landscape</h2><div class="lead">{esc(model["landscape_lead"])}</div><p>{esc(model["landscape_body"])}</p><p>See the <a href="01_LIT_SURVEY.html">complete verified literature survey</a> and its search audit; the survey page derives its displayed count from the verified record set.</p></section>
-<section id="ranked-slate" data-report-section="ranked-slate"><h2>2. Ranked Decision Slate</h2><div class="callout warning"><b>No high-confidence novel recommendation.</b><p>{esc(model["ranking_note"])}</p></div><table><thead><tr><th>ID</th><th>Tier</th><th>Idea</th><th>Novelty</th><th>Scope</th><th>Closest work</th><th>Difference</th><th>Strongest objection</th><th>Confidence</th></tr></thead><tbody>{rows}</tbody></table></section>
-<section id="candidate-cards" data-report-section="candidate-cards"><h2>3. Candidate Cards</h2><p class="lead">Each card separates technical feasibility from novelty and reviewer risk. Dataset plans marked self-built have no fabricated publication link.</p><div class="cards">{cards}</div></section>
-<section id="human-selection" data-report-section="human-selection"><h2>4. Human Selection</h2>{selection_banner}<p class="lead">Choose one Tier B candidate only if you accept a framing-sensitive contribution. The two blocked candidates remain visible because their collisions are useful negative evidence.</p>{picks}</section>
-<script id="idea-novelty-audit" type="application/json">{audit_json}</script><script id="idea-selection" type="application/json">{selection_json}</script></main><footer>Generated from the verified profile, literature survey, and candidate-level collision searches. Recheck concurrent work before submission.</footer></body></html>'''
+<header><h1>{esc(model["title"])}</h1><p class="sub">{esc(model["subtitle"])}</p></header>
+<nav class="toc"><a href="#literature-landscape">Landscape</a><a href="#ranked-slate">Decision slate</a><a href="#candidate-cards">Ideas</a><a href="#human-selection">Selection</a></nav>
+<main data-idea-branch="standard" data-disruptive-wildcard="off" data-crowded="{"true" if model.get("crowded") else "false"}">
+<section id="literature-landscape" data-report-section="literature-landscape"><h2>1. Literature Landscape</h2>{question_lead(model)}<div class="lead">{esc(model["landscape_lead"])}</div><p>{esc(model["landscape_body"])}</p><p>See the <a href="01_LIT_SURVEY.html">complete verified literature survey</a> and its search audit; the survey page derives its displayed count from the verified record set.</p></section>
+<section id="ranked-slate" data-report-section="ranked-slate"><h2>2. Ranked Decision Slate</h2>{ranking_callout}<table class="slate"><thead><tr><th>ID</th><th>Tier</th><th>Idea</th><th>Novelty</th><th>Closest work</th><th>Difference</th><th>Strongest objection</th><th>Confidence</th></tr></thead><tbody>{rows}</tbody></table></section>
+<section id="candidate-cards" data-report-section="candidate-cards"><h2>3. Ideas</h2><div class="cards">{cards}</div></section>
+<section id="human-selection" data-report-section="human-selection"><h2>4. Human Selection</h2>{selection_banner}</section>
+<script id="idea-novelty-audit" type="application/json">{audit_json}</script><script id="idea-selection" type="application/json">{selection_json}</script><script id="idea-generation" type="application/json">{generation_json}</script></main><footer>Generated for one research question and angle from the verified literature survey, with candidate-level collision searches. Recheck concurrent work before submission.</footer></body></html>'''
 
 
 def main() -> int:

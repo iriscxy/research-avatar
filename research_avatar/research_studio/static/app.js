@@ -1,3 +1,34 @@
+const uiLanguage = (() => {
+  let stored = "";
+  try { stored = localStorage.getItem("research-avatar-language") || ""; } catch {}
+  const requested = new URLSearchParams(window.location.search).get("lang") || stored;
+  return requested === "zh" ? "zh" : "en";
+})();
+const t = (zh, en) => uiLanguage === "en" ? en : zh;
+document.documentElement.lang = uiLanguage === "en" ? "en" : "zh-CN";
+const zhTerms = {
+  "Research Profile": "研究者画像", "Literature Survey": "文献综述", "Idea Selection": "研究方向",
+  "Experiment Plan": "实验设计", "Experiment Execution": "实验执行", "Paper Writing": "论文写作",
+  "Paper Studio · Interactive Writing": "Paper Studio · 交互式写作",
+  "Experiment results": "实验结果", "Run plan": "执行计划",
+  "Waiting for this stage to be generated": "等待生成此阶段",
+  "Waiting for experiment execution and 05_EXP_RESULT.html": "等待实验执行与 05_EXP_RESULT.html",
+  "Waiting for command": "等待命令",
+};
+const tr = value => uiLanguage === "en" ? value : (zhTerms[value] || value);
+document.title = t("研究工作台", "Research Studio");
+const staticText = {
+  "#pipeline": ["aria-label", "研究阶段", "Research stages"],
+  "#preview-frame": ["title", "产物预览", "Artifact preview"],
+  "#artifact-tabs": ["aria-label", "当前阶段产物", "Current stage artifacts"],
+};
+for (const [selector, [attr, zh, en]] of Object.entries(staticText)) document.querySelector(selector)?.setAttribute(attr, t(zh, en));
+document.querySelector(".preview-toolbar span").textContent = t("规范产物", "CANONICAL ARTIFACT");
+document.querySelector("#preview-open").textContent = t("在新窗口打开 ↗", "Open in new window ↗");
+document.querySelector("#preview-empty strong").textContent = t("此阶段尚未生成", "This stage has not been generated yet");
+document.querySelector("#preview-empty small").textContent = t("请在本地终端运行以下命令", "Run the following command in the local terminal");
+document.querySelector("#preview-command-copy").textContent = t("复制命令", "Copy command");
+
 const app = {
   state: null,
   stage: 0,
@@ -18,7 +49,7 @@ const stageStorageKey = "research-studio.active-stage";
 const artifactSandbox = "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads";
 
 const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
-const statusLabel = status => ({complete:"Complete",attention_required:"Experiment complete · review claims",in_progress:"In progress",waiting_confirmation:"Awaiting confirmation",not_started:"Not started"}[status] || status);
+const statusLabel = status => ({complete:t("已完成","Complete"),attention_required:t("实验完成 · 请复核结论","Experiment complete · review claims"),in_progress:t("进行中","In progress"),waiting_confirmation:t("等待确认","Awaiting confirmation"),not_started:t("未开始","Not started")}[status] || status);
 const isRunnableCommand = value => value.startsWith("$") || value.startsWith("python3 -m ");
 
 async function copyText(value) {
@@ -71,19 +102,19 @@ function setStage(index) {
 }
 
 function renderPipeline() {
-  pipeline.innerHTML = app.state.stages.map((stage, index) => `<button class="pipeline-button ${index === app.stage ? "active" : ""}" data-stage="${index}" data-status="${escapeHtml(stage.status)}" type="button"><span>0${index + 1} · ${escapeHtml(statusLabel(stage.status))}</span><strong>${escapeHtml(stage.title)}</strong></button>`).join("");
+  pipeline.innerHTML = app.state.stages.map((stage, index) => `<button class="pipeline-button ${index === app.stage ? "active" : ""}" data-stage="${index}" data-status="${escapeHtml(stage.status)}" type="button"><span>0${index + 1} · ${escapeHtml(statusLabel(stage.status))}</span><strong>${escapeHtml(tr(stage.title))}</strong></button>`).join("");
 }
 
 function renderStage() {
   const stage = app.state.stages[app.stage];
   document.body.classList.toggle("paper-focus", stage.id === "paper");
   renderPipeline();
-  const command = stage.command || "Waiting for this stage to be generated";
+  const command = tr(stage.command || "Waiting for this stage to be generated");
   const copyableCommand = isRunnableCommand(command);
   previewCommand.textContent = command;
   previewCommandCopy.hidden = !copyableCommand;
   previewCommandCopy.disabled = false;
-  previewCommandCopy.textContent = "Copy command";
+  previewCommandCopy.textContent = t("复制命令", "Copy command");
   previewCopyStatus.textContent = "";
   const availableArtifacts = stage.artifacts?.filter(item => item.exists) || [];
   const rememberedKey = app.artifactByStage[stage.id];
@@ -100,7 +131,7 @@ function renderArtifactTabs(stage, selectedKey) {
   artifactTabs.innerHTML = available.map(artifact => (
     `<button type="button" data-artifact-key="${escapeHtml(artifact.key)}" `
     + `class="artifact-tab ${artifact.key === selectedKey ? "active" : ""}">`
-    + `${escapeHtml(artifact.key === "results" ? "Experiment results" : artifact.key === "runplan" ? "Run plan" : artifact.title)}`
+    + `${escapeHtml(artifact.key === "results" ? tr("Experiment results") : artifact.key === "runplan" ? tr("Run plan") : tr(artifact.title))}`
     + "</button>"
   )).join("");
 }
@@ -110,13 +141,13 @@ previewCommandCopy.addEventListener("click", async () => {
   if (!isRunnableCommand(command)) return;
   previewCommandCopy.disabled = true;
   const copied = await copyText(command);
-  previewCommandCopy.textContent = copied ? "Copied ✓" : "Copy failed";
+  previewCommandCopy.textContent = copied ? t("已复制 ✓", "Copied ✓") : t("复制失败", "Copy failed");
   previewCopyStatus.textContent = copied
-    ? "Command copied. Paste it into the project terminal."
-    : "The browser cannot access the clipboard. Select the command manually.";
+    ? t("命令已复制，请粘贴到项目终端。", "Command copied. Paste it into the project terminal.")
+    : t("浏览器无法访问剪贴板，请手动选择命令。", "The browser cannot access the clipboard. Select the command manually.");
   window.setTimeout(() => {
     previewCommandCopy.disabled = false;
-    previewCommandCopy.textContent = "Copy command";
+    previewCommandCopy.textContent = t("复制命令", "Copy command");
     previewCopyStatus.textContent = "";
   }, 2200);
 });
@@ -126,7 +157,7 @@ function clearPreview() {
   app.previewSignature = "";
   previewFrame.hidden = true; previewFrame.removeAttribute("src");
   previewFrame.setAttribute("sandbox", artifactSandbox);
-  previewEmpty.hidden = false; previewOpen.hidden = true; previewTitle.textContent = "Waiting for output";
+  previewEmpty.hidden = false; previewOpen.hidden = true; previewTitle.textContent = t("等待输出", "Waiting for output");
 }
 
 function selectArtifact(key) {
@@ -135,7 +166,7 @@ function selectArtifact(key) {
   if (!artifact) return;
   app.artifactByStage[stage.id] = key;
   renderArtifactTabs(stage, key);
-  previewTitle.textContent = artifact.title || artifact.path;
+  previewTitle.textContent = tr(artifact.title) || artifact.path;
   previewOpen.href = artifact.url; previewOpen.hidden = artifact.interactive === true;
   const signature = `${app.stage}:${artifact.key}:${artifact.size}:${artifact.modified_ns || 0}`;
   if (signature === app.previewSignature) return;
@@ -169,7 +200,7 @@ async function loadState({preserveStage = true} = {}) {
     renderStage();
   } catch (error) {
     clearPreview();
-    previewTitle.textContent = `Load failed: ${error.message}`;
+    previewTitle.textContent = t(`加载失败：${error.message}`, `Load failed: ${error.message}`);
   } finally {
     app.loading = false;
   }

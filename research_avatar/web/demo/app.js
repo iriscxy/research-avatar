@@ -357,7 +357,7 @@ const stages = [
   },
   {
     id: "literature", short: t("文献调研", "Literature"), path: "literature", title: t("用四步结构提炼可核验的文献地图", "Build a verifiable literature map in four steps"),
-    compare: [t("一次返回大量论文、摘要和零散结论", "Returns many papers, abstracts, and disconnected findings at once"), t("结果太多、太乱，方法类别、评测依据和真正的研究空白混在一起，很难直接用于判断。", "Method families, evaluation evidence, and genuine gaps are mixed together, making decisions difficult."), t("把核验过的证据归纳为 Problem → Approaches → Evaluation → Gaps：先界定问题，再分类方法、比较评测，最后推出研究空白，清晰、简洁、准确。", "Organizes verified evidence as Problem → Approaches → Evaluation → Gaps for a concise, decision-ready field map.")],
+    compare: [t("一次返回大量论文、摘要和零散结论", "Returns many papers, abstracts, and disconnected findings at once"), t("结果太多、太乱，方法类别、评测依据和真正的研究空白混在一起，很难直接用于判断。", "Method families, evaluation evidence, and genuine gaps are mixed together, making decisions difficult."), t("把核验过的证据归纳为 Problem → Approaches → Evaluation → Research Questions：先界定问题，再分类方法、比较评测，最后从研究空白推出研究问题，清晰、简洁、准确。", "Organizes verified evidence as Problem → Approaches → Evaluation → Research Questions for a concise, decision-ready field map.")],
     render: () => `
       <div class="stage-head"><div><p class="eyebrow">第二步 · 文献调研</p><h3>把相关工作整理成可核验的研究地图</h3><p>从不同角度检索并核对论文，梳理主要方向、争议和仍待解决的问题。</p></div><span class="status-pill">52 篇已核验</span></div>
       ${commandStrip("整理并核验相关文献", "$researchlit <research topic>")}

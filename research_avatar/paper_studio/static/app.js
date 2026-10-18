@@ -1,10 +1,353 @@
 const $ = (id) => document.getElementById(id);
+const requestedUiLanguage = new URLSearchParams(window.location.search).get("lang");
 const embeddedInResearchStudio = new URLSearchParams(window.location.search).get("embedded") === "research-studio";
-const studioUiLanguage = "en";
-const studioT = (_unused, english) => english;
+const studioUiLanguage = requestedUiLanguage === "en"
+  ? "en"
+  : (requestedUiLanguage === "zh" ? "zh" : (localStorage.getItem("research-avatar-language") === "en" ? "en" : "zh"));
+const studioT = (zh, en) => studioUiLanguage === "en" ? en : zh;
 if (embeddedInResearchStudio) document.documentElement.classList.add("research-studio-embedded");
-function translateStudioUi() { document.documentElement.lang = "en"; }
+const studioTranslations = new Map(Object.entries({
+  "界面语言":"Interface language", "写作模型":"Writing model", "应用":"Apply", "安全更换 API Key":"Update API key securely",
+  "请为当前选择的正文写作 API 在启动 Paper Studio 的本机终端配置；不要把真实 key 输入聊天、提交到仓库或保存在浏览器中。GPT Image 仍单独使用 OpenAI。":"Configure the selected prose-writing API in the local terminal that starts Paper Studio. Never paste a real key into chat, commit it, or store it in the browser. GPT Image still uses OpenAI separately.",
+  "网页未提供的功能或其他需求，请在本地终端运行 Code Agent。":"For features not available in the web interface, run Code Agent in your local terminal.",
+  "正文":"Prose", "图":"Figures", "表":"Tables", "编译 PDF":"Compile PDF", "清空生成内容":"Clear generated content", "下载项目 ZIP":"Download project ZIP",
+  "写论文需要 LLM API":"Paper writing requires an LLM API", "然后停止当前服务并重新运行":"Then stop the current service and run it again",
+  "Paper Studio 已启动，尚未载入论文":"Paper Studio is running with no paper loaded", "Paper Studio 状态加载失败":"Failed to load Paper Studio state",
+  "将项目配置、段落计划、LaTeX 与图表数据写入 paper/ 后，固定网页会自动读取这些内容。":"Once project configuration, paragraph plans, LaTeX, and artifact data are written to paper/, this interface loads them automatically.",
+  "直接生成全文初稿":"Generate full first draft", "复用已批准的段落结构、结果与逐段校验，只补齐尚未写入的段落。":"Use the approved paragraph structure, results, and paragraph checks to fill only unwritten paragraphs.",
+  "⏸ 停止":"⏸ Stop", "论文标题":"Paper title", "当前标题 / 可编辑候选标题":"Current title / editable candidate", "输入论文标题":"Enter a paper title",
+  "GPT 生成候选标题":"Generate title candidates", "确认写入 LaTeX":"Write to LaTeX", "选择当前编辑的自然段":"Select the paragraph to edit",
+  "例如：更突出 representation contraction，保持审慎，不增加未验证 claim。":"For example: emphasize representation contraction, remain cautious, and add no unverified claims.",
+  "一键生成当前 Section":"Generate current section", "参考论文中对应的写法":"Corresponding writing move in the reference paper",
+  "目标段落规划（写作约束）":"Target paragraph plan (writing constraints)", "查看参考原文":"View reference text", "当前候选段落":"Current candidate paragraph",
+  "给 GPT 的修改意见":"Revision instructions for GPT", "根据 comment 修改":"Revise from comment", "Accept → LaTeX":"Accept → LaTeX",
+  "系统正在结合已批准的段落结构、working abstract 和实验结果生成当前段落…":"The system is generating this paragraph from the approved structure, working abstract, and experiment results…",
+  "例如：motivation 太泛；把三个 confound 说清楚，缩短最后一句。":"For example: the motivation is too broad; clarify the three confounds and shorten the last sentence.",
+  "第 — / — 页":"Page — / —", "下载 PDF":"Download PDF", "显示导航栏":"Show navigation", "隐藏导航栏":"Hide navigation",
+  "还没有可预览的 PDF":"No PDF is available yet", "outline 确认并生成 LaTeX scaffold 后，这里会随每次 Accept 自动刷新。":"After the outline is approved and the LaTeX scaffold is generated, this preview refreshes after every Accept.",
+  "按论证依赖推进图表":"Build artifacts in argument order", "机制图单独设计；数据图和表格都从 results/ 生成，确认后插入对应自然段。":"Design mechanism figures separately; generate data figures and tables from results/, then insert them into the linked paragraph after approval.",
+  "选择一张图":"Select a figure", "修改命令":"Revision request", "调用本地 Agent":"Call local Agent", "⏸ 停止调用":"⏸ Stop request",
+  "绘图前置步骤":"Figure prerequisite", "画图 Prompt":"Figure prompt", "GPT Image 将按这里的完整描述绘制":"GPT Image renders the complete description entered here.",
+  "GPT 生成的画图 Prompt":"GPT-generated figure prompt", "修改 Prompt":"Revise prompt", "描述希望 GPT 怎样调整左侧 Prompt":"Describe how GPT should revise the prompt on the left.",
+  "给 GPT 的 Prompt 修改指令":"Prompt revision instructions", "GPT 生成画图 Prompt":"Generate figure prompt", "确认 Prompt 后绘图":"Approve prompt and draw",
+  "确认后依次完成 GPT Image 绘制和可编辑 PowerPoint 重建":"After approval, generate the GPT Image and rebuild it as an editable PowerPoint.",
+  "待生成":"Pending", "等待 Prompt":"Waiting for prompt", "可编辑 PPT/PDF":"Editable PPT/PDF", "随后自动重建":"Rebuilt automatically next",
+  "确认 Prompt → GPT Image":"Approve prompt → GPT Image", "重试可编辑 PPT/PDF 重建":"Retry editable PPT/PDF rebuild",
+  "这张图的修改 Prompt":"Revision prompt for this figure", "本地 Agent 生成这张图":"Generate this figure with local Agent", "合成设置":"Composition settings",
+  "论文组合 Prompt":"Paper composition prompt", "合成图":"Compose figure", "Agent 解析的布局计划":"Agent-parsed layout plan", "显示 GPT 原图":"Show original GPT image",
+  "图片 Caption":"Figure caption", "给 GPT 的 Caption 修改 Prompt":"Caption revision prompt", "GPT 生成 Caption candidate":"Generate caption candidate",
+  "描述这张图所展示的内容和必要的实验条件。":"Describe what the figure shows and any necessary experimental conditions.",
+  "当前正文将使用此 Caption":"The paper will use this caption", "保存 Caption":"Save caption", "插入正文位置":"Insertion point", "排版方式":"Layout", "单栏":"Single column", "双栏":"Two columns",
+  "确认并插入正文":"Approve and insert into paper", "高级：生成新的表格初稿":"Advanced: generate a new table draft",
+  "初始表格规格":"Initial table specification", "本地 Agent 生成初稿":"Generate draft with local Agent", "可编辑 Table LaTeX":"Editable table LaTeX",
+  "保存修改":"Save changes", "取消":"Cancel", "确认清空":"Confirm clearing", "复制 ID":"Copy ID", "当前项目 ID（可选择复制）":"Current project ID (copy if needed)",
+  "粘贴或输入项目 ID 以确认":"Paste or enter the project ID to confirm", "服务商":"Provider", "安全更新":"Update securely",
+  "这会删除当前项目的生成正文、候选、对话和图表产物，但保留配置、输入与实验结果。":"This deletes generated prose, candidates, conversations, and artifacts for the current project while preserving configuration, inputs, and experiment results.",
+  "密钥只写入当前 Paper Studio 进程内存，不进入聊天记录、浏览器存储或项目文件。":"The key is stored only in the current Paper Studio process memory, never in chat, browser storage, or project files."
+  ,"参考论文：":"Reference paper: ", "正文已全部写入 LaTeX；请在图表工作台完成并确认：":"All prose has been written to LaTeX; complete and approve these artifacts in the figure and table workspace: ",
+  "全文初稿已生成":"Full first draft generated", "已写入 PDF":"Written to PDF", "修改后需确认，才会写入 LaTeX。":"Approve revisions before writing them to LaTeX.",
+  "当前 Section 已完成":"Current section is complete", "参考摘要先提出假设，解释现象，再给出验证。":"The reference abstract introduces the hypothesis, explains the phenomenon, and then presents validation.",
+  "参考摘要先说明问题，再提出假设，最后总结验证。":"The reference abstract states the problem, introduces the hypothesis, and closes with the validation.",
+  "仅向当前目标段落提供 EXP PLAN 中已批准并嵌入的参考原文，用于模仿论证动作，不复制研究结论或措辞。":"Only the approved reference excerpt embedded in the experiment plan is provided for the current target paragraph. It guides the argumentative move, not the research claims or wording.",
+  "参考论文先说明问题重要性，再收窄到尚未解决的矛盾。":"The reference paper establishes the importance of the problem, then narrows to the unresolved tension.",
+  "参考论文先综述方法，再综述理论，最后定位自身。":"The reference paper reviews methods, then theory, and finally positions its own contribution.",
+  "参考论文先概述方法，再定义过程，最后说明细节。":"The reference paper gives an overview, defines the procedure, and then specifies implementation details.",
+  "参考论文先描述设置，再给出结果，最后分析。":"The reference paper describes the setup, presents results, and then analyzes them.",
+  "参考论文讨论可预测性，并指出不可预测的部分。":"The reference paper discusses predictability and identifies what remains unpredictable.",
+  "参考论文总结贡献，指出意义，并列出未来方向。":"The reference paper summarizes its contributions, implications, and future directions.",
+  "已接受版本（可继续修改）":"Accepted version (editable)", "已写入 LaTeX":"Written to LaTeX",
+  "机制图 · 先完成":"Mechanism figure · complete first", "画图 Prompt 任务已开始…":"Figure-prompt task started…", "生成中":"Generating",
+  "Caption 已在接受 I-P1 时自动生成":"The caption was generated automatically when I-P1 was accepted", "Wrapfigure（AAAI 禁用）":"Wrapfigure (disabled for AAAI)",
+  "结果表 · 可编辑 LaTeX":"Results table · editable LaTeX", "正在启动本地 Codex agent 生成表格初稿…":"Starting the local Agent to draft the table…",
+  "上方图片由当前 LaTeX 真实编译。初稿与实验结果相关修改均由本地 Agent 完成。":"The preview above is compiled from the current LaTeX. The local Agent creates the draft and applies result-grounded revisions.",
+  "本地 Agent 已启动，正在从可追溯结果生成 LaTeX 表格。":"The local Agent is generating a LaTeX table from traceable results.",
+  "正在自动生成 T1 表格初稿…":"Automatically generating the initial T1 table…"
+  ,"请先确认 outline；批量模式不会绕过论文结构确认。":"Confirm the outline first; batch drafting does not bypass structure approval."
+  ,"请先按页面顶部说明配置 LLM API Key。":"Configure the LLM API key using the instructions at the top of the page."
+  ,"继续补齐未完成正文":"Continue unfinished prose"
+  ,"尚未载入论文":"No paper loaded"
+  ,"完成":"Complete"
+  ,"未找到标题":"No title found"
+  ,"查看参考原文":"View reference text"
+  ,"显示导航栏":"Show navigation"
+  ,"隐藏导航栏":"Hide navigation"
+  ,"加载失败":"Loading failed"
+  ,"已写入 PDF":"Written to PDF"
+  ,"线上仅保留正文、可编辑表格与 Python 数据图；其他图以带 Caption 和 label 的 placeholder 写入论文。":"The online version supports prose, editable tables, and Python data plots. Other figures are inserted as placeholders with captions and labels."
+  ,"这是只读 Demo，无法生成或修改内容。":"This is a read-only demo; content cannot be generated or modified."
+  ,"等待 candidate":"Waiting for candidate"
+  ,"当前版本已写入 LaTeX；可直接修改正文，或填写 comment 让写作模型生成新 candidate。":"The current version is in LaTeX. Edit it directly or add a comment for GPT to generate a new candidate."
+  ,"正在结合已批准的段落结构、working abstract 和实验结果生成当前段落…":"Generating the current paragraph from the approved structure, working abstract, and experiment results…"
+  ,"确认后更新 LaTeX 并重新编译 PDF。":"Update LaTeX and recompile the PDF after confirmation."
+  ,"当前标题已经写入 PDF。":"The current title is already in the PDF."
+  ,"模型 candidate 尚未保存；可编辑后确认。":"The GPT candidate is unsaved; edit it and confirm when ready."
+  ,"提炼后的参考结构":"Distilled reference structure"
+  ,"双击正文、图片或表格，返回对应编辑位置":"Double-click prose, a figure, or a table to return to its editor"
+  ,"正在定位 PDF 中的源内容…":"Locating the source content in the PDF…"
+  ,"已就绪":"Ready"
+  ,"绘制中":"Drawing"
+  ,"已归档":"Archived"
+  ,"自动重建中":"Rebuilding automatically"
+  ,"已完成":"Completed"
+  ,"Prompt 未变 → 显示原图":"Prompt unchanged → Show original"
+  ,"确认新 Prompt → 重新调用 GPT Image":"Approve new prompt → Call GPT Image again"
+  ,"重新解析 Prompt 并生成合成图":"Reparse prompt and regenerate composition"
+  ,"更新 Caption → PDF":"Update caption → PDF"
+  ,"补生成 Caption → PDF":"Generate missing caption → PDF"
+  ,"已插入正文":"Inserted into paper"
+  ,"重新插入":"Insert again"
+  ,"保存修改（需重新确认）":"Save changes (confirmation required)"
+  ,"更新表格 → PDF":"Update table → PDF"
+  ,"保存 Caption 并更新 PDF":"Save caption and update PDF"
+  ,"例如：缩短标题，把图例移到右上角；只调整这一张图，不改变数据。":"For example: shorten the title and move the legend to the upper right; adjust only this panel without changing the data."
+  ,"这张图的修改 Prompt":"Revision prompt for this figure"
+  ,"这张子图的修改 Prompt":"Revision prompt for this panel"
+  ,"尚未生成这张图":"This figure has not been generated"
+  ,"尚未生成这张独立子图":"This panel has not been generated"
+  ,"本地 Agent 正在处理这张图…":"The local Agent is processing this figure…"
+  ,"本地 Agent 正在处理这张子图…":"The local Agent is processing this panel…"
+  ,"本地 Agent 重新生成这张":"Regenerate with local Agent"
+  ,"这是一张独立单图：点击下方按钮后直接生成最终 PDF candidate，不添加子图角标。":"This is a standalone figure. The button below generates the final PDF candidate directly, without panel labels."
+  ,"请分别生成并检查每张 PDF candidate。全部满意后，再手动点击“合成图”生成 PPTX 与矢量 PDF candidate。":"Generate and review each PDF candidate separately. When all are satisfactory, click Compose figure to create the PPTX and vector PDF candidate."
+  ,"线上不提供画图表功能":"Figure and table drawing is unavailable online"
+  ,"来源图 · 参考论文证据":"Source figure · reference-paper evidence"
+  ,"数据图 · results/ 驱动":"Data figure · driven by results/"
+  ,"生成表格初稿":"Generate table draft"
+  ,"当前候选段落":"Current candidate paragraph"
+  ,"已接受并写入 LaTeX 的 section 内容":"Accepted section content written to LaTeX"
+  ,"未上传实验结果：本 section 只保留段落主旨和待执行实验，不生成正文。":"No experimental results were uploaded. This section keeps only paragraph purposes and planned experiments, without drafting prose."
+  ,"这是当前写入 LaTeX 的版本；填写 comment 后可继续修改。":"This is the version currently written to LaTeX; add a comment to revise it."
+  ,"等待生成当前段落…":"Waiting to generate the current paragraph…"
+  ,"这个 section 已完成。":"This section is complete."
+  ,"未上传实验结果：从 Experiments 开始仅展示每段主旨、写作任务和待执行实验，不调用 LLM 生成正文。":"No experimental results were uploaded. From Experiments onward, only paragraph purposes, writing tasks, and planned experiments are shown; the LLM does not draft prose."
+  ,"Outline 尚未确认。可以浏览界面，但在确认并建立 LaTeX scaffold 前不能 Accept → LaTeX。":"The outline is not confirmed. You may browse, but cannot accept content into LaTeX until the scaffold is created."
+  ,"当前段落完成后自动生成本 Section…":"Generate this section automatically after the current paragraph…"
+  ,"正在根据 comment 修改当前段落…":"Revising the current paragraph from the comment…"
+  ,"后台 candidate 已生成；已保留你正在编辑的正文，Accept 时将以编辑框内容为准。":"A background candidate is ready. Your current edits were preserved and will be used on Accept."
+  ,"当前段落已生成。你只需要写 comment 修改，或 Accept → LaTeX。":"The current paragraph is ready. Add a comment to revise it or accept it into LaTeX."
+  ,"已接受版本的手动修改（尚未写入）":"Manual edits to the accepted version (not yet written)"
+  ,"请先输入写作模型名称。":"Enter a writing model first."
+  ,"标题有未保存修改。":"The title has unsaved changes."
+  ,"请先填写 Title GPT Prompt。":"Enter the Title GPT Prompt first."
+  ,"正在生成标题候选；不会自动保存…":"Generating title candidates; they will not be saved automatically…"
+  ,"正在写入 LaTeX 并编译 PDF…":"Writing to LaTeX and compiling the PDF…"
+  ,"正在核对最新段落状态…":"Checking the latest paragraph state…"
+  ,"候选已在另一轮生成中更新；已自动载入最新版，请确认内容后再次 Accept。":"The candidate changed in another generation run. The latest version is loaded; review it before accepting again."
+  ,"当前段落没有可接受的正文。":"The current paragraph has no prose to accept."
+  ,"正在校验引用；缺失时会联网检索、更新 BibTeX，再写入 LaTeX 并编译…":"Validating citations; missing references will be retrieved, added to BibTeX, written to LaTeX, and compiled…"
+  ,"正在编译 LaTeX…":"Compiling LaTeX…"
+  ,"PDF 编译成功。":"PDF compiled successfully."
+  ,"项目 ID 不匹配；未删除任何生成内容。":"Project ID does not match; nothing was deleted."
+  ,"当前没有可清空的论文项目。":"There is no paper project to clear."
+  ,"项目 ID 已复制。":"Project ID copied."
+  ,"自动复制失败；ID 已选中，请按 Ctrl/Cmd+C。":"Automatic copy failed. The ID is selected; press Ctrl/Cmd+C."
+  ,"全文初稿任务已启动；可以切换页面查看进度，完成后仍可逐段修改。":"Full-draft generation has started. You may navigate elsewhere and edit paragraphs after it completes."
+  ,"全文初稿与全部图表已写入 LaTeX，并完成 PDF 编译。":"The full draft and all artifacts were written to LaTeX, and the PDF was compiled."
+  ,"全文初稿已写入 LaTeX 并完成 PDF 编译，计划图表已以 placeholder 保留。":"The full draft was written to LaTeX and compiled to PDF; planned figures and tables remain as placeholders."
+  ,"已请求停止；已完成段落保留，之后可继续补齐未完成正文。":"Stop requested. Completed paragraphs are preserved and unfinished prose can be resumed later."
+  ,"完成。":"Done."
+  ,"正在停止本次 Codex 绘图任务…":"Stopping this GPT Image request…"
+  ,"正在生成 Caption…":"GPT is generating a caption…"
+  ,"正在生成 Caption candidate…":"Generating a caption candidate…"
+  ,"Caption 已保存。":"Caption saved."
+  ,"正在安全更新…":"Updating securely…"
+  ,"GPT candidate 尚未保存；可继续编辑，确认后再写入 LaTeX。":"The GPT candidate is unsaved; edit it and confirm before writing it to LaTeX."
+  ,"标题已确认写入 LaTeX，并完成 PDF 编译。":"The title was written to LaTeX and the PDF was compiled."
+  ,"网页版保留图位、图题和正文引用，但不直接绘制机制图；请下载项目 ZIP，并在本地终端运行 Code Agent 完成绘图。":"The web version preserves the figure location, caption, and prose reference but does not draw mechanism figures. Download the project ZIP and use Code Agent locally to complete the figure."
+  ,"线上版以带 Caption 和 label 的 placeholder 保留该图位，不提供正式绘图。完整功能请下载项目 ZIP 后在本地版使用。":"The online version preserves this figure as a placeholder with its caption and label; formal drawing is unavailable. Download the project ZIP and use the local version for the complete workflow."
+  ,"线上版以带 Caption 和 label 的 placeholder 保留该表位，不提供表格生成。完整功能请下载项目 ZIP 后在本地版使用。":"The online version preserves this table as a placeholder with its caption and label; table generation is unavailable. Download the project ZIP and use the local version for the complete workflow."
+  // English text taken from the interface as shipped before the Chinese restore; later keys override earlier ones.
+  ,"写作模型":"Writing model"
+  ,"应用":"Apply"
+  ,"安全更换 API Key":"Update API key"
+  ,"网页未提供的功能或其他需求，请在本地终端运行 Code Agent。":"Features not provided by the webpage or other requests should be run with Code Agent in the local terminal."
+  ,"正文":"Prose"
+  ,"图":"Figures"
+  ,"表":"Tables"
+  ,"编译 PDF":"Compile PDF."
+  ,"清空生成内容":"Clear generated content"
+  ,"下载项目 ZIP":"Download project ZIP"
+  ,"写论文需要 LLM API":"Writing a paper requires an LLM API."
+  ,"请为当前选择的正文写作 API 在启动 Paper Studio 的本机终端配置；不要把真实 key 输入聊天、提交到仓库或保存在浏览器中。":"Configure the writing API for the current selected text in the local terminal to start Paper Studio; do not input real keys into chat, submit to repositories, or store in the browser."
+  ,"export OPENAI_API_KEY=\"粘贴你的 API key\"":"export OPENAI_API_KEY=\"Paste your API key.\""
+  ,"然后停止当前服务并重新运行":"Then stop the current service and restart."
+  ,"Paper Studio 已启动，尚未载入论文":"Paper Studio Started, the paper has not yet loaded."
+  ,"将项目配置、段落计划、LaTeX 与图表数据写入":"Write project configuration, paragraph plan, LaTeX and chart data."
+  ,"后，固定网页会自动读取这些内容。":"Thereafter, the static webpage will automatically read these contents."
+  ,"空壳启动命令：":"Bare-bones startup command:"
+  ,"Paper Studio 状态加载失败":"Paper Studio Status load failed"
+  ,"直接生成全文初稿":"Directly generate the full draft."
+  ,"复用已批准的段落结构、结果与逐段校验，只补齐尚未写入的段落。":"Reuse approved paragraph structure, results, and per paragraph validation, filling only the sections not yet written."
+  ,"⏸ 停止":"⏸ stop"
+  ,"论文标题":"Paper title"
+  ,"当前标题 / 可编辑候选标题":"Current title / editable candidate titles."
+  ,"输入论文标题":"Enter paper title"
+  ,"标题生成指令":"Title-generation instructions"
+  ,"例如：更突出 representation contraction，保持审慎，不增加未验证 claim。":"For example, emphasize representation contraction, remain cautious, do not add unverified claims."
+  ,"生成候选标题":"Generate candidate titles"
+  ,"确认写入 LaTeX":"Confirm writing to LaTeX"
+  ,"选择当前编辑的自然段":"Select the currently edited paragraph."
+  ,"一键生成当前 Section":"One-click generation of the current section."
+  ,"参考论文中对应的写法":"The corresponding formulation in the reference papers."
+  ,"目标段落规划（写作约束）":"Target paragraph planning (writing constraints)."
+  ,"查看参考原文":"View referenced original text."
+  ,"当前候选段落":"Current candidate paragraph."
+  ,"系统正在结合已批准的段落结构、working abstract 和实验结果生成当前段落…":"The system is combining approved paragraph structure working abstract and experimental results to generate the current paragraph."
+  ,"给写作模型的修改意见":"Feedback to the writing model"
+  ,"例如：motivation 太泛；把三个 confound 说清楚，缩短最后一句。":"For example, motivation is too generic; clarify three confounds and shorten the last sentence."
+  ,"根据 comment 修改":"Modify according to comment."
+  ,"第 — / — 页":"Page — / —"
+  ,"下载 PDF":"Download PDF"
+  ,"显示导航栏":"Show navigation bar."
+  ,"还没有可预览的 PDF":"No PDF available for preview yet."
+  ,"outline 确认并生成 LaTeX scaffold 后，这里会随每次 Accept 自动刷新。":"outline After confirming and generating the LaTeX scaffold, this will automatically refresh with every Accept."
+  ,"PDF 页面导航":"PDF Page navigation"
+  ,"双击正文或图表可返回编辑":"Double click the main text or charts to return to editing."
+  ,"按论证依赖推进图表":"Advance charts according to argument dependencies"
+  ,"机制图单独设计；数据图和表格都从 results/ 生成，确认后插入对应自然段。":"Mechanism diagrams designed separately; data plots and tables are generated from results/ and inserted into the corresponding paragraph after confirmation."
+  ,"选择一张图":"Select a figure."
+  ,"修改命令":"Modify command"
+  ,"例如：把两个 benchmark 做成分组表头；我们的方法放最后并加粗；在 caption 中说明 ASR 和 StrongREJECT 都是跨模型平均值。不要改变任何数值。":"Example: arrange the two benchmarks as grouped headers; place our method last and bold it; in the caption note that ASR and StrongREJECT are cross model averages. Do not modify any values."
+  ,"调用本地 Agent":"Invoke local Agent"
+  ,"⏸ 停止调用":"⏸ Stop calling"
+  ,"绘图前置步骤":"Drawing prerequisites"
+  ,"画图 Prompt":"Plotting prompt"
+  ,"Codex 将按这里的完整描述绘制原生可编辑图形":"The local Agent will render native editable graphics according to this complete description."
+  ,"模型生成的画图 Prompt":"Model-generated drawing prompt"
+  ,"先生成画图 Prompt；可以直接修改左侧完整 Prompt，也可以在右侧输入修改指令。":"First generate the drawing prompt; you can directly modify the complete prompt on the left or enter modification commands on the right."
+  ,"修改 Prompt":"Modify prompt"
+  ,"描述希望模型怎样调整左侧 Prompt":"Describe how you want the model to adjust the prompt on the left."
+  ,"画图 Prompt 修改指令":"Drawing-prompt revision instructions"
+  ,"例如：当前内容太多；改成适合单栏的简单图，只保留两个核心模块，减少文字。":"For example the current content is too long; replace with a simple single column graphic, keep only two core modules, reduce text."
+  ,"生成画图 Prompt":"Generate drawing prompt"
+  ,"确认 Prompt 后绘图":"Plot after confirming the Prompt."
+  ,"确认后由 Codex 直接生成可编辑 PowerPoint 和论文 PDF":"Upon confirmation, the local Agent directly generates editable PowerPoint and the paper PDF."
+  ,"机制图生成流程":"Mechanism diagram generation process"
+  ,"待生成":"To be generated"
+  ,"Codex 原生图形":"Native graphics"
+  ,"等待 Prompt":"Waiting for Prompt"
+  ,"可编辑 PPT/PDF":"Editable PPT/PDF."
+  ,"随后自动重建":"Then automatically rebuild."
+  ,"确认 Prompt → Codex 绘图":"Confirm prompt → draw"
+  ,"重试可编辑 PPT/PDF 重建":"Retry editable PPT/PDF reconstruction."
+  ,"请分别生成并检查每张 PDF candidate。全部满意后，再手动点击“合成图”生成 PPTX 与矢量 PDF candidate。":"Please generate and review each PDF candidate separately. When all are satisfactory, manually click Synthesize Figure to generate PPTX and vector PDF candidates."
+  ,"这张图的修改 Prompt":"Modification prompt for this figure."
+  ,"例如：缩短标题，把图例移到右上角；只调整这张图，不改变数据。":"For example shorten the title and move the legend to the upper right corner; only adjust this figure and do not change the data."
+  ,"本地 Agent 生成这张图":"Local agent generated this figure."
+  ,"合成设置":"Synthesis settings"
+  ,"论文组合 Prompt":"Paper composition prompt."
+  ,"合成图":"Composite figure"
+  ,"Agent 解析的布局计划":"Agent Parsed layout plan"
+  ,"显示构图草稿":"Show composition draft"
+  ,"图片 Caption":"Image caption"
+  ,"描述这张图所展示的内容和必要的实验条件。":"Describe what this figure shows and the required experimental conditions."
+  ,"Caption 修改指令":"Caption-revision instructions"
+  ,"例如：解释三条曲线分别对应什么；压缩为一句短句；保留 synthetic 声明。":"For example, explain what each of three curves represents; compress to one sentence; retain the synthetic declaration."
+  ,"生成 Caption candidate":"Generate caption candidate"
+  ,"当前正文将使用此 Caption":"The current main text will use this caption."
+  ,"保存 Caption":"Save caption"
+  ,"插入正文位置":"Body text insertion point"
+  ,"排版方式":"Typesetting method"
+  ,"单栏":"single-column"
+  ,"双栏":"two-column"
+  ,"Wrapfigure（AAAI 禁用）":"Wrapfigure(AAAI Disable)"
+  ,"确认并插入正文":"Confirm and insert the body text"
+  ,"上方图片由当前 LaTeX 真实编译。初稿与实验结果相关修改均由本地 Agent 完成。":"The top image is compiled by the current LaTeX; initial draft and experiment result related edits are performed by the local Agent."
+  ,"高级：生成新的表格初稿":"Advanced: generate a new table draft"
+  ,"初始表格规格":"Initial table specification"
+  ,"列: Method | Dataset A metric | Dataset B metric\n行: source\nCaption: Main comparison.\n字号: small\n最优值: max":"Column: Method | Dataset A metric | Dataset B metric\nLine: source\nCaption: Main comparison.\nFont size: small\nBest value: max."
+  ,"本地 Agent 生成初稿":"Local agent generated the first draft."
+  ,"可编辑 Table LaTeX":"Editable Table LaTeX."
+  ,"保存修改":"Save changes"
+  ,"关闭清空确认":"Close and clear confirmation."
+  ,"这会删除当前项目的生成正文、候选、对话和图表产物，但保留配置、输入与实验结果。":"This will delete the generated main text content candidates dialogues and chart artifacts for the current project, while preserving configuration inputs and experimental results."
+  ,"当前项目 ID（可选择复制）":"Current project ID (copyable)."
+  ,"复制 ID":"Copy ID."
+  ,"粘贴或输入项目 ID 以确认":"Paste or enter the project ID to confirm."
+  ,"取消":"cancel"
+  ,"确认清空":"Confirm clear"
+  ,"关闭安全密钥输入":"Disable security key input"
+  ,"密钥只写入当前 Paper Studio 进程内存，不进入聊天记录、浏览器存储或项目文件。":"Keys are written only to the current Paper Studio process memory and are not stored in chat history browser storage or project files."
+  ,"服务商":"Service provider"
+  ,"安全更新":"Security update"
+}));
+
+function translateStudioText(value) {
+  const exact = studioTranslations.get(value);
+  if (exact) return exact;
+  const replacements = [
+    ["参考论文：", "Reference paper: "],
+    ["正文已全部写入 LaTeX；请在图表工作台完成并确认：", "All prose has been written to LaTeX; complete and approve these artifacts in the figure and table workspace: "],
+    ["第 ", "Page "],
+    [" 页", ""],
+    [" · 图", " · Figures"],
+    [" · 表", " · Tables"],
+    ["已等待 ", "waited "],
+    [" 秒", " seconds"],
+    [" 后", " after"],
+  ];
+  let translated = value;
+  replacements.forEach(([source, target]) => { translated = translated.split(source).join(target); });
+  translated = translated
+    .replace(/^正在生成 (.+)$/, "Generating $1")
+    .replace(/^已写入并编译 (.+)$/, "Written and compiled: $1")
+    .replace(/^(.+) 的正文已写入 LaTeX 和 PDF，计划图表已以 placeholder 保留。$/, "$1 prose was written to LaTeX and PDF; planned figures and tables remain as placeholders.")
+    .replace(/^(.+) 的新版本已替换写入 LaTeX，并完成 PDF 编译。$/, "The new version of $1 was written to LaTeX and the PDF was compiled.")
+    .replace(/^\u5168\u90e8 (\d+) \u4e2a\u6bb5\u843d\u5df2\u7ecf\u5199\u5165 LaTeX\uff0c\u53ef\u7ee7\u7eed\u9010\u6bb5\u4fee\u6539\u3002$/, "All $1 paragraphs have been written to LaTeX and remain editable.")
+    .replace(/^\u5c06\u6309\u9879\u76ee\u5199\u4f5c\u987a\u5e8f\u8865\u9f50 (\d+) \/ (\d+) \u4e2a\u672a\u5b8c\u6210\u6bb5\u843d\uff1b\u5df2\u63a5\u53d7\u5185\u5bb9\u4e0d\u4f1a\u88ab\u8986\u76d6\u3002$/, "Draft $1 of $2 unfinished paragraphs in project order; accepted content will not be overwritten.")
+    .replace(/^\u4e00\u952e\u751f\u6210\u5f53\u524d Section\uff08(\d+) \u6bb5\u5f85\u5b8c\u6210\uff09$/, "Generate current section ($1 paragraphs remaining)")
+    .replace(/^\u5df2\u4ece PDF \u8fd4\u56de (.+) \u7684\u6587\u5b57\u7f16\u8f91\u4f4d\u7f6e\u3002$/, "Returned from the PDF to the text editor for $1.")
+    .replace(/^\u5df2\u4ece PDF \u8fd4\u56de (.+) \u7684(\u8868\u683c|\u56fe\u7247)\u7f16\u8f91\u4f4d\u7f6e\u3002$/, (_, id, kind) => `Returned from the PDF to the ${kind === "\u8868\u683c" ? "table" : "figure"} editor for ${id}.`)
+    .replace(/^(.+) \u7684\u5f53\u524d\u6bb5\u843d\u5df2\u751f\u6210\u5e76\u4fdd\u5b58\u3002$/, "The current paragraph in $1 was generated and saved.")
+    .replace(/^(.+) \u5df2\u63a5\u53d7\u5e76\u5b8c\u6210 LaTeX \u7f16\u8bd1\uff1b\u5f53\u524d section \u5df2\u5b8c\u6210\u3002$/, "$1 was accepted and compiled; the current section is complete.")
+    .replace(/^(.+) \u5df2\u63a5\u53d7\u5e76\u5b8c\u6210 LaTeX \u7f16\u8bd1\uff1b\u6b63\u5728\u540e\u53f0\u51c6\u5907 (.+) \u5019\u9009\u3002$/, "$1 was accepted and compiled; the candidate for $2 is being prepared in the background.")
+    .replace(/^(.+) \u5df2\u63a5\u53d7\u5e76\u5b8c\u6210 LaTeX \u7f16\u8bd1\uff1b(.+) \u5019\u9009\u5df2\u5237\u65b0\u3002$/, "$1 was accepted and compiled; the candidate for $2 was refreshed.")
+    .replace(/^(.+) \u5df2\u63a5\u53d7\u5e76\u5b8c\u6210 LaTeX \u7f16\u8bd1\u3002$/, "$1 was accepted and compiled in LaTeX.")
+    .replace(/^(.+) \u5df2\u52a0\u5165\u961f\u5217\uff1b\u5f53\u524d\u6bb5\u843d\u751f\u6210\u5b8c\u6210\u540e\u4f1a\u81ea\u52a8\u5f00\u59cb\u6574\u8282\u751f\u6210\u3002$/, "$1 was queued and will start after the current paragraph finishes.")
+    .replace(/^(.+) \u7684\u6574\u8282\u751f\u6210\u4efb\u52a1\u5df2\u542f\u52a8\uff1b\u5c06\u6309\u6bb5\u843d\u987a\u5e8f\u81ea\u52a8\u5199\u5165 LaTeX \u5e76\u7f16\u8bd1\u3002$/, "Full-section drafting for $1 has started and will write paragraphs to LaTeX in order.")
+    .replace(/\uff08([^\uff09]+)\uff09/g, " ($1)");
+  return translated;
+}
+
+function translateStudioUi(root = document.body) {
+  document.documentElement.lang = studioUiLanguage === "en" ? "en" : "zh-CN";
+  const select = $("studio-language-select");
+  if (select) select.value = studioUiLanguage;
+  if (studioUiLanguage !== "en" || !root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node => {
+    if (node.parentElement?.closest("script,style,textarea,code")) return;
+    if (node.parentElement?.closest("pre") && !node.parentElement.closest("pre.message")) return;
+    const value = node.nodeValue.trim();
+    const translated = translateStudioText(value);
+    if (translated !== value) node.nodeValue = node.nodeValue.replace(value, translated);
+  });
+  root.querySelectorAll?.("[placeholder]").forEach(node => {
+    const translated = studioTranslations.get(node.placeholder);
+    if (translated) node.placeholder = translated;
+  });
+}
+
 translateStudioUi();
+$("studio-language-select")?.addEventListener("change", event => {
+  const language = event.target.value === "en" ? "en" : "zh";
+  localStorage.setItem("research-avatar-language", language);
+  if (window.parent !== window) {
+    window.parent.postMessage({type: "research-avatar-language", language}, window.location.origin);
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set("lang", language);
+  window.location.replace(url.toString());
+});
+new MutationObserver(records => records.forEach(record => {
+  if (record.type === "characterData") translateStudioUi(record.target.parentElement);
+  record.addedNodes.forEach(node => {
+    if (node.nodeType === Node.ELEMENT_NODE) translateStudioUi(node);
+    if (node.nodeType === Node.TEXT_NODE) translateStudioUi(node.parentElement);
+  });
+})).observe(document.body, {subtree:true, childList:true, characterData:true});
 const STUDIO_BASE_PATH = ["/demo-studio", "/paper-studio"].find(
   prefix => window.location.pathname === prefix
     || window.location.pathname.startsWith(prefix + "/"),
@@ -85,7 +428,6 @@ let modelApplyBusy = false;
 let figureRequestBusy = false;
 let generatedResetBusy = false;
 let fullDraftRequestBusy = false;
-let queuedFullDraftStart = false;
 let queuedSectionDraftStart = "";
 let pdfLocateRequestId = 0;
 let pdfResizeObserver = null;
@@ -426,7 +768,7 @@ async function request(path, options = {}) {
     && !["GET", "HEAD"].includes(method)
     && !DEMO_SAFE_WRITE_PATHS.has(path)
   ) {
-    throw new Error("This is a read only demo; cannot generate or modify content.");
+    throw new Error(studioT("这是只读 Demo，无法生成或修改内容。", "This is a read only demo; cannot generate or modify content."));
   }
   const response = await fetch(studioPath(path), {
     headers: {"Content-Type": "application/json"},
@@ -450,10 +792,10 @@ function updateAcceptButton() {
   $("accept").textContent = canAccept
     ? "Accept → LaTeX"
     : accepted
-      ? "LaTeX has been written."
-      : "Waiting for candidate.";
+      ? studioT("已写入 LaTeX", "LaTeX has been written.")
+      : studioT("等待 candidate", "Waiting for candidate.");
   $("accept").title = accepted && !canAccept
-    ? "The current version is written in LaTeX; you can modify the main text directly or give the writing model feedback to generate a new candidate."
+    ? studioT("当前版本已写入 LaTeX；可直接修改正文，或填写 comment 让写作模型生成新 candidate。", "The current version is written in LaTeX; you can modify the main text directly or give the writing model feedback to generate a new candidate.")
     : "";
 }
 
@@ -474,7 +816,7 @@ function setBusy(busy, label = "") {
       ? state.sections[activeSection].current_paragraph
       : null;
     if (paragraph && !$("candidate").value) {
-      $("candidate").placeholder = "Currently combining approved paragraph structure working abstract and experimental results to generate the current paragraph.";
+      $("candidate").placeholder = studioT("正在结合已批准的段落结构、working abstract 和实验结果生成当前段落…", "Currently combining approved paragraph structure working abstract and experimental results to generate the current paragraph.");
     }
     $("message").textContent = label || "Working…";
   } else {
@@ -521,11 +863,11 @@ function updateTitleSaveButton() {
   const currentTitle = String(editor.current_title || "").replace(/\s+/g, " ").trim();
   const changed = Boolean(visibleTitle) && visibleTitle !== currentTitle;
   $("title-save").disabled = titleBusy || !changed;
-  $("title-save").textContent = changed ? "Confirm writing to LaTeX" : "Written to PDF";
-  $("title-save").title = changed ? "Update LaTeX after confirmation and recompile the PDF." : "The current title has been written into the PDF.";
+  $("title-save").textContent = changed ? studioT("确认写入 LaTeX", "Confirm writing to LaTeX") : studioT("已写入 PDF", "Written to PDF");
+  $("title-save").title = changed ? studioT("确认后更新 LaTeX 并重新编译 PDF。", "Update LaTeX after confirmation and recompile the PDF.") : studioT("当前标题已经写入 PDF。", "The current title has been written into the PDF.");
   if (!changed && !state?.pdf?.exists) {
-    $("title-save").textContent = "Current title";
-    $("title-save").title = "The title is saved in the manuscript; compile the paper to create a PDF.";
+    $("title-save").textContent = studioT("当前标题", "Current title");
+    $("title-save").title = studioT("标题已保存在稿件中；编译论文后才会生成 PDF。", "The title is saved in the manuscript; compile the paper to create a PDF.");
   }
 }
 
@@ -551,11 +893,11 @@ function renderTitleEditor(force = false) {
   const promptInput = $("title-gpt-prompt");
   titleInput.disabled = titleBusy;
   promptInput.disabled = titleBusy;
-  $("title-current-summary").textContent = editor.current_title || "Title not found.";
+  $("title-current-summary").textContent = editor.current_title || studioT("未找到标题", "Title not found.");
   renderTitleDraftInput(titleInput, "title", editor.candidate || editor.current_title || "", force);
   renderTitleDraftInput(promptInput, "prompt", editor.prompt || "", force);
   $("title-status").textContent = editor.last_message || (
-    editor.candidate ? "Model candidate not saved yet; it can be edited and confirmed." : "Must confirm after modification before writing to LaTeX."
+    editor.candidate ? studioT("模型 candidate 尚未保存；可编辑后确认。", "Model candidate not saved yet; it can be edited and confirmed.") : studioT("修改后需确认，才会写入 LaTeX。", "Must confirm after modification before writing to LaTeX.")
   );
   $("title-status").classList.remove("error");
   if (!titleBusy) $("title-generate").disabled = false;
@@ -605,7 +947,7 @@ function renderParagraphNavigation(section) {
       paragraphRequestBusy = true;
       const requestedSection = activeSection;
       try {
-        setBusy(true, `Switching to. ${paragraph.id}…`);
+        setBusy(true, studioT(`正在切换到 ${paragraph.id}…`, `Switching to. ${paragraph.id}…`));
         const payload = await request("/api/select-paragraph", {
           method: "POST",
           body: JSON.stringify({
@@ -618,8 +960,8 @@ function renderParagraphNavigation(section) {
           render();
           showMessage(
             paragraph.status === "accepted"
-              ? `Switched to ${paragraph.id}; Can continue editing based on the accepted version.`
-              : `Switched to ${paragraph.id}.`,
+              ? studioT(`已切换到 ${paragraph.id}；可基于已接受版本继续修改。`, `Switched to ${paragraph.id}; Can continue editing based on the accepted version.`)
+              : studioT(`已切换到 ${paragraph.id}。`, `Switched to ${paragraph.id}.`),
           );
         } else {
           renderSections();
@@ -647,11 +989,11 @@ function renderReferenceContext(section) {
   }
   card.hidden = false;
   $("reference-context-title").textContent = abstracted
-    ? "Refined reference structure"
-    : "The corresponding formulation in the reference papers.";
+    ? studioT("提炼后的参考结构", "Refined reference structure")
+    : studioT("参考论文中对应的写法", "The corresponding formulation in the reference papers.");
   const toggle = $("reference-excerpts-toggle");
   toggle.hidden = abstracted;
-  $("reference-excerpts-title").textContent = abstracted ? "" : "View referenced original text.";
+  $("reference-excerpts-title").textContent = abstracted ? "" : studioT("查看参考原文", "View referenced original text.");
   const root = $("reference-context-excerpts");
   root.replaceChildren(...excerpts.map((excerpt) => {
     const container = document.createElement("div");
@@ -718,11 +1060,11 @@ function updatePdfPageIndicator() {
   const total = Number(state && state.pdf && state.pdf.page_count) || 0;
   const budget = state && state.pdf && state.pdf.page_budget;
   const budgetText = budget && budget.limit && budget.content_pages
-    ? ` · Body ${budget.content_pages}/${budget.limit}`
+    ? ` · ${studioT("正文", "Body")} ${budget.content_pages}/${budget.limit}`
     : "";
   indicator.textContent = position && total
-    ? `Page ${position.page} / ${total}${budgetText}`
-    : "Page — / —";
+    ? `${studioT("第", "Page")} ${position.page} / ${total}${studioT(" 页", "")}${budgetText}`
+    : studioT("第 — / — 页", "Page — / —");
   $("pdf-navigation").querySelectorAll(".pdf-thumbnail").forEach((thumbnail) => {
     thumbnail.classList.toggle("active", thumbnail.dataset.page === (position && position.page));
   });
@@ -735,7 +1077,7 @@ function renderPdf() {
   const empty = $("pdf-empty");
   const toggle = $("pdf-navigation-toggle");
   const download = $("pdf-download");
-  toggle.textContent = pdfNavigationVisible ? "Hide navigation bar." : "Show navigation bar.";
+  toggle.textContent = pdfNavigationVisible ? studioT("隐藏导航栏", "Hide navigation bar.") : studioT("显示导航栏", "Show navigation bar.");
   toggle.setAttribute("aria-pressed", pdfNavigationVisible ? "true" : "false");
   if (state.pdf.exists) {
     download.hidden = false;
@@ -752,9 +1094,9 @@ function renderPdf() {
         const page = document.createElement("div");
         page.className = "pdf-page";
         page.dataset.page = String(pageNumber);
-        page.title = "Double-click the body text, image, or table to jump to the corresponding editing position.";
+        page.title = studioT("双击正文、图片或表格，返回对应编辑位置", "Double-click the body text, image, or table to jump to the corresponding editing position.");
         const image = document.createElement("img");
-        image.alt = `Paper PDF page ${pageNumber} page`;
+        image.alt = studioT(`论文 PDF 第 ${pageNumber} 页`, `Paper PDF page ${pageNumber} page`);
         image.draggable = false;
         image.width = Number(state.pdf.page_width_pt) || 612;
         image.height = Number(state.pdf.page_height_pt) || 792;
@@ -774,9 +1116,9 @@ function renderPdf() {
         thumbnail.className = "pdf-thumbnail";
         thumbnail.type = "button";
         thumbnail.dataset.page = String(pageNumber);
-        thumbnail.title = `Go to the ${pageNumber} page`;
+        thumbnail.title = studioT(`转到第 ${pageNumber} 页`, `Go to the ${pageNumber} page`);
         const image = document.createElement("img");
-        image.alt = `the ${pageNumber} page`;
+        image.alt = studioT(`第 ${pageNumber} 页`, `the ${pageNumber} page`);
         image.src = studioPath(`/paper-page/${pageNumber}.svg?v=${state.pdf.version}`);
         thumbnail.appendChild(image);
         thumbnail.onclick = () => {
@@ -816,7 +1158,7 @@ async function locatePdfEditTarget(event, pageElement) {
   const x = (event.clientX - rectangle.left) / rectangle.width * state.pdf.page_width_pt;
   const y = (event.clientY - rectangle.top) / rectangle.height * state.pdf.page_height_pt;
   try {
-    showMessage("Locating source content in PDF…");
+    showMessage(studioT("正在定位 PDF 中的源内容…", "Locating source content in PDF…"));
     const payload = await request("/api/pdf/locate", {
       method: "POST",
       body: JSON.stringify({page, x, y}),
@@ -836,7 +1178,7 @@ async function locatePdfEditTarget(event, pageElement) {
       if (locateRequestId !== pdfLocateRequestId) return;
       state = selected.state;
       render();
-      showMessage(`Returned from PDF ${target.paragraph_id} The text editing position.`);
+      showMessage(studioT(`已从 PDF 返回 ${target.paragraph_id} 的文字编辑位置。`, `Returned from PDF ${target.paragraph_id} The text editing position.`));
       return;
     }
     activeFigure = target.artifact_id;
@@ -844,7 +1186,7 @@ async function locatePdfEditTarget(event, pageElement) {
       localStorage.setItem(ACTIVE_FIGURE_KEY, activeFigure);
     } catch (_error) {}
     render();
-    $("figure-message").textContent = `Returned from PDF ${target.artifact_id} of${target.view === "tables" ? "table" : "Image"}Edit position.`;
+    $("figure-message").textContent = studioT(`已从 PDF 返回 ${target.artifact_id} 的${target.view === "tables" ? "表格" : "图片"}编辑位置。`, `Returned from PDF ${target.artifact_id} of${target.view === "tables" ? "table" : "Image"}Edit position.`);
   } catch (error) {
     if (locateRequestId !== pdfLocateRequestId) return;
     showMessage(error.message, true);
@@ -904,22 +1246,22 @@ function updateMechanismFlow(figure) {
       id: "prompt",
       ready: promptReady,
       active: promptActive,
-      status: figure.status === "prompt_generating" ? "Generating" : (promptReady ? "Ready" : "To be generated"),
+      status: figure.status === "prompt_generating" ? studioT("生成中", "Generating") : (promptReady ? studioT("已就绪", "Ready") : studioT("待生成", "To be generated")),
     },
     {
       id: "image",
       ready: imageReady,
       active: imageActive,
       status: ["image_generating", "agent_generating"].includes(figure.status)
-        ? "Drawing in progress" : (imageReady ? "Completed" : "Waiting for Prompt"),
+        ? studioT("绘制中", "Drawing in progress") : (imageReady ? studioT("已完成", "Completed") : studioT("等待 Prompt", "Waiting for Prompt")),
     },
     {
       id: "paper",
       ready: paperReady,
       active: paperActive,
       status: ["agent_generating", "agent_editing"].includes(figure.status)
-        ? "Auto-rebuilding."
-        : (paperReady ? "Completed" : "Then automatically rebuild."),
+        ? studioT("自动重建中", "Auto-rebuilding.")
+        : (paperReady ? studioT("已完成", "Completed") : studioT("随后自动重建", "Then automatically rebuild.")),
     },
   ];
   stages.forEach((stage) => {
@@ -948,8 +1290,8 @@ function updateFigureButtonStates() {
     || !figure.ready || !generationReady || running || Boolean(submittedPrompt && !promptInstruction);
   $("figure-draw").disabled = !figure.ready || !generationReady || running || !submittedPrompt;
   $("figure-draw").textContent = figure.paper_preview_url
-    ? "Confirm new Prompt → Codex Redraw"
-    : "Confirm prompt → Codex plotting";
+    ? studioT("确认新 Prompt → 重绘", "Confirm new Prompt → Redraw")
+    : studioT("确认 Prompt → Codex 绘图", "Confirm prompt → draw");
   $("figure-cancel").hidden = figure.status !== "image_generating";
   $("figure-cancel").disabled = figure.status !== "image_generating" || figureRequestBusy;
   const mechanismBuildFailed = Boolean(
@@ -960,7 +1302,7 @@ function updateFigureButtonStates() {
   );
   $("figure-build").hidden = !mechanismBuildFailed;
   $("figure-build").disabled = !figure.ready || !generationReady || running || !figure.preview_url;
-  $("figure-build").textContent = "Retry editable PPT/PDF reconstruction.";
+  $("figure-build").textContent = studioT("重试可编辑 PPT/PDF 重建", "Retry editable PPT/PDF reconstruction.");
   $("figure-approve").disabled = (
     table
     || !insertionReady
@@ -976,8 +1318,8 @@ function updateFigureButtonStates() {
   $("data-compose").disabled = table || !figure.ready || running || !panelsReady;
   $("single-data-generate").disabled = table || !figure.ready || running;
   $("data-compose").textContent = figure.composition_ready
-    ? "Reparse the Prompt and generate a composite image."
-    : "Composite figure";
+    ? studioT("重新解析 Prompt 并生成合成图", "Reparse the Prompt and generate a composite image.")
+    : studioT("合成图", "Composite figure");
   $("data-approve").disabled = (
     table
     || !insertionReady
@@ -995,26 +1337,26 @@ function updateFigureButtonStates() {
   $("figure-layout-mode").disabled = running || !hasPlacement;
   $("figure-approve").textContent = figure.status === "approved"
     ? (captionDirty
-      ? "Update Caption → PDF"
+      ? studioT("更新 Caption → PDF", "Update Caption → PDF")
       : captionNeedsBackfill
-        ? "Generate additional caption. → PDF"
-        : "Body text has been inserted.")
-    : "Confirm and insert the body text";
+        ? studioT("补生成 Caption → PDF", "Generate additional caption. → PDF")
+        : studioT("已插入正文", "Body text has been inserted."))
+    : studioT("确认并插入正文", "Confirm and insert the body text");
   $("data-approve").textContent = figure.status === "approved"
     ? (captionDirty
-      ? "Update Caption → PDF"
+      ? studioT("更新 Caption → PDF", "Update Caption → PDF")
       : captionNeedsBackfill
-        ? "Generate additional caption. → PDF"
-        : "Reinsert")
-    : "Confirm and insert the body text";
+        ? studioT("补生成 Caption → PDF", "Generate additional caption. → PDF")
+        : studioT("重新插入", "Reinsert"))
+    : studioT("确认并插入正文", "Confirm and insert the body text");
   const visibleTableLatex = $("table-latex").value.trim();
   const tableLatexDirty = $("table-latex").dataset.dirty === "true";
   $("table-generate").disabled = !table || !figure.ready || running;
   $("table-agent-edit").disabled = !table || !figure.ready || running || !visibleTableLatex;
   $("table-save").disabled = !table || running || !visibleTableLatex || !tableLatexDirty;
   $("table-save").textContent = figure.status === "approved" && tableLatexDirty
-    ? "Save changes (requires reconfirmation)."
-    : "Save changes";
+    ? studioT("保存修改（需重新确认）", "Save changes (requires reconfirmation).")
+    : studioT("保存修改", "Save changes");
   $("table-approve").disabled = (
     !table
     || !figure.ready
@@ -1023,15 +1365,15 @@ function updateFigureButtonStates() {
     || (figure.status === "approved" && !tableLatexDirty)
   );
   $("table-approve").textContent = figure.status === "approved"
-    ? (tableLatexDirty ? "Update table → PDF" : "Body text has been inserted.")
-    : "Confirm and insert the body text";
+    ? (tableLatexDirty ? studioT("更新表格 → PDF", "Update table → PDF") : studioT("已插入正文", "Body text has been inserted."))
+    : studioT("确认并插入正文", "Confirm and insert the body text");
   $("figure-caption").disabled = table || running;
   $("figure-caption-prompt").disabled = table || running;
   $("figure-caption-generate").disabled = table || running;
   $("figure-caption-save").disabled = table || running || !captionDirty;
   $("figure-caption-save").textContent = figure.status === "approved"
-    ? "Save caption and update PDF."
-    : "Save caption";
+    ? studioT("保存 Caption 并更新 PDF", "Save caption and update PDF.")
+    : studioT("保存 Caption", "Save caption");
   $("draw-prompt").disabled = running;
   $("prompt-instruction").disabled = running;
   $("single-data-prompt").disabled = running;
@@ -1058,10 +1400,10 @@ function renderSingleDataFigure(figure) {
   const input = $("single-data-prompt");
   renderFigureEditorInput(input, figure.id, `panel:${panel.id}`, panel.agent_prompt || "");
   const generate = $("single-data-generate");
-  const generatorName = state.online_project ? "Python" : "Local Agent";
+  const generatorName = state.online_project ? "Python" : studioT("本地 Agent", "Local Agent");
   generate.textContent = panel.preview_url
-    ? `${generatorName} Regenerate this figure`
-    : `${generatorName} Generate this figure.`;
+    ? studioT(`${generatorName} 重新生成这张图`, `${generatorName} Regenerate this figure`)
+    : studioT(`${generatorName} 生成这张图`, `${generatorName} Generate this figure.`);
   generate.onclick = () => startFigureJob(
     "/api/figure/panel/generate",
     {
@@ -1073,7 +1415,7 @@ function renderSingleDataFigure(figure) {
         ? "two-column"
         : "single-column",
     },
-    `Generating ${figure.id} Final single figure…`,
+    studioT(`正在生成 ${figure.id} 最终单图…`, `Generating ${figure.id} Final single figure…`),
   );
 }
 
@@ -1101,8 +1443,8 @@ function renderDataPanels(figure) {
         <div class="figure-progress data-panel-progress" hidden>
           <progress class="figure-progress-track" max="100" value="0"></progress><strong></strong>
         </div>
-        <label class="data-panel-prompt-label">Modification prompt for this subfigure.</label>
-        <textarea class="data-panel-prompt" rows="3" placeholder="For example shorten the title and move the legend to the upper right corner; only adjust this figure and do not change the data."></textarea>
+        <label class="data-panel-prompt-label">${studioT("这张子图的修改 Prompt", "Modification prompt for this subfigure")}</label>
+        <textarea class="data-panel-prompt" rows="3" placeholder="${studioT("例如：缩短标题，把图例移到右上角；只调整这张图，不改数据。", "For example shorten the title and move the legend to the upper right corner; only adjust this figure and do not change the data.")}"></textarea>
         <div class="data-panel-actions"><button class="primary data-panel-generate"></button></div>
         <pre class="message data-panel-message" hidden></pre>
       `;
@@ -1130,8 +1472,8 @@ function renderDataPanels(figure) {
       ? `${figure.id} · ${figure.title}`
       : `${figure.id}(${panel.id}) · ${panel.title}`;
     card.querySelector(".data-panel-prompt-label").textContent = singlePanel
-      ? "Modification prompt for this figure."
-      : "Modification prompt for this subfigure.";
+      ? studioT("这张图的修改 Prompt", "Modification prompt for this figure.")
+      : studioT("这张子图的修改 Prompt", "Modification prompt for this subfigure.");
     const status = card.querySelector(".data-panel-head .status");
     status.className = `status ${panel.status === "built" ? "ok" : ""}`;
     status.textContent = panel.status;
@@ -1147,8 +1489,8 @@ function renderDataPanels(figure) {
           frame.src = target;
           frame.dataset.source = target;
           frame.title = singlePanel
-            ? `${figure.id} vector PDF candidate`
-            : `${figure.id}(${panel.id}) vector PDF candidate`;
+            ? `${figure.id} ${studioT("矢量 PDF 候选", "vector PDF candidate")}`
+            : `${figure.id}(${panel.id}) ${studioT("矢量 PDF 候选", "vector PDF candidate")}`;
           preview.replaceChildren(frame);
         }
       } else {
@@ -1157,7 +1499,7 @@ function renderDataPanels(figure) {
           panelImage = document.createElement("img");
           panelImage.src = panel.preview_url;
           panelImage.dataset.source = panel.preview_url;
-          panelImage.alt = `${figure.id}(${panel.id}) preview`;
+          panelImage.alt = `${figure.id}(${panel.id}) ${studioT("预览", "preview")}`;
           preview.replaceChildren(panelImage);
         }
       }
@@ -1165,7 +1507,7 @@ function renderDataPanels(figure) {
       if (!preview.querySelector(".data-panel-empty")) {
         const panelEmpty = document.createElement("div");
         panelEmpty.className = "data-panel-empty";
-        panelEmpty.textContent = singlePanel ? "This figure has not yet been generated." : "This independent subfigure has not yet been generated";
+        panelEmpty.textContent = singlePanel ? studioT("尚未生成这张图", "This figure has not yet been generated.") : studioT("尚未生成这张独立子图", "This independent subfigure has not yet been generated");
         preview.replaceChildren(panelEmpty);
       }
     }
@@ -1174,12 +1516,12 @@ function renderDataPanels(figure) {
     progress.hidden = panel.status !== "agent_generating";
     progress.querySelector(".figure-progress-track").value = Math.max(0, Math.min(100, panel.progress || 0));
     progress.querySelector("strong").textContent = panel.progress_message
-      || (singlePanel ? "Local Agent is processing this figure…" : "Local Agent is processing this sub-figure.");
+      || (singlePanel ? studioT("本地 Agent 正在处理这张图…", "Local Agent is processing this figure…") : studioT("本地 Agent 正在处理这张子图…", "Local Agent is processing this sub-figure."));
 
     const input = card.querySelector(".data-panel-prompt");
     renderFigureEditorInput(input, figure.id, `panel:${panel.id}`, panel.agent_prompt || "");
     const generate = card.querySelector(".data-panel-generate");
-    generate.textContent = panel.preview_url ? "Local Agent regenerates this." : "Local agent generated this.";
+    generate.textContent = panel.preview_url ? studioT("本地 Agent 重新生成这张", "Local Agent regenerates this.") : studioT("本地 Agent 生成这张", "Local agent generated this.");
     generate.onclick = () => startFigureJob(
       "/api/figure/panel/generate",
       {
@@ -1192,8 +1534,8 @@ function renderDataPanels(figure) {
           : "single-column",
       },
       singlePanel
-        ? `Generating ${figure.id} Final single figure…`
-        : `Generating separately ${figure.id}(${panel.id})…`,
+        ? studioT(`正在生成 ${figure.id} 最终单图…`, `Generating ${figure.id} Final single figure…`)
+        : studioT(`正在单独生成 ${figure.id}(${panel.id})…`, `Generating separately ${figure.id}(${panel.id})…`),
     );
     const panelMessage = card.querySelector(".data-panel-message");
     panelMessage.hidden = !panel.last_message;
@@ -1255,8 +1597,8 @@ function scheduleAutomaticDataPanel(figure) {
           : "single-column",
       },
       singlePanel
-        ? `Auto-generating. ${current.id} Final single figure candidate…`
-        : `Auto-generating. ${current.id}(${currentNext.id}); Continue to the next figure after completion…`,
+        ? studioT(`正在自动生成 ${current.id} 最终单图 candidate…`, `Auto-generating. ${current.id} Final single figure candidate…`)
+        : studioT(`正在自动生成 ${current.id}(${currentNext.id})；完成后继续下一张…`, `Auto-generating. ${current.id}(${currentNext.id}); Continue to the next figure after completion…`),
     );
   }, 50);
 }
@@ -1303,7 +1645,7 @@ function scheduleAutomaticTableGenerate(figure) {
         table_id: current.id,
         generation_prompt: $("table-prompt").value,
       },
-      `Auto-generating. ${current.id} Table draft…`,
+      studioT(`正在自动生成 ${current.id} 表格初稿…`, `Auto-generating. ${current.id} Table draft…`),
     );
   }, 50);
 }
@@ -1314,8 +1656,8 @@ function renderLayoutPrompt(figure) {
   renderFigureEditorInput(input, figure.id, "layout_prompt", figure.layout_prompt || "");
   const plan = figure.layout_plan || {};
   $("data-workflow-note").textContent = singlePanel
-    ? "This is a standalone single figure: click the button below to directly generate the final PDF candidate without subfigure corner marks."
-    : "Please generate and review each PDF candidate separately. When all are satisfactory, manually click Synthesize Figure to generate PPTX and vector PDF candidates.";
+    ? studioT("这是一张独立单图：点击下方按钮后直接生成最终 PDF candidate，不添加子图角标。", "This is a standalone single figure: click the button below to directly generate the final PDF candidate without subfigure corner marks.")
+    : studioT("请分别生成并检查每张 PDF candidate。全部满意后，再手动点击“合成图”生成 PPTX 与矢量 PDF candidate。", "Please generate and review each PDF candidate separately. When all are satisfactory, manually click Synthesize Figure to generate PPTX and vector PDF candidates.");
   $("data-layout-prompt-label").hidden = singlePanel;
   input.hidden = singlePanel;
   $("data-compose-actions").hidden = singlePanel;
@@ -1381,9 +1723,9 @@ function renderFigures() {
   cards.innerHTML = "";
   const tableMode = activeView === "tables";
   $("section-kicker").textContent = tableMode ? "SECTION TABLES" : "SECTION FIGURES";
-  $("section-title").textContent = `${state.sections[activeSection].title} · ${tableMode ? "table" : "figure"}`;
+  $("section-title").textContent = studioT(`${state.sections[activeSection].title} · ${tableMode ? "表" : "图"}`, `${state.sections[activeSection].title} · ${tableMode ? "table" : "figure"}`);
   if (!figures.length) {
-    cards.innerHTML = `<div class="data-note">The current paragraph and section do not have the planned structure. ${tableMode ? "table" : "figure"}.</div>`;
+    cards.innerHTML = studioT(`<div class="data-note">当前自然段和 section 没有计划中的 ${tableMode ? "table" : "figure"}。</div>`, `<div class="data-note">The current paragraph and section do not have the planned structure. ${tableMode ? "table" : "figure"}.</div>`);
     $("figure-detail").hidden = true;
     return;
   }
@@ -1393,7 +1735,7 @@ function renderFigures() {
     button.className = `figure-card${figure.id === activeFigure ? " selected" : ""}${figure.ready ? "" : " blocked"}`;
     button.innerHTML = `
       <span class="figure-card-id">${figure.id}</span>
-      <span><strong>${figure.title}</strong><small>${figure.placeholder_only ? "Online service does not provide charting functionality." : figure.kind === "table" ? "Results table · Editable LaTeX." : figure.kind === "source" ? "Source figure · Reference paper evidence." : figure.kind === "mechanism" ? "Mechanism diagram · finish first" : "Data figure · results/ driver."}</small></span>
+      <span><strong>${figure.title}</strong><small>${figure.placeholder_only ? studioT("线上不提供画图表功能", "Online service does not provide charting functionality.") : figure.kind === "table" ? studioT("结果表 · 可编辑 LaTeX", "Results table · Editable LaTeX.") : figure.kind === "source" ? studioT("来源图 · 参考论文证据", "Source figure · Reference paper evidence.") : figure.kind === "mechanism" ? studioT("机制图 · 先完成", "Mechanism diagram · finish first") : studioT("数据图 · results/ 驱动", "Data figure · results/ driver.")}</small></span>
       <span class="figure-card-state ${figure.placeholder_only ? "placeholder" : figure.status}">${figure.placeholder_only ? "placeholder" : figure.ready ? figure.status : "locked"}</span>
     `;
     button.onclick = () => {
@@ -1449,7 +1791,7 @@ function renderFigures() {
   progress.hidden = !running || (figure.kind === "data" && !singleData);
   $("figure-progress-bar").value = Math.max(0, Math.min(100, figure.progress || 0));
   const elapsed = running && Number.isFinite(figure.running_seconds)
-    ? ` · Waiting ${figure.running_seconds} seconds`
+    ? studioT(` · 已等待 ${figure.running_seconds} 秒`, ` · Waiting ${figure.running_seconds} seconds`)
     : "";
   $("figure-progress-message").textContent = `${figure.progress_message || ""}${elapsed}`;
 
@@ -1476,20 +1818,20 @@ function renderFigures() {
   mechanismBuildStatus.hidden = !mechanismBuildPending;
   mechanismBuildStatus.textContent = mechanismBuildPending
     ? (["agent_generating", "agent_editing"].includes(figure.status)
-      ? "Codex Generating editable PPT PDF in the background."
+      ? studioT("绘图已完成；可编辑 PPT/PDF 正在后台生成。", "Generating editable PPT and PDF in the background.")
       : figure.status === "failed"
-        ? `Editable PPT/PDF reconstruction failed.${figure.last_message || figure.progress_message || "Please click Retry."}`
-        : "Editable PPT/PDF is not yet complete; please re-run Codex drawing.")
+        ? studioT(`可编辑 PPT/PDF 重建失败：${figure.last_message || figure.progress_message || "请点击重试。"}`, `Editable PPT/PDF reconstruction failed.${figure.last_message || figure.progress_message || "Please click Retry."}`)
+        : studioT("可编辑 PPT/PDF 尚未完成；请重新运行 Codex 绘图。", "Editable PPT/PDF is not yet complete; please re-run the drawing."))
     : "";
   const textFreeDraftPreview = Boolean(figure.draft_preview_no_text);
   mechanismPreviewToggle.textContent = mechanismPreviewMode === "paper"
-    ? (textFreeDraftPreview ? "Show layout draft (no text)." : "Show composition draft")
-    : "Show editable PPT/PDF full version.";
+    ? (textFreeDraftPreview ? studioT("显示构图底图（无文字）", "Show layout draft (no text)") : studioT("显示构图草稿", "Show composition draft"))
+    : studioT("显示可编辑 PPT/PDF 完整版", "Show editable PPT/PDF full version");
   mechanismPreviewNote.textContent = paperVersionInserted
-    ? "The current preview and the main PDF use the same image file."
+    ? studioT("当前预览与正文 PDF 使用同一个图文件。", "The current preview and the main PDF use the same image file.")
     : textFreeDraftPreview
-      ? "The draft is a layout reference; labels and caption text reside in the editable PPT/PDF version."
-      : "The draft is for visual review; insertion and download use the editable PPT/PDF version.";
+      ? studioT("草稿仅作构图参考；标签和图注文字在可编辑 PPT/PDF 版本中。", "The draft is a layout reference; labels and caption text reside in the editable PPT/PDF version.")
+      : studioT("草稿仅供视觉审阅；插入和下载使用可编辑 PPT/PDF 版本。", "The draft is for visual review; insertion and download use the editable PPT/PDF version.");
   const effectivePreviewUrl = placeholderOnly
     ? null
     : (figure.paper_preview_url || figure.preview_url);
@@ -1504,7 +1846,7 @@ function renderFigures() {
   if (isTable) {
     if (effectivePreviewUrl) {
       image.src = effectivePreviewUrl;
-      image.alt = `${figure.id} LaTeX-compiled table preview`;
+      image.alt = `${figure.id} ${studioT("LaTeX 编译表格预览", "LaTeX-compiled table preview")}`;
       image.hidden = false;
     }
   } else if (effectivePreviewUrl && effectivePreviewType === "image") {
@@ -1565,28 +1907,28 @@ function renderFigures() {
   renderFigureEditorInput(captionPrompt, figure.id, "caption_prompt", "");
   const captionDirty = captionInput.dataset.dirty === "true";
   const automaticCaptionStatus = figure.caption_last_error
-    ? `Automatic caption generation failed:${figure.caption_last_error}`
+    ? studioT(`自动 Caption 生成失败：${figure.caption_last_error}`, `Automatic caption generation failed:${figure.caption_last_error}`)
     : (figure.caption_source === "paragraph_accept"
-      ? `Caption Has been accepted ${figure.caption_generated_from_paragraph || "Citation paragraph"} Auto-generating.`
+      ? studioT(`Caption 已在接受 ${figure.caption_generated_from_paragraph || "引用段落"} 时自动生成`, `Caption Has been accepted ${figure.caption_generated_from_paragraph || "Citation paragraph"} Auto-generating.`)
       : "");
   $("figure-caption-status").textContent = captionDirty
     ? (figure.status === "approved"
-      ? "Caption Modified, not yet updated in the main text and PDF."
-      : "Caption Modified, not yet saved")
+      ? studioT("Caption 已修改，尚未更新到正文与 PDF", "Caption Modified, not yet updated in the main text and PDF.")
+      : studioT("Caption 已修改，尚未保存", "Caption Modified, not yet saved"))
     : automaticCaptionStatus
       ? automaticCaptionStatus
     : (figure.status === "approved"
-      ? "Caption Written into main text and PDF"
-      : "The current main text will use this caption.");
+      ? studioT("Caption 已写入正文与 PDF", "Caption Written into main text and PDF")
+      : studioT("当前正文将使用此 Caption", "The current main text will use this caption."));
   $("mechanism-controls").hidden = !mechanism;
   $("mechanism-approve-after-placement").hidden = !mechanism;
   $("data-controls").hidden = placeholderOnly || mechanism || isTable || sourceFigure;
   $("table-agent-controls").hidden = !isTable || Boolean(state.online_project);
   $("table-controls").hidden = !isTable || placeholderOnly;
   $("table-workflow-note").textContent = state.online_project
-    ? "The image above is produced by the actual LaTeX compilation; it can generate a structured draft and allow direct LaTeX editing."
-    : "The top image is compiled by the current LaTeX; initial draft and experiment result related edits are performed by the local Agent.";
-  $("table-generate").textContent = state.online_project ? "Generate initial table draft" : "Local agent generated the first draft.";
+    ? studioT("上方图片由当前 LaTeX 真实编译；可生成结构化初稿并直接编辑 LaTeX。", "The image above is produced by the actual LaTeX compilation; it can generate a structured draft and allow direct LaTeX editing.")
+    : studioT("上方图片由当前 LaTeX 真实编译。初稿与实验结果相关修改均由本地 Agent 完成。", "The top image is compiled by the current LaTeX; initial draft and experiment result related edits are performed by the local Agent.");
+  $("table-generate").textContent = state.online_project ? studioT("生成表格初稿", "Generate initial table draft") : studioT("本地 Agent 生成初稿", "Local agent generated the first draft.");
   renderFigureEditorInput(
     $("table-prompt"),
     figure.id,
@@ -1620,7 +1962,7 @@ function renderFigures() {
   (figure.placement_options || []).forEach((option) => {
     const item = document.createElement("option");
     item.value = option.id;
-    item.textContent = `${option.id} after${option.accepted ? "" : "(Main text not completed)"}`;
+    item.textContent = studioT(`${option.id} 后${option.accepted ? "" : "（正文未完成）"}`, `${option.id} after${option.accepted ? "" : "(Main text not completed)"}`);
     item.disabled = !option.accepted;
     placement.appendChild(item);
   });
@@ -1629,8 +1971,8 @@ function renderFigures() {
   $("figure-layout-control").hidden = placeholderOnly;
   $("figure-layout-mode").value = figure.layout_mode || "single-column";
   $("figure-prompt").textContent = figure.draw_prompt
-    ? "Update Prompt per the right side instructions."
-    : "Generate drawing prompt";
+    ? studioT("按右侧指令更新 Prompt", "Update Prompt per the right side instructions.")
+    : studioT("生成画图 Prompt", "Generate drawing prompt");
   updateMechanismFlow(figure);
   updateFigureButtonStates();
 
@@ -1639,7 +1981,7 @@ function renderFigures() {
   Object.entries(figure.downloads || {}).forEach(([kind, url]) => {
     const link = document.createElement("a");
     link.href = url;
-    link.textContent = `download ${kind.toUpperCase()}`;
+    link.textContent = studioT(`下载 ${kind.toUpperCase()}`, `download ${kind.toUpperCase()}`);
     link.download = "";
     downloads.appendChild(link);
   });
@@ -1647,8 +1989,8 @@ function renderFigures() {
   const figureMessage = figure.last_message || "";
   $("figure-message").textContent = placeholderOnly ? "" : (
     figure.status === "approved" && state.compile?.status === "ok"
-      && figureMessage === "The mechanism diagram has been automatically generated, inserted, and is awaiting PDF compilation."
-      ? "The mechanism diagram has been inserted and the paper PDF compiled successfully."
+      && figureMessage === studioT("机制图已自动生成并插入，等待编译 PDF。", "The mechanism diagram has been automatically generated, inserted, and is awaiting PDF compilation.")
+      ? studioT("机制图已插入，论文 PDF 已成功编译。", "The mechanism diagram has been inserted and the paper PDF compiled successfully.")
       : figureMessage
   );
   ensureFigurePolling();
@@ -1677,7 +2019,7 @@ function renderFigures() {
             current_prompt: "",
             prompt_instruction: "",
           },
-          "Automatically generating drawing prompts from the current section text.",
+          studioT("正在根据当前 section 正文自动生成画图 Prompt…", "Automatically generating drawing prompts from the current section text."),
         );
       }
     }, 50);
@@ -1688,7 +2030,7 @@ function renderFigures() {
 
 const DEMO_READ_ONLY_CONTROL_IDS = [
   "generate", "accept", "candidate", "comment", "reset-generated",
-  "full-draft-start", "full-draft-cancel", "section-draft-start",
+  "section-draft-start",
   "compile", "model", "model-apply", "runtime-key-open",
   "title-generate", "title-save", "paper-title", "title-gpt-prompt",
   "figure-prompt", "draw-prompt", "prompt-instruction", "figure-draw",
@@ -1726,7 +2068,7 @@ function applyDraftJobRestrictions() {
   if (!running) return;
   // A workspace switch or a preview load must not unlock mutations while a
   // background writer owns the manuscript. Navigation and export remain usable.
-  DEMO_READ_ONLY_CONTROL_IDS.filter((id) => id !== "full-draft-cancel")
+  DEMO_READ_ONLY_CONTROL_IDS
     .forEach((id) => {
       const element = $(id);
       if (element) element.disabled = true;
@@ -1751,8 +2093,8 @@ function render() {
   $("model-runtime-config").hidden = Boolean(state.online_project);
   $("runtime-key-open").hidden = Boolean(state.online_project);
   $("artifact-workflow-summary").textContent = state.online_project
-    ? "Online keep only the main text, editable tables, and Python data plots; other figures are inserted into the paper as placeholders with captions and labels."
-    : "Mechanism diagrams designed separately; data plots and tables are generated from results/ and inserted into the corresponding paragraph after confirmation.";
+    ? studioT("线上仅保留正文、可编辑表格与 Python 数据图；其他图以带 Caption 和 label 的 placeholder 写入论文。", "Online keep only the main text, editable tables, and Python data plots; other figures are inserted into the paper as placeholders with captions and labels.")
+    : studioT("机制图单独设计；数据图和表格都从 results/ 生成，确认后插入对应自然段。", "Mechanism diagrams designed separately; data plots and tables are generated from results/ and inserted into the corresponding paragraph after confirmation.");
   const modelInput = $("model");
   const modelOptions = state.llm_model_options || [];
   $("model-suggestions").replaceChildren(...modelOptions.map((option) => {
@@ -1764,8 +2106,8 @@ function render() {
   renderTitleDraftInput(modelInput, "model", state.model || "gpt-5-nano");
   updateModelApplyButton();
   $("api-key-setup").hidden = apiKeyReady;
-  $("api-key-setup-command").textContent = apiKeySetup.setup_command || 'export OPENAI_API_KEY="Paste your API key."';
-  $("api-key-setup-description").textContent = `${apiKeySetup.provider_label || "current"} API is not configured. Set it in the local terminal that launches Paper Studio; keys are never exposed to the web page. Mechanism figures are drawn locally as editable native shapes by Codex and do not require an image API.`;
+  $("api-key-setup-command").textContent = apiKeySetup.setup_command || studioT('export OPENAI_API_KEY="粘贴你的 API key"', 'export OPENAI_API_KEY="Paste your API key."');
+  $("api-key-setup-description").textContent = studioT(`${apiKeySetup.provider_label || "当前"} API 尚未配置。请在启动 Paper Studio 的本机终端设置；密钥不会进入网页。`, `${apiKeySetup.provider_label || "current"} API is not configured. Set it in the local terminal that launches Paper Studio; keys are never exposed to the web page. Mechanism figures are drawn locally as editable native shapes by Codex and do not require an image API.`);
   $("api-key-restart-command").textContent = apiKeySetup.restart_command || "python3 -m research_avatar.paper_studio.server";
   document.querySelector(".workspace").classList.toggle("api-key-missing", !apiKeyReady);
   $("studio-title").textContent = project.studio_title || "Paper Studio";
@@ -1774,7 +2116,7 @@ function render() {
   if (referencePaper.title) {
     const meta = referencePaper.venue || "";
     referenceEl.replaceChildren();
-    referenceEl.append(studioT("Reference paper:", "Reference paper: "));
+    referenceEl.append(studioT("参考论文：", "Reference paper: "));
     if (referencePaper.url) {
       const link = document.createElement("a");
       link.href = referencePaper.url;
@@ -1785,7 +2127,7 @@ function render() {
     } else {
       referenceEl.append(referencePaper.title);
     }
-    if (meta) referenceEl.append(studioT(`(${meta})`, ` (${meta})`));
+    if (meta) referenceEl.append(studioT(`（${meta}）`, ` (${meta})`));
     referenceEl.hidden = false;
   } else {
     referenceEl.hidden = true;
@@ -1801,7 +2143,7 @@ function render() {
     $("writing-workspace").hidden = true;
     $("figures-workspace").hidden = true;
     $("section-kicker").textContent = "EMPTY STUDIO";
-    $("section-title").textContent = "Paper not yet loaded.";
+    $("section-title").textContent = studioT("尚未载入论文", "Paper not yet loaded.");
     ["writing-view", "figures-view", "tables-view", "compile", "reset-generated", "model", "model-apply", "runtime-key-open"].forEach((id) => {
       $(id).disabled = true;
     });
@@ -1836,17 +2178,17 @@ function render() {
   renderStructureBlueprint(section);
   const paragraph = section.current_paragraph;
   const candidate = paragraph && paragraph.candidate;
-  $("paragraph-id").textContent = paragraph ? paragraph.id : "complete";
+  $("paragraph-id").textContent = paragraph ? paragraph.id : studioT("完成", "complete");
   $("paragraph-progress").textContent = paragraph
     ? `${paragraph.position} / ${paragraph.total}`
     : `${section.paragraph_count} / ${section.paragraph_count}`;
   $("candidate-label").textContent = paragraph
     ? candidate
-      ? "Current candidate paragraph."
+      ? studioT("当前候选段落", "Current candidate paragraph.")
       : paragraph.accepted_text
-        ? "Accepted version (may still be modified)."
-        : "Current candidate paragraph."
-    : "Section content has been accepted and written in LaTeX.";
+        ? studioT("已接受版本（可继续修改）", "Accepted version (may still be modified).")
+        : studioT("当前候选段落", "Current candidate paragraph.")
+    : studioT("已接受并写入 LaTeX 的 section 内容", "Section content has been accepted and written in LaTeX.");
   const proseEditor = $("candidate");
   const editorKey = `${activeSection}:${paragraph ? paragraph.id : "complete"}`;
   const serverText = candidate
@@ -1869,26 +2211,26 @@ function render() {
     proseBaselineText = proseDraft ? proseDraft.baseline : serverText;
   }
   $("candidate").placeholder = planningOnly
-    ? "No experimental results uploaded: this section only keeps paragraph aims and planned experiments, and does not generate body text."
+    ? studioT("未上传实验结果：本 section 只保留段落主旨和待执行实验，不生成正文。", "No experimental results uploaded: this section only keeps paragraph aims and planned experiments, and does not generate body text.")
     : paragraph
     ? paragraph.accepted_text
-      ? "This is the current LaTeX version; after filling the comment you can continue to modify."
-      : "Waiting to generate the current paragraph…"
-    : "This section is completed.";
+      ? studioT("这是当前写入 LaTeX 的版本；填写 comment 后可继续修改。", "This is the current LaTeX version; after filling the comment you can continue to modify.")
+      : studioT("等待生成当前段落…", "Waiting to generate the current paragraph…")
+    : studioT("这个 section 已完成。", "This section is completed.");
   $("comment").value = commentDrafts.get(editorKey) || "";
   updateAcceptButton();
   $("candidate").disabled = planningOnly;
   $("comment").disabled = planningOnly;
   $("generate").disabled = !paragraph || planningOnly;
   $("generate").textContent = candidate || paragraph?.accepted_text
-    ? "Revise paragraph"
-    : "Generate paragraph";
+    ? studioT("修改段落", "Revise paragraph")
+    : studioT("生成段落", "Generate paragraph");
   const gate = $("gate");
   gate.textContent = planningOnly
-    ? "Experiment results not uploaded: starting from Experiments only display the main idea of each section, writing task, and pending experiments, without invoking LLM to generate the main text."
+    ? studioT("未上传实验结果：从 Experiments 开始仅展示每段主旨、写作任务和待执行实验，不调用 LLM 生成正文。", "Experiment results not uploaded: starting from Experiments only display the main idea of each section, writing task, and pending experiments, without invoking LLM to generate the main text.")
     : state.outline_confirmed
     ? ""
-    : "Outline Not confirmed yet. You may browse the interface, but you cannot Accept until you confirm and establish the LaTeX scaffold. → LaTeX.";
+    : studioT("Outline 尚未确认。可以浏览界面，但在确认并建立 LaTeX scaffold 前不能 Accept → LaTeX。", "Outline Not confirmed yet. You may browse the interface, but you cannot Accept until you confirm and establish the LaTeX scaffold. → LaTeX.");
   gate.classList.toggle("show", planningOnly || !state.outline_confirmed);
   renderFullDraft();
   renderPdf();
@@ -1936,115 +2278,25 @@ function render() {
   sectionProgressRow.hidden = !sectionProgressVisible;
   $("section-draft-progress").value = Number(sectionDraftJob?.progress || 0);
   $("section-draft-progress-text").textContent = sectionProgressVisible
-    ? `Completed ${Number(sectionDraftJob.completed || 0)} / ${Number(sectionDraftJob.total || sectionPending)} Section · ${sectionDraftJob.progress_message || "Generating current Section…"}`
+    ? studioT(`已完成 ${Number(sectionDraftJob.completed || 0)} / ${Number(sectionDraftJob.total || sectionPending)} 段 · ${sectionDraftJob.progress_message || "正在生成当前 Section…"}`, `Completed ${Number(sectionDraftJob.completed || 0)} / ${Number(sectionDraftJob.total || sectionPending)} Section · ${sectionDraftJob.progress_message || "Generating current Section…"}`)
     : "";
   sectionDraftStart.textContent = activeSectionRunningJob
-    ? `${sectionDraftJob.progress_message || "Generating current Section…"}`
+    ? studioT(`${sectionDraftJob.progress_message || "正在生成当前 Section…"}`, `${sectionDraftJob.progress_message || "Generating current Section…"}`)
     : activeSectionArtifactJob
-    ? `Completing this Section chart (${(sectionDraftJob.pending_artifacts || []).join(", ")})`
+    ? studioT(`正在完成本 Section 图表（${(sectionDraftJob.pending_artifacts || []).join("、")}）`, `Completing this Section chart (${(sectionDraftJob.pending_artifacts || []).join(", ")})`)
     : queuedSectionDraftStart === activeSection
-    ? "After the current paragraph completes, this Section will be generated automatically."
+    ? studioT("当前段落完成后自动生成本 Section…", "After the current paragraph completes, this Section will be generated automatically.")
     : sectionPending
-      ? `One click generate current Section (${sectionPending} Paragraph to be completed).`
-      : "The current section is complete.";
+      ? studioT(`一键生成当前 Section（${sectionPending} 段待完成）`, `Generate current section (${sectionPending} paragraphs remaining)`)
+      : studioT("当前 Section 已完成", "The current section is complete");
   applyReadOnlyDemoRestrictions();
   applyDraftJobRestrictions();
 }
 
 function renderFullDraft() {
-  const card = $("full-draft-card");
-  if (state.demo_mode) {
-    card.classList.remove("is-running", "is-failed", "has-pending-artifacts", "is-completed");
-    $("full-draft-summary").textContent = "Read-only demo. Explore paragraphs, figures, tables, and the compiled PDF. Generation and editing are available in your own project.";
-    $("full-draft-summary").title = "Read-only demo";
-    $("full-draft-start").textContent = "Read-only demo";
-    $("full-draft-start").disabled = true;
-    $("full-draft-cancel").hidden = true;
-    $("full-draft-progress-row").hidden = true;
-    return;
-  }
-  const draft = state.full_draft || {};
-  const job = draft.job || null;
+  if (state.demo_mode) return;
+  const job = (state.full_draft || {}).job || null;
   const running = Boolean(job && job.status === "running");
-  const artifactsPending = Boolean(job && job.status === "artifacts_pending");
-  const pending = Number(draft.pending_paragraphs || 0);
-  const pendingArtifacts = Array.isArray(draft.pending_artifacts)
-    ? draft.pending_artifacts
-    : [];
-  const activelyGeneratingArtifacts = pendingArtifacts.some((artifactId) => {
-    const figure = (state.figures || []).find((item) => item.id === artifactId);
-    return figure && [
-      "prompt_generating",
-      "image_generating",
-      "agent_generating",
-      "generating",
-    ].includes(figure.status);
-  });
-  const pendingTitle = Boolean(draft.pending_title);
-  const hasRemainingWork = pending > 0 || pendingArtifacts.length > 0 || pendingTitle
-    || Boolean(job && job.status === "failed");
-  const total = Number(draft.total_paragraphs || 0);
-  const failed = Boolean(job && job.status === "failed");
-  card.classList.toggle("is-running", running);
-  card.classList.toggle("is-failed", failed);
-  card.classList.toggle("is-completed", Boolean(job && job.status === "completed"));
-  card.classList.toggle("has-pending-artifacts", Boolean(job && job.status === "artifacts_pending"));
-
-  const summary = $("full-draft-summary");
-  summary.title = job && job.progress_message ? job.progress_message : "";
-  if (failed && String(job.progress_message || "").includes("page budget exceeded")) {
-    summary.textContent = "The current paragraph would exceed the configured body-page limit, so it was rolled back safely. Continue to rebalance and finish the remaining text.";
-  } else if (failed && job.progress_message) {
-    summary.textContent = String(job.progress_message).split("\n", 1)[0];
-  } else if (job && job.progress_message) {
-    summary.textContent = job.progress_message;
-  } else if (!state.outline_confirmed) {
-    summary.textContent = studioT("Please first confirm the outline; batch mode will not bypass paper structure confirmation.", "Confirm the outline first; batch drafting does not bypass structure approval.");
-  } else if (!state.api_key_configured) {
-    summary.textContent = studioT("Please configure LLM API Key as described at top of page.", "Configure the LLM API key using the instructions at the top of the page.");
-  } else if (!pending && pendingArtifacts.length) {
-    summary.textContent = `Complete the remaining real figures and tables: ${pendingArtifacts.join(", ")}.`;
-  } else if (!pending && pendingTitle) {
-    summary.textContent = "The manuscript is complete; generate and insert its final title.";
-  } else if (!pending) {
-    summary.textContent = studioT(`all ${total} Several paragraphs have been written in LaTeX; you can continue editing them paragraph by paragraph.`, `All ${total} paragraphs have been written to LaTeX and remain editable.`);
-  } else {
-    summary.textContent = state.online_project
-      ? studioT(`Will be filled in according to project writing order. ${pending} / ${total} Some unfinished paragraphs; planned charts are kept as placeholders with captions and labels, accepted content will not be overwritten.`, `Draft ${pending} of ${total} unfinished paragraphs in project order. Planned figures and tables remain placeholders with captions and labels; accepted content will not be overwritten.`)
-      : studioT(`Will be filled in according to project writing order. ${pending} / ${total} Some unfinished paragraphs and generate and insert all bound real charts; placeholders do not count as complete, accepted content will not be overwritten.`, `Draft ${pending} of ${total} unfinished paragraphs in project order, then generate and insert every bound real figure and table; placeholders do not count as complete, and accepted content will not be overwritten.`);
-  }
-
-  const start = $("full-draft-start");
-  const cancel = $("full-draft-cancel");
-  start.disabled = fullDraftRequestBusy || queuedFullDraftStart || running || activelyGeneratingArtifacts || !draft.available || !hasRemainingWork;
-  start.textContent = job && ["failed", "cancelled"].includes(job.status)
-    ? pending > 0
-      ? "Continue completing the unfinished main text"
-      : "Continue finalizing the full draft"
-    : pending === 0 && pendingArtifacts.length
-      ? "Continue generating figures and tables"
-    : pending === 0 && pendingTitle
-      ? "Generate final paper title"
-    : pending === 0
-      ? studioT("The full draft has been generated.", "Full first draft generated")
-      : studioT("Directly generate the full draft.", "Generate full first draft");
-  cancel.hidden = !running;
-  cancel.disabled = fullDraftRequestBusy;
-
-  const progressRow = $("full-draft-progress-row");
-  progressRow.hidden = !job;
-  // A finalization-only job has no paragraph targets. Show manuscript progress
-  // in that case instead of presenting a completed paper as 0 / 0.
-  const progressTotal = Number(job && job.total) || total;
-  const progressCompleted = Number(job && job.total) > 0
-    ? Number(job.completed || 0)
-    : Math.max(0, total - pending);
-  $("full-draft-progress").value = Number((job && job.progress) || 0);
-  $("full-draft-progress-text").textContent = job
-    ? failed
-      ? `${progressCompleted} / ${progressTotal} · Draft paused; details are shown above.`
-      : `${progressCompleted} / ${progressTotal} · ${job.progress_message || job.status}`
-    : "";
 
   ["candidate", "comment", "generate", "section-draft-start", "accept", "paper-title", "title-gpt-prompt", "title-generate", "title-save", "model", "reset-generated"].forEach((id) => {
     const element = $(id);
@@ -2096,8 +2348,8 @@ async function generateCurrent(automatic = false) {
   }
   try {
     setBusy(true, automatic
-      ? "Currently combining approved paragraph structure working abstract and experimental results to generate the current paragraph."
-      : "Modifying the current paragraph based on the comment.");
+      ? studioT("正在结合已批准的段落结构、working abstract 和实验结果生成当前段落…", "Currently combining approved paragraph structure working abstract and experimental results to generate the current paragraph.")
+      : studioT("正在根据 comment 修改当前段落…", "Modifying the current paragraph based on the comment."));
     const payload = await request("/api/generate", {
       method: "POST",
       body: JSON.stringify({
@@ -2113,17 +2365,17 @@ async function generateCurrent(automatic = false) {
       if (automatic && $("candidate").dataset.dirty === "true") {
         renderSections();
         updateAcceptButton();
-        showMessage("Backend candidate has been generated; the text you are editing remains, and Accept will use the content from the editing box.");
+        showMessage(studioT("后台 candidate 已生成；已保留你正在编辑的正文，Accept 时将以编辑框内容为准。", "Backend candidate has been generated; the text you are editing remains, and Accept will use the content from the editing box."));
         return;
       }
       forgetProseDraft(`${requestedSection}:${requestedParagraph.id}`);
       forgetCommentDraft(`${requestedSection}:${requestedParagraph.id}`);
       $("candidate").dataset.dirty = "false";
       render();
-      showMessage("Current paragraph has been generated; you may write comment edits or Accept. → LaTeX.");
+      showMessage(studioT("当前段落已生成。你只需要写 comment 修改，或 Accept → LaTeX。", "Current paragraph has been generated; you may write comment edits or Accept. → LaTeX."));
     } else {
       renderSections();
-      showMessage(`${state.sections[requestedSection].title} The current paragraph has been generated and saved.`);
+      showMessage(studioT(`${state.sections[requestedSection].title} 的当前段落已生成并保存。`, `${state.sections[requestedSection].title} The current paragraph has been generated and saved.`));
     }
   } catch (error) {
     showMessage(error.message, true);
@@ -2134,9 +2386,6 @@ async function generateCurrent(automatic = false) {
       const section = queuedSectionDraftStart;
       queuedSectionDraftStart = "";
       void startSectionDraftFromBrowser(section);
-    } else if (queuedFullDraftStart) {
-      queuedFullDraftStart = false;
-      void startFullDraftFromBrowser();
     }
   }
 }
@@ -2154,7 +2403,7 @@ $("candidate").addEventListener("input", (event) => {
     );
   }
   if (paragraph && paragraph.accepted_text && !paragraph.candidate) {
-    $("candidate-label").textContent = "Manual edits of accepted version (not yet written).";
+    $("candidate-label").textContent = studioT("已接受版本的手动修改（尚未写入）", "Manual edits of accepted version (not yet written).");
   }
   updateAcceptButton();
 });
@@ -2170,17 +2419,17 @@ async function applyWritingModel() {
   }
   const requestedModel = $("model").value.trim();
   if (!requestedModel) {
-    showMessage("Please enter the writing model name first.", true);
+    showMessage(studioT("请先输入写作模型名称。", "Please enter the writing model name first."), true);
     updateModelApplyButton();
     return;
   }
   if (requestedModel === state.model) return;
-  if (!confirm(`Switch to ${requestedModel}?This will reset all LLM chat history, but will not modify the already written body, figures, or PDF.`)) {
+  if (!confirm(studioT(`切换到 ${requestedModel}？这会重置所有 LLM 对话链，但不会修改已写入的正文、图表或 PDF。`, `Switch to ${requestedModel}?This will reset all LLM chat history, but will not modify the already written body, figures, or PDF.`))) {
     return;
   }
   modelApplyBusy = true;
   try {
-    setBusy(true, `Switching writing model to ${requestedModel}…`);
+    setBusy(true, studioT(`正在切换写作模型为 ${requestedModel}…`, `Switching writing model to ${requestedModel}…`));
     const payload = await request("/api/llm-model", {
       method: "POST",
       body: JSON.stringify({model: requestedModel}),
@@ -2188,7 +2437,7 @@ async function applyWritingModel() {
     state = payload.state;
     forgetTitleDraft("model");
     render();
-    showMessage(`Writing model has been switched to ${state.model}; LLM Dialogue chain has been reset; written content remains unchanged.`);
+    showMessage(studioT(`写作模型已切换为 ${state.model}；LLM 对话链已重置，已写入内容保持不变。`, `Writing model has been switched to ${state.model}; LLM Dialogue chain has been reset; written content remains unchanged.`));
   } catch (error) {
     showMessage(error.message, true);
   } finally {
@@ -2215,7 +2464,7 @@ $("paper-title").addEventListener("input", (event) => {
   event.currentTarget.dataset.dirty = "true";
   const editor = state.title_editor || {};
   rememberTitleDraft("title", event.currentTarget.value, editor.candidate || editor.current_title || "");
-  $("title-status").textContent = "Title has unsaved changes.";
+  $("title-status").textContent = studioT("标题有未保存修改。", "Title has unsaved changes.");
   updateTitleSaveButton();
 });
 
@@ -2228,7 +2477,7 @@ $("title-generate").onclick = async () => {
   if (titleBusy) return;
   const prompt = $("title-gpt-prompt").value.trim();
   try {
-    setTitleBusy(true, "Generating title candidates; will not auto save…");
+    setTitleBusy(true, studioT("正在生成标题候选；不会自动保存…", "Generating title candidates; will not auto save…"));
     const payload = await request("/api/title/generate", {
       method: "POST",
       body: JSON.stringify({
@@ -2255,7 +2504,7 @@ $("title-save").onclick = async () => {
   if (titleBusy) return;
   const title = $("paper-title").value.trim();
   try {
-    setTitleBusy(true, "Writing LaTeX and compiling PDF.");
+    setTitleBusy(true, studioT("正在写入 LaTeX 并编译 PDF…", "Writing LaTeX and compiling PDF."));
     const payload = await request("/api/title/save", {
       method: "POST",
       body: JSON.stringify({title}),
@@ -2276,7 +2525,7 @@ $("title-save").onclick = async () => {
 async function acceptCurrent() {
   if (acceptRequestBusy) return;
   acceptRequestBusy = true;
-  setBusy(true, "Verifying latest paragraph status…");
+  setBusy(true, studioT("正在核对最新段落状态…", "Verifying latest paragraph status…"));
   const requestedSection = activeSection;
   let acceptedParagraphId = "";
   let acceptanceCompleted = false;
@@ -2297,7 +2546,7 @@ async function acceptCurrent() {
       state = latestState;
       $("candidate").dataset.dirty = "false";
       render();
-      showMessage(`Current editing position updated to ${latestParagraph.id}, Please confirm before Accept.`, true);
+      showMessage(studioT(`当前编辑位置已更新到 ${latestParagraph.id}，请确认后再 Accept。`, `Current editing position updated to ${latestParagraph.id}, Please confirm before Accept.`), true);
       return;
     }
     if (
@@ -2313,7 +2562,7 @@ async function acceptCurrent() {
       forgetProseDraft(`${requestedSection}:${visibleParagraphId}`);
       $("candidate").dataset.dirty = "false";
       render();
-      showMessage("The candidate has been updated in another round of generation; the latest version is auto-loaded; please review and Accept again.", true);
+      showMessage(studioT("候选已在另一轮生成中更新；已自动载入最新版，请确认内容后再次 Accept。", "The candidate has been updated in another round of generation; the latest version is auto-loaded; please review and Accept again."), true);
       return;
     }
     state = latestState;
@@ -2328,15 +2577,15 @@ async function acceptCurrent() {
       render();
       showMessage(
         latestParagraph && visibleParagraphId && latestParagraph.id !== visibleParagraphId
-          ? `Current editing position updated to ${latestParagraph.id}, Please confirm before Accept.`
-          : "The current paragraph has no acceptable body text.",
+          ? studioT(`当前编辑位置已更新到 ${latestParagraph.id}，请确认后再 Accept。`, `Current editing position updated to ${latestParagraph.id}, Please confirm before Accept.`)
+          : studioT("当前段落没有可接受的正文。", "The current paragraph has no acceptable body text."),
         true,
       );
       return;
     }
     const revisingAccepted = Boolean(paragraph.accepted_text);
     acceptedParagraphId = paragraph.id;
-    setBusy(true, "Checking the paragraph, writing LaTeX, and compiling the PDF…");
+    setBusy(true, studioT("正在校验引用；缺失时会联网检索、更新 BibTeX，再写入 LaTeX 并编译…", "Checking the paragraph, writing LaTeX, and compiling the PDF…"));
     const payload = await request("/api/accept", {
       method: "POST",
       body: JSON.stringify({
@@ -2357,12 +2606,12 @@ async function acceptCurrent() {
       render();
       showMessage(
         revisingAccepted
-          ? `${acceptedParagraphId} The new version has replaced content in LaTeX and completed PDF compilation.`
+          ? studioT(`${acceptedParagraphId} 的新版本已替换写入 LaTeX，并完成 PDF 编译。`, `${acceptedParagraphId} The new version has replaced content in LaTeX and completed PDF compilation.`)
           : state.sections[requestedSection].complete
-          ? `${acceptedParagraphId} LaTeX compilation has been accepted and completed; the current section is finished.`
+          ? studioT(`${acceptedParagraphId} 已接受并完成 LaTeX 编译；当前 section 已完成。`, `${acceptedParagraphId} LaTeX compilation has been accepted and completed; the current section is finished.`)
           : nextParagraph
-          ? `${acceptedParagraphId} LaTeX compilation has been accepted and completed; preparing in the background. ${nextParagraph.id} Candidate.`
-          : `${acceptedParagraphId} LaTeX compilation completed.`,
+          ? studioT(`${acceptedParagraphId} 已接受并完成 LaTeX 编译；正在后台准备 ${nextParagraph.id} 候选。`, `${acceptedParagraphId} LaTeX compilation has been accepted and completed; preparing in the background. ${nextParagraph.id} Candidate.`)
+          : studioT(`${acceptedParagraphId} 已接受并完成 LaTeX 编译。`, `${acceptedParagraphId} LaTeX compilation completed.`),
       );
       if (
         !revisingAccepted
@@ -2374,7 +2623,7 @@ async function acceptCurrent() {
         autoAttempted.add(key);
         setBusy(
           true,
-          `${acceptedParagraphId} Written and compiled; generating. ${nextParagraph.id}…`,
+          studioT(`${acceptedParagraphId} 已写入并编译；正在生成 ${nextParagraph.id}…`, `${acceptedParagraphId} Written and compiled; generating. ${nextParagraph.id}…`),
         );
         const nextPayload = await request("/api/generate", {
           method: "POST",
@@ -2392,22 +2641,22 @@ async function acceptCurrent() {
       const current = state.sections[requestedSection].current_paragraph;
       showMessage(
         revisingAccepted
-          ? `${acceptedParagraphId} The new version has replaced content in LaTeX and completed PDF compilation.`
+          ? studioT(`${acceptedParagraphId} 的新版本已替换写入 LaTeX，并完成 PDF 编译。`, `${acceptedParagraphId} The new version has replaced content in LaTeX and completed PDF compilation.`)
           : state.sections[requestedSection].complete
-          ? `${acceptedParagraphId} LaTeX compilation has been accepted and completed; the current section is finished.`
+          ? studioT(`${acceptedParagraphId} 已接受并完成 LaTeX 编译；当前 section 已完成。`, `${acceptedParagraphId} LaTeX compilation has been accepted and completed; the current section is finished.`)
           : current
-          ? `${acceptedParagraphId} LaTeX compilation completed;${current.id} Candidate refreshed.`
-          : `${acceptedParagraphId} LaTeX compilation completed.`,
+          ? studioT(`${acceptedParagraphId} 已接受并完成 LaTeX 编译；${current.id} 候选已刷新。`, `${acceptedParagraphId} LaTeX compilation completed;${current.id} Candidate refreshed.`)
+          : studioT(`${acceptedParagraphId} 已接受并完成 LaTeX 编译。`, `${acceptedParagraphId} LaTeX compilation completed.`),
       );
     } else {
       renderSections();
-      showMessage(`${state.sections[requestedSection].title} LaTeX compilation completed.`);
+      showMessage(studioT(`${state.sections[requestedSection].title} 已接受并完成 LaTeX 编译。`, `${state.sections[requestedSection].title} LaTeX compilation completed.`));
     }
   } catch (error) {
     if (acceptanceCompleted) {
       render();
       showMessage(
-        `${acceptedParagraphId} LaTeX has been written and compiled, but generation of the next paragraph failed.${error.message}`,
+        studioT(`${acceptedParagraphId} 已写入 LaTeX 并编译，但下一段生成失败：${error.message}`, `${acceptedParagraphId} LaTeX has been written and compiled, but generation of the next paragraph failed.${error.message}`),
         true,
       );
     } else {
@@ -2425,17 +2674,17 @@ $("compile").onclick = async () => {
   if (compileRequestBusy) return;
   compileRequestBusy = true;
   try {
-    setBusy(true, "Compiling LaTeX…");
+    setBusy(true, studioT("正在编译 LaTeX…", "Compiling LaTeX…"));
     const payload = await request("/api/compile", {method: "POST", body: "{}"});
     state = payload.state;
-    showMessage("PDF Compilation succeeded.");
+    showMessage(studioT("PDF 编译成功。", "PDF Compilation succeeded."));
     renderPdf();
   } catch (error) {
     showMessage(error.message, true);
     try {
       await refresh();
     } catch (refreshError) {
-      showMessage(`${error.message}\nStatus refresh also failed:${refreshError.message}`, true);
+      showMessage(studioT(`${error.message}\n状态刷新也失败：${refreshError.message}`, `${error.message}\nStatus refresh also failed:${refreshError.message}`), true);
     }
   } finally {
     compileRequestBusy = false;
@@ -2448,7 +2697,7 @@ async function submitGeneratedReset(typed) {
   const requestedModel = $("model").value.trim();
   const projectId = state && state.project && state.project.id;
   if (typed.trim() !== projectId) {
-    $("reset-project-copy-status").textContent = "Project ID mismatch; no generated content was deleted.";
+    $("reset-project-copy-status").textContent = studioT("项目 ID 不匹配；未删除任何生成内容。", "Project ID mismatch; no generated content was deleted.");
     $("reset-project-copy-status").classList.add("error");
     $("reset-project-confirm").focus();
     $("reset-project-confirm").select();
@@ -2457,7 +2706,7 @@ async function submitGeneratedReset(typed) {
   generatedResetBusy = true;
   $("reset-generated-dialog").close();
   try {
-    setBusy(true, "Clearing generated content and compiling an empty shell PDF.");
+    setBusy(true, studioT("正在清空生成内容并编译空壳 PDF…", "Clearing generated content and compiling an empty shell PDF."));
     // Cancel old vector-page loads before the server removes generated page
     // caches and recompiles the empty shell. Otherwise an already queued
     // page-4 request can race the new one-page PDF and surface a noisy 400.
@@ -2493,7 +2742,7 @@ async function submitGeneratedReset(typed) {
 $("reset-generated").onclick = () => {
   const projectId = state && state.project && state.project.id;
   if (!projectId) {
-    showMessage("There is no paper project to clear currently.", true);
+    showMessage(studioT("当前没有可清空的论文项目。", "There is no paper project to clear currently."), true);
     return;
   }
   $("reset-project-id").value = projectId;
@@ -2529,8 +2778,8 @@ $("reset-project-copy").onclick = async () => {
   input.select();
   $("reset-project-copy-status").classList.toggle("error", !copied);
   $("reset-project-copy-status").textContent = copied
-    ? "Project ID has been copied."
-    : "Auto copy failed; the ID has been selected, please press Ctrl/Cmd+C.";
+    ? studioT("项目 ID 已复制。", "Project ID has been copied.")
+    : studioT("自动复制失败；ID 已选中，请按 Ctrl/Cmd+C。", "Auto copy failed; the ID has been selected, please press Ctrl/Cmd+C.");
 };
 
 function closeGeneratedResetDialog() {
@@ -2584,39 +2833,13 @@ function switchView(view) {
 }
 
 $("writing-view").onclick = () => switchView("writing");
-async function startFullDraftFromBrowser() {
-  if (fullDraftRequestBusy || queuedFullDraftStart) return;
-  if (proseRequestBusy) {
-    queuedFullDraftStart = true;
-    renderFullDraft();
-    showMessage("After the current paragraph generation completes, automatically start the full manuscript draft task…");
-    return;
-  }
-  fullDraftRequestBusy = true;
-  $("full-draft-start").disabled = true;
-  try {
-    const payload = await request("/api/full-draft/start", {
-      method: "POST",
-      body: JSON.stringify({model: $("model").value.trim()}),
-    });
-    state = payload.state;
-    render();
-    showMessage("The full draft task has started; you can switch pages to view progress, and you can continue to modify section by section after completion.");
-  } catch (error) {
-    showMessage(error.message, true);
-  } finally {
-    fullDraftRequestBusy = false;
-    renderFullDraft();
-  }
-}
-$("full-draft-start").onclick = () => startFullDraftFromBrowser();
 async function startSectionDraftFromBrowser(section = activeSection) {
   if (fullDraftRequestBusy || queuedSectionDraftStart) return;
   const requestedSection = section;
   if (proseRequestBusy) {
     queuedSectionDraftStart = requestedSection;
     render();
-    showMessage(`${state.sections[requestedSection].title} Queued; once the current paragraph generation is complete, the entire section generation will automatically start.`);
+    showMessage(studioT(`${state.sections[requestedSection].title} 已加入队列；当前段落生成完成后会自动开始整节生成。`, `${state.sections[requestedSection].title} Queued; once the current paragraph generation is complete, the entire section generation will automatically start.`));
     return;
   }
   fullDraftRequestBusy = true;
@@ -2631,7 +2854,7 @@ async function startSectionDraftFromBrowser(section = activeSection) {
     });
     state = payload.state;
     render();
-    showMessage(`${state.sections[requestedSection].title} The entire section generation task has started; LaTeX will be written and compiled automatically in paragraph order.`);
+    showMessage(studioT(`${state.sections[requestedSection].title} 的整节生成任务已启动；将按段落顺序自动写入 LaTeX 并编译。`, `${state.sections[requestedSection].title} The entire section generation task has started; LaTeX will be written and compiled automatically in paragraph order.`));
   } catch (error) {
     showMessage(error.message, true);
   } finally {
@@ -2640,25 +2863,6 @@ async function startSectionDraftFromBrowser(section = activeSection) {
   }
 }
 $("section-draft-start").onclick = () => startSectionDraftFromBrowser();
-$("full-draft-cancel").onclick = async () => {
-  if (fullDraftRequestBusy) return;
-  fullDraftRequestBusy = true;
-  $("full-draft-cancel").disabled = true;
-  try {
-    const payload = await request("/api/full-draft/cancel", {
-      method: "POST",
-      body: "{}",
-    });
-    state = payload.state;
-    render();
-    showMessage("Stop requested; completed paragraphs are retained, and unfinished body text can be completed later.");
-  } catch (error) {
-    showMessage(error.message, true);
-  } finally {
-    fullDraftRequestBusy = false;
-    renderFullDraft();
-  }
-};
 $("figures-view").onclick = () => switchView("figures");
 $("tables-view").onclick = () => switchView("tables");
 
@@ -2680,7 +2884,7 @@ async function runFigureAction(path, body, busyMessage) {
     render();
     if (selectedFigure() && selectedFigure().id === requestedArtifactId) {
       $("figure-message").classList.remove("error");
-      $("figure-message").textContent = payload.message || "Done.";
+      $("figure-message").textContent = payload.message || studioT("完成。", "Done.");
     }
     return payload;
   } catch (error) {
@@ -2767,13 +2971,13 @@ $("figure-prompt").onclick = () => startFigureJob(
     current_prompt: $("draw-prompt").value,
     prompt_instruction: $("prompt-instruction").value,
   },
-  "Starting drawing-prompt generation…",
+  studioT("正在启动画图 Prompt 生成…", "Starting drawing-prompt generation…"),
 );
 
 $("figure-draw").onclick = () => startFigureJob(
   "/api/figure/draw",
   {figure_id: activeFigure, draw_prompt: $("draw-prompt").value},
-  "Checking if the Prompt has changed…",
+  studioT("正在检查 Prompt 是否变化…", "Checking if the Prompt has changed…"),
 );
 
 $("draw-prompt").addEventListener("input", (event) => {
@@ -2805,7 +3009,7 @@ $("figure-cancel").onclick = async () => {
   const button = $("figure-cancel");
   updateFigureButtonStates();
   $("figure-message").classList.remove("error");
-  $("figure-message").textContent = "Stopping this Codex drawing task…";
+  $("figure-message").textContent = studioT("正在停止本次 Codex 绘图任务…", "Stopping this Codex drawing task…");
   try {
     const result = await request("/api/figure/cancel", {
       method: "POST",
@@ -2826,7 +3030,7 @@ $("figure-cancel").onclick = async () => {
 $("figure-build").onclick = () => startFigureJob(
   "/api/figure/build",
   {figure_id: activeFigure},
-  "Starting local Agent and reconstructing original PowerPoint shapes according to the sketch.",
+  studioT("正在启动本地 Agent，按草图重建原生 PowerPoint shapes…", "Starting local Agent and reconstructing original PowerPoint shapes according to the sketch."),
 );
 
 $("mechanism-preview-toggle").onclick = () => {
@@ -2860,8 +3064,8 @@ function updateFigurePlacement() {
           layout_mode: $("figure-layout-mode").value,
         },
     figure && figure.kind === "table"
-      ? "Updating table position and single column or double column layout, and recompiling PDF…"
-      : "Updating figure locations and layout settings…",
+      ? studioT("正在更新表格位置与单栏/双栏排版并重新编译 PDF…", "Updating table position and single column or double column layout, and recompiling PDF…")
+      : studioT("正在更新插图位置与排版方式…", "Updating figure locations and layout settings…"),
   );
 }
 
@@ -2876,11 +3080,11 @@ $("figure-caption").addEventListener("input", (event) => {
   else if (figure) forgetCaptionDraft(figure.id);
   $("figure-caption-status").textContent = dirty
     ? (figure && figure.status === "approved"
-      ? "Caption Modified, not yet updated in the main text and PDF."
-      : "Caption Modified, not yet saved")
+      ? studioT("Caption 已修改，尚未更新到正文与 PDF", "Caption Modified, not yet updated in the main text and PDF.")
+      : studioT("Caption 已修改，尚未保存", "Caption Modified, not yet saved"))
     : (figure && figure.status === "approved"
-      ? "Caption Written into main text and PDF"
-      : "The current main text will use this caption.");
+      ? studioT("Caption 已写入正文与 PDF", "Caption Written into main text and PDF")
+      : studioT("当前正文将使用此 Caption", "The current main text will use this caption."));
   updateFigureButtonStates();
 });
 
@@ -2901,8 +3105,8 @@ $("figure-caption-generate").onclick = async () => {
   const originalLabel = button.textContent;
   try {
     updateFigureButtonStates();
-    button.textContent = "Generating caption…";
-    $("figure-caption-status").textContent = "Generating Caption candidate.";
+    button.textContent = studioT("正在生成 Caption…", "Generating caption…");
+    $("figure-caption-status").textContent = studioT("正在生成 Caption candidate…", "Generating Caption candidate.");
     const payload = await request("/api/figure/caption/generate", {
       method: "POST",
       body: JSON.stringify({
@@ -2924,8 +3128,8 @@ $("figure-caption-generate").onclick = async () => {
     $("figure-caption-prompt").dataset.dirty = "false";
     captionInput.dataset.dirty = String(dirty);
     $("figure-caption-status").textContent = dirty
-      ? "Model candidate not saved yet"
-      : "Model candidate is the same as the current caption.";
+      ? studioT("模型 candidate 尚未保存", "Model candidate not saved yet")
+      : studioT("模型 candidate 与当前 Caption 相同", "Model candidate is the same as the current caption.");
     updateFigureButtonStates();
   } catch (error) {
     $("figure-caption-status").textContent = error.message;
@@ -2956,13 +3160,13 @@ async function saveFigureCaption() {
     }
     render();
     if (selectedFigure() && selectedFigure().id === requestedFigureId) {
-      $("figure-message").textContent = payload.message || "Caption Saved.";
+      $("figure-message").textContent = payload.message || studioT("Caption 已保存。", "Caption Saved.");
       $("figure-message").classList.remove("error");
     }
     return true;
   } catch (error) {
     if (selectedFigure() && selectedFigure().id === requestedFigureId) {
-      $("figure-caption-status").textContent = `Caption Save failed:${error.message}`;
+      $("figure-caption-status").textContent = studioT(`Caption 保存失败：${error.message}`, `Caption Save failed:${error.message}`);
       $("figure-message").textContent = error.message;
       $("figure-message").classList.add("error");
     }
@@ -2986,7 +3190,7 @@ async function approveFigureOrSaveCaption() {
   return runFigureAction(
     "/api/figure/approve",
     {figure_id: requestedFigureId},
-    "Inserting the body text, adding Figure references, and recompiling the PDF.",
+    studioT("正在插入正文、补充 Figure 引用并重新编译 PDF…", "Inserting the body text, adding Figure references, and recompiling the PDF."),
   );
 }
 
@@ -3001,7 +3205,7 @@ $("data-compose").onclick = () => runFigureAction(
       ? "two-column"
       : "single-column",
   },
-  "Starting local Agent and reconstructing original PowerPoint shapes according to the sketch.",
+  studioT("本地 Agent 正在解释组合 Prompt；随后将在 PPT 中排版并导出、裁剪 PDF…", "Starting local Agent and reconstructing original PowerPoint shapes according to the sketch."),
 );
 
 function openRuntimeKeyDialog() {
@@ -3028,7 +3232,7 @@ $("runtime-key-form").addEventListener("submit", async (event) => {
   const submit = $("runtime-key-submit");
   const status = $("runtime-key-message");
   submit.disabled = true;
-  status.textContent = "Security update in progress…";
+  status.textContent = studioT("正在安全更新…", "Security update in progress…");
   try {
     const payload = await request("/api/runtime-key", {
       method: "POST",
@@ -3108,7 +3312,7 @@ $("table-generate").onclick = () => runFigureAction(
     table_id: activeFigure,
     generation_prompt: $("table-prompt").value,
   },
-  "Starting local Agent to generate the initial draft table from traceable results…",
+  studioT("正在启动本地 Agent 从可追溯结果生成表格初稿…", "Starting local Agent to generate the initial draft table from traceable results…"),
 );
 
 $("table-agent-edit").onclick = () => startFigureJob(
@@ -3118,29 +3322,29 @@ $("table-agent-edit").onclick = () => startFigureJob(
     latex: $("table-latex").value,
     agent_prompt: $("table-agent-prompt").value,
   },
-  "Starting local Codex agent to modify the table.",
+  studioT("正在启动本机 Codex agent 修改表格…", "Starting local Codex agent to modify the table."),
 );
 
 $("table-save").onclick = () => runFigureAction(
   "/api/table/save",
   {table_id: activeFigure, latex: $("table-latex").value},
-  "Saving table edits…",
+  studioT("正在保存表格修改…", "Saving table edits…"),
 );
 
 $("table-approve").onclick = () => runFigureAction(
   "/api/table/approve",
   {table_id: activeFigure, latex: $("table-latex").value},
-  "Inserting main text and recompiling PDF…",
+  studioT("正在插入正文并重新编译 PDF…", "Inserting main text and recompiling PDF…"),
 );
 
 refresh().catch((error) => {
-  $("section-title").textContent = "Loading failed";
+  $("section-title").textContent = studioT("加载失败", "Loading failed");
   $("load-error-message").textContent = error.message;
   $("load-error").hidden = false;
   [
     "model", "model-apply", "reset-generated", "writing-view",
     "figures-view", "tables-view", "compile", "section-draft-start",
-    "full-draft-start", "full-draft-cancel", "runtime-key-open",
+    "runtime-key-open",
   ].forEach((id) => {
     const control = $(id);
     if (control) control.disabled = true;

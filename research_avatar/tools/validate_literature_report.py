@@ -147,6 +147,11 @@ def validate(source: str) -> list[str]:
         ]
         if missing:
             errors.append(f"papers[{index}] lacks {missing}")
+        authors = paper.get("authors")
+        if isinstance(authors, list) and any(re.search(r"\bet\s+al\b|\band\s+others\b", str(name), re.I) for name in authors):
+            errors.append(
+                f"papers[{index}] authors must be the complete list from the verified source, not an abbreviation such as 'et al.'"
+            )
         paper_id = str(paper.get("id", ""))
         paper_ids.append(paper_id)
         if not valid_url(paper.get("url")) or not valid_url(paper.get("final_url")):
@@ -184,6 +189,13 @@ def validate(source: str) -> list[str]:
                 errors.append(f"search_angles[{index}] references an unknown paper")
         if any(not value for value in angle_ids) or len(angle_ids) != len(set(angle_ids)):
             errors.append("search angle IDs must be unique and non-empty")
+    questions = contract.get("research_questions")
+    if not isinstance(questions, list) or sum(1 for q in questions if isinstance(q, dict) and q.get("origin") == "neutral") < 3:
+        errors.append("research_questions must carry at least three neutral gap-derived questions")
+    else:
+        for index, question in enumerate(questions):
+            if question.get("origin") not in {"neutral", "personalized"} or not str(question.get("question", "")).strip():
+                errors.append(f"research_questions[{index}] needs an origin and question text")
     falsification = contract.get("gap_falsification")
     if not isinstance(falsification, dict):
         errors.append("gap_falsification must be an object")
@@ -191,11 +203,19 @@ def validate(source: str) -> list[str]:
         queries = falsification.get("queries")
         if not isinstance(queries, list) or len(queries) < 3:
             errors.append("gap_falsification requires at least three counterevidence queries")
-        collision = str(falsification.get("closest_collision_id", "")).strip()
-        if collision not in known:
-            errors.append("gap_falsification closest_collision_id must resolve to a paper")
-        if not str(falsification.get("bounded_difference", "")).strip():
-            errors.append("gap_falsification bounded_difference is required")
+        per_gap = falsification.get("per_gap")
+        if per_gap:
+            for entry in per_gap:
+                if str(entry.get("closest_collision_id", "")).strip() not in known:
+                    errors.append(f"gap {entry.get('gap_id')} closest work must resolve to a paper")
+                if not str(entry.get("bounded_difference", "")).strip():
+                    errors.append(f"gap {entry.get('gap_id')} needs a bounded difference")
+        elif "closest_collision_id" in falsification:
+            collision = str(falsification.get("closest_collision_id", "")).strip()
+            if collision not in known:
+                errors.append("gap_falsification closest_collision_id must resolve to a paper")
+            if not str(falsification.get("bounded_difference", "")).strip():
+                errors.append("gap_falsification bounded_difference is required")
     family_ids: list[str] = []
     family_members: list[str] = []
     for index, family in enumerate(families):

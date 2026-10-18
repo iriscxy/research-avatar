@@ -356,7 +356,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('id="model-runtime-config"', html)
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('id="api-key-setup"', html)
-        self.assertIn("Writing a paper requires an LLM API.", html)
+        self.assertIn("写论文需要 LLM API", html)
         self.assertNotIn('value="compatible"', html)
         self.assertEqual(
             [item["id"] for item in configured["llm_provider_options"]],
@@ -534,9 +534,9 @@ class PaperStudioTests(unittest.TestCase):
             "table-latex", "table-save", "table-approve", "reset-generated-close",
             "reset-project-id", "reset-project-copy", "reset-project-confirm",
             "reset-generated-cancel", "reset-generated-confirm",
-            "full-draft-start", "full-draft-cancel",
             "runtime-key-open", "runtime-key-close", "runtime-key-provider",
             "runtime-key-input", "runtime-key-cancel", "runtime-key-submit",
+            "studio-language-select",
         }
         self.assertEqual(set(parser.control_ids), expected_controls)
         self.assertEqual(len(parser.control_ids), len(expected_controls))
@@ -564,7 +564,6 @@ class PaperStudioTests(unittest.TestCase):
             {
                 "/api/accept",
                 "/api/compile", "/api/figure/approve", "/api/figure/build",
-                "/api/full-draft/start", "/api/full-draft/cancel",
                 "/api/section-draft/start",
                 "/api/figure/cancel", "/api/figure/caption",
                 "/api/figure/caption/generate", "/api/figure/compose",
@@ -841,7 +840,7 @@ class PaperStudioTests(unittest.TestCase):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="figure-cancel" class="danger" hidden', html)
-        self.assertIn("⏸ Stop calling", html)
+        self.assertIn("⏸ 停止调用", html)
         progress_start = html.index('id="figure-progress"')
         progress_end = html.index('id="mechanism-controls"')
         self.assertTrue(progress_start < html.index('id="figure-cancel"') < progress_end)
@@ -1404,9 +1403,9 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('id="title-save"', html)
         self.assertIn('"/api/title/generate"', source)
         self.assertIn('"/api/title/save"', source)
-        self.assertIn("Model candidate not saved yet", source)
+        self.assertIn('studioT("模型 candidate 尚未保存", "Model candidate not saved yet")', source)
         self.assertIn("function updateTitleSaveButton()", source)
-        self.assertIn('changed ? "Confirm writing to LaTeX" : "Written to PDF"', source)
+        self.assertIn('changed ? studioT("确认写入 LaTeX", "Confirm writing to LaTeX") : studioT("已写入 PDF", "Written to PDF")', source)
         self.assertIn("currentTitle", source)
         self.assertIn('$("title-editor").hidden = activeSection !== "abstract"', source)
         self.assertIn('if (activeSection === "abstract") renderTitleEditor()', source)
@@ -1424,33 +1423,14 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('return "abstract";', source)
         self.assertNotIn("paper-studio.active-section", source)
         self.assertNotIn("paper-studio.active-view", source)
-        self.assertIn("static/app.js?v=20260830.1-deduplicated-planning", index)
+        self.assertIn("static/app.js?v=20261003.1-restore-zh", index)
 
-    def test_full_draft_click_queues_behind_an_inflight_paragraph_generation(self):
+    def test_browser_has_no_full_draft_card_or_controls(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
-        self.assertIn("let queuedFullDraftStart = false", source)
-        self.assertIn("if (proseRequestBusy) {\n    queuedFullDraftStart = true;", source)
-        self.assertIn("automatically start the full manuscript draft task", source)
-        self.assertIn(
-            "if (queuedFullDraftStart) {\n      queuedFullDraftStart = false;\n"
-            "      void startFullDraftFromBrowser();",
-            source,
-        )
-        self.assertIn(
-            "start.disabled = fullDraftRequestBusy || queuedFullDraftStart || running",
-            source,
-        )
-
-    def test_failed_pending_figure_does_not_disable_full_draft_retry(self):
-        source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
-        render = source[
-            source.index("function renderFullDraft()") :
-            source.index("async function startFullDraftFromBrowser()")
-        ]
-        self.assertIn("const activelyGeneratingArtifacts", render)
-        self.assertIn('Boolean(job && job.status === "failed")', render)
-        self.assertIn("|| activelyGeneratingArtifacts ||", render)
-        self.assertNotIn("|| artifactsPending ||", render)
+        index = (studio.STATIC / "index.html").read_text(encoding="utf-8")
+        self.assertNotIn("full-draft", index)
+        self.assertNotIn("full-draft", source)
+        self.assertNotIn("startFullDraftFromBrowser", source)
 
     def test_full_draft_api_uses_persisted_provider_model_when_body_omits_model(self):
         handler = object.__new__(Handler)
@@ -1544,9 +1524,9 @@ class PaperStudioTests(unittest.TestCase):
         candidate_tag = html[html.index('<textarea id="candidate"') : html.index("></textarea>", html.index('<textarea id="candidate"'))]
         self.assertNotIn("readonly", candidate_tag)
         self.assertIn("function updateAcceptButton()", source)
-        self.assertIn('? "LaTeX has been written."', source)
+        self.assertIn('? studioT("已写入 LaTeX", "LaTeX has been written.")', source)
         self.assertIn('$("candidate").addEventListener("input"', source)
-        self.assertIn("Accepted version (may still be modified).", source)
+        self.assertIn('studioT("已接受版本（可继续修改）", "Accepted version (may still be modified).")', source)
         self.assertIn("base_text: visibleBaseText", source)
 
     def test_manuscript_entrypoint_requires_every_configured_section(self):
@@ -1890,8 +1870,8 @@ class PaperStudioTests(unittest.TestCase):
             html.index('id="data-compose"'),
         )
         self.assertIn('id="data-composition-editor"', html)
-        self.assertIn("When all are satisfactory, manually click Synthesize Figure", html)
-        self.assertIn('<button id="data-compose" class="primary">Composite figure</button>', html)
+        self.assertIn("全部满意后，再手动点击“合成图”", html)
+        self.assertIn('<button id="data-compose" class="primary">合成图</button>', html)
         self.assertIn('id="data-compose-actions"', html)
         self.assertIn('id="data-layout-prompt-label"', html)
         self.assertIn('id="single-data-controls"', html)
@@ -1902,7 +1882,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('? `${figure.id} · ${figure.title}`', source)
         self.assertIn('id="data-layout-prompt" rows="4" placeholder=""', html)
         self.assertNotIn('oncontextmenu="activateLayoutPrompt()', html)
-        self.assertIn('src="static/app.js?v=20260830.1-deduplicated-planning"', html)
+        self.assertIn('src="static/app.js?v=20261003.1-restore-zh"', html)
         self.assertIn('STUDIO_BASE_PATH', source)
         self.assertIn('return STUDIO_BASE_PATH + value', source)
         self.assertIn('id="writing-workspace" class="editor-grid" hidden', html)
@@ -1916,12 +1896,12 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('project.name ? `${project.name} · Paper Studio`', source)
         self.assertNotIn('(figure.placement_options || []).filter(', source)
         self.assertIn('item.disabled = !option.accepted', source)
-        self.assertIn('? "Reparse the Prompt and generate a composite image."', source)
+        self.assertIn('? studioT("重新解析 Prompt 并生成合成图", "Reparse the Prompt and generate a composite image.")', source)
         self.assertIn('id="figure-layout-mode"', html)
-        self.assertIn('<option value="single-column">single-column</option>', html)
-        self.assertIn('<option value="two-column">two-column</option>', html)
+        self.assertIn('<option value="single-column">单栏</option>', html)
+        self.assertIn('<option value="two-column">双栏</option>', html)
         self.assertIn(
-            '<option value="wrapfigure" disabled>Wrapfigure(AAAI Disable)</option>',
+            '<option value="wrapfigure" disabled>Wrapfigure（AAAI 禁用）</option>',
             html,
         )
         self.assertIn('layout_mode: $("figure-layout-mode").value', source)
@@ -1944,8 +1924,8 @@ class PaperStudioTests(unittest.TestCase):
             html.index('id="figure-preview-pdf"'),
             html.index('id="data-approve-after-placement"'),
         )
-        self.assertIn('? "Generate additional caption. → PDF"', source)
-        self.assertIn(': "Reinsert"', source)
+        self.assertIn('? studioT("补生成 Caption → PDF", "Generate additional caption. → PDF")', source)
+        self.assertIn(': studioT("重新插入", "Reinsert")', source)
         self.assertIn('pdf.onload = () =>', source)
         self.assertIn('id="figure-caption-box"', html)
         self.assertIn('id="figure-caption"', html)
@@ -1970,7 +1950,7 @@ class PaperStudioTests(unittest.TestCase):
             '(figure.status === "approved" && !captionDirty && !captionNeedsBackfill)',
             source,
         )
-        self.assertIn('"Generate additional caption. → PDF"', source)
+        self.assertIn('studioT("补生成 Caption → PDF", "Generate additional caption. → PDF")', source)
         self.assertIn('const captionDrafts = new Map()', source)
         self.assertIn('function rememberCaptionDraft(figureId, caption)', source)
         self.assertIn('function forgetCaptionDraft(figureId)', source)
@@ -2007,7 +1987,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('let pdfLocateRequestId = 0', source)
         self.assertIn('const submittedPrompt = $("draw-prompt").value.trim()', source)
         self.assertIn('const visibleTableLatex = $("table-latex").value.trim()', source)
-        self.assertIn('tableLatexDirty ? "Update table → PDF" : "Body text has been inserted."', source)
+        self.assertIn('tableLatexDirty ? studioT("更新表格 → PDF", "Update table → PDF") : studioT("已插入正文", "Body text has been inserted.")', source)
         self.assertIn('$("candidate").disabled = busy', source)
         self.assertIn('$("paper-title").disabled = busy', source)
         self.assertIn('control.disabled = running || !figure.ready', source)
@@ -2035,7 +2015,7 @@ class PaperStudioTests(unittest.TestCase):
             html.index('class="figure-placement-row"'),
             html.index('id="mechanism-approve-after-placement"'),
         )
-        self.assertIn('src="static/app.js?v=20260830.1-deduplicated-planning"', html)
+        self.assertIn('src="static/app.js?v=20261003.1-restore-zh"', html)
         self.assertNotIn("System-defined paragraph task", html)
         self.assertNotIn('id="purpose"', html)
         self.assertNotIn('$("purpose")', source)
@@ -2092,7 +2072,7 @@ class PaperStudioTests(unittest.TestCase):
         self.assertIn('download.hidden = false', source)
         self.assertIn('download.href = studioPath(state.pdf.url || "/paper.pdf")', source)
         self.assertIn('paper-studio.pdf-navigation-visible', source)
-        self.assertIn('pdfNavigationVisible ? "Hide navigation bar." : "Show navigation bar."', source)
+        self.assertIn('pdfNavigationVisible ? studioT("隐藏导航栏", "Hide navigation bar.") : studioT("显示导航栏", "Show navigation bar.")', source)
         self.assertIn('function uniqueArtifacts(artifacts = [])', source)
         self.assertIn('uniqueArtifacts(paragraph.artifacts || [])', source)
         self.assertNotIn('id="artifact-marker"', html)
@@ -2700,17 +2680,12 @@ First accepted paragraph.
             ],
         }
 
-        def fake_run(command, **kwargs):
-            captured["command"] = command
-            captured["prompt"] = kwargs["input"]
-            captured["env"] = kwargs["env"]
-            output = Path(command[command.index("--output-last-message") + 1])
-            output.write_text(json.dumps(raw_plan), encoding="utf-8")
-            return CompletedProcess(command, 0, "", "")
+        def fake_agent(prompt, *, root, images, timeout, env, auth_args=None):
+            captured.update({"prompt": prompt, "env": env})
+            return json.dumps(raw_plan)
 
         with (
-            patch.object(studio, "shutil_which", return_value="/usr/local/bin/codex"),
-            patch.object(studio.subprocess, "run", side_effect=fake_run),
+            patch.object(studio.figure_agent, "run_agent", side_effect=fake_agent),
             patch.dict(studio.os.environ, {"OPENAI_API_KEY": "must-not-leak"}),
         ):
             plan = create_data_figure_layout_with_local_agent(
@@ -2827,23 +2802,18 @@ parser.add_argument("--png")
 args = parser.parse_args()
 """
 
-        def fake_run(command, **kwargs):
-            captured["command"] = command
-            captured["env"] = kwargs["env"]
-            captured["prompt"] = kwargs["input"]
-            output = Path(command[command.index("--output-last-message") + 1])
-            output.write_text(program, encoding="utf-8")
-            return CompletedProcess(command, 0, "", "")
+        def fake_agent(prompt, *, root, images, timeout, env, auth_args=None):
+            captured.update({"prompt": prompt, "env": env, "images": images})
+            return program
 
         with (
-            patch.object(studio, "shutil_which", return_value="/usr/local/bin/codex"),
-            patch.object(studio.subprocess, "run", side_effect=fake_run),
+            patch.object(studio.figure_agent, "run_agent", side_effect=fake_agent),
+            patch.object(studio.figure_agent, "reference_figure_images", return_value=[]),
             patch.dict(studio.os.environ, {"OPENAI_API_KEY": "must-not-leak"}),
         ):
             source = studio.create_data_figure_code_with_local_agent("F4")
 
         self.assertEqual(source, program)
-        self.assertEqual(captured["command"][:2], ["/usr/local/bin/codex", "exec"])
         self.assertNotIn("OPENAI_API_KEY", captured["env"])
         self.assertIn("Ablation and style analysis", captured["prompt"])
         self.assertIn("<traceable_results>", captured["prompt"])
@@ -2851,8 +2821,8 @@ args = parser.parse_args()
     def test_local_agent_table_prompt_is_not_html_hidden(self):
         source = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         self.assertIn('id="table-agent-prompt"', source)
-        self.assertIn('for="table-agent-prompt">Modify command</label>', source)
-        self.assertIn("Invoke local Agent</button>", source)
+        self.assertIn('for="table-agent-prompt">修改命令</label>', source)
+        self.assertIn("调用本地 Agent</button>", source)
         self.assertNotIn("(Non API)", source)
         # CSP-safe markup starts dynamic controls hidden; renderFigures removes
         # the native hidden attribute for local table editing.
@@ -3644,7 +3614,7 @@ args = parser.parse_args()
             r"<required_heading_latex>\textbf{Safety alignment and refusal behavior.}",
             captured["input"],
         )
-        self.assertIn("<writing_style>", captured["input"])
+        self.assertIn("<writing_style_profile>", captured["input"])
         self.assertIn("Do not use em dashes", captured["instructions"])
         self.assertIn("LaTeX double/triple hyphens", captured["instructions"])
         self.assertIn(
@@ -3699,12 +3669,38 @@ args = parser.parse_args()
         self.assertEqual(text, "Fresh evidence-only prose.")
         self.assertNotIn("previous_response_id", captured)
         self.assertIn("<current_candidate></current_candidate>", captured["input"])
+        self.assertIn("<writing_style_profile>", captured["input"])
 
-    def test_html_profile_writing_style_is_extracted(self):
-        style = studio.writing_style_context()
-        self.assertIn("Measured abstract tendencies", style)
-        self.assertIn("Introduction architecture", style)
-        self.assertNotIn("<section", style)
+    def test_html_profile_writing_style_is_selected_for_current_section(self):
+        profile = '''<section data-report-section="writing-style">
+          <article data-writing-profile="abstract" data-organization="Abstract" data-section-names="Abstract">Abstract profile.</article>
+          <article data-writing-profile="introduction" data-organization="Introduction" data-section-names="Introduction">Introduction profile.</article>
+          <article data-writing-profile="section" data-organization="Related Work" data-section-names="2 Related Work">Related work profile.</article>
+          <article data-writing-profile="section" data-organization="Limitations" data-section-names="Limitations">Limitations profile.</article>
+          <article data-writing-profile="section" data-organization="Conclusion" data-section-names="6 Conclusion">Conclusion profile.</article>
+        </section>'''
+        with patch.object(studio, "read_text", return_value=profile):
+            abstract = studio.writing_style_context("abstract")
+            introduction = studio.writing_style_context("introduction")
+            related_work = studio.writing_style_context("related_work")
+            limitations = studio.writing_style_context("limitations", "Limitations")
+            conclusion = studio.writing_style_context("conclusion", "Conclusion")
+        self.assertEqual(abstract, "Abstract profile.")
+        self.assertEqual(introduction, "Introduction profile.")
+        self.assertEqual(related_work, "Related work profile.")
+        self.assertNotIn("<section", related_work)
+        self.assertEqual(limitations, "Limitations profile.")
+        self.assertEqual(conclusion, "Conclusion profile.")
+
+    def test_html_profile_writing_style_prefers_matching_subsection(self):
+        profile = '''<section data-report-section="writing-style">
+          <article data-writing-profile="section" data-organization="Experiments" data-section-names="4.1 Experimental Setup">Setup profile.</article>
+          <article data-writing-profile="section" data-organization="Experiments" data-section-names="4.3 Ablation Study">Ablation profile.</article>
+        </section>'''
+        with patch.object(studio, "read_text", return_value=profile):
+            style = studio.writing_style_context("experiments", "Ablation Study")
+        self.assertIn("Ablation profile.", style)
+        self.assertNotIn("Setup profile.", style)
 
     def test_prompt_bibliography_is_compact_metadata(self):
         bibliography = studio.PAPER / "references.bib"
@@ -4155,12 +4151,14 @@ args = parser.parse_args()
             ),
             patch.object(studio, "FIGURES", {"F1": {}, "F2": {}}),
             patch.object(studio, "TABLES", {"T1": {}, "T2": {}}),
+            patch.object(studio, "projected_word_budget", return_value={}),
+            patch.object(studio, "projected_abstract_words", return_value=None),
         ):
-            self.assertEqual(studio.paragraph_word_range("introduction"), (53, 70))
-            self.assertEqual(studio.paragraph_word_range("abstract"), (90, 100))
-            self.assertEqual(studio.paragraph_word_range("experiments"), (96, 120))
+            self.assertEqual(studio.paragraph_word_range("introduction"), (77, 102))
+            self.assertEqual(studio.paragraph_word_range("abstract"), (90, 102))
+            self.assertEqual(studio.paragraph_word_range("experiments"), (103, 128))
             guidance = studio.section_budget_guidance("introduction")
-            self.assertIn("between 53 and 70 readable words", guidance)
+            self.assertIn("between 77 and 102 readable words", guidance)
 
     def test_citation_resolver_starts_a_new_chain_when_previous_id_is_absent(self):
         captured = {}
@@ -5009,12 +5007,9 @@ args = parser.parse_args()
         )
         observed = {}
 
-        def fake_run(command, **kwargs):
-            observed["command"] = command
-            observed["env"] = kwargs["env"]
-            output = Path(command[command.index("--output-last-message") + 1])
-            output.write_text(revised, encoding="utf-8")
-            return studio.subprocess.CompletedProcess(command, 0, "", "")
+        def fake_agent(prompt, *, root, images, timeout, env, auth_args=None):
+            observed.update({"env": env, "prompt": prompt})
+            return revised
 
         metrics = {
             "defenses": {
@@ -5024,16 +5019,13 @@ args = parser.parse_args()
             }
         }
         with (
-            patch.object(studio, "shutil_which", return_value="/usr/bin/codex"),
-            patch.object(studio.subprocess, "run", side_effect=fake_run),
+            patch.object(studio.figure_agent, "run_agent", side_effect=fake_agent),
             patch.dict(studio.os.environ, {"OPENAI_API_KEY": "must-not-leak"}),
         ):
             result = edit_table_with_local_agent(
                 "T2", current, "Improve the grouped header.", metrics=metrics
             )
         self.assertIn(r"\caption{Revised locally.}", result)
-        self.assertEqual(observed["command"][1], "exec")
-        self.assertIn("read-only", observed["command"])
         self.assertNotIn("OPENAI_API_KEY", observed["env"])
 
     def test_related_work_plan_contains_only_the_two_retained_groups(self):
@@ -5658,14 +5650,14 @@ args = parser.parse_args()
         self.assertNotIn('Check composition or data charts here after generation.', html)
         self.assertIn("const hasMechanismVersions = false", source)
         self.assertIn("figure.paper_preview_url || figure.preview_url", source)
-        self.assertIn("Codex Native graphics", html)
+        self.assertIn("Codex 原生图形", html)
 
     def test_approved_figure_preview_is_locked_to_inserted_paper_pdf(self):
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('figure.status === "approved"', source)
         self.assertIn("paperVersionInserted", source)
         self.assertIn("figure.paper_preview_url || figure.preview_url", source)
-        self.assertIn("The current preview and the main PDF use the same image file.", source)
+        self.assertIn('studioT("当前预览与正文 PDF 使用同一个图文件。", "The current preview and the main PDF use the same image file.")', source)
 
     def test_mechanism_prompt_editor_has_two_columns_and_adjacent_draw_flow(self):
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
@@ -5679,7 +5671,7 @@ args = parser.parse_args()
         self.assertIn('id="mechanism-generation-prerequisite-text"', html)
         self.assertIn('id="mechanism-build-status"', html)
         self.assertIn("mechanismPrerequisiteBlocked", source)
-        self.assertIn("Codex Generating editable PPT PDF in the background.", source)
+        self.assertIn('studioT("绘图已完成；可编辑 PPT/PDF 正在后台生成。", "Generating editable PPT and PDF in the background.")', source)
         self.assertIn("Editable PPT/PDF reconstruction failed.", source)
         self.assertLess(html.index('id="draw-prompt"'), html.index('id="prompt-instruction"'))
         self.assertLess(html.index('id="prompt-instruction"'), html.index('id="mechanism-draw-stage"'))
@@ -5688,7 +5680,7 @@ args = parser.parse_args()
         self.assertIn('id="mechanism-flow-image"', html)
         self.assertIn('id="mechanism-flow-paper"', html)
         self.assertIn("function updateMechanismFlow(figure)", source)
-        self.assertIn('"Update Prompt per the right side instructions."', source)
+        self.assertIn('studioT("按右侧指令更新 Prompt", "Update Prompt per the right side instructions.")', source)
         self.assertIn('$("mechanism-controls").hidden = !mechanism;', source)
         self.assertIn("grid-template-columns:minmax(0,1.35fr) minmax(240px,.8fr)", style)
 
@@ -6357,11 +6349,11 @@ args = parser.parse_args()
     def test_artifact_card_labels_data_figures_by_kind_not_phase(self):
         app = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn(
-            'figure.kind === "mechanism" ? "Mechanism diagram · finish first" : "Data figure · results/ driver."',
+            'figure.kind === "mechanism" ? studioT("机制图 · 先完成", "Mechanism diagram · finish first") : studioT("数据图 · results/ 驱动", "Data figure · results/ driver.")',
             app,
         )
         self.assertNotIn(
-            'figure.phase === 1 ? "Mechanism diagram · finish first" : "Data figure · results/ driver."',
+            'figure.phase === 1 ? studioT("机制图 · 先完成", "Mechanism diagram · finish first") : studioT("数据图 · results/ 驱动", "Data figure · results/ driver.")',
             app,
         )
 
@@ -6408,7 +6400,7 @@ args = parser.parse_args()
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         source = (studio.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('id="project-reference-paper"', html)
-        self.assertIn("Features not provided by the webpage or other requests should be run with Code Agent in the local terminal.", html)
+        self.assertIn("网页未提供的功能或其他需求，请在本地终端运行 Code Agent。", html)
         self.assertNotIn('id="project-subtitle"', html)
         self.assertNotIn("Paragraph by paragraph discussion, write to LaTeX after confirmation.", html + source)
         self.assertIn('$("project-reference-paper")', source)
@@ -6516,7 +6508,7 @@ args = parser.parse_args()
         for control_id in (
             "generate", "accept", "comment", "reset-generated",
             "title-generate", "title-save", "figure-approve", "table-generate",
-            "table-approve", "full-draft-start", "full-draft-cancel",
+            "table-approve",
             "section-draft-start", "data-compose", "figure-caption-save",
         ):
             self.assertIn(f'"{control_id}"', controls)
@@ -6565,11 +6557,12 @@ args = parser.parse_args()
         # control, fail, and get redirected into a "bring your own key"
         # dialog that no longer exists. The demo is view-only now -- no
         # API-key postMessage escape hatch, no redirect, just a disabled control
-        # surface and a plain blocked-request fallback. Paper Studio is fixed
-        # to English and sends no parent-window language messages.
+        # surface and a plain blocked-request fallback. Paper Studio follows
+        # the interface language chosen in the shell.
         self.assertNotIn("paper-studio-demo-api-key-required", source)
-        self.assertNotIn("research-avatar-language", source)
-        self.assertEqual(source.count("window.parent.postMessage"), 0)
+        self.assertIn("research-avatar-language", source)
+        # The only parent message is the language switch the shell listens for.
+        self.assertEqual(source.count("window.parent.postMessage"), 1)
         self.assertNotIn('demo_key_required: "1"', source)
         self.assertIn("function applyReadOnlyDemoRestrictions()", source)
         self.assertIn('if (!state || !state.demo_mode) return;', source)
@@ -6630,28 +6623,22 @@ args = parser.parse_args()
             self.assertIsNone(finished["prompt_approved_at"])
             self.assertEqual(finished["progress"], 100)
 
-    def test_figure_prompt_continues_only_its_own_responses_chain(self):
+    def test_figure_prompt_uses_the_local_agent_with_reference_figures_and_no_gpt_api(self):
         with TemporaryDirectory() as directory:
             source_dir = Path(directory)
             state = _default_state()
-            state["llm_provider"] = "openai"
-            state["model"] = "gpt-5-nano"
-            state["figures"]["F1"]["previous_response_id"] = "resp-f1-previous"
-            state["figures"]["F3"]["previous_response_id"] = "resp-f3-unrelated"
             captured = {}
 
-            def fake_post(payload):
-                captured.update(payload)
-                return {
-                    "id": "resp-f1-next",
-                    "output_text": "A simpler single-column drawing prompt with at most eight text labels.",
-                }
+            def fake_agent(prompt, *, root, images, timeout, env, auth_args=None):
+                captured.update({"prompt": prompt, "images": images})
+                return "A simpler single-column drawing prompt with at most eight text labels."
 
+            reference = [Path(directory) / "figure-page-2.png"]
             with (
-                patch.dict(os.environ, {"OPENAI_API_KEY": "unit-test-placeholder"}),
                 patch.object(studio, "FIGURE_SOURCE_DIR", source_dir),
-                patch.object(studio, "active_llm_provider", return_value="openai"),
-                patch.object(studio, "post_openai", side_effect=fake_post),
+                patch.object(studio.figure_agent, "run_agent", side_effect=fake_agent),
+                patch.object(studio.figure_agent, "reference_figure_images", return_value=reference),
+                patch.object(studio, "post_openai", side_effect=AssertionError("a GPT API must not draw figures")),
             ):
                 response_id, prompt = studio.generate_mechanism_prompt(
                     "F1",
@@ -6660,19 +6647,29 @@ args = parser.parse_args()
                     current_prompt="Previous dense prompt.",
                 )
 
-            self.assertEqual(captured["previous_response_id"], "resp-f1-previous")
-            self.assertNotEqual(captured["previous_response_id"], "resp-f3-unrelated")
-            self.assertTrue(captured["store"])
-            self.assertIn("<paper_figure_format>", captured["input"])
-            self.assertIn("Previous dense prompt.", captured["input"])
-            self.assertNotIn("Approved outline:", captured["input"])
-            self.assertEqual(response_id, "resp-f1-next")
+            self.assertIn("Previous dense prompt.", captured["prompt"])
+            self.assertEqual(captured["images"], reference)
+            self.assertTrue(response_id.startswith("agent-"))
             self.assertTrue(
                 prompt.startswith(
                     "A simpler single-column drawing prompt with at most eight text labels."
                 )
             )
             self.assertIn("Use no more than eight text labels total", prompt)
+
+    def test_figure_agent_follows_the_host_and_attaches_reference_figures(self):
+        from research_avatar.paper_studio import figure_agent
+
+        everything = {"claude": "/bin/claude", "codex": "/bin/codex"}
+        with patch.dict(os.environ, {"CLAUDECODE": "1"}, clear=False):
+            os.environ.pop("PAPER_STUDIO_FIGURE_AGENT", None)
+            self.assertEqual(figure_agent.choose_agent(everything.get), "claude")
+        with patch.dict(os.environ, {"PAPER_STUDIO_FIGURE_AGENT": "codex"}, clear=False):
+            self.assertEqual(figure_agent.choose_agent(everything.get), "codex")
+        env = {k: v for k, v in os.environ.items() if k not in {"CLAUDECODE", "PAPER_STUDIO_FIGURE_AGENT"}}
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(figure_agent.choose_agent(everything.get), "codex")
+            self.assertEqual(figure_agent.choose_agent({"claude": "/bin/claude"}.get), "claude")
 
     def test_mechanism_prompt_contract_rejects_results_captions_and_analysis_leaks(self):
         invalid = (
@@ -7646,7 +7643,7 @@ args = parser.parse_args()
     def test_paper_studio_uses_provider_neutral_writing_labels(self):
         html = (studio.STATIC / "index.html").read_text(encoding="utf-8")
         script = (studio.STATIC / "app.js").read_text(encoding="utf-8")
-        self.assertIn("Feedback to the writing model", html)
+        self.assertIn("给写作模型的修改意见", html)
         for obsolete in (
             "Feedback to GPT",
             "GPT Generate candidate titles",

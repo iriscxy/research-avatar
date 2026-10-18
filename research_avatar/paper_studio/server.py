@@ -39,6 +39,7 @@ from research_avatar.survey_bibliography import verified_survey_bibliography
 
 from .account_usage import ensure_ledger_budget
 from .api_usage import append_usage, usage_record, usage_summary
+from . import figure_agent
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
@@ -2054,7 +2055,17 @@ def planned_paragraphs(section: str) -> list[dict[str, Any]]:
     return [
         {
             **spec,
-            "candidate": None,
+            "candidate": (
+                {
+                    "id": uuid.uuid4().hex,
+                    "text": str(spec["seed_candidate"]),
+                    "purpose": spec.get("purpose", ""),
+                    "citations_added": [],
+                    "created_at": int(time.time()),
+                }
+                if spec.get("seed_candidate")
+                else None
+            ),
             "accepted_text": "",
             "history": [],
         }
@@ -2249,6 +2260,22 @@ def online_citation_placeholder_minimum(section: str, paragraph_index: int) -> i
     if section == "related_work":
         return 2
     return 0
+
+
+def local_citation_minimum(section: str, paragraph_index: int) -> int:
+    """Distinct survey citations a literature-facing paragraph must carry in a local project.
+
+    A short ACL paper cites roughly 15 to 25 works: the introduction positions the problem
+    (at least nine citations across its first three paragraphs) and Related Work reviews prior
+    work (at least eight per paragraph). Other sections cite only when they name a source.
+    """
+    if section == "introduction":
+        return 3 if paragraph_index < 3 else 0
+    if section == "related_work":
+        return 8
+    # Sections that name external work must attribute it: method (what each system builds on),
+    # experiments setup (baselines and protocols), discussion (what the findings agree or disagree with).
+    return {"method": {0: 2, 2: 1}, "experiments": {0: 3, 4: 1}, "discussion": {0: 2, 1: 2}, "limitations": {0: 1}}.get(section, {}).get(paragraph_index, 0)
 
 
 def _default_state() -> dict[str, Any]:
@@ -2483,6 +2510,27 @@ def load_state() -> dict[str, Any]:
                 "progress_message": "Service has restarted; the full text generation task has stopped, you can resume from the unfinished paragraph.",
                 "finished_at": int(time.time()),
             }
+        for figure_state in state.get("figures", {}).values():
+            if (
+                isinstance(figure_state, dict)
+                and figure_state.get("status") in FIGURE_RUNNING_STATUSES
+                and figure_state.get("job_server_instance") != SERVER_INSTANCE_TOKEN
+                and not process_is_alive(figure_state.get("job_server_pid"))
+                and (
+                    figure_state.get("job_server_instance")
+                    or int(time.time()) - int(figure_state.get("job_started_at") or time.time()) > 120
+                )
+            ):
+                figure_state.update(
+                    {
+                        "status": "prompt_ready" if str(figure_state.get("draw_prompt") or "").strip() else "pending",
+                        "progress": 0,
+                        "progress_message": "",
+                        "last_message": "The process that owned this figure task has exited; the task was stopped and can be started again.",
+                        "job_token": None,
+                        "job_started_at": None,
+                    }
+                )
         section_job = state.setdefault("section_draft_job", None)
         if (
             isinstance(section_job, dict)
@@ -2651,18 +2699,96 @@ def read_text(path: Path, limit: int = 24000) -> str:
     return path.read_text(encoding="utf-8", errors="replace")[:limit]
 
 
-def writing_style_context() -> str:
+def writing_style_context(section: str | None = None, subsection: str | None = None) -> str:
     profile = read_text(ROOT / "researcher-profile/PROFILE.html", 50000)
     html_match = re.search(
-        r"<section\b[^>]*(?:id|data-report-section)=[\"']writing-style[\"'][^>]*>"
+        r"<section\b[^>]*(?:id|data-report-section)=[\"']writing-(?:profile|style)[\"'][^>]*>"
         r"(.*?)</section>",
         profile,
         re.DOTALL | re.IGNORECASE,
     )
     if html_match:
-        return strip_html(html_match.group(1))[:16000]
+        style_markup = html_match.group(1)
+        if section and 'data-writing-profile=' in style_markup:
+            title = SECTION_MAP.get(section, {}).get("title", section)
+            normalized_title = re.sub(r"[^a-z0-9]+", " ", str(title).lower()).strip()
+            articles = re.findall(r"<article\b([^>]*)>(.*?)</article>", style_markup, re.DOTALL | re.IGNORECASE)
+            parsed: list[tuple[str, str, str, str]] = []
+            for attrs, body in articles:
+                profile_type = re.search(r'data-writing-profile=["\']([^"\']+)', attrs, re.I)
+                organization = re.search(r'data-organization=["\']([^"\']+)', attrs, re.I)
+                names = re.search(r'data-section-names=["\']([^"\']*)', attrs, re.I)
+                if not profile_type or not organization:
+                    continue
+                parsed.append((
+                    html.unescape(profile_type.group(1)),
+                    html.unescape(organization.group(1)),
+                    html.unescape(names.group(1) if names else ""),
+                    body,
+                ))
+
+            def norm(value: str) -> str:
+                value = re.sub(r"\\(?:subsection|subsubsection|paragraph)\*?\{([^{}]*)\}", r"\1", value)
+                value = re.sub(r"^\s*\d+(?:\.\d+)*\.?\s+", "", value)
+                return re.sub(r"[^a-z0-9]+", " ", value.lower()).strip()
+
+            target_org = normalized_title
+            aliases = {
+                "abstract": {"abstract"},
+                "introduction": {"introduction", "intro"},
+                "related work": {"related work", "literature review"},
+                "method": {"method", "methods", "methodology", "approach"},
+                "experiments": {"experiment", "experiments", "evaluation", "experimental results"},
+                "discussion": {"discussion", "analysis"},
+                "limitations and ethics": {"limitations", "limitation", "ethics", "limitations and ethics", "ethical considerations"},
+                "conclusion": {"conclusion", "conclusions", "conclusion and future work"},
+            }
+            category = next((key for key, values in aliases.items() if normalized_title in values), normalized_title)
+            expected = aliases.get(category, {category})
+            direct_profile_type = {"abstract": "abstract", "introduction": "introduction"}.get(category)
+            matches = [item for item in parsed if norm(item[0]) == (direct_profile_type or "section")]
+            if direct_profile_type:
+                selected = next((item for item in matches if item[0] == direct_profile_type), None)
+                if selected is None and category == "introduction":
+                    matches = [item for item in parsed if norm(item[0]) == "section"]
+                    current_heading = norm(subsection or "")
+                    selected = next((
+                        item for item in matches
+                        if current_heading and any(current_heading == norm(name) for name in item[2].split(" | "))
+                    ), None)
+                    if selected is None:
+                        selected = next(
+                            (item for item in matches if any(norm(name) == norm(title) for name in item[2].split(" | "))),
+                            None,
+                        )
+                    if selected is None:
+                        selected = next((item for item in matches if norm(item[1]) in expected), None)
+            else:
+                current_heading = norm(subsection or "")
+                selected = next((
+                    item for item in matches
+                    if current_heading and any(
+                        current_heading == norm(name)
+                        for name in item[2].split(" | ")
+                    )
+                ), None)
+                if selected is None:
+                    selected = next(
+                        (item for item in matches if any(norm(name) == norm(title) for name in item[2].split(" | "))),
+                        None,
+                    )
+                if selected is None:
+                    selected = next((item for item in matches if norm(item[1]) in expected), None)
+            if selected:
+                return strip_html(selected[3])[:16000]
+            return (
+                f"No author-specific writing profile was found for the {title} section. "
+                "Follow the approved paragraph architecture, evidence, and explicit researcher instructions; "
+                "do not infer a style preference from unrelated sections."
+            )
+        return strip_html(style_markup)[:16000]
     match = re.search(
-        r"## Writing Style\s*(.*?)(?=\n## Experiment Templates)",
+        r"## Writing (?:Profile|Style)\s*(.*?)(?=\n## (?:Research Environment|Experiment Templates))",
         profile,
         re.DOTALL,
     )
@@ -5007,6 +5133,27 @@ def local_agent_auth_args() -> list[str]:
     ]
 
 
+def run_local_figure_agent(prompt: str, *, timeout: int, with_reference_figures: bool = True) -> str:
+    """Run one drawing/typesetting prompt through the local agent in use (Claude Code or Codex)."""
+    try:
+        return figure_agent.run_agent(
+            prompt,
+            root=ROOT,
+            images=(
+                figure_agent.reference_figure_images(ROOT, STATE_DIR / "reference-figures")
+                if with_reference_figures
+                else []
+            ),
+            timeout=timeout,
+            env=local_agent_environment(),
+            auth_args=local_agent_auth_args(),
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise StudioError("The local Agent timed out.") from exc
+    except figure_agent.FigureAgentError as exc:
+        raise StudioError("The local Agent failed.\n" + str(exc)) from exc
+
+
 def codex_thread_id(output: str) -> str | None:
     """Read the persisted Codex thread id from JSONL without trusting prose."""
     for line in output.splitlines():
@@ -5066,9 +5213,6 @@ def edit_table_with_local_agent(
     layout_mode: str | None = None,
 ) -> str:
     """Ask the installed Codex CLI—not the Responses API—to revise one table."""
-    codex = shutil_which("codex")
-    if not codex:
-        raise StudioError("Local codex CLI not found; cannot invoke the local Agent.")
     instruction = instruction.strip()
     if not instruction:
         raise StudioError("Please specify how the local Agent should modify the table.")
@@ -5126,51 +5270,11 @@ Hard constraints:
 {latex.strip()}
 </current_table_latex>
 """
-    environment = local_agent_environment()
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(
-        prefix=f"agent-table-{table_id.lower()}-", dir=STATE_DIR
-    ) as temporary_name:
-        output = Path(temporary_name) / "last_message.txt"
-        command = [
-            codex,
-            "exec",
-            "--ephemeral",
-            *local_agent_auth_args(),
-            "--sandbox",
-            "read-only",
-            "--color",
-            "never",
-            "--cd",
-            str(ROOT),
-            "--output-last-message",
-            str(output),
-            "-",
-        ]
-        try:
-            process = subprocess.run(
-                command,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                timeout=600,
-                env=environment,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise StudioError("Local Agent table modification timed out.") from exc
-        if process.returncode:
-            diagnostic = (process.stdout + "\n" + process.stderr).strip()
-            raise StudioError(
-                "Local agent execution failed.\n"
-                + (diagnostic[-2400:] or "codex exec returned a non-zero status.")
-            )
-        if not output.exists():
-            raise StudioError("Local Agent did not produce a final reply.")
-        revised = normalize_table_numeric_precision(
-            extract_agent_table_latex(
-                output.read_text(encoding="utf-8", errors="replace")
-            )
+    revised = normalize_table_numeric_precision(
+        extract_agent_table_latex(
+            run_local_figure_agent(prompt, timeout=600, with_reference_figures=False)
         )
+    )
     return validate_table_latex_source(
         table_id,
         revised,
@@ -5831,7 +5935,10 @@ def experiment_setup_context() -> dict[str, Any]:
             "name": str(row.get("name", "")).strip(),
             "url": str(row.get("url", "")).strip(),
             "citation_key": str(
-                row.get("citation_key") or row.get("bibtex_key") or ""
+                row.get("citation_key")
+                or row.get("bibtex_key")
+                or bibliography_key_for_url(str(row.get("url", "")))
+                or ""
             ).strip(),
         }
         for row in dataset_rows
@@ -5856,7 +5963,10 @@ def experiment_setup_context() -> dict[str, Any]:
                 "implementation": implementations.get(name, ""),
                 "url": str(row.get("url", "")).strip(),
                 "citation_key": str(
-                    row.get("citation_key") or row.get("bibtex_key") or ""
+                    row.get("citation_key")
+                    or row.get("bibtex_key")
+                    or bibliography_key_for_url(str(row.get("url", "")))
+                    or ""
                 ).strip(),
             }
         )
@@ -6463,6 +6573,31 @@ def bibliography_fingerprint() -> str:
 def section_source_fingerprint(section: str) -> str:
     section_path = PAPER / "sections" / SECTION_MAP[section]["file"]
     return hashlib.sha256(read_text(section_path, 500_000).encode("utf-8")).hexdigest()
+
+
+def bibliography_key_for_url(url: str) -> str:
+    """Key of the verified survey entry whose source URL is ``url`` (empty when there is none).
+
+    A baseline or dataset is attributed through the verified literature survey: the plan
+    carries its source URL, and the bibliography built from that survey carries the same
+    URL, so the pairing is exact and never guessed.
+    """
+    wanted = re.sub(r"^https?://", "", str(url or "").strip()).rstrip("/")
+    if not wanted:
+        return ""
+    arxiv = re.search(r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5})", wanted)
+    try:
+        source = (PAPER / "references.bib").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    for entry in re.finditer(r"@\w+\{([^,\s]+),(.*?)\n\}", source, re.S):
+        found = re.search(r"\burl\s*=\s*\{([^}]*)\}", entry.group(2))
+        if found and re.sub(r"^https?://", "", found.group(1).strip()).rstrip("/") == wanted:
+            return entry.group(1)
+        eprint = re.search(r"\beprint\s*=\s*\{([^}]*)\}", entry.group(2))
+        if arxiv and eprint and eprint.group(1).strip() == arxiv.group(1):
+            return entry.group(1)
+    return ""
 
 
 def citation_keys(source: str) -> set[str]:
@@ -7375,8 +7510,13 @@ def resolve_citations_from_survey(
     section: str,
     purpose: str,
     paragraph: str,
+    minimum_citations: int = 0,
 ) -> tuple[str, str]:
-    """Audit one local paragraph using only sources already verified in survey HTML."""
+    """Audit one local paragraph using only sources already verified in survey HTML.
+
+    ``minimum_citations`` is the number of distinct survey works this literature-facing
+    paragraph must cite; with a positive minimum, zero citations is not a valid result.
+    """
     if SECTION_MAP.get(section, {}).get("render") == "abstract":
         return previous_response_id, remove_manuscript_citations(paragraph)
     allowed = survey_bibliography_keys()
@@ -7387,6 +7527,13 @@ def resolve_citations_from_survey(
     if not allowed or not catalog:
         return previous_response_id, local_survey_citations(paragraph)
     prior_counts = prior_section_citation_counts(section, paragraph)
+    requirement = ""
+    if minimum_citations > 0:
+        requirement = (
+            f"\n\nThis paragraph is literature-facing: it MUST cite at least {minimum_citations} "
+            "distinct works from <survey_catalog>, each next to the specific claim it supports. "
+            "Zero citations is not acceptable here. Spread them across sentences; do not stack them."
+        )
     response = post_openai(
         {
             "model": model,
@@ -7408,7 +7555,7 @@ with the literal \\cite{}. Avoid reusing a key listed in
 when this paragraph makes a distinct, source-specific claim that genuinely requires
 that same paper; a key already used twice should not appear a third time. Preserve all
 scientific claims, numbers, headings, artifact
-references, and wording except the citation commands.""",
+references, and wording except the citation commands.""" + requirement,
             "input": f"""<section>{section}</section>
 <paragraph_purpose>{purpose}</paragraph_purpose>
 <paragraph>{paragraph}</paragraph>
@@ -7423,7 +7570,36 @@ Return the citation-audited paragraph only.""",
     response_id = str(response.get("id") or "")
     if not revised or not response_id:
         raise StudioError("Survey citation audit did not return a paragraph.")
-    return response_id, local_survey_citations(revised)
+    revised = local_survey_citations(revised)
+    attempts = 0
+    while len(citation_keys(revised)) < minimum_citations and attempts < 3:
+        attempts += 1
+        cited = citation_keys(revised)
+        candidates = [key for key in re.findall(r"key=([^\s|]+)", catalog) if key not in cited][:12]
+        retry = post_openai(
+            {
+                "model": model,
+                "store": True,
+                "previous_response_id": response_id,
+                "instructions": "Return only the complete LaTeX-ready paragraph. Keep every claim and number; change only the citations.",
+                "input": (
+                    f"The paragraph cites {len(cited)} works but must cite at least {minimum_citations} distinct works from the survey catalog. "
+                    f"Add at least {minimum_citations - len(cited)} more, each beside the specific claim it supports. "
+                    f"Most relevant keys not yet cited: {', '.join(candidates)}.\n\n<paragraph>{revised}</paragraph>"
+                ),
+                "text": {"verbosity": "low"},
+            }
+        )
+        again = normalize_latex_ready_text(extract_output_text(retry))
+        if again:
+            revised = local_survey_citations(again)
+            response_id = str(retry.get("id") or response_id)
+    if len(citation_keys(revised)) < minimum_citations:
+        raise StudioError(
+            f"This {section.replace('_', ' ')} paragraph cites {len(citation_keys(revised))} survey works but needs at least "
+            f"{minimum_citations}; add citations from the verified literature survey."
+        )
+    return response_id, revised
 
 
 def resolve_citations_from_online_bibliography(
@@ -7883,6 +8059,11 @@ def call_openai(
         comment, PAPER_TEXT_CONTEXT_LIMITS["researcher_comment"], "researcher comment"
     )
     stable_context = ""
+    writing_profile = bounded_prompt_text(
+        writing_style_context(section, required_heading),
+        PAPER_TEXT_CONTEXT_LIMITS["writing_style"],
+        "writing style",
+    )
     evidence = bounded_prompt_text(
         section_evidence(section, artifacts),
         PAPER_TEXT_CONTEXT_LIMITS["section_evidence"],
@@ -7900,7 +8081,6 @@ def call_openai(
         stable_context = f"""<conversation_bootstrap>
 <approved_outline>{bounded_prompt_text(approved_outline_context(), PAPER_TEXT_CONTEXT_LIMITS['outline'], 'approved outline')}</approved_outline>
 <working_abstract>{bounded_prompt_text(effective_working_abstract_context(), PAPER_TEXT_CONTEXT_LIMITS['working_abstract'], 'working abstract')}</working_abstract>
-<writing_style>{bounded_prompt_text(writing_style_context(), PAPER_TEXT_CONTEXT_LIMITS['writing_style'], 'writing style')}</writing_style>
 <bibliography_catalog>{bounded_prompt_text(prompt_bibliography, BIBLIOGRAPHY_PROMPT_MAX_CHARS, 'bibliography catalog')}</bibliography_catalog>
 <section_evidence>{evidence}</section_evidence>
 </conversation_bootstrap>"""
@@ -8063,6 +8243,17 @@ contracts in these instructions. Do not preserve wording, claims, numbers, struc
 style from the current candidate merely because they were previously accepted or because
 you prefer the earlier version. Do not weaken, reinterpret, or silently omit any
 nonconflicting part of the researcher's request."""
+    instructions += """ Use <writing_style_profile> only as guidance about this author's
+organization, paragraph progression, and prose preferences. The profile contributes
+no scientific facts, results, claims, or citations; take those only from the approved
+target-paper evidence and outline. This profile has been selected for the current
+section and required heading, so follow its relevant observation without copying any
+prior wording."""
+    if section == "introduction":
+        instructions += """ The introduction profile summarizes how this author's
+introductions departed from a model's default. These are observations, not instructions:
+apply one only where it suits the current content, and where the author's papers
+disagree, follow the paper closest to the current task."""
     instructions += """ The paragraph may reference only the artifacts listed in
 <bound_artifacts>. Include every listed required_reference exactly once, even when the
 same artifact appears elsewhere in <current_section_context>. Do not repeat a reference
@@ -8266,6 +8457,7 @@ Smith et al. (2024)) must carry a supporting citation command in the same senten
 <reference_section_context>{reference_context_json}</reference_section_context>
 <bound_artifacts>{bound_artifacts_json}</bound_artifacts>
 <citations_already_used_in_section>{json.dumps(section_citations_already_used, ensure_ascii=False)}</citations_already_used_in_section>
+<writing_style_profile>{writing_profile}</writing_style_profile>
 {f"<bibliography_update>{bounded_prompt_text(bibliography_update, BIBLIOGRAPHY_PROMPT_MAX_CHARS, 'bibliography update')}</bibliography_update>" if bibliography_update else ""}
 {stable_context}
 
@@ -8655,8 +8847,10 @@ evidence.{(
         text = online_citation_markers(text)
     else:
         text = local_survey_citations(text)
-        if needs_citation_resolution(text) or paragraph_requires_citation_audit(
-            section, purpose, text
+        if (
+            needs_citation_resolution(text)
+            or paragraph_requires_citation_audit(section, purpose, text)
+            or len(citation_keys(text)) < minimum_online_citation_placeholders
         ):
             response_id, text = resolve_citations_from_survey(
                 model=model,
@@ -8664,6 +8858,7 @@ evidence.{(
                 section=section,
                 purpose=purpose,
                 paragraph=text,
+                minimum_citations=minimum_online_citation_placeholders,
             )
     response_id, text = repair_empty_citation_placeholders(
         model=model,
@@ -9690,6 +9885,25 @@ def page_budget_worsened(before: int | None, after: int | None) -> bool:
     return before is None or before <= limit or after > before
 
 
+def longest_paragraph_hint() -> str:
+    """Name the accepted paragraphs that are longest against the plan, so an overflow can be fixed where it is."""
+    try:
+        state = load_state()
+        rows = []
+        for section, section_state in state["sections"].items():
+            planned = projected_word_budget().get(section)
+            for paragraph in section_state.get("paragraphs", []):
+                words = manuscript_paragraph_word_count(str(paragraph.get("accepted_text") or ""))
+                if words and planned:
+                    rows.append((words - planned, words, planned, paragraph.get("id")))
+        rows.sort(reverse=True)
+        if rows and rows[0][0] > 0:
+            return " Longest against the plan: " + ", ".join(f"{pid} ({words} words vs {planned} planned)" for _gap, words, planned, pid in rows[:4]) + "."
+    except (OSError, ValueError, KeyError):
+        pass
+    return ""
+
+
 def page_budget_error(before: int | None, after: int | None) -> str:
     limit = submission_content_page_limit()
     return (
@@ -9697,8 +9911,26 @@ def page_budget_error(before: int | None, after: int | None) -> str:
         f"Body pages changed from {before if before is not None else 'unknown'} "
         f"to {after if after is not None else 'unknown'}, limit {limit}. "
         "References are excluded from this count. Shorten the current paragraph "
-        "or move nonessential material to the appendix."
+        "or move nonessential material to the appendix." + longest_paragraph_hint()
     )
+
+
+def projected_abstract_words() -> int | None:
+    path = PAPER / "projected" / "budget.json"
+    try:
+        value = int(json.loads(path.read_text(encoding="utf-8")).get("abstract_words", 0))
+    except (OSError, ValueError, AttributeError):
+        return None
+    return value or None
+
+
+def projected_word_budget() -> dict[str, int]:
+    """Per-paragraph words by section, taken from the compiled projected paper (single source of length)."""
+    path = PAPER / "projected" / "budget.json"
+    try:
+        return {str(k): int(v) for k, v in json.loads(path.read_text(encoding="utf-8")).get("section_words", {}).items()}
+    except (OSError, ValueError, AttributeError):
+        return {}
 
 
 def paragraph_word_limit(section: str) -> int | None:
@@ -9711,6 +9943,9 @@ def paragraph_word_limit(section: str) -> int | None:
     """
     page_limit = submission_content_page_limit()
     section_meta = SECTION_MAP.get(section, {})
+    projected = projected_word_budget().get(section)
+    if projected and section_meta.get("render") != "abstract":
+        return round(projected * 1.1)
     section_spec = next(
         (item for item in SECTION_SPECS if str(item.get("id")) == section),
         {},
@@ -9723,9 +9958,14 @@ def paragraph_word_limit(section: str) -> int | None:
     if not page_limit or not paragraphs or not 0 < share <= 1:
         return None
     float_count = len(FIGURES) + len(TABLES)
-    total_prose_words = max(900, page_limit * 425 - float_count * 75)
+    # Calibrated against the compiled projected paper: a two-column ACL body page holds
+    # about 560 prose words, and each body float costs about 50 of them.
+    total_prose_words = max(900, page_limit * 560 - float_count * 50)
     allocated = round(total_prose_words * share / len(paragraphs))
     if section_meta.get("render") == "abstract":
+        projected_abstract = projected_abstract_words()
+        if projected_abstract:
+            return min(170, projected_abstract)
         return max(100, min(130, allocated))
     if section == "experiments":
         # Setup/result paragraphs must retain dataset, metric, baseline, and
@@ -9743,6 +9983,9 @@ def paragraph_word_range(section: str) -> tuple[int | None, int | None]:
     if maximum is None:
         return None, None
     section_meta = SECTION_MAP.get(section, {})
+    projected = projected_word_budget().get(section)
+    if projected and section_meta.get("render") != "abstract":
+        return round(projected * 0.8), maximum
     if section_meta.get("render") == "abstract":
         minimum = max(90, math.ceil(maximum * 0.80))
     elif section == "experiments":
@@ -10278,6 +10521,22 @@ def update_full_draft_job(token: str, **updates: Any) -> dict[str, Any] | None:
         return job
 
 
+def written_vs_projected_summary() -> str:
+    """One sentence: how long the written paper is against the projected paper of the approved plan."""
+    try:
+        budget = json.loads((PAPER / "projected" / "budget.json").read_text(encoding="utf-8"))
+        status = page_budget_status()
+        pages, fill = status.get("content_pages"), status.get("last_page_fill")
+        if pages is None or fill is None:
+            return "Length against the projected paper is not measured yet (compile first)."
+        written = pages - 1 + fill
+        planned = float(budget["body_pages"])
+        verdict = "within half a column" if abs(written - planned) <= 0.25 else ("longer" if written > planned else "shorter")
+        return f"Length: written {written:.2f} body pages vs projected {planned:.2f} ({verdict}; limit {status.get('limit')})."
+    except (OSError, ValueError, KeyError):
+        return ""
+
+
 def draft_batch_worker(
     token: str,
     model: str,
@@ -10303,179 +10562,193 @@ def draft_batch_worker(
         # Paper Studio version that stopped at a manual Prompt-approval gate.
         schedule_ready_mechanism_figures(artifact_ids)
         targets = full_draft_targets(initial, section_filter or None)
-        for ordinal, (section, paragraph_id) in enumerate(targets, start=1):
-            with job_lock:
-                state = load_state()
-                job = state.get(job_key) or {}
-                if (
-                    token in cancelled_jobs
-                    or job.get("token") != token
-                    or job.get("status") != "running"
-                ):
-                    return
-                paragraph, paragraph_index = paragraph_by_id(state, section, paragraph_id)
-                if str(paragraph.get("accepted_text", "")).strip():
-                    job.update(completed=ordinal, progress=int(ordinal * 100 / max(1, len(targets))))
-                    state[job_key] = job
-                    save_state(state)
-                    continue
-                section_state = state["sections"][section]
-                previous_response_id = section_state.get("previous_response_id")
-                source_fingerprint = section_source_fingerprint(section)
-                include_section_context = (
-                    not previous_response_id
-                    or section_state.get("conversation_section_fingerprint")
-                    != source_fingerprint
-                )
-                current_bib_fingerprint = bibliography_fingerprint()
-                bibliography_update = ""
-                if (
-                    not ONLINE_PROJECT_MODE
-                    and previous_response_id
-                    and section_state.get("bibliography_fingerprint")
-                    != current_bib_fingerprint
-                ):
-                    bibliography_update = writing_bibliography_catalog(
-                        paragraph["purpose"] + "\n" + section_evidence(section)
-                    )
-                figure_states = json.loads(json.dumps(state.get("figures", {})))
-                job.update(
-                    current_section=section,
-                    current_paragraph=paragraph_id,
-                    progress_message=f"Generating {SECTION_MAP[section]['title']} · {paragraph_id}",
-                )
-                state[job_key] = job
-                save_state(state)
-
-            response_id, text, citations_added = call_openai(
-                section=section,
-                model=model,
-                previous_response_id=previous_response_id,
-                purpose=paragraph["purpose"],
-                required_heading=paragraph.get("heading"),
-                required_heading_style=paragraph.get("heading_style"),
-                architecture=paragraph_architecture(paragraph),
-                reference_context=paragraph_reference_context(section, paragraph),
-                comment="",
-                current_text="",
-                bibliography_update=bibliography_update,
-                artifacts=[str(item) for item in paragraph.get("artifacts", [])],
-                figure_states=figure_states,
-                include_section_context=include_section_context,
-                minimum_online_citation_placeholders=(
-                    online_citation_placeholder_minimum(section, paragraph_index)
-                    if ONLINE_PROJECT_MODE
-                    else 0
-                ),
-            )
-
-            with job_lock:
-                state = load_state()
-                job = state.get(job_key) or {}
-                if (
-                    token in cancelled_jobs
-                    or job.get("token") != token
-                    or job.get("status") != "running"
-                ):
-                    return
-                paragraph, paragraph_index = paragraph_by_id(state, section, paragraph_id)
-                if str(paragraph.get("accepted_text", "")).strip():
-                    continue
-                section_state = state["sections"][section]
-                candidate_id = uuid.uuid4().hex
-                paragraph["candidate"] = {
-                    "id": candidate_id,
-                    "text": text,
-                    "purpose": paragraph["purpose"],
-                    "citations_added": citations_added,
-                    "created_at": int(time.time()),
-                }
-                paragraph.setdefault("history", []).append(
-                    {
-                        "candidate_id": candidate_id,
-                        "comment": (
-                            "[SECTION DRAFT]" if section_filter else "[FULL DRAFT]"
-                        ),
-                        "text": text,
-                        "citations_added": citations_added,
-                        "created_at": int(time.time()),
-                    }
-                )
-                paragraph["history"] = paragraph["history"][-40:]
-                section_state["previous_response_id"] = response_id
-                section_state["bibliography_fingerprint"] = bibliography_fingerprint()
-                section_state["conversation_section_fingerprint"] = source_fingerprint
-                section_state["current_index"] = paragraph_index
-
-            # Compilation can take minutes. Do not hold the job lock: cancellation
-            # remains responsive and takes effect after this transactional paragraph.
-            for latex_attempt in range(3):
+        # A paragraph that still fails after its own corrections must not abandon the whole job:
+        # keep writing, retry the failures once more at the end, and report exactly what is missing.
+        failed_paragraphs: list[tuple[str, str, str]] = []
+        pending_targets = list(targets)
+        for pass_number in range(2):
+            next_failed: list[tuple[str, str, str]] = []
+            for ordinal, (section, paragraph_id) in enumerate(pending_targets, start=1):
                 try:
-                    accept_full_draft_paragraph(state, section, paragraph, text)
-                    break
-                except StudioError as exc:
-                    diagnostic = str(exc)
-                    latex_failure = diagnostic.startswith("LaTeX failed;")
-                    budget_failure = diagnostic.startswith(
-                        "Submission body page budget exceeded;"
-                    )
-                    if not (latex_failure or budget_failure) or latex_attempt == 2:
-                        raise
-                    text = (
-                        repair_batch_latex_candidate(
-                            model=model,
-                            section=section,
-                            paragraph=paragraph,
-                            text=text,
-                            compile_error=diagnostic,
+                    with job_lock:
+                        state = load_state()
+                        job = state.get(job_key) or {}
+                        if (
+                            token in cancelled_jobs
+                            or job.get("token") != token
+                            or job.get("status") != "running"
+                        ):
+                            return
+                        paragraph, paragraph_index = paragraph_by_id(state, section, paragraph_id)
+                        if str(paragraph.get("accepted_text", "")).strip():
+                            job.update(completed=ordinal, progress=int(ordinal * 100 / max(1, len(targets))))
+                            state[job_key] = job
+                            save_state(state)
+                            continue
+                        section_state = state["sections"][section]
+                        previous_response_id = section_state.get("previous_response_id")
+                        source_fingerprint = section_source_fingerprint(section)
+                        include_section_context = (
+                            not previous_response_id
+                            or section_state.get("conversation_section_fingerprint")
+                            != source_fingerprint
                         )
-                        if latex_failure
-                        else repair_batch_page_budget_candidate(
-                            model=model,
-                            section=section,
-                            paragraph=paragraph,
-                            text=text,
-                            diagnostic=diagnostic,
+                        current_bib_fingerprint = bibliography_fingerprint()
+                        bibliography_update = ""
+                        if (
+                            not ONLINE_PROJECT_MODE
+                            and previous_response_id
+                            and section_state.get("bibliography_fingerprint")
+                            != current_bib_fingerprint
+                        ):
+                            bibliography_update = writing_bibliography_catalog(
+                                paragraph["purpose"] + "\n" + section_evidence(section)
+                            )
+                        figure_states = json.loads(json.dumps(state.get("figures", {})))
+                        job.update(
+                            current_section=section,
+                            current_paragraph=paragraph_id,
+                            progress_message=f"Generating {SECTION_MAP[section]['title']} · {paragraph_id}",
                         )
+                        state[job_key] = job
+                        save_state(state)
+
+                    response_id, text, citations_added = call_openai(
+                        section=section,
+                        model=model,
+                        previous_response_id=previous_response_id,
+                        purpose=paragraph["purpose"],
+                        required_heading=paragraph.get("heading"),
+                        required_heading_style=paragraph.get("heading_style"),
+                        architecture=paragraph_architecture(paragraph),
+                        reference_context=paragraph_reference_context(section, paragraph),
+                        comment="",
+                        current_text="",
+                        bibliography_update=bibliography_update,
+                        artifacts=[str(item) for item in paragraph.get("artifacts", [])],
+                        figure_states=figure_states,
+                        include_section_context=include_section_context,
+                        minimum_online_citation_placeholders=(
+                            online_citation_placeholder_minimum(section, paragraph_index)
+                            if ONLINE_PROJECT_MODE
+                            else local_citation_minimum(section, paragraph_index)
+                        ),
                     )
-                    paragraph.setdefault("history", []).append(
-                        {
-                            "candidate_id": uuid.uuid4().hex,
-                            "comment": (
-                                "[LATEX REPAIR]"
-                                if latex_failure
-                                else "[PAGE BUDGET COMPRESSION]"
-                            ),
+
+                    with job_lock:
+                        state = load_state()
+                        job = state.get(job_key) or {}
+                        if (
+                            token in cancelled_jobs
+                            or job.get("token") != token
+                            or job.get("status") != "running"
+                        ):
+                            return
+                        paragraph, paragraph_index = paragraph_by_id(state, section, paragraph_id)
+                        if str(paragraph.get("accepted_text", "")).strip():
+                            continue
+                        section_state = state["sections"][section]
+                        candidate_id = uuid.uuid4().hex
+                        paragraph["candidate"] = {
+                            "id": candidate_id,
                             "text": text,
+                            "purpose": paragraph["purpose"],
                             "citations_added": citations_added,
                             "created_at": int(time.time()),
                         }
-                    )
-                    paragraph["history"] = paragraph["history"][-40:]
+                        paragraph.setdefault("history", []).append(
+                            {
+                                "candidate_id": candidate_id,
+                                "comment": (
+                                    "[SECTION DRAFT]" if section_filter else "[FULL DRAFT]"
+                                ),
+                                "text": text,
+                                "citations_added": citations_added,
+                                "created_at": int(time.time()),
+                            }
+                        )
+                        paragraph["history"] = paragraph["history"][-40:]
+                        section_state["previous_response_id"] = response_id
+                        section_state["bibliography_fingerprint"] = bibliography_fingerprint()
+                        section_state["conversation_section_fingerprint"] = source_fingerprint
+                        section_state["current_index"] = paragraph_index
 
-            with job_lock:
-                latest = load_state()
-                latest["sections"][section] = state["sections"][section]
-                # Accepting a paragraph can atomically generate captions for its
-                # bound figures.  Dropping this state made the UI and final LaTeX
-                # fall back to temporary captions such as "F1" after every batch.
-                latest["figures"] = state["figures"]
-                latest["compile"] = state["compile"]
-                latest["model"] = model
-                job = latest.get(job_key) or {}
-                if job.get("status") == "running" and job.get("token") == token:
-                    job.update(
-                        completed=ordinal,
-                        progress=int(ordinal * 100 / max(1, len(targets))),
-                        progress_message=f"Written and compiled. {SECTION_MAP[section]['title']} · {paragraph_id}",
-                    )
-                latest[job_key] = job
-                save_state(latest)
-                # Drawing starts at the semantic boundary: as soon as every
-                # paragraph required by a mechanism figure has been accepted.
-                schedule_ready_mechanism_figures(artifact_ids)
-                if job.get("status") != "running" or job.get("token") != token:
-                    return
+                    # Compilation can take minutes. Do not hold the job lock: cancellation
+                    # remains responsive and takes effect after this transactional paragraph.
+                    for latex_attempt in range(3):
+                        try:
+                            accept_full_draft_paragraph(state, section, paragraph, text)
+                            break
+                        except StudioError as exc:
+                            diagnostic = str(exc)
+                            latex_failure = diagnostic.startswith("LaTeX failed;")
+                            budget_failure = diagnostic.startswith(
+                                "Submission body page budget exceeded;"
+                            )
+                            if not (latex_failure or budget_failure) or latex_attempt == 2:
+                                raise
+                            text = (
+                                repair_batch_latex_candidate(
+                                    model=model,
+                                    section=section,
+                                    paragraph=paragraph,
+                                    text=text,
+                                    compile_error=diagnostic,
+                                )
+                                if latex_failure
+                                else repair_batch_page_budget_candidate(
+                                    model=model,
+                                    section=section,
+                                    paragraph=paragraph,
+                                    text=text,
+                                    diagnostic=diagnostic,
+                                )
+                            )
+                            paragraph.setdefault("history", []).append(
+                                {
+                                    "candidate_id": uuid.uuid4().hex,
+                                    "comment": (
+                                        "[LATEX REPAIR]"
+                                        if latex_failure
+                                        else "[PAGE BUDGET COMPRESSION]"
+                                    ),
+                                    "text": text,
+                                    "citations_added": citations_added,
+                                    "created_at": int(time.time()),
+                                }
+                            )
+                            paragraph["history"] = paragraph["history"][-40:]
+
+                    with job_lock:
+                        latest = load_state()
+                        latest["sections"][section] = state["sections"][section]
+                        # Accepting a paragraph can atomically generate captions for its
+                        # bound figures.  Dropping this state made the UI and final LaTeX
+                        # fall back to temporary captions such as "F1" after every batch.
+                        latest["figures"] = state["figures"]
+                        latest["compile"] = state["compile"]
+                        latest["model"] = model
+                        job = latest.get(job_key) or {}
+                        if job.get("status") == "running" and job.get("token") == token:
+                            job.update(
+                                completed=ordinal,
+                                progress=int(ordinal * 100 / max(1, len(targets))),
+                                progress_message=f"Written and compiled. {SECTION_MAP[section]['title']} · {paragraph_id}",
+                            )
+                        latest[job_key] = job
+                        save_state(latest)
+                        # Drawing starts at the semantic boundary: as soon as every
+                        # paragraph required by a mechanism figure has been accepted.
+                        schedule_ready_mechanism_figures(artifact_ids)
+                        if job.get("status") != "running" or job.get("token") != token:
+                            return
+                except Exception as exc:  # noqa: BLE001 - recorded and reported, never swallowed
+                    next_failed.append((section, paragraph_id, str(exc)))
+                    continue
+            pending_targets = [(name, ident) for name, ident, _ in next_failed]
+            failed_paragraphs = next_failed
+            if not pending_targets:
+                break
 
         if not section_filter and full_draft_title_pending(load_state()):
             update_full_draft_job(
@@ -10502,7 +10775,7 @@ def draft_batch_worker(
                 # running artifact is pending work, not a manuscript defect.
                 # Apply the final quality gate only after every bound artifact
                 # has produced its real deliverables.
-                if not pending_artifacts and not section_filter:
+                if not pending_artifacts and not section_filter and not failed_paragraphs:
                     if page_budget_status().get("status") == "under":
                         state = repair_underfilled_manuscript(
                             model,
@@ -10516,12 +10789,22 @@ def draft_batch_worker(
                             "Deterministic quality check after full text generation failed."
                             + "; ".join(quality_issues)
                         )
+                incomplete_message = ""
+                if failed_paragraphs:
+                    incomplete_message = (
+                        "THE PAPER IS INCOMPLETE. Paragraphs not written: "
+                        + "; ".join(f"{ident} ({reason[:160]})" for _name, ident, reason in failed_paragraphs)
+                        + (". Artifacts still pending: " + ", ".join(pending_artifacts) if pending_artifacts else "")
+                        + ". " + written_vs_projected_summary()
+                    )
                 job.update(
-                    status="artifacts_pending" if pending_artifacts else "completed",
+                    status="failed" if failed_paragraphs else ("artifacts_pending" if pending_artifacts else "completed"),
+                    incomplete=bool(failed_paragraphs),
+                    failed_paragraphs=[ident for _name, ident, _reason in failed_paragraphs],
                     token=None,
                     progress=100,
-                    completed=job.get("total", len(targets)),
-                    progress_message=(
+                    completed=job.get("total", len(targets)) - len(failed_paragraphs),
+                    progress_message=incomplete_message or (
                         (
                             f"{SECTION_MAP[section_filter]['title']} The main text has been written in LaTeX."
                             "Completing and confirming the binding of charts."
@@ -11577,9 +11860,6 @@ def create_mechanism_shape_spec_with_local_agent(
     provenance: dict[str, str],
 ) -> dict[str, Any]:
     """Have the local code agent author a fully editable native-shape figure."""
-    codex = shutil_which("codex")
-    if not codex:
-        raise StudioError("Local codex CLI not found; cannot generate an editable mechanism diagram.")
     paths = figure_paths(figure_id)
     definition = FIGURES[figure_id]
     canvas = initial_mechanism_spec(figure_id)["canvas_in"]
@@ -11628,40 +11908,20 @@ Hard constraints:
         retry_feedback = ""
         last_error: StudioError | None = None
         for attempt in range(3):
-            command = [
-                codex,
-                "exec",
-                "--ephemeral",
-                *local_agent_auth_args(),
-                "--sandbox",
-                "read-only",
-                "--color",
-                "never",
-                "--cd",
-                str(ROOT),
-                "--output-last-message",
-                str(output),
-                "-",
-            ]
             attempt_prompt = prompt + retry_feedback
             try:
-                process = subprocess.run(
-                    command,
-                    input=attempt_prompt,
-                    capture_output=True,
-                    text=True,
+                source = figure_agent.run_agent(
+                    attempt_prompt,
+                    root=ROOT,
+                    images=figure_agent.reference_figure_images(ROOT, STATE_DIR / "reference-figures"),
                     timeout=MECHANISM_AGENT_TIMEOUT_SECONDS,
                     env=environment,
+                    auth_args=local_agent_auth_args(),
                 )
             except subprocess.TimeoutExpired as exc:
                 raise StudioError("Local Agent rebuild of the editable mechanism diagram timed out.") from exc
-            if process.returncode or not output.exists():
-                diagnostic = (process.stdout + "\n" + process.stderr).strip()
-                raise StudioError(
-                    "Local Agent failed to rebuild the editable mechanism diagram.\n"
-                    + (diagnostic[-2400:] or "codex exec Shape spec not returned.")
-                )
-            source = output.read_text(encoding="utf-8", errors="replace").strip()
+            except figure_agent.FigureAgentError as exc:
+                raise StudioError("Local Agent failed to rebuild the editable mechanism diagram.\n" + str(exc)) from exc
             fenced = re.search(r"```(?:json)?\s*(\{.*\})\s*```", source, re.DOTALL)
             if fenced:
                 source = fenced.group(1)
@@ -11711,9 +11971,6 @@ def generate_mechanism_prompt(
     prompt_instruction: str = "",
     current_prompt: str = "",
 ) -> tuple[str, str]:
-    setup = api_setup_for_provider(str(state.get("llm_provider") or DEFAULT_PROVIDER))
-    if not setup["configured"]:
-        raise StudioError(f"{setup['provider_label']} API Not configured, unable to generate drawing Prompt.")
     paths = figure_paths(figure_id)
     FIGURE_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     source = mechanism_source(
@@ -11723,75 +11980,40 @@ def generate_mechanism_prompt(
         prompt_instruction=prompt_instruction,
     )
     paths["source"].write_text(source, encoding="utf-8")
-    figure_state = state["figures"][figure_id]
-    # An explicit empty current prompt means "design afresh". Reusing an old
-    # response in that case silently drops the new paragraph evidence and type
-    # profile because the API receives only a compact revision turn.
-    previous_response_id = (
-        reusable_response_id(figure_state.get("previous_response_id"))
-        if current_prompt.strip()
-        else None
-    )
-    api_input = source
-    if previous_response_id:
-        format_match = re.search(
-            r"<paper_figure_format>.*?</paper_figure_format>", source, re.DOTALL
-        )
-        format_contract = format_match.group(0) if format_match else ""
-        type_match = re.search(
-            r"<acl_figure_type_profile>.*?</acl_figure_type_profile>",
-            source,
-            re.DOTALL,
-        )
-        type_contract = type_match.group(0) if type_match else ""
-        api_input = f"""{type_contract}
-{format_contract}
-<current_image_prompt>{current_prompt.strip()}</current_image_prompt>
-<researcher_revision>{prompt_instruction.strip()}</researcher_revision>
+    images = figure_agent.reference_figure_images(ROOT, STATE_DIR / "reference-figures")
+    environment = local_agent_environment()
 
-Return the complete revised image-generation prompt."""
-    payload: dict[str, Any] = {
-        "model": str(state.get("model") or DEFAULT_MODEL),
-        "store": True,
-        "instructions": FIGURE_PROMPT_INSTRUCTIONS,
-        "input": api_input,
-    }
-    if previous_response_id:
-        payload["previous_response_id"] = previous_response_id
-    response = post_openai(payload)
-    response_id = str(response.get("id", "")).strip()
-    prompt = mechanism_prompt_with_contract_footer(
-        figure_id, extract_output_text(response)
-    )
-    if not response_id:
-        raise StudioError("GPT No continuation Figure conversation response id returned.")
+    def ask_agent(text: str) -> str:
+        try:
+            return figure_agent.run_agent(
+                FIGURE_PROMPT_INSTRUCTIONS + "\n\n" + text,
+                root=ROOT,
+                images=images,
+                timeout=MECHANISM_AGENT_TIMEOUT_SECONDS,
+                env=environment,
+                auth_args=local_agent_auth_args(),
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise StudioError("The local Agent timed out while writing the drawing Prompt.") from exc
+        except figure_agent.FigureAgentError as exc:
+            raise StudioError("The local Agent could not write the drawing Prompt.\n" + str(exc)) from exc
+
+    response_id = "agent-" + uuid.uuid4().hex
+    prompt = mechanism_prompt_with_contract_footer(figure_id, ask_agent(source))
     if not prompt:
-        raise StudioError("GPT No usable drawing Prompt returned.")
+        raise StudioError("The local Agent returned no usable drawing Prompt.")
     issues = mechanism_prompt_contract_issues(figure_id, prompt)
     if issues:
-        repair_payload = {
-            "model": str(state.get("model") or DEFAULT_MODEL),
-            "store": True,
-            "instructions": FIGURE_PROMPT_INSTRUCTIONS,
-            "previous_response_id": response_id,
-            "input": (
-                "Rewrite the complete image-generation prompt. The previous answer "
-                "violated the mandatory mechanism-figure contract in these ways: "
-                + "; ".join(issues)
-                + ". Remove the violations instead of merely saying not to include them. "
-                "Return only the clean final prompt, with no analysis tags or commentary."
-            ),
-        }
-        repaired = post_openai(repair_payload)
-        response_id = str(repaired.get("id", "")).strip()
-        prompt = mechanism_prompt_with_contract_footer(
-            figure_id, extract_output_text(repaired)
+        repaired = ask_agent(
+            "Rewrite the complete image-generation prompt below. It violated the mandatory mechanism-figure contract in these ways: "
+            + "; ".join(issues)
+            + ". Remove the violations instead of merely saying not to include them. Return only the clean final prompt, with no analysis tags or commentary.\n\n"
+            + prompt
         )
+        prompt = mechanism_prompt_with_contract_footer(figure_id, repaired)
         remaining = mechanism_prompt_contract_issues(figure_id, prompt)
-        if not response_id or not prompt or remaining:
-            raise StudioError(
-                "GPT Mechanism Diagram Prompt did not pass the semantic contract." + "; ".join(remaining or issues)
-            )
+        if not prompt or remaining:
+            raise StudioError("The mechanism Prompt did not pass the semantic contract. " + "; ".join(remaining or issues))
     return response_id, prompt
 
 
@@ -11915,6 +12137,8 @@ FIGURE_RUNNING_STATUSES = {
 
 def begin_figure_job(figure_state: dict[str, Any], job_token: str) -> None:
     figure_state["job_token"] = job_token
+    figure_state["job_server_instance"] = SERVER_INSTANCE_TOKEN
+    figure_state["job_server_pid"] = os.getpid()
     figure_state["job_started_at"] = int(time.time())
     figure_state["job_revision"] = int(figure_state.get("job_revision", 0)) + 1
 
@@ -11976,7 +12200,7 @@ def cancel_figure_job(figure_id: str) -> dict[str, Any]:
         figure_state = state["figures"][figure_id]
         job_token = str(figure_state.get("job_token") or "")
         if figure_state.get("status") != "image_generating" or not job_token:
-            raise StudioError("There are currently no Codex drawing tasks running.")
+            raise StudioError("There are currently no drawing tasks running.")
         with FIGURE_PROCESS_LOCK:
             CANCELLED_FIGURE_JOBS.add(job_token)
             process = RUNNING_FIGURE_PROCESSES.get(job_token)
@@ -11987,9 +12211,9 @@ def cancel_figure_job(figure_id: str) -> dict[str, Any]:
                 "progress": 0,
                 "progress_message": "",
                 "last_message": (
-                    "This Codex drawing task has been stopped; the current Prompt and the previous version of the candidate have both been retained."
+                    "This drawing task has been stopped; the current Prompt and the previous version of the candidate have both been retained."
                     if has_previous_draft
-                    else "This Codex drawing task has been stopped; the current Prompt has been retained."
+                    else "This drawing task has been stopped; the current Prompt has been retained."
                 ),
                 "job_token": None,
                 "job_started_at": None,
@@ -12021,9 +12245,9 @@ def generate_prompt_worker(
             job_token,
             progress=45,
             progress_message=(
-                "GPT Rewriting the drawing prompt according to your instructions."
+                "The local Agent is rewriting the drawing prompt according to your instructions."
                 if current_prompt
-                else "GPT Converting the main text mechanism into a drawing prompt."
+                else "The local Agent is converting the main text mechanism into a drawing prompt."
             ),
         )
         response_id, prompt = generate_mechanism_prompt(
@@ -12054,7 +12278,7 @@ def generate_prompt_worker(
             prompt_approved_at=None,
             progress=100,
             progress_message="Drawing Prompt has been generated, awaiting your confirmation.",
-            last_message="Please review or modify the drawing Prompt; Codex drawing will only be invoked after confirmation.",
+            last_message="Please review or modify the drawing Prompt; The local Agent will draw only after confirmation.",
             job_token=None,
         )
     except Exception as exc:  # pragma: no cover - external process boundary
@@ -12067,13 +12291,13 @@ def draw_figure_worker(figure_id: str, job_token: str, prompt: str) -> None:
             figure_id,
             job_token,
             progress=15,
-            progress_message="Prompt Confirmed; preparing Codex native graphics task…",
+            progress_message="Prompt Confirmed; preparing the local Agent's native graphics task…",
         )
         update_figure_job(
             figure_id,
             job_token,
             progress=35,
-            progress_message="Codex Designing and archiving native editable graphics…",
+            progress_message="The local Agent is designing and archiving native editable graphics…",
         )
         draw_mechanism_draft(figure_id, prompt, job_token=job_token)
         update_figure_job(
@@ -12092,7 +12316,7 @@ def draw_figure_worker(figure_id: str, job_token: str, prompt: str) -> None:
             revision=int(load_state()["figures"][figure_id].get("revision", 0)) + 1,
             approved_at=None,
             progress=100,
-            progress_message="Codex Original graphics, PPTX, and PDF candidate have all been generated.",
+            progress_message="Original graphics, PPTX, and PDF candidate have all been generated.",
             last_message=(
                 message
                 + " Please review the final candidate; if needed modify the Prompt and redraw; once satisfied, confirm to insert into the body."
@@ -12536,7 +12760,7 @@ def build_mechanism_figure(
     )
     validate_editable_shape_deliverables(shape_spec, paths["pptx"], paths["pdf"])
     return (
-        f"Codex Directly generated. {len(shape_spec['shapes'])} A standalone PowerPoint native object."
+        f"Directly generated by the local Agent. {len(shape_spec['shapes'])} A standalone PowerPoint native object."
         "PPTX No background bitmap; each module, arrow and text can be edited independently."
     )
 
@@ -12622,9 +12846,6 @@ def create_data_figure_code_with_local_agent(
     instruction: str = "",
 ) -> str:
     """Ask the installed Codex CLI to author a traceable result-figure program."""
-    codex = shutil_which("codex")
-    if not codex:
-        raise StudioError("The local Codex CLI was not found; cannot generate experimental result figures.")
     definition = FIGURES[figure_id]
     panel_definition = next(
         (
@@ -12690,49 +12911,7 @@ Hard constraints:
 </traceable_results>
 {revision_block}
 """
-    environment = local_agent_environment()
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(
-        prefix=f"agent-figure-{figure_id.lower()}-", dir=STATE_DIR
-    ) as temporary_name:
-        output = Path(temporary_name) / "last_message.txt"
-        command = [
-            codex,
-            "exec",
-            "--ephemeral",
-            *local_agent_auth_args(),
-            "--sandbox",
-            "read-only",
-            "--color",
-            "never",
-            "--cd",
-            str(ROOT),
-            "--output-last-message",
-            str(output),
-            "-",
-        ]
-        try:
-            process = subprocess.run(
-                command,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                timeout=600,
-                env=environment,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise StudioError("The local Agent timed out while generating the experiment result graph code.") from exc
-        if process.returncode:
-            diagnostic = (process.stdout + "\n" + process.stderr).strip()
-            raise StudioError(
-                "Local Agent failed to generate the experiment result figure.\n"
-                + (diagnostic[-2400:] or "codex exec returned a non-zero status.")
-            )
-        if not output.exists():
-            raise StudioError("Local Agent did not write drawing code.")
-        return extract_agent_python_source(
-            output.read_text(encoding="utf-8", errors="replace")
-        )
+    return extract_agent_python_source(run_local_figure_agent(prompt, timeout=600))
 
 
 def generate_data_figure_with_local_agent(
@@ -12812,7 +12991,7 @@ def generate_data_figure_agent_worker(
             figure_id,
             job_token,
             progress=20,
-            progress_message="Launching local Codex agent and organizing traceable experimental results.",
+            progress_message="Launching the local Agent and organizing traceable experimental results.",
         )
         update_data_panel_job(
             figure_id,
@@ -13075,9 +13254,6 @@ def create_data_figure_layout_with_local_agent(
     figure_id: str, instruction: str
 ) -> dict[str, Any]:
     """Use the local Codex Agent to translate natural language into safe layout JSON."""
-    codex = shutil_which("codex")
-    if not codex:
-        raise StudioError("Could not find the local Codex CLI; unable to interpret the paper assembly Prompt.")
     panels = FIGURES[figure_id].get("panels", [])
     panel_ids = [item["id"] for item in panels]
     panel_context = [
@@ -13120,47 +13296,9 @@ Constraints:
    Do not propose PNG stitching, rasterization or modification of experimental data.
 5. Decorative requirements that cannot be expressed should be ignored and must not add fields outside the schema.
 """
-    environment = local_agent_environment()
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(
-        prefix=f"agent-layout-{figure_id.lower()}-", dir=STATE_DIR
-    ) as temporary_name:
-        output = Path(temporary_name) / "last_message.txt"
-        command = [
-            codex,
-            "exec",
-            "--ephemeral",
-            *local_agent_auth_args(),
-            "--sandbox",
-            "read-only",
-            "--color",
-            "never",
-            "--cd",
-            str(ROOT),
-            "--output-last-message",
-            str(output),
-            "-",
-        ]
-        try:
-            process = subprocess.run(
-                command,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                timeout=300,
-                env=environment,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise StudioError("Local Agent timed out while processing the paper composition Prompt.") from exc
-        if process.returncode or not output.exists():
-            diagnostic = (process.stdout + "\n" + process.stderr).strip()
-            raise StudioError(
-                "Local Agent failed to interpret the paper composition Prompt.\n"
-                + (diagnostic[-2400:] or "codex exec Layout plan not returned.")
-            )
-        raw = extract_agent_layout_json(
-            output.read_text(encoding="utf-8", errors="replace")
-        )
+    raw = extract_agent_layout_json(
+        run_local_figure_agent(prompt, timeout=300, with_reference_figures=False)
+    )
     return validate_data_figure_layout(raw, panel_ids)
 
 
@@ -14195,12 +14333,17 @@ class Handler(BaseHTTPRequestHandler):
             artifacts=[str(item) for item in paragraph.get("artifacts", [])],
             figure_states=state["figures"],
             include_section_context=include_section_context,
+            maximum_word_override=(
+                int(body["maximum_words"]) if str(body.get("maximum_words", "")).isdigit() else None
+            ),
             minimum_online_citation_placeholders=(
                 online_citation_placeholder_minimum(
                     section, section_state["paragraphs"].index(paragraph)
                 )
                 if ONLINE_PROJECT_MODE
-                else 0
+                else local_citation_minimum(
+                    section, section_state["paragraphs"].index(paragraph)
+                )
             ),
         )
         # The model call is intentionally outside the lock, but it can outlive
@@ -14609,7 +14752,7 @@ class Handler(BaseHTTPRequestHandler):
         if FIGURES[figure_id]["kind"] == "mechanism":
             if ONLINE_PROJECT_MODE:
                 raise StudioError("Online sessions currently do not run a mechanism diagram design agent; paper dialogue, main text, titles, captions, tables, and LLM writing functions remain usable.")
-            raise StudioError("Mechanism diagrams use the dedicated Codex native-shape workflow.")
+            raise StudioError("Mechanism diagrams use the dedicated local-Agent native-shape workflow.")
         if figure_state.get("status") in FIGURE_RUNNING_STATUSES:
             raise StudioError("A task is already running for this figure.")
         if ONLINE_PROJECT_MODE:
@@ -14763,7 +14906,7 @@ class Handler(BaseHTTPRequestHandler):
         if len(prompt_instruction) > 4000:
             raise StudioError("Prompt The modification instruction is too long; please reduce to within 4000 characters.")
         if current_prompt and not prompt_instruction:
-            raise StudioError("Before regenerating the Prompt, please specify how you want GPT to modify it.")
+            raise StudioError("Before regenerating the Prompt, please specify how you want the local Agent to modify it.")
         job_token = uuid.uuid4().hex
         figure_state.update(
             {
@@ -14786,7 +14929,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "GPT Generating drawing prompts for this section text.",
+                "message": "The local Agent is generating the drawing prompt for this section text.",
                 "state": public_state(state),
             },
             status=202,
@@ -14861,7 +15004,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_json(
             {
                 "ok": True,
-                "message": "Prompt confirmed; Codex is generating an editable native-shape sketch.",
+                "message": "Prompt confirmed; the local Agent is generating an editable native-shape sketch.",
                 "state": public_state(state),
             },
             status=202,
@@ -15247,7 +15390,7 @@ class Handler(BaseHTTPRequestHandler):
                 "status": "agent_editing",
                 "agent_prompt": instruction,
                 "progress": 10,
-                "progress_message": "Starting local Codex agent to generate the initial draft of the table…",
+                "progress_message": "Starting the local Agent to generate the initial draft of the table…",
                 "last_message": "",
                 "job_token": token,
                 "job_started_at": int(time.time()),

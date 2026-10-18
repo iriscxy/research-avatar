@@ -766,7 +766,7 @@ class OnlineStudioTests(unittest.TestCase):
         with zipfile.ZipFile(buffer, "w") as archive:
             archive.writestr("../escape.json", "{}")
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(online.OnlineStudioError, "disallowed paths"):
+            with self.assertRaisesRegex(online.OnlineStudioError, "不允许的路径"):
                 online._extract_evidence_archive(buffer.getvalue(), Path(directory))
 
     def test_result_parser_survives_void_tags_inside_artifact(self):
@@ -784,7 +784,7 @@ class OnlineStudioTests(unittest.TestCase):
     def test_required_artifact_never_receives_fabricated_placeholder_rows(self):
         contract = {**PLAN_CONTRACT, "_result_tables": {"T1": []}}
         sections = online._outline_sections(contract)
-        with self.assertRaisesRegex(online.OnlineStudioError, "placeholder values will not be used"):
+        with self.assertRaisesRegex(online.OnlineStudioError, "不会用占位值"):
             online._artifact_definitions(contract, sections)
 
     def test_online_materials_keep_empty_result_figure_as_non_data_placeholder(self):
@@ -969,7 +969,7 @@ class OnlineStudioTests(unittest.TestCase):
 
         self.assertIn("author = {Larson, Stefan and Mahendran, Anish}", bibliography)
         self.assertNotIn("note =", bibliography)
-        self.assertNotIn("موثق", bibliography)
+        self.assertNotIn("已验证", bibliography)
 
     def test_verified_survey_bibliography_rejects_authorless_verified_card(self):
         source = """
@@ -1019,7 +1019,7 @@ class OnlineStudioTests(unittest.TestCase):
             (root / "results").mkdir()
             (root / "reports/03_EXPERIMENT_PLAN.html").write_text(plan)
             (root / "reports/05_EXP_RESULT.html").write_text(incomplete)
-            with self.assertRaisesRegex(online.OnlineStudioError, "not yet been filled"):
+            with self.assertRaisesRegex(online.OnlineStudioError, "尚未填满"):
                 online._validated_upstream_contract(root, plan, incomplete)
 
     def test_evidence_packager_emits_only_supported_project_inputs(self):
@@ -1153,7 +1153,7 @@ class OnlineStudioTests(unittest.TestCase):
             ]
         )
         self.assertEqual([item[0] for item in sections], ["abstract", "evaluation_protocol"])
-        with self.assertRaisesRegex(online.OnlineStudioError, "The first"):
+        with self.assertRaisesRegex(online.OnlineStudioError, "第一个"):
             online._validated_sections(
                 [
                     {"title": "Introduction", "purpose": "Explain the paper motivation carefully."},
@@ -1174,7 +1174,7 @@ class OnlineStudioTests(unittest.TestCase):
                 "researcher@example.org", password
             )
             self.assertEqual(logged_in["id"], user["id"])
-            with self.assertRaisesRegex(online.OnlineStudioError, "incorrect"):
+            with self.assertRaisesRegex(online.OnlineStudioError, "不正确"):
                 online.authenticate_local_user(
                     "researcher@example.org", "wrong-password-value"
                 )
@@ -1725,7 +1725,7 @@ class OnlineStudioTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(
                 online.OnlineStudioError,
-                "Please upload a complete structure reference paper.",
+                "请上传一篇完整的结构参考论文",
             ):
                 online._write_lightweight_workspace(
                     Path(directory),
@@ -2352,7 +2352,7 @@ class OnlineStudioTests(unittest.TestCase):
             root = Path(directory)
             validator = subprocess.CompletedProcess([], 0, stdout="ok", stderr="")
             with patch.object(online.subprocess, "run", return_value=validator):
-                with self.assertRaisesRegex(online.OnlineStudioError, "official LaTeX template"):
+                with self.assertRaisesRegex(online.OnlineStudioError, "官方 LaTeX 模板"):
                     online._write_workspace(
                         root,
                         files=pipeline_files(venue="Some Unlisted Workshop 2099"),
@@ -2393,11 +2393,11 @@ class OnlineStudioTests(unittest.TestCase):
 
     def test_online_onboarding_describes_xx_and_placeholder_policy(self):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
-        self.assertIn("all quantitative values set to xx", html)
-        self.assertIn("Introduction keeps the Motivation figure slot", html)
-        self.assertIn("local completion in the terminal", html)
+        self.assertIn("定量值统一使用 xx", html)
+        self.assertIn("Introduction 默认保留 Motivation 图位", html)
+        self.assertIn("在本地终端继续完成", html)
         self.assertIn("placeholder", html)
-        self.assertNotIn("The mechanism diagram still requires the drawing Agent from the complete project package.", html)
+        self.assertNotIn("机制图仍需完整项目包中的绘图 Agent", html)
 
     def test_page_refresh_always_shows_landing_tabs_not_an_auto_redirect(self):
         # Regression: the landing page used to auto-redirect straight into
@@ -2409,9 +2409,9 @@ class OnlineStudioTests(unittest.TestCase):
         # session: an explicit choice, not automatic.
         script = (online.STATIC / "app.js").read_text(encoding="utf-8")
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
-        self.assertIn(">Free plain text PaperWrite edition</button>", html)
+        self.assertIn(">免费纯文字 PaperWrite 版</button>", html)
         self.assertNotIn(">Use it</button>", html)
-        self.assertIn("free plain text PaperWrite version", script)
+        self.assertIn("免费纯文字 PaperWrite 版", script)
         self.assertNotIn("window.location.assign('/studio')", script)
         self.assertIn(": 'demo-panel'", script)
         self.assertIn("get('open') === 'use'", script)
@@ -2435,10 +2435,10 @@ class OnlineStudioTests(unittest.TestCase):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
         script = (online.STATIC / "app.js").read_text(encoding="utf-8")
         self.assertIn('id="reset-studio"', html)
-        self.assertIn("Clear current content and re-upload.", html)
+        self.assertIn("清空当前内容并重新上传", html)
         self.assertIn("/api/online/session/reset", script)
         self.assertIn("showUploadView()", script)
-        self.assertIn("idle for four hours", script)
+        self.assertIn("连续 4 小时未使用", script)
         self.assertIn("window.setInterval", script)
 
     def test_free_paperwrite_uses_the_shared_section_draft_surface(self):
@@ -2452,10 +2452,10 @@ class OnlineStudioTests(unittest.TestCase):
             / "research_avatar/paper_studio/static/app.js"
         ).read_text(encoding="utf-8")
         self.assertIn('id="section-draft-start"', html)
-        self.assertIn("One-click generation of the current section.", html)
+        self.assertIn("一键生成当前 Section", html)
         self.assertIn('request("/api/section-draft/start"', script)
         self.assertIn("section_draft", script)
-        self.assertIn("should be run with Code Agent in the local terminal", html)
+        self.assertIn("请在本地终端运行 Code Agent", html)
 
     def test_studio_navigation_redirects_to_html_with_actionable_notice(self):
         html = (online.STATIC / "index.html").read_text(encoding="utf-8")
@@ -2466,7 +2466,7 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn('id="session-notice"', html)
         self.assertIn("session_expired", script)
         self.assertIn("login_required", script)
-        self.assertIn("last temporary writing session has ended", script)
+        self.assertIn("上一次临时写作会话已结束", script)
         self.assertIn('new URL("/?login_required=1", request.url)', worker)
         self.assertIn('path === "/studio"', worker)
         self.assertIn('"/?session_expired=1"', Path(online.__file__).read_text(encoding="utf-8"))
@@ -2495,7 +2495,7 @@ class OnlineStudioTests(unittest.TestCase):
         )
         self.assertNotIn("env.CF_VERSION_METADATA.id", worker)
         self.assertIn('getContainer(env.ONLINE_STUDIO, env.ONLINE_STUDIO_INSTANCE_NAME || "public-studio")', worker)
-        self.assertIn('"instance_type": "basic"', wrangler)
+        self.assertIn('"instance_type": "standard-1"', wrangler)
         self.assertIn('"max_instances": 1', wrangler)
         self.assertIn('"version_metadata"', wrangler)
         self.assertIn('"binding": "CF_VERSION_METADATA"', wrangler)
@@ -2538,7 +2538,7 @@ class OnlineStudioTests(unittest.TestCase):
         for source in (html, script, server, worker):
             self.assertNotIn("access_token_required", source)
         self.assertNotIn('name="access_token"', html)
-        self.assertNotIn("Deployment access token", html)
+        self.assertNotIn("部署访问口令", html)
         self.assertNotIn("payload.get(\"access_token\")", server)
 
     def test_container_image_installs_every_tool_compile_table_preview_requires(self):
@@ -2587,8 +2587,8 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("/api/online/session/job?job_id=", script)
         self.assertIn("const jobId = result.job_id", script)
         self.assertIn("encodeURIComponent(jobId)", script)
-        self.assertIn("Waiting ${elapsed} seconds", script)
-        self.assertIn("(Estimated 2–3 min", script)
+        self.assertIn("已等待 ${elapsed} 秒", script)
+        self.assertIn("（预计 2–3 min）", script)
         self.assertNotIn('name="project_package"', html)
         self.assertLess(
             html.index('name="project_brief_file"'),
@@ -2838,20 +2838,20 @@ class OnlineStudioTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(
             online, "DATA_ROOT", Path(directory)
         ):
-            # RMB 5 / 7.2: USD 0.69 is below the cap; USD 0.70 exceeds it.
+            # RMB 10 / 7.2: USD 1.38 is below the cap; USD 1.39 exceeds it.
             ledger = (
                 online.user_project_root("over-cap-user")
                 / "session-a/paper/.paper_studio/api_usage.jsonl"
             )
             ledger.parent.mkdir(parents=True)
             ledger.write_text(
-                json.dumps({"estimated_cost_usd": 0.69}) + "\n", encoding="utf-8"
+                json.dumps({"estimated_cost_usd": 1.38}) + "\n", encoding="utf-8"
             )
             online.require_under_spend_cap("over-cap-user")
             ledger.write_text(
-                json.dumps({"estimated_cost_usd": 0.70}) + "\n", encoding="utf-8"
+                json.dumps({"estimated_cost_usd": 1.39}) + "\n", encoding="utf-8"
             )
-            with self.assertRaisesRegex(online.OnlineStudioError, "RMB 5"):
+            with self.assertRaisesRegex(online.OnlineStudioError, "10 元"):
                 online.require_under_spend_cap("over-cap-user")
             online.require_under_spend_cap("fresh-user")
 
@@ -2937,10 +2937,10 @@ class OnlineStudioTests(unittest.TestCase):
             "demoFrame.src = `/demo/?lang=${uiLanguage}&embedded=1&authenticated=",
             app,
         )
-        self.assertNotIn("First see how a paper is completed.", source)
-        self.assertNotIn("This is an interactive example of the complete Research Avatar workflow.", source)
-        self.assertNotIn("Upload the complete project to begin your own paper.", source)
-        self.assertNotIn("Upload the necessary research evidence generated by Research Avatar.", source)
+        self.assertNotIn("先看看一篇论文是怎样完成的。", source)
+        self.assertNotIn("这是完整 Research Avatar 流程的可交互示例。", source)
+        self.assertNotIn("上传完整项目，开始自己的论文。", source)
+        self.assertNotIn("上传由 Research Avatar 生成的必要研究证据。", source)
         style = (online.STATIC / "style.css").read_text(encoding="utf-8")
         self.assertIn("width: min(1500px, calc(100% - 32px))", style)
         self.assertIn(".use-columns { max-width: 1500px; align-items: start; }", style)
@@ -2968,7 +2968,7 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertEqual(source.count('<p class="step-index">01</p>'), 1)
         self.assertNotIn('<p class="step-index">02</p>', source)
         self.assertNotIn('name="scholar_file"', source)
-        self.assertNotIn("(Required)", source)
+        self.assertNotIn("（必传）", source)
         self.assertIn('name="project_brief_file"', source)
         self.assertNotIn('name="results_file"', source)
         self.assertNotIn('name="results_files"', source)
@@ -3032,7 +3032,7 @@ class OnlineStudioTests(unittest.TestCase):
         self.assertIn("grid-template-columns:minmax(0,1fr) auto", style)
         self.assertIn('<div class="demo-top-row">', html)
         self.assertIn(".stage-content{min-height:calc(100dvh - 117px);max-height:none;overflow:visible", style)
-        self.assertIn("style.css?v=20260823.5-single-language-control", html)
+        self.assertIn("style.css?v=20261003.1-restore-zh", html)
 
     def test_lightweight_structure_requests_english_planning_fields(self):
         source = Path(online.__file__).read_text(encoding="utf-8")

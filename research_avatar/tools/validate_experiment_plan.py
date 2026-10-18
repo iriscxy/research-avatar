@@ -1303,7 +1303,9 @@ def validate(plan: Path) -> list[str]:
     if local_full_text and not (project_root / local_full_text).is_file():
         errors.append("researcher-owned structure reference local full text does not exist")
     publication_fulltext = str(structure_publication.get("fulltext_path", "")).strip()
-    if structure_publication and publication_fulltext != local_full_text:
+    if structure_publication and local_full_text not in {
+        publication_fulltext, f"researcher-profile/{publication_fulltext}"
+    }:
         errors.append("structure reference local full text must match its publications.json record")
 
     if set(references) != {"confirmed_at", "researcher_owned_logic"}:
@@ -1519,7 +1521,18 @@ def validate(plan: Path) -> list[str]:
         if str(section.get("id") or section.get("section_id") or "").lower() == "method"
     ]
     model_design = contract.get("grounding", {}).get("model_design")
-    if method_sections:
+    idea_method = str(contract.get("grounding", {}).get("idea_method", "")).strip()
+    if method_sections and idea_method:
+        # The projected Method section takes the selected idea's method verbatim; no design table.
+        idea_blocks = re.findall(
+            r'<div\b[^>]*\bdata-idea-method(?:\s*=\s*["\'][^"\']*["\'])?[^>]*>(.*?)</div>',
+            page, re.S | re.I,
+        )
+        if len(idea_blocks) != 1:
+            errors.append("projected Method must contain exactly one visible data-idea-method block")
+        elif " ".join(idea_method.split()) not in " ".join(visible_text(idea_blocks[0]).split()):
+            errors.append("visible Method block must show grounding.idea_method verbatim")
+    elif method_sections:
         required_design_fields = {
             "source_authority", "inputs", "outputs", "modules", "backbone",
             "stage_1", "stage_boundary", "stage_2", "adaptive_rule",

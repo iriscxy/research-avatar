@@ -251,7 +251,9 @@ def completed_run_inputs(root: Path) -> tuple[Path, Path]:
     state = json.loads(node.string)
     goals = state.get("goals", [])
     if not (
-        (state.get("status") or state.get("state")) == "completed"
+        # Every goal ran. A claim gate that stayed open (pivot/refine) is the researcher's decision
+        # to report the evidence as observed; it does not make the executed results unusable.
+        (state.get("status") or state.get("state")) in {"completed", "pivot", "refine", "stopped"}
         and isinstance(goals, list)
         and bool(goals)
         and all(
@@ -543,7 +545,10 @@ def repair_reference_context(root: Path, plan: Path) -> dict:
         if metrics_path.is_file()
         else {}
     )
-    metrics["model_design"] = contract.get("grounding", {}).get("model_design", {})
+    grounding_block = contract.get("grounding", {})
+    metrics["model_design"] = grounding_block.get("model_design") or (
+        {"idea_method": grounding_block["idea_method"]} if grounding_block.get("idea_method") else {}
+    )
     metrics["metric_contract"] = contract.get("metric_contract", [])
     metrics["claims"] = contract.get("claims", [])
     metrics["contract_approval_sha256"] = contract.get("approval_contract_sha256")
@@ -770,6 +775,7 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
     ).strip()
     project_name = method_name or selected_title or plan.stem
     title = str(contract.get("paper_title") or "").strip() or selected_title or project_name
+    projected_abstract = str((contract.get("abstract_generation") or {}).get("output") or "").strip()
     section_specs = []
     main_inputs = []
     for section in sections:
@@ -792,6 +798,9 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
             "length_share": section.get("length_share"),
             "paragraphs": section["paragraphs"],
         }
+        if render == "abstract" and projected_abstract and len(spec["paragraphs"]) == 1:
+            # The approved plan's personalized abstract is the starting candidate.
+            spec["paragraphs"] = [{**spec["paragraphs"][0], "seed_candidate": projected_abstract}]
         if render != "abstract":
             spec["latex_title"] = display_title
             spec["start_label"] = f"sec:{section_id.replace('_', '-')}"
@@ -881,7 +890,9 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
         "gold_standard_contract": contract.get("gold_standard_contract", {}),
         # Keep the approved Method specification in the bounded report-derived
         # evidence bundle. Paper Studio must not reduce it to paragraph titles.
-        "model_design": grounding.get("model_design", {}),
+        "model_design": grounding.get("model_design") or (
+            {"idea_method": grounding["idea_method"]} if grounding.get("idea_method") else {}
+        ),
         "metric_contract": contract.get("metric_contract", []),
         "symbol_registry": contract.get("consistency_requirements", {}).get(
             "symbol_registry", []
@@ -912,6 +923,7 @@ def initialize(root: Path, plan: Path, results: Path) -> dict:
         encoding="utf-8",
     )
     (paper / "working_abstract.txt").write_text(
+        projected_abstract + "\n" if projected_abstract else
         "Draft the abstract only from accepted manuscript evidence and validated result artifacts. Use exact supported numerical results where they materially summarize the findings, do not invent placeholders, and include no citation command.\n",
         encoding="utf-8",
     )

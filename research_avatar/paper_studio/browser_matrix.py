@@ -65,8 +65,8 @@ class Matrix:
         assert page.locator("#model").input_value() == "gpt-5-nano"
         controls = (
             "model", "model-apply", "reset-generated", "writing-view",
-            "figures-view", "tables-view", "compile", "section-draft-start", "full-draft-start",
-            "full-draft-cancel", "runtime-key-open",
+            "figures-view", "tables-view", "compile", "section-draft-start",
+            "runtime-key-open",
         )
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#studio-language-select").input_value() in {"zh", "en"}
@@ -142,7 +142,7 @@ class Matrix:
             ),
         )
         self.visit(page, "", "!document.querySelector('#load-error').hidden")
-        controls = ("model", "model-apply", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "section-draft-start", "full-draft-start", "full-draft-cancel", "runtime-key-open")
+        controls = ("model", "model-apply", "reset-generated", "writing-view", "figures-view", "tables-view", "compile", "section-draft-start", "runtime-key-open")
         assert all(page.locator("#" + item).is_disabled() for item in controls)
         assert page.locator("#writing-workspace").is_hidden()
         assert page.locator("#figures-workspace").is_hidden()
@@ -283,49 +283,9 @@ class Matrix:
         self.results["online_placeholder_only_figures"] = True
         page.close()
 
-    def direct_full_draft_states(self) -> None:
-        # The real controls bind these persisted background-job endpoints.
-        assert "/api/full-draft/start" in (self.base_url + "/api/full-draft/start")
-        assert "/api/full-draft/cancel" in (self.base_url + "/api/full-draft/cancel")
+    def section_draft_state_is_independent(self) -> None:
         assert "/api/llm-provider" in (self.base_url + "/api/llm-provider")
         assert "/api/llm-model" in (self.base_url + "/api/llm-model")
-        fixture = safe_fixture(self.state)
-        fixture["outline_confirmed"] = True
-        fixture["api_key_configured"] = True
-        fixture["full_draft"] = {
-            "available": True,
-            "pending_paragraphs": 2,
-            "total_paragraphs": 7,
-            "writing_order": list(fixture.get("sections", {})),
-            "job": None,
-        }
-        page, errors, posts = self.page(fixture)
-        self.visit(page, "/?view=writing", "!document.querySelector('#writing-workspace').hidden")
-        assert page.locator("#full-draft-start").is_enabled()
-        assert page.locator("#full-draft-cancel").is_hidden()
-        assert "Draft 2 of 7" in page.locator("#full-draft-summary").inner_text()
-        assert not posts and not errors
-        page.close()
-
-        running = copy.deepcopy(fixture)
-        running["full_draft"]["job"] = {
-            "status": "running",
-            "completed": 1,
-            "total": 2,
-            "progress": 50,
-            "progress_message": "Generating Method · M2",
-        }
-        page, errors, posts = self.page(running)
-        self.visit(page, "/?view=writing", "!document.querySelector('#full-draft-cancel').hidden")
-        assert page.locator("#full-draft-start").is_disabled()
-        assert page.locator("#full-draft-cancel").is_visible()
-        assert page.locator("#candidate").is_disabled()
-        assert page.locator("#full-draft-progress").get_attribute("value") == "50"
-        assert not posts and not errors
-        self.results["direct_full_draft_states"] = True
-        page.close()
-
-    def section_draft_state_is_independent(self) -> None:
         assert "/api/section-draft/start" in (
             self.base_url + "/api/section-draft/start"
         )
@@ -345,11 +305,9 @@ class Matrix:
             "!document.querySelector('#writing-workspace').hidden",
         )
         assert page.locator("#section-draft-start").is_enabled()
-        assert page.locator("#full-draft-progress-row").is_hidden()
         page.locator("#section-draft-start").click()
         page.wait_for_timeout(80)
         assert any(url.endswith("/api/section-draft/start") for url in posts), posts
-        assert not any(url.endswith("/api/full-draft/start") for url in posts), posts
         assert not errors, errors
         self.results["section_draft_state_is_independent"] = True
         page.close()
@@ -1598,7 +1556,6 @@ class Matrix:
             self.modal_and_responsive_layout,
             self.mechanism_buttons,
             self.online_placeholder_only_figures,
-            self.direct_full_draft_states,
             self.section_draft_state_is_independent,
             self.blocked_mechanism,
             self.table_buttons,

@@ -185,10 +185,17 @@ class MengyaoRegressionTests(unittest.TestCase):
                                 "https://aclanthology.org/2026.acl-long.1/"],
             }]
         }) + "</script>"
-        old = audit + (
+        generation = (
+            '<script id="idea-generation" type="application/json">'
+            '{"research_question":{"id":"Q1a","question":"When does memory keep source authority?",'
+            '"origin":"neutral","gap_id":"G1"},"setting":"none","candidates":[{"id":"I1","setting":"none",'
+            '"retrieved_ids":[],"run_id":"fresh-1","output":{"research_focus":"f","method":"m",'
+            '"validation":"v","title":"t"}}]}</script>'
+        )
+        old = audit + generation + (
             '<article data-idea-id="I1" data-scope-necessity="ESSENTIAL" '
             'data-scope-action="retain" data-novelty-status="differentiable" '
-            'data-idea-tier="B" data-default-pick="true"></article>'
+            'data-idea-tier="B" data-default-pick="true"></article><main data-crowded="true"></main>'
         )
         self.assertTrue(any("only a novel Tier A" in error
                             for error in validate_ideagen_report.validate(old)))

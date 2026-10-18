@@ -1,23 +1,20 @@
 {
-  "profile": {"artifact":"Researcher Profile","note":"Research directions, method preferences, writing style, and experimental habits","sections":[
-    {"number":"H","title":"Source and Coverage","content":"The profile records its Scholar export, publication records, local writing samples, generation time, and missing inputs.","details":["Scholar snapshot","Local publication records","Writing and experiment samples"]},
-    {"number":"1","title":"Research Identity","content":"The main threads are trustworthy AI, LLM safety, and verifiable evaluation, with failure observations converted into controlled, falsifiable questions.","details":["Trustworthy AI","LLM safety","Verifiable evaluation"]},
+  "profile": {"artifact":"Researcher Profile","note":"Research directions, plan differences, and writing style","sections":[
+    {"number":"1","title":"Research Identity","content":"The main threads are trustworthy AI, LLM safety, and verifiable evaluation, summarized from every paper's abstract and metadata.","details":["Trustworthy AI","LLM safety","Verifiable evaluation"]},
     {"number":"2","title":"Research Lineage","content":"The trajectory extends from task modeling and robust evaluation to safety interventions, representation mechanisms, and evidence contracts.","details":["Task modeling","Robust evaluation","Safety interventions"]},
-    {"number":"3","title":"Writing Style","content":"Abstracts close the loop from problem and gap to method and evidence; observations, explanations, and scope are kept separate.","details":["Problem first","Closed evidence loop","Restrained scope"]},
-    {"number":"4","title":"Experiment Templates","content":"Run low-cost falsification tests first, freeze data and randomness, and make every result recomputable from saved operands.","details":["Falsify first","Frozen configuration","Recomputable results"]},
-    {"number":"5","title":"Workflow Preferences","content":"Every reported number links to its result path, calculation, and command; major research decisions retain approval records.","details":["Traceable numbers","Reproducible commands","Recorded decisions"]},
-    {"number":"6","title":"Publication Records","content":"Publication records remain searchable; self-citation is limited and structure is calibrated using the author's closest venue-matched paper.","details":["Searchable records","At most three self-citations","Venue-matched structure"]}
+    {"number":"3","title":"Idea Profile","content":"Compared with a model's default plan, the author narrows a question to one falsifiable mechanism and tests it with controlled interventions rather than aggregate scores.","details":["Mechanism hypothesis","Controlled intervention","Falsifiable"]},
+    {"number":"4","title":"Writing Profile","content":"Abstract and Introduction profiles summarize paired differences; other sections follow the headings observed in the author's papers.","details":["Abstract","Introduction","Section-matched"]}
   ]},
-  "literature": {"artifact":"Literature Survey","note":"Verified evidence organized as Problem → Approaches → Evaluation → Gaps","sections":[
+  "literature": {"artifact":"Literature Survey","note":"Verified evidence organized as Problem → Approaches → Evaluation → Research Questions","sections":[
     {"number":"1","title":"Problem","content":"Define the sample task as multi-objective coordination: task quality, robustness, and compute cannot be hidden by one average score."},
     {"number":"2","title":"Approaches","content":"Organize prior work by data strategy, training objective, optimization method, and deployment constraint instead of paper-by-paper listing."},
     {"number":"3","title":"Evaluation","content":"Separate automatic metrics, human judgments, interactive success, online outcomes, and compute, then verify whether comparisons are fair."},
-    {"number":"4","title":"Gaps","content":"Key gaps concern reward-conflict detection, judge validity, public reproducibility, and matched quality–cost comparisons."}
+    {"number":"4","title":"Research Questions","content":"Key gaps concern reward-conflict detection, judge validity, public reproducibility, and matched quality–cost comparisons."}
   ]},
   "ideas": {"artifact":"Research-Idea Assessment","note":"A selected direction grounded in verified gaps, with falsifiers and deployment risks retained","sections":[
     {"number":"1","title":"Literature Landscape","content":"The sample field contains several method families; its central issues are objective conflict, judge validity, and cost matching."},
     {"number":"2","title":"Ranked Decision Slate","content":"Candidates are screened against the researcher's profile and the verified gaps: I1 is selected, and the rest cover algorithmic, theoretical, and evaluation paths.","details":["Fits research lineage","Builds on own papers","Matches experiment habits"]},
-    {"number":"3","title":"Candidate Cards","content":"Each card states the problem, mechanism, expected evidence, failure condition, and difference from recent work, and links to the researcher's existing work.","details":["Maps to research identity","Connects to own papers","Reuses experiment templates"]},
+    {"number":"3","title":"Ideas","content":"Each idea shows its sub-question and the generated research focus, method, and validation, verbatim.","details":["Maps to research identity","Connects to own papers","Reuses experiment templates"]},
     {"number":"4","title":"Human Selection","content":"Only after the researcher confirms I1 does the system pass it to experiment planning; the demo is not tied to a real project name."}
   ]},
   "expplan": {"artifact":"Experiment Plan","note":"Claims determine artifacts, thresholds, controls, and evidence boundaries before execution","sections":[

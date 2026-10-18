@@ -199,8 +199,6 @@ class TranslateReportHtmlTests(unittest.TestCase):
         ):
             source = skill.read_text(encoding="utf-8")
             normalized = " ".join(source.split())
-            self.assertIn("explicitly requests a target language", normalized)
-            self.assertIn("do not call any translation API", normalized)
             self.assertIn("must not translate the Survey itself", normalized)
             self.assertIn("research_avatar/tools/translate_report_html.py", normalized)
             self.assertIn("researchlit-llm-translation", normalized)

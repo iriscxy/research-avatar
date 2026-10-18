@@ -241,6 +241,11 @@ class GengsenRegressionTests(unittest.TestCase):
         old = '<article data-idea-id="I1"><h2>Multimodal Temporal Authority Memory</h2></article>'
         self.assertTrue(validate_ideagen_report.validate(old))
         corrected = (
+            '<script id="idea-generation" type="application/json">'
+            '{"research_question":{"id":"Q1a","question":"When does memory keep source authority?",'
+            '"origin":"neutral","gap_id":"G1"},"setting":"none","candidates":[{"id":"I1","setting":"none",'
+            '"retrieved_ids":[],"run_id":"fresh-1","output":{"research_focus":"f","method":"m",'
+            '"validation":"v","title":"t"}}]}</script>'
             '<script id="idea-novelty-audit" type="application/json">'
             '{"candidates":[{"idea_id":"I1","verdict":"novel","absorbable":false,'
             '"closest_work":"Prior memory","overlap":"retrieval",'
@@ -254,7 +259,7 @@ class GengsenRegressionTests(unittest.TestCase):
             '<article data-idea-id="I1" data-scope-necessity="EVALUATION_SCOPE_ONLY" '
             'data-scope-action="relabel" data-novelty-status="novel" '
             'data-idea-tier="A" data-default-pick="true">'
-            '<h2>Temporal Authority Memory</h2></article>'
+            '<h2>Temporal Authority Memory</h2></article><main data-crowded="true"></main>'
         )
         self.assertEqual(validate_ideagen_report.validate(corrected), [])
 

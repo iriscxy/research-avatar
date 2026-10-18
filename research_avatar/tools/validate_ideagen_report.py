@@ -16,6 +16,10 @@ ARTICLE_RE = re.compile(
     r'<article\b(?P<attrs>[^>]*\bdata-idea-id=["\'][^"\']+["\'][^>]*)>', re.I
 )
 ATTR_RE = re.compile(r'\b([\w-]+)=["\']([^"\']*)["\']')
+GENERATION_RE = re.compile(
+    r'<script\b[^>]*id=["\']idea-generation["\'][^>]*>(.*?)</script>', re.I | re.S
+)
+IDEA_FIELDS = ("research_focus", "method", "validation", "title")
 AUDIT_RE = re.compile(
     r'<script\b[^>]*id=["\']idea-novelty-audit["\'][^>]*>(.*?)</script>', re.I | re.S
 )
@@ -49,6 +53,56 @@ def valid_source_url(value: object) -> bool:
     )
 
 
+def validate_generation(source: str) -> list[str]:
+    """Check that the slate comes from one research question in one Jinghui setting."""
+    match = GENERATION_RE.search(source)
+    if not match:
+        return ["missing idea-generation record"]
+    try:
+        payload = json.loads(match.group(1))
+    except json.JSONDecodeError as exc:
+        return [f"invalid idea-generation JSON: {exc}"]
+    errors: list[str] = []
+    direction = payload.get("research_direction")
+    if direction:
+        if not str(direction.get("title", "")).strip() or not str(direction.get("id", "")).strip():
+            errors.append("idea-generation research_direction needs an id and a title")
+        if direction.get("origin") not in {"neutral", "personalized", "researcher"}:
+            errors.append("idea-generation research_direction origin must be neutral, personalized, or researcher")
+        seen_questions = set()
+        for item in payload.get("candidates", []):
+            question = item.get("research_question") or {}
+            text = str(question.get("question", "")).strip()
+            if not text.endswith("?"):
+                errors.append(f"{item.get('id', 'unknown')}: research_question must be one question ending with '?'")
+            if text.lower() in seen_questions:
+                errors.append(f"{item.get('id', 'unknown')}: research_question repeats another candidate's question")
+            seen_questions.add(text.lower())
+    else:
+        question = payload.get("research_question") or {}
+        if not str(question.get("question", "")).strip().endswith("?"):
+            errors.append("idea-generation research_question must be one question ending with '?'")
+        if question.get("origin") not in {"neutral", "personalized", "researcher"}:
+            errors.append("idea-generation research_question origin must be neutral, personalized, or researcher")
+    setting = payload.get("setting")
+    if setting not in {"profile", "none"}:
+        errors.append("idea-generation setting must be profile or none")
+    for item in payload.get("candidates", []):
+        idea_id = item.get("id", "unknown")
+        if item.get("setting") != setting:
+            errors.append(f"{idea_id}: generation setting differs from the slate setting")
+        output = item.get("output") or {}
+        if any(not str(output.get(field, "")).strip() for field in IDEA_FIELDS):
+            errors.append(f"{idea_id}: generation output needs research_focus, method, validation, and title")
+        if not str(item.get("run_id", "")).strip():
+            errors.append(f"{idea_id}: generation record needs the isolated context run_id")
+        if setting == "none" and item.get("retrieved_ids"):
+            errors.append(f"{idea_id}: the None setting cannot retrieve author_differences")
+        if setting == "profile" and not item.get("retrieved_ids"):
+            errors.append(f"{idea_id}: the Profile setting needs retrieved author_differences")
+    return errors
+
+
 def validate(source: str) -> list[str]:
     errors: list[str] = []
     articles = list(ARTICLE_RE.finditer(source))
@@ -65,6 +119,7 @@ def validate(source: str) -> list[str]:
         str(item.get("idea_id", "")): item
         for item in audit_payload.get("candidates", []) if isinstance(item, dict)
     }
+    errors += validate_generation(source)
     default_ids: list[str] = []
     for match in articles:
         attrs = dict(ATTR_RE.findall(match.group("attrs")))
@@ -140,8 +195,8 @@ def validate(source: str) -> list[str]:
                     for field in ("title", "anchor", "failure_boundary"):
                         if not str(item.get(field, "")).strip():
                             errors.append(f"{idea_id}: source_grounding[{grounding_index}] lacks {field}")
-                if not kinds.intersection({"Gap", "Opening", "Live Debate"}):
-                    errors.append(f"{idea_id}: source_grounding must name a Survey Gap/Opening or Live Debate")
+                if not kinds.intersection({"Gap", "Opening", "Live Debate", "Failure Boundary", "Trend", "Research Direction"}):
+                    errors.append(f"{idea_id}: source_grounding must name a Survey Gap/Opening, Live Debate, Failure Boundary, Trend, or Research Direction")
         if status not in ALLOWED:
             errors.append(f"{idea_id}: invalid or missing data-scope-necessity")
             continue
@@ -164,6 +219,15 @@ def validate(source: str) -> list[str]:
             default_ids.append(idea_id)
     if len(default_ids) > 1:
         errors.append("idea slate may contain at most one default recommendation")
+    novel_ids = []
+    for match in articles:
+        attrs = dict(ATTR_RE.findall(match.group("attrs")))
+        if attrs.get("data-novelty-status", "").strip().lower() == "novel" and \
+                str(audits.get(attrs.get("data-idea-id", ""), {}).get("verdict", "")).lower() == "novel":
+            novel_ids.append(attrs.get("data-idea-id"))
+    if len(novel_ids) < 2 and 'data-crowded="true"' not in source:
+        errors.append("the slate needs at least two independently confirmed novel ideas, "
+                      "or must be marked crowded after the extra generation rounds")
     return errors
 
 

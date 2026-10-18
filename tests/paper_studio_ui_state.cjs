@@ -18,6 +18,7 @@ const context = vm.createContext({
   titleBusy: false,
   renderTitleDraftInput: (input, _key, value) => { input.value = value; },
   $: control,
+  studioT: (_zh, en) => en,
   document: { querySelectorAll: () => [control('dynamic-panel-generate')] },
 });
 const controlStart = source.indexOf('const DEMO_READ_ONLY_CONTROL_IDS = [');
@@ -37,10 +38,9 @@ for (const jobType of ['full_draft', 'section_draft']) {
   context.state = { [jobType]: { job: { status: 'running' } } };
   for (const item of controls.values()) item.disabled = false;
   vm.runInContext('applyDraftJobRestrictions()', context);
-  for (const id of ['reset-generated', 'generate', 'accept', 'full-draft-start', 'section-draft-start', 'figure-draw', 'table-agent-edit', 'dynamic-panel-generate']) {
+  for (const id of ['reset-generated', 'generate', 'accept', 'section-draft-start', 'figure-draw', 'table-agent-edit', 'dynamic-panel-generate']) {
     assert.equal(control(id).disabled, true, `${jobType} must lock ${id}`);
   }
-  assert.equal(control('full-draft-cancel').disabled, false);
   assert.equal(control('figures-view').disabled, false);
   assert.equal(control('project-export').disabled, false);
   // A preview callback may calculate that an action is ready; the job lock

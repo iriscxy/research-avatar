@@ -157,7 +157,7 @@ class ReviewRegressions(unittest.TestCase):
                 first = pool.submit(online.create_session, {}, user_id='one')
                 try:
                     self.assertTrue(entered.wait(5))
-                    with self.assertRaisesRegex(online.OnlineStudioError, 'session is full'):
+                    with self.assertRaisesRegex(online.OnlineStudioError, '会话已满'):
                         online.create_session({}, user_id='two')
                 finally:
                     release.set()

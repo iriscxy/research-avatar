@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 import re
 
 
@@ -74,6 +75,9 @@ def verified_survey_bibliography(source: str) -> str:
     that exact URL and visible metadata; this function never guesses missing authors
     or publication fields.
     """
+    contract_bibliography = _bibliography_from_verification_contract(source)
+    if contract_bibliography:
+        return contract_bibliography
     records: list[str] = []
     seen_urls: set[str] = set()
     seen_keys: set[str] = set()
@@ -137,5 +141,52 @@ def verified_survey_bibliography(source: str) -> str:
             f"@misc{{{key},\n" + ",\n".join(fields) + "\n}"
         )
         seen_urls.add(url)
+        seen_keys.add(key)
+    return "\n\n".join(records).rstrip() + ("\n" if records else "")
+
+
+def _bibliography_from_verification_contract(source: str) -> str:
+    """Build BibTeX from the survey's embedded ``literature-verification`` records.
+
+    The fixed-template survey renders papers as plain list items, so the machine
+    records (title, authors, year, venue, verified URL) are the authoritative
+    source. Abbreviated author lists such as ``Turner et al.`` become BibTeX's
+    ``and others``; no author, year, or venue is invented.
+    """
+    match = re.search(r'<script\b[^>]*id=["\']literature-verification["\'][^>]*>(.*?)</script>', source, re.S)
+    if not match:
+        return ""
+    papers = json.loads(match.group(1)).get("papers", [])
+    records: list[str] = []
+    seen_keys: set[str] = set()
+    for paper in papers:
+        title, url = _plain(str(paper.get("title", ""))), str(paper.get("final_url") or paper.get("url") or "").strip()
+        authors_list = [str(a).strip() for a in paper.get("authors", []) if str(a).strip()]
+        if not title or not url or not authors_list:
+            continue
+        names = []
+        for a in authors_list:
+            abbreviated = re.fullmatch(r"(.+?)\s+et\s+al\.?", a, re.IGNORECASE)
+            names.append(f"{_bib_value(abbreviated.group(1))} and others" if abbreviated else _bib_value(a))
+        year = str(paper.get("year", "")).strip()
+        coordinate = re.sub(r"^https?://", "", url).rstrip("/").split("/")[-1]
+        key_base = "survey" + re.sub(r"[^A-Za-z0-9]+", "", coordinate).lower()
+        if year and year not in key_base:
+            key_base = f"survey{year}{key_base.removeprefix('survey')}"
+        key, suffix = key_base, 2
+        while key in seen_keys:
+            key = f"{key_base}{suffix}"
+            suffix += 1
+        fields = [f"  title = {{{_bib_value(title)}}}", f"  author = {{{' and '.join(names)}}}", f"  url = {{{_bib_value(url)}}}"]
+        if year:
+            fields.append(f"  year = {{{year}}}")
+        arxiv_match = re.search(r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5})", str(paper.get("arxiv_url", "")) + " " + url)
+        if arxiv_match:
+            fields.append(f"  eprint = {{{arxiv_match.group(1)}}}")
+            fields.append("  archiveprefix = {arXiv}")
+        venue = _bib_value(str(paper.get("venue", "")))
+        if venue and venue.isascii():
+            fields.append(f"  note = {{{venue}}}")
+        records.append(f"% Verified by reports/01_LIT_SURVEY.html; source: {url}\n@misc{{{key},\n" + ",\n".join(fields) + "\n}")
         seen_keys.add(key)
     return "\n\n".join(records).rstrip() + ("\n" if records else "")

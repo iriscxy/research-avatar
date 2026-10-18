@@ -11,13 +11,10 @@ from pathlib import Path
 REPORT_STRUCTURES = {
     "profile": {
         "sections": [
-            ("source-coverage", "Source and Coverage"),
-            ("research-identity", "Research Identity"),
-            ("research-lineage", "Research Lineage"),
-            ("writing-style", "Writing Style"),
-            ("experiment-templates", "Experiment Templates"),
-            ("workflow-preferences", "Workflow Preferences"),
-            ("publication-records", "Publication Records"),
+            ("research-identity", "1. Research Identity"),
+            ("research-lineage", "2. Research Lineage"),
+            ("idea-profile", "3. Idea Profile"),
+            ("writing-profile", "4. Writing Profile"),
         ],
     },
     "literature": {
@@ -25,14 +22,14 @@ REPORT_STRUCTURES = {
             ("problem", "1. Problem"),
             ("approaches", "2. Approaches"),
             ("evaluation", "3. Evaluation"),
-            ("gaps", "4. Gaps"),
+            ("gaps", "4. Research Questions"),
         ],
     },
     "ideas": {
         "sections": [
             ("literature-landscape", "1. Literature Landscape"),
             ("ranked-slate", "2. Ranked Decision Slate"),
-            ("candidate-cards", "3. Candidate Cards"),
+            ("candidate-cards", "3. Ideas"),
             ("human-selection", "4. Human Selection"),
         ],
     },
@@ -72,7 +69,7 @@ LOCALIZED_TITLE_ALIASES = {
         "problem": {"1. issue"},
         "approaches": {"2. method"},
         "evaluation": {"3. evaluation"},
-        "gaps": {"4. gap"},
+        "gaps": {"4. gap", "4. gaps", "4. research question"},
     },
     "results": {
         "generation-process": {"3. Acquisition Process"},
