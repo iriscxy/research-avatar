@@ -2,6 +2,13 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "research-avatar-studio",
   "main": "index.ts",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
   "compatibility_date": "2026-08-16",
   "workers_dev": true,
   "preview_urls": true,
@@ -16,7 +23,7 @@
     {
       "class_name": "OnlineStudioContainerV61",
       "image": "registry.cloudflare.com/CLOUDFLARE_ACCOUNT_ID/research-avatar-studio-onlinestudiocontainer:REPLACE_WITH_IMAGE_TAG",
-      "instance_type": "basic",
+      "instance_type": "standard-1",
       "max_instances": 1,
       "constraints": {
         "regions": ["APAC"]

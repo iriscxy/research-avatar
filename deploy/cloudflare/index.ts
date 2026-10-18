@@ -9,6 +9,7 @@ const PASSWORD_ITERATIONS = 100_000;
 interface Env {
   ONLINE_STUDIO: DurableObjectNamespace;
   AUTH_DB: D1Database;
+  ASSETS: Fetcher;
   CF_VERSION_METADATA: {
     id: string;
     tag: string;
@@ -38,8 +39,8 @@ export class OnlineStudioContainer extends Container<Env> {
     ONLINE_STUDIO_PUBLIC_REGISTRATION: "1",
     ONLINE_STUDIO_TRUST_PROXY_AUTH: "1",
     ONLINE_STUDIO_IDLE_SECONDS: "14400",
-    ONLINE_STUDIO_MAX_SESSIONS: "2",
-    ONLINE_STUDIO_SPEND_CAP_RMB: "5",
+    ONLINE_STUDIO_MAX_SESSIONS: "10",
+    ONLINE_STUDIO_SPEND_CAP_RMB: "10",
   };
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -512,6 +513,27 @@ async function accountUsage(request: Request, env: Env): Promise<Response> {
   }
 }
 
+const STATIC_CSP = (sameOriginFrame: boolean) =>
+  "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; "
+  + (sameOriginFrame ? "frame-src 'self'; frame-ancestors 'self'" : "frame-ancestors 'none'");
+
+// Serve browser assets straight from the Worker so first paint never waits for
+// the container to wake. Revalidates (ETag) on each load; URLs carry ?v= anyway.
+async function staticAsset(request: Request, env: Env, assetPath: string, sameOriginFrame: boolean): Promise<Response> {
+  const url = new URL(request.url);
+  url.pathname = assetPath;
+  url.search = "";
+  const response = await env.ASSETS.fetch(new Request(url, request));
+  if (response.status !== 200 && response.status !== 304) return response;
+  const headers = new Headers(response.headers);
+  headers.set("cache-control", "no-cache");
+  headers.set("x-content-type-options", "nosniff");
+  headers.set("referrer-policy", "no-referrer");
+  headers.set("x-frame-options", sameOriginFrame ? "SAMEORIGIN" : "DENY");
+  headers.set("content-security-policy", STATIC_CSP(sameOriginFrame));
+  return new Response(response.body, { status: response.status, headers });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     try {
@@ -530,7 +552,21 @@ export default {
       if (request.method === "POST" && path === "/api/auth/logout") {
         return logout(request, env);
       }
+      if (request.method === "GET" && path === "/") {
+        return staticAsset(request, env, "/index.html", false);
+      }
+      if (request.method === "GET" && (path === "/online-assets/app.js" || path === "/online-assets/style.css")) {
+        return staticAsset(request, env, path, false);
+      }
       const user = await currentUser(request, env);
+      if (request.method === "GET" && user && (path === "/demo" || path.startsWith("/demo/"))) {
+        if (path === "/demo") return Response.redirect(new URL("/demo/", request.url), 302);
+        const relative = path === "/demo/" ? "/demo/index.html" : path;
+        if (/\.(html|js|css|json|png|svg)$/.test(relative) && !relative.includes("..")) {
+          const asset = await staticAsset(request, env, relative, true);
+          if (asset.status !== 404) return asset;
+        }
+      }
       if (
         request.method === "GET"
         && !user
