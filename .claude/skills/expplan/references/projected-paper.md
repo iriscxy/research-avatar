@@ -4,12 +4,28 @@ Design the paper claim-first and backward from the projected abstract.
 **Reader-facing opening — write the conference and reference first, then the projected paper.** Use `1. Target Conference and Reference Paper` for exactly two entries: target conference and the sole researcher-owned reference. Keep the official-rules link inside the target-conference entry. Do not include the research question, object of study, implementation architecture, datasets, metrics, baselines, or any other setup material there. Immediately follow it with `2. Projected Paper`, containing parts (a)–(c). Do not create later top-level report sections for claims, implementation, budget, or approval; those are contract concerns whose paper-facing consequences belong in the projected structure.
 
 (a) **Projected Title + Abstract** — immediately **above the abstract, draft a working paper title** (`<h2>`-sized, styled as a title): a concrete, non-generic title naming the idea's ONE core mechanism (a short name + a claim-bearing subtitle is fine, e.g. "ABD++: One Modality-Invariant Harmful Axis for Deployable Jailbreak Defense"), not a topic label. It should read like a real paper title and match the idea's single mechanism — if the best honest title still sounds like "technique A applied to domain B", that is a signal the idea is a mashup (flag it, don't dress it up). Then the **projected abstract** — the abstract the paper *would* have if the idea succeeds, in her *Writing Style* (gap-first, "We propose/release" bullets). Mark **PROJECTED — not results**; every number a placeholder `[X%]`, never fabricated.
-   - Derive a target length band from the venue's official abstract rule when one
-     exists; otherwise use the confirmed researcher-owned reference's measured
-     abstract length as the center of a reasonable band. Do not impose one universal
-     word count. Require the complete rhetorical sequence: motivation · precise gap ·
-     method · evaluation scope · 1–2 result-with-placeholder sentences · takeaway;
-     an abstract below the band or missing a role is incomplete, not merely concise.
+   - **Generate the projected abstract with the Jinghui Abstract task,
+     Profile+History setting.** Build a `content_brief` (grouped facts: problem, prior-work gap,
+     the selected idea's research focus and method, evaluation scope with the
+     confirmed datasets/models/baselines, and each planned result as a `[X]`
+     placeholder tied to its claim) plus the verified `references`, and set
+     `reference_abstract_words` to the word count of the confirmed reference
+     paper's own abstract (its `author_version` in `profile_pairs.json`) so the
+     projected abstract matches that length; then run
+     `python3 research_avatar/tools/jinghui_prompt.py --task abstract --setting profile_history --input-file <brief.json> --output reports/.build/03_ABSTRACT_REQUEST.json`,
+     and generate the abstract in one fresh isolated context that sees only that
+     request. Use the returned abstract verbatim as the projected abstract and
+     keep the brief, `retrieved_ids`, `system_sha256` and run ID in the
+     contract's `abstract_generation` record. The request carries the
+     researcher's most similar earlier abstracts with each paper's paired
+     differences (`retrieved_history` built from `researcher-profile/profile_pairs.json`);
+     the texts are the main evidence of how the researcher writes. Do not
+     rewrite the output by hand.
+   - **This abstract is also the paper's abstract.** Paper Studio starts the
+     Abstract paragraph with `abstract_generation.output` as its candidate and
+     uses it as the working abstract for every other section, so Paper Writing
+     does not regenerate the abstract; the researcher edits it and replaces
+     each `[X]` once results exist.
    - **No em-dashes, no rare words**; use common words and keep only genuine terms of art.
    - **abstract↔claim self-check:** map each abstract claim-sentence to a §1 claim; a sentence with no backing experiment gets cut or gets an experiment.
 (b) **Projected Paper Blueprint (write right after the abstract, INSIDE `03`)** — show the paper that will be written, not merely a list of experiments. Use the confirmed researcher-owned paper already named and linked in Section 1. Model the target architecture on its section order, paragraph progression, and figure/table rhythm, while filling that architecture only with the current idea and independently grounded scientific content. Do not copy the reference paper's subject matter, claims, results, or prose.
@@ -55,35 +71,13 @@ and evidence grade (`claim-grade`, `pilot-only`, `smoke-only`, or
 `unavailable`). Mark the entire blueprint PROJECTED and keep unknown prose
 numbers as `[X%]`.
 
-Within the projected **Method** section, add one visible block marked
-`data-model-design`. It must be detailed enough for the later browser writer to
-draft the method without reverse-engineering scattered plan fields. Cover:
-
-- inputs, outputs, and the end-to-end information flow;
-- every named module and its responsibility;
-- training phases and the boundary between trainable, frozen, teacher, and
-  reference components;
-- the objective/loss terms and any selection, aggregation, routing, or dynamic
-  weighting equations that determine behavior;
-- the inference path, including components used only during training;
-- a component-to-evidence list naming the ablation, diagnostic, sensitivity,
-  or result artifact that can weaken or falsify each material design claim.
-
-Make this block concise but reproduction-grade: normally one 8--14-row table
-or 250--500 English-word equivalent. It must contain an executable ordered
-algorithm, define every symbol, state candidate/sampling construction,
-preprocessing, objective normalization and parameter-update rules, list the
-source-disclosed model-defining hyperparameters, and distinguish trainable,
-frozen, teacher, and reference components. Put all source-undisclosed choices
-in one explicit `Unknowns for exact reproduction` row and set
-`reproducibility_status` to `partial_due_to_source_omissions`; never guess them.
-Omit repeated motivation, results, and extended rationale from this block.
-
-Mirror this exact specification in `grounding.model_design`; the visible block
-and hidden contract may differ in presentation but not in scientific content.
-Do not count this prose/table block as a result artifact. A generic pipeline
-summary, method-module inventory without interactions, or conceptual-figure
-caption does not satisfy the requirement.
+Within the projected **Method** section, show the selected idea's generated
+method verbatim in one visible block marked `data-idea-method`, and store the
+same text in `grounding.idea_method`. There is no model-design table: the
+idea's method is the Method section's content, and the Method paragraphs plan
+how to present it. Do not introduce modules or mechanisms the idea's method
+does not contain; if the experiments need a different method, return to
+`/ideagen` instead.
 
 For a **one-goal-paper reconstruction**, populate the block only from the goal
 paper's verified full text, equations, captions, and method figures. Record the
@@ -113,8 +107,7 @@ one row per selected baseline plus one row for the proposed method; keep each
 decision to one concise sentence or clause sequence and attach the supporting
 paper link in the relevant baseline row. Full metric formulas and machine
 provenance belong only in the embedded contract; method-defining equations
-belong in the Method model-design block above when needed for an unambiguous
-design.
+belong in the Method paragraphs when needed for an unambiguous design.
 
 ## Routed details
 

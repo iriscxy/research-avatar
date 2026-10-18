@@ -1,17 +1,20 @@
 ## Arguments
-- `<topic>` — free text (required). If empty, ask the researcher for one, or offer the *Niche subfields* from the profile.
+- `<topic>` — free text (required). If empty, ask the researcher for one, or propose 2–3 broad directions from the profile's *Research Identity* and *Research Lineage*.
+- `— questions: personalized` — also write 2–4 personalized questions (`personalized_directions`) from the same evidence plus the profile (see the SKILL's Research questions section). Neutral questions are always written.
 - `— out: <path>` — output HTML path. Default **`reports/01_LIT_SURVEY.html`** (create `reports/` if missing).
 - `— angles: N` — number of parallel survey angles (default **5**; use 4–6).
 - `— for: ideagen` — grounding mode: also return the compact landscape (prose + gaps) so `/ideagen` can fold it in; still write the HTML.
-- `— language: <target language>` — optional and **explicit-only**. When present, translate the completed English Survey through the configured LLM API. Do not infer translation merely from the language used in conversation.
-- `— provider: openai|deepseek` — translation provider, used only with an explicit target language. If translation is requested and no provider was specified, ask the researcher which one to use; never infer it from available keys.
+- `— language: <target language>` — optional. When present, translate the completed English Survey through the configured LLM API.
+- `— provider: openai|deepseek` — translation provider, used with a target language. If translation is requested and no provider was specified, ask the researcher which one to use; never infer it from available keys.
 
-## Optional personalization (read, don't require)
-If `researcher-profile/PROFILE.html` (at the project-local `researcher-profile/` path) exists, skim it to bias
-*angle selection* toward the researcher's niche and to name where her own work
-sits in the landscape — but the survey itself stays **field-neutral and honest**
-(this is a map of the field, not a pitch). If the profile is absent, proceed
-anyway; this skill does not depend on it.
+## Profile use (read, don't require)
+If `researcher-profile/PROFILE.html` exists, read only *Research Identity* and
+*Research Lineage* to propose broad directions when no topic was given, to name
+where the researcher's own work sits in the landscape, and, with
+`— questions: personalized`, to write the personalized questions. Angle
+selection, searches, synthesis, gaps, and neutral questions do not use the
+profile, so the survey stays a field-neutral map shared by personalized and
+non-personalized runs. If the profile is absent, proceed anyway.
 
 ## A1 — Multi-angle verified search (the core)
 Cover the topic with **many distinct query angles, run in PARALLEL** — so the
@@ -56,7 +59,7 @@ volume for its own sake. Do NOT do one or two searches.
 5. Before declaring a gap, run a **gap-falsification search** using the proposed
    missing mechanism as an exact phrase, its main synonyms, and combinations
    with the task and intervention. Search specifically for work that would make
-   the gap false. Retain the queries, closest collision, and bounded difference;
+   the gap false. Retain the queries in the canonical source;
    “no paper in the selected families” is not novelty evidence.
 
 > Prefer delegating the searches to agents so raw search dumps stay out of the
@@ -68,5 +71,7 @@ Over the merged set, do interpretive (not accept/reject) synthesis:
 - Find the **live debates** (papers that directly disagree) — these make the best
   callouts.
 - Find the **structural gaps** (thin/empty sub-areas) — flag them explicitly; a
-  gap is a valuable signal, worth more than padding.
+  gap is a valuable signal, worth more than padding. Summarize the open
+  problem areas as 3–5 research questions (keyword titles only) as
+  the SKILL specifies; the gaps stay in the synthesis as their evidence.
 - Identify **trends** across the 2–3 year window.

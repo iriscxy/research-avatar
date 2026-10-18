@@ -14,17 +14,12 @@ Never create a second report for the disruptive pass. Set `data-idea-branch="sta
 - Keep the standard ranking table unchanged. Do not insert D1 as rank 8 and do not compare its Disruptive score to standard Novelty / qualitative ranks.
 - When the wildcard is on, run `python3 research_avatar/tools/validate_ideagen_wildcard.py reports/02_IDEA_REPORT.html` and fix all errors before presenting it. Ask the researcher to pick / kill / redirect by id (`I*` or `D1`). Never auto-proceed.
 
-Present a **4–6 idea decision slate when evidence supports it**; fewer is valid after the second generation pass. Use `ID | Tier | Idea | Novelty status | Scope necessity | Closest work | Concrete difference | Strongest objection | Confidence` (plus conditional ethics risk). Each selectable card carries `data-idea-id`, `data-novelty-status`, `data-idea-tier`, `data-default-pick`, and the scope attributes from 2b. Only Tier A may be default; Tier B says `needs framing`; at most one card is default. Before the gate, give a fresh-context reviewer only the cards and retrieved sources; embed its per-ID verdict, absorbability result, closest-work overlap/difference, ISO latest-search date, fresh-context run ID, and ≥2 non-placeholder direct URLs as `idea-novelty-audit` JSON. The card and audit must agree. Non-selectable survivors have no pick ID. Run `research_avatar/tools/validate_ideagen_report.py` and the fixed-structure validator, then stop for pick/kill/redirect.
+Present **at most ten ideas**, the strongest of the pool, selectable ones first; absorbed or weaker candidates are omitted from the page. Use `ID | Tier | Idea (name + one-sentence summary) | Novelty status | Closest work | Concrete difference | Strongest objection | Confidence` (plus conditional ethics risk). Each selectable card carries `data-idea-id`, `data-novelty-status`, `data-idea-tier`, `data-default-pick`, and the scope attributes from 2b. Only Tier A may be default; Tier B says `needs framing`; at most one card is default. Before the gate, give a fresh-context reviewer only the cards and retrieved sources, together with the main-contribution novelty definitions from `generation-and-novelty.md`; embed its per-ID verdict, absorbability result, closest-work overlap/difference, ISO latest-search date, fresh-context run ID, and ≥2 non-placeholder direct URLs as `idea-novelty-audit` JSON. The card and audit must agree. Non-selectable survivors have no pick ID. Run `research_avatar/tools/validate_ideagen_report.py` and the fixed-structure validator, then stop for pick/kill/redirect.
 
-**Selection never hides or compacts ideas.** Every idea shown in the ranked
-decision slate must keep its complete Candidate Card after a selection is
-recorded, including the full summary, novelty evidence, mechanism, falsifier,
-scope necessity, feasibility, strongest objection, and ethics assessment.
-Choosing one ID may add only the selected banner/row/card marker and downstream
-selection state. It must not remove another card, replace it with a one-line
-`not selected`/`rejected` block, collapse its fields, or filter it from the
-rendered page. Rejected and non-selectable ideas remain fully readable for
-comparison; only their selection controls are disabled.
+**Selection never hides ideas.** Every idea in the slate keeps its full entry in
+`3. Ideas` after a selection is recorded. Choosing one ID adds only the selected
+marker and the `4. Human Selection` line; it never removes, collapses or filters
+another idea.
 
 
 If any ethics risk is `HIGH` or `CRITICAL`, the gate must state that the candidate requires explicit human ethics review before implementation, data collection, deployment, or release, as applicable. Ask only the concrete review question needed for the flagged pathway; do not show an ethics prompt for unflagged work. For `LOW` or `MEDIUM`, show the risk and safeguards in the report and let the normal idea-selection gate handle the decision.
@@ -46,7 +41,31 @@ Render `02_IDEA_REPORT.html` with an unnumbered selected-status banner when appl
 
 1. `1. Literature Landscape` (`literature-landscape`);
 2. `2. Ranked Decision Slate` (`ranked-slate`);
-3. `3. Candidate Cards` (`candidate-cards`);
+3. `3. Ideas` (`candidate-cards`);
 4. `4. Human Selection` (`human-selection`).
 
-Place any opt-in `Disruptive Wildcard` inside `Candidate Cards`; it is not a fifth top-level section. Each candidate card owns its plain-language summary, novelty evidence, one mechanism, falsifier, scope necessity, feasibility, strongest objection, and conditional ethics assessment. Every top-level title must own substantive topic-specific content; an empty section, title-only slot, or placeholder-only body is invalid. Keep audits as hidden JSON, not visible sections. Do not add, rename, reorder, or omit a top-level section; workflow logs, dashboards, and tool comparisons are forbidden. Before the pick gate, run `python3 research_avatar/tools/validate_report_structure.py --kind ideas --html reports/02_IDEA_REPORT.html` in addition to the idea-specific validators. Research Studio adds selection controls around this report; the Live Demo must display this exact section list with filled illustrative candidates.
+Place any opt-in `Disruptive Wildcard` inside `Ideas`; it is not a fifth top-level section. `3. Ideas` shows, for each idea, only its title, its sub-question (no ID), and the generated research focus, method, and validation, verbatim from the isolated context, unrewritten and unfolded. Novelty, closest work, difference and strongest objection appear only in the `2. Ranked Decision Slate` table. `4. Human Selection` shows only the selected idea's title (`Selected: I<k> — <title>`), or one line saying no idea is selected yet. Every top-level title must own substantive topic-specific content; an empty section, title-only slot, or placeholder-only body is invalid. Keep audits as hidden JSON, not visible sections. Do not add, rename, reorder, or omit a top-level section; workflow logs, dashboards, and tool comparisons are forbidden. Before the pick gate, run `python3 research_avatar/tools/validate_report_structure.py --kind ideas --html reports/02_IDEA_REPORT.html` in addition to the idea-specific validators. Research Studio adds selection controls around this report; the Live Demo must display this exact section list with filled illustrative candidates.
+
+Do not reveal the generation setting on the visible page: no Profile/None label, no mention of retrieved prior papers or of the Jinghui task in the title, subtitle, landscape text, or cards. The setting stays only in the hidden `idea-generation` record and the `data-setting` attribute.
+
+## Source JSON for the renderer
+
+`reports/.build/02_IDEA_REPORT.source.json` holds only content; the renderer
+fixes layout, column order, and widths. Top level: `title`, `subtitle`,
+`research_direction` (`{"id", "title", "origin"}`, the chosen research question from Step 1), `angle` (`{"title", "origin"}` from Step 1a),
+`setting` (`profile` or `none`), `landscape_lead`, `landscape_body`,
+`ranking_note`, `selection` (`{}` before a pick, else `{"selected_id",
+"selected_title", "reason", "confirmed_at"}`), and `candidates` in rank order.
+Each candidate has `id`, `research_question` (`{"id", "question"}`, the Step 1b sub-question, shown in `3. Ideas` without its ID), `title`, `summary` (one plain sentence; shown under the
+name in the slate's Idea column), `research_focus`, `mechanism`, `steps`,
+`validation`, `hypothesis`,
+`falsifier`, `closest_sources` (`[{"title","url"}]`, verified only),
+`difference`, `own_work_overlap`, `scope_necessity`, `scope_action`,
+`scope_text`, `feasibility`, `reviewer_risk`, `objection`, `effort`,
+`contribution_type`, `novelty_status`, `novelty_attribute`, `tier`,
+`selectable`, `confidence`, `source_grounding`
+(`[{"anchor","kind","title","failure_boundary"}]`), `generation` (`{"setting",
+"retrieved_ids", "system_sha256", "run_id", "output"}` with the unedited
+four-field JSON from the isolated context; rendered as hidden `idea-generation`
+JSON), and `audit` (the hidden per-idea novelty audit object). Scope necessity is recorded in the card attributes, not as a
+slate column.

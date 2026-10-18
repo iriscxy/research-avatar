@@ -40,17 +40,9 @@ the Section 2 heading. Then use exactly these ordered visible subsections:
 1. `2.1 Projected Title and Abstract` (`projected-title-abstract`);
 2. `2.2 Projected Paper Structure and Evidence Shells` (`projected-paper-structure`), including every paper section in manuscript order and each paper-shaped table/figure shell at its first planned paragraph.
 
-Inside the projected Method section, render exactly one substantive
-`<div data-model-design>` sourced from `grounding.model_design`. It must show
-inputs, outputs, modules and their interactions, training stages and frozen
-boundaries, method-defining objectives/equations, inference flow, and explicit
-component-to-evidence links. For a one-goal-paper reconstruction it also shows
-the goal-paper `source_authority`, the reconstruction policy, and any unknown
-implementation choices; structural-reference prose is never a method source.
-Keep it to one compact 8--14-row table (or equivalent) while also exposing the
-ordered algorithm, symbol definitions, candidate/sampling construction,
-normalization/update rules, disclosed model-defining configuration, one
-explicit unknowns row, and `reproducibility_status`.
+Inside the projected Method section, render exactly one `<div data-idea-method>`
+showing `grounding.idea_method`, the selected idea's generated method verbatim;
+there is no model-design table.
 
 Inside the projected Experiments section, include one
 `<div data-experiment-setup>` containing a fixed six-row

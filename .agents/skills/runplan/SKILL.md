@@ -196,3 +196,30 @@ estimate or recover a value from chat.
 For fabricated skill tests, apply the visible banner
 `SKILL-TEST — fabricated data, NOT a scientific result` and a `SYNTHETIC`
 watermark throughout the artifact set.
+
+## Shared page theme
+
+Every report page uses the same visual theme from `research_avatar/report_theme.py`
+(warm paper background, white cards, teal headings, orange accents, plain page
+title with no banner). Generators append `THEME_CSS` to their stylesheet; never
+write a different palette or a display-size hero. Leave layout classes as they are
+and keep the navigation, title, and section content left-aligned to one container.
+
+## Fixed templates — fill content, never write HTML
+
+`04_RUN_PLAN.html` is rendered by `research_avatar/tools/render_run_plan.py` from
+`reports/.build/04_RUN_PLAN.source.json` (`{"page": ..., "state": ...}`); `05_EXP_RESULT.html` by
+`research_avatar/tools/render_experiment_results.py` from `reports/.build/05_EXP_RESULT.source.json`
+(`{"page": ..., "provenance": ...}`). The templates fix the stylesheet, header, five (run plan) or
+three (results) sections, ids, and classes. The project decides only the content:
+
+- Run plan `page`: `kicker`, `title`, `subtitle`, `estimate` rows, `sources` rows, `coverage`
+  (`summary`, `head`, `rows`), `mode`, `parts` → `goals` (`id`, `artifact_ids`, `title`, `question`,
+  `artifacts`, `completion`, `results_html` written by `run_plan_progress.py`), and `checkpoint`.
+  The number of Parts and Goals follows the project.
+- Results `page`: `artifacts` (table or figure with `head`, `rows`, per-cell `text`/`result_id`/`summary`,
+  figure `plot`) and the per-goal `audit`. The number of artifacts follows the experiment plan.
+
+Run `python3 research_avatar/tools/render_run_plan.py --source … --output reports/04_RUN_PLAN.html` and
+`python3 research_avatar/tools/render_experiment_results.py --source … --output reports/05_EXP_RESULT.html`;
+both reject empty slots and validate structure before replacing the file.

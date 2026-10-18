@@ -144,3 +144,27 @@ coverage. If Main Results already covers the complete approved datasets,
 models, methods, and metrics, a second aggregate table over the same cells is a
 duplicate and must be removed or replaced with a distinct claim-bearing test,
 such as a component ablation, robustness analysis, or defense evaluation.
+
+## Shared page theme
+
+Every report page uses the same visual theme from `research_avatar/report_theme.py`
+(warm paper background, white cards, teal headings, orange accents, plain page
+title with no banner). Generators append `THEME_CSS` to their stylesheet; never
+write a different palette or a display-size hero. Leave layout classes as they are
+and keep the navigation, title, and section content left-aligned to one container.
+
+## Fixed template — fill the page model, never write HTML
+
+`reports/03_EXPERIMENT_PLAN.html` is rendered by `research_avatar/tools/render_experiment_plan.py`
+from `reports/.build/03_EXPERIMENT_PLAN.source.json` (`{"page": ..., "contract": ...}`). The
+template fixes the stylesheet, header, section order, ids, classes, and every shell's markup; a
+planning run only fills content:
+
+- `page`: `kicker`, `title`, `subtitle`, `target` (paragraphs), `float_budget`, `paper_title`,
+  `abstract`, and the ordered `blocks`: `h4`/`h5` headings, `paragraph` (id, plan, artifact_refs,
+  relation, mappings), `model_design`, `experiment_setup`, `result_table`, `figure`, `ledger`,
+  `approval`. The number of sections, paragraphs, tables, and figures is decided by the project.
+- `contract`: the experiment-plan contract JSON that validators read.
+
+Render with `python3 research_avatar/tools/render_experiment_plan.py --source reports/.build/03_EXPERIMENT_PLAN.source.json --output reports/03_EXPERIMENT_PLAN.html`.
+The renderer rejects empty slots and runs the structure validator before replacing the file.

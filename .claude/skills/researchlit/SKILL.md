@@ -32,9 +32,12 @@ metadata, then atomically replace the canonical file. Never migrate, translate,
 or repair the delivered HTML through local DOM/string edits.
 
 Arguments may specify topic, output path, 4–6 search angles, `— for: ideagen`,
-and an explicit target language/provider. If the topic is missing, ask for it
-or offer profile niche subfields. Profile personalization is optional and may
-bias angle selection, but the survey remains a field-neutral map.
+`— questions: personalized`, and an explicit target language/provider. If the
+topic is missing, propose 2–3 broad directions derived from the profile's
+Research Identity and Research Lineage (for example, “activation steering”) and
+let the researcher pick one, or ask for a topic. The profile only chooses the
+broad direction. Angles, searches, synthesis, and gaps stay field-neutral, so a
+personalized and a non-personalized run share the same survey.
 
 ## Verified search
 
@@ -42,7 +45,7 @@ Decompose the topic into distinct angles and search them in parallel to
 saturation. A useful broad survey commonly contains 30–60 papers, but coverage
 quality—not count—is the criterion.
 
-For every paper retrieve and verify title, arXiv ID or DOI, year, takeaway,
+For every paper retrieve and verify title, the complete author list (never "First Author et al."; the paper stage can cite only works with full authors), arXiv ID or DOI, year, takeaway,
 formal publication status, venue, and authoritative URL. Cross-check relevant
 official sources such as ACL Anthology, OpenReview, DBLP, publisher/venue pages,
 and DOI records. Use arXiv as a preprint fallback. Never infer missing metadata;
@@ -54,8 +57,7 @@ paper/family counts from these records; never type a count separately in prose.
 Before delivery, reopen every rendered paper URL and reject redirects to an
 unrelated work, title/identifier mismatches, placeholder hosts, and dead links.
 Record 4–6 structured search angles, each angle's normal and current/previous-
-year queries, and the gap-falsification queries and closest collision in the
-canonical source. Embed those canonical records once as `literature-verification` JSON. Render
+year queries, and the gap-falsification queries in the canonical source. Embed those canonical records once as `literature-verification` JSON. Render
 paper cards and families with matching `data-paper-id` and `data-family-id`;
 derive the visible counts from the arrays.
 
@@ -90,17 +92,20 @@ landscape synthesis.
 
 Write one self-contained, white-background HTML survey with direct verified
 links and exactly four reader-facing stages: **Problem → Approaches →
-Evaluation → Gaps**. This sequence is the handoff contract for downstream idea
+Evaluation → Research Questions**. This sequence is the handoff contract for downstream idea
 generation and experiment planning: define the problem before cataloging
 methods, compare evaluation protocols before inferring gaps, and keep gaps
-separate from mere absence of papers. Use a hero, sticky contents, taxonomy
-flow, thematic cards, landscape table, debates, and a
-verification footer. Address the researcher directly where appropriate. Reuse
-the existing canonical report's house-style CSS when available.
+separate from mere absence of papers. Keep the format plain and uniform: a one-paragraph Problem, collapsible
+Approaches and Evaluation families with nested sub-categories, and a short bullet
+list of research questions. No cards, tags, callouts, flow diagrams, or landscape table. Use
+the renderer's built-in stylesheet; never restyle.
 
 `Approaches` and `Evaluation` are synthesis taxonomies, not bibliographies.
-Group papers into a small number of explicit, decision-relevant families and
-compare work within each family. A sequence of one-paper cards or table rows
+Group papers into a small number of explicit, decision-relevant families, each
+split into 2–5 finer sub-categories (`families[].subfamilies`,
+`evaluation_regimes[].subregimes`) that together cover each paper exactly once.
+Write `problem.paragraph` as one paragraph and `directions` (the research questions) as 3–5 entries in the
+structured source; the renderer rejects anything else. Compare work within each family. A sequence of one-paper cards or table rows
 without category definitions, inclusion criteria, and cross-paper comparison
 does not satisfy the deliverable.
 
@@ -110,10 +115,42 @@ while rendering the report, translating it, or preparing the handoff. It
 contains the complete visual contract, fixed section structure, publication
 metadata rules, and translation failure conditions.
 
-## Explicit translation only
+## Research questions
 
-Translate only when the researcher explicitly requests a target language; the
-conversation language alone is not a translation request. Require
+The last section lists 3–5 research questions, the broad problems the field
+leaves open, each written as a short keyword title rather than a sentence. Store
+them as `directions`: `[{"id": "Q<k>", "title": "..."}]`. `title` is the only
+visible field: a short keyword phrase of at most six words that names the
+problem area, for example `Steering reliability` or `Multi-behavior steering`;
+not a question or a sentence, and with no explanation after it.
+
+A research question here names a broad problem area, not a project and not a
+pipeline stage or technical step (for example not `Context selection`,
+`Retrieval` or `Vector construction`): a step names where the answer lies and
+leaves room for one obvious idea. The questions must be mutually distinct: no two
+share the same central tension or could be answered by the same study. Do not name methods,
+theories, systems to compare, experimental designs, datasets, metrics, or
+expected results, and do not attach closest work or gap evidence: the
+questions sit on top of the survey's synthesis, and `/ideagen` reads the whole
+survey when it generates ideas for the chosen question.
+Choose questions that are clearly distinct from one another and that the
+survey evidence (families, failure boundaries, live debates, trends) supports.
+These neutral questions never read the profile.
+
+With `— questions: personalized`, also write `personalized_directions`: 2–4
+`{"id": "PQ<k>", "title", "anchor"}` entries drawn from the same
+evidence plus the profile's Research Identity, Research Lineage, and the
+researcher's past `research_question` values from the Idea pairs in
+`researcher-profile/profile_pairs.json`. `anchor` names the past paper or
+lineage turn the question continues. They are labeled separately and never
+replace the neutral questions.
+
+The researcher chooses one question at the start of `/ideagen`; this skill does
+not ask for the pick.
+
+## Translation
+
+To translate into a target language, require
 `provider: openai|deepseek`, then run:
 
 ```bash
@@ -132,12 +169,11 @@ glossary identity still match. Use the built-in academic glossary or pass a
 project JSON glossary with `--glossary`; never repair a partial translation by
 editing rendered DOM nodes. The translator writes each checkpoint batch and the
 completed HTML atomically, so the validated English staging file remains intact
-on failure. When the researcher does not explicitly request translation, do not
-call any translation API.
+on failure.
 
 ## Validation and handoff
 
-Run on the completed canonical English survey, before translation if requested
+Run on the completed canonical English survey, before translation if one is run
 and otherwise before returning:
 
 ```bash
@@ -145,7 +181,7 @@ python3 research_avatar/tools/validate_literature_report.py reports/01_LIT_SURVE
 python3 research_avatar/tools/validate_report_structure.py --kind literature --html reports/01_LIT_SURVEY.html
 ```
 
-Report the output path, paper/angle counts, and 2–4 key debates or gaps. With
-`— for: ideagen`, also return a compact landscape/gap summary for `/ideagen`;
-otherwise leave the survey standalone and optionally suggest ideation as the
-next step.
+Report the output path, paper/angle counts, and 2–4 key debates or gaps, and
+list the research questions by ID. With `— for: ideagen`, also return a compact
+landscape/gap summary for `/ideagen`; otherwise leave the survey standalone and
+optionally suggest ideation as the next step.

@@ -31,7 +31,9 @@ Read:
 - `researcher-profile/PROFILE.html`;
 - `researcher-profile/publications.json`;
 - the explicit idea, otherwise the `SELECTED` idea in
-  `reports/02_IDEA_REPORT.html`.
+  `reports/02_IDEA_REPORT.html`, including its generated research focus,
+  method and validation (the `idea-generation` record). The idea's method is
+  the source of the projected paper's Method section.
 
 If profile records are missing, stop for `/profileconstruct`. If an idea report
 exists without a selected idea, ask the researcher; never guess. A complete
@@ -58,6 +60,8 @@ Stop for explicit confirmation at each gate. Read these detailed procedures only
 
 ## Reference paper and paragraph alignment
 
+Cite each selected baseline and evaluation protocol through its verified source URL: the paper stage matches that URL to the verified literature survey's bibliography key automatically, so no BibTeX key needs to be typed in the plan.
+
 Use exactly one researcher-authored reference paper with a verified Code Agent
 transcript. It controls argumentative moves and paragraph transitions, not the
 new paper's scientific content. Map every target paragraph to one or more
@@ -81,11 +85,12 @@ while defining Claims, metrics, protocols, evidence sources, and outcome gates.
 
 Design the complete target paper inside `03`: title, projected abstract, every
 section/subsection and paragraph, reference-aligned rhetorical moves,
-reproduction-grade Method design, compact Experimental Setup, inline result
+the selected idea's method as the Method section, compact Experimental Setup, inline result
 shells, artifact ledger, and a page-fill contract. The visible report remains
 paper-shaped; machine registries stay in the embedded contract.
 
-Use one authoritative symbol registry and one model-design specification.
+Use one authoritative symbol registry; the Method section shows the selected
+idea's method verbatim instead of a model-design table.
 Conceptual figures remain count-only at this stage, with an explicit
 `figure_type`; every empirical table cell or plotted value has exactly one
 result requirement. Discussion paragraphs bind the exact result artifact they
@@ -93,7 +98,7 @@ interpret. Scope the evidence so the planned paper can honestly fill the venue
 limit without duplicate or scientifically empty experiments.
 
 Read [`references/projected-paper.md`](references/projected-paper.md) while
-building the paragraph architecture and model design. Read
+building the paragraph architecture and the Method section. Read
 [`references/artifact-shells.md`](references/artifact-shells.md) only while
 defining figures, tables, source cells, and fixtures. Read
 [`references/page-fill-and-contract.md`](references/page-fill-and-contract.md)
