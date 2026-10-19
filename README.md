@@ -8,28 +8,27 @@ Research Avatar gives experienced researchers personalized assistance that speed
 
 | | Common open-source AutoResearch | Research Avatar |
 |---|---|---|
-| 🧑‍🔬 **Human-agent roles** | End-to-end automated exploration | You approve the global plan before automatic execution |
 | 💡 **Idea generation** | Generic brainstorming from a topic | Ideas tailored to your profile and the field map |
-| 🧪 **Experiment organization** | Search and execution from a task objective | Verifiable goals executed through your coding agent's `/goal`, improving as the agent does; every number traceable |
-| ✍️ **Paper output** | Automatic synthesis of intermediate results | Writing adapted to your personal style |
+| 🧪 **Experiment organization** | Search and execution from a task objective | A projected paper plans the experiments first, then each goal runs through your coding agent's `/goal`; every number traceable |
+| ✍️ **Paper output** | Automatic synthesis of intermediate results | Structure and writing adapted to your personal style |
 
 ---
 
 ## See it in action
 
-**1. Researcher profile.** Your research lineage and current frontier are extracted from your own publications, and every later stage builds on them.
+**1. Researcher profile.** Built from your own publications, in four sections: 1. Research Identity, 2. Research Lineage, 3. Idea Profile, 4. Writing Profile. Every later stage builds on them.
 
 ![Research lineage extracted from the researcher's publications](docs/images/real-1-profile.png)
 
-**2. Idea selection.** Each candidate is screened against the closest published work, with a concrete difference, the strongest objection, and a confidence level; you make the final choice.
+**2. Idea selection.** A literature survey proposes several research questions and you pick one. From that question and your Idea Profile, several personalized ideas are generated; each is shown against the closest published work, with a concrete difference, the strongest objection, and a confidence level, and you make the final choice.
 
 ![Decision slate with linked closest work](docs/images/real-3-ideas.png)
 
-**3. Experiment plan.** Every projected figure comes with the source table that experiments must fill; no value is shown until it is measured.
+**3. Experiment plan.** A projected paper is planned first: its sections, figures and tables decide which experiments the paper needs and how many. The plan is then split into verifiable goals that your coding agent runs one by one with `/goal`. Every projected figure comes with the source table that experiments must fill; no value is shown until it is measured.
 
 ![Projected figure and its pending source table](docs/images/real-4-experiment-plan.png)
 
-**4. Paper writing.** Draft paragraph by paragraph, with the writing plan matched from the reference paper beside each paragraph and a live LaTeX PDF on the right.
+**4. Paper writing.** Each paragraph is drafted from your reference paper, which sets its structure and argument, and your Writing Profile, which sets the style. The matched writing plan sits beside each paragraph and a live LaTeX PDF on the right.
 
 ![Paper Studio writing workspace](docs/images/real-paper-writing.png)
 
@@ -37,14 +36,12 @@ Research Avatar gives experienced researchers personalized assistance that speed
 
 ## Tutorial
 
-**1. Prepare your inputs.** Save the complete HTML of a Google Scholar profile. You may use your own page, or that of a researcher whose research taste and paper organization you want to study. Paper writing also needs an LLM API key; set the one for your provider in a local terminal:
+**1. Prepare your inputs.** Save the complete HTML of a Google Scholar profile. You may use your own page, or that of a researcher whose research taste and paper organization you want to study. Paper writing needs one API key, DeepSeek by default; set it in a local terminal:
 
 ```bash
-# Required for OpenAI
-export OPENAI_API_KEY="your API key"
-
-# Required for DeepSeek
 export DEEPSEEK_API_KEY="your API key"
+# or, to write with OpenAI instead:
+# export OPENAI_API_KEY="your API key"
 ```
 
 **2. Build your profile.** In a coding agent, run:
@@ -74,16 +71,16 @@ The authoritative personalization artifact is:
 researcher-profile/PROFILE.html
 ```
 
-`$profileconstruct` reads the researcher's Google Scholar publication list and uses available coding-agent history to extract experimental environments and working habits.
+`$profileconstruct` reads the researcher's Google Scholar publication list and the verified full texts of their papers. For the 8 most recent first- or last-author papers, a model rewrites the idea, abstract and introduction from the same inputs, and the differences between the author's version and the model's version are recorded in `profile_pairs.json`.
 
-The profile contains:
+The profile contains four sections:
 
-- **Research Identity / Lineage:** research identity and the development of research themes;
-- **Writing Style:** abstract-level argument structure, method naming, and contribution framing, plus document-level section organization and figure/table conventions;
-- **Experiment Templates:** common launchers, training frameworks, base models, GPU configurations, and historical out-of-memory records;
-- **Workflow Preferences:** habits such as starting with low-cost steps, caching intermediate results, and making experiments resumable.
+- **Research Identity:** who the researcher is and the problems they work on;
+- **Research Lineage:** how their research themes developed over the years;
+- **Idea Profile:** how the author's ideas differ from what a model proposes for the same question;
+- **Writing Profile:** separate Abstract and Introduction profiles from the paired comparisons, then profiles for the other section types found in their papers.
 
-The researcher chooses the Scholar profile. Local working habits still come from the current user.
+The researcher chooses the Scholar profile; it can be their own or that of a researcher they want to learn from.
 
 ### Experiments
 
@@ -95,7 +92,7 @@ The researcher chooses the Scholar profile. Local working habits still come from
 
 1. **Two drafting modes.** Use the approved Experiment Planning architecture to generate a complete first draft or draft one paragraph at a time.
 2. **Interactive paper workspace.** Generate and edit paragraphs, inspect reference structure and vector PDF previews, and write to LaTeX transactionally only after explicit acceptance.
-3. **Personalized writing style.** Follow the target venue, the researcher's Writing Style, and document-level citation and logic checks.
+3. **Personalized structure and style.** Each paragraph follows the matched paragraph of the researcher's reference paper for structure and argument and the Writing Profile for style, plus the target venue and document-level citation and logic checks.
 4. **Publication-ready figure prompts.** Design a composition and convert it into editable PowerPoint and PDF artifacts.
 5. **Real experimental figures and tables.** Read only traceable data under `results/`.
 
@@ -107,9 +104,9 @@ The researcher chooses the Scholar profile. Local working habits still come from
 
 | Skill | Purpose |
 |---|---|
-| `$profileconstruct` | Create or refresh the researcher profile from Google Scholar and available session history |
+| `$profileconstruct` | Create or refresh the researcher profile from a Google Scholar export and the papers' verified full texts |
 | `$researchlit "research topic"` | Retrieve and verify literature from several angles and create a structured survey |
-| `$ideagen` | Generate ideas tailored to your profile (research lineage, past publications) and the literature field map, then verify novelty |
+| `$ideagen` | Generate personalized ideas from the chosen research question and your Idea Profile, then verify novelty against the closest work |
 | `$expplan` | Plan the Projected Paper paragraph by paragraph and derive its experimental contracts |
 | `$runplan` | Decompose the experiment into dependency-ordered executable goals |
 
