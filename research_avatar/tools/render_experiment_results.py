@@ -33,6 +33,15 @@ PROVENANCE_SCRIPT = "\nconst records=JSON.parse(document.getElementById('result-
 INLINE_TAGS = {"strong", "b", "em", "i", "code", "a", "span", "br"}
 
 
+def banner_html(page: dict) -> str:
+    """Optional visible banner (e.g. demo/reported data); omitted when the slot is empty."""
+    text = str(page.get("banner") or "").strip()
+    if not text:
+        return ""
+    return (f'<div class="report-banner" role="note" style="margin:0 0 14px;padding:10px 14px;border:2px solid #9a6511;'
+            f'border-radius:8px;background:#fff4df;color:#5b3a06;font-weight:800">{esc(text)}</div>')
+
+
 def esc(value: object) -> str:
     return html.escape(str(value), quote=True)
 
@@ -88,7 +97,7 @@ def render(page: dict, provenance: dict) -> str:
     payload = json.dumps(provenance, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>Experiment Results · {esc(page["name"])}</title><style>{STYLE}</style></head><body>'
-            f'<header><div class="muted">{esc(page["kicker"])}</div><h1>{esc(page["title"])}</h1><p>{esc(page["subtitle"])}</p></header><main>\n'
+            f'<header>{banner_html(page)}<div class="muted">{esc(page["kicker"])}</div><h1>{esc(page["title"])}</h1><p>{esc(page["subtitle"])}</p></header><main>\n'
             f'<section data-report-section="artifact-completion"><h2>1. Artifact Completion</h2>{cards}</section>\n'
             f'<section data-report-section="paper-artifacts"><h2>2. Paper Tables and Figures</h2>{artifacts}</section>\n'
             f'<section data-report-section="generation-process"><h2>3. generation process</h2><details id="result-provenance-index"><summary>Commands, files, calculations, and verification</summary>{audit}</details></section>\n'

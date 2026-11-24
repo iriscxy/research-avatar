@@ -33,6 +33,15 @@ STYLE = with_theme(BASE_STYLE, "runplan")
 INLINE_TAGS = {"strong", "b", "em", "i", "code", "a", "span", "br"}
 
 
+def banner_html(page: dict) -> str:
+    """Optional visible banner (e.g. demo/reported data); omitted when the slot is empty."""
+    text = str(page.get("banner") or "").strip()
+    if not text:
+        return ""
+    return (f'<div class="report-banner" role="note" style="margin:0 0 14px;padding:10px 14px;border:2px solid #9a6511;'
+            f'border-radius:8px;background:#fff4df;color:#5b3a06;font-weight:800">{esc(text)}</div>')
+
+
 def esc(value: object) -> str:
     return html.escape(str(value), quote=True)
 
@@ -81,7 +90,7 @@ def render(page: dict, state: dict) -> str:
     payload = json.dumps(state, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>Run Plan · {esc(page["name"])}</title><style>{STYLE}</style></head><body>'
-            f'<header><div class="muted">{esc(page["kicker"])}</div><h1>{esc(page["title"])}</h1><p>{esc(page["subtitle"])}</p></header><main>\n'
+            f'<header>{banner_html(page)}<div class="muted">{esc(page["kicker"])}</div><h1>{esc(page["title"])}</h1><p>{esc(page["subtitle"])}</p></header><main>\n'
             f'<section data-report-section="execution-estimate"><h2>1. Execution Estimate</h2>{estimate}</section>\n'
             f'<section data-report-section="implementation-sources"><h2>2. Implementation Sources</h2>{sources}</section>\n'
             f'<section data-report-section="artifact-coverage"><h2>3. Figure/Table Coverage</h2>{coverage}</section>\n'

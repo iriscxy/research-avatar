@@ -28,7 +28,11 @@ h2{margin:44px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--accent);f
 .lead,.callout{padding:12px 16px;border-left:4px solid var(--accent);background:var(--soft);border-radius:5px}.warning{border-color:var(--accent2);background:var(--warn)}
 .cards{display:grid;grid-template-columns:1fr;gap:12px}.card{border:1px solid var(--line);border-radius:10px;background:var(--card);padding:0}.card-details>summary{cursor:pointer;list-style:none;position:relative;padding:14px 40px 14px 18px}.card-details>summary::-webkit-details-marker{display:none}
 .card-details>summary::after{content:'\\25B8';position:absolute;right:16px;top:14px;color:var(--accent2);font-size:18px;transition:transform .15s}.card-details[open]>summary::after{transform:rotate(90deg)}
-.card h3{margin:.2em 0 .4em;color:var(--accent)}.eyebrow{color:var(--accent2);font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.badge{display:inline-block;margin-right:6px;padding:2px 9px;border-radius:999px;background:var(--soft);color:var(--accent);font-weight:700;font-size:.78rem}.blocked{background:#fbe9e4;color:#9a3e3e}
+.card h3{margin:.2em 0 .4em;color:var(--accent)}
+.card.idea{padding:18px 22px 6px}.card.idea[data-selected="true"]{border-color:var(--accent);box-shadow:inset 4px 0 0 var(--accent)}
+.idea-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;padding-bottom:12px;border-bottom:1px solid var(--line)}.idea-head h3{flex:1;margin:0;font:700 1.15rem/1.35 Georgia,serif}
+.idea-id{flex:none;min-width:34px;padding:2px 8px;border-radius:6px;background:var(--accent);color:#fff;font-weight:800;font-size:.85rem;line-height:1.5;text-align:center}
+.idea-tag{flex:none;margin-top:2px;padding:1px 9px;border:1px solid var(--accent);border-radius:999px;color:var(--accent);font-weight:700;font-size:.75rem}.eyebrow{color:var(--accent2);font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}.badge{display:inline-block;margin-right:6px;padding:2px 9px;border-radius:999px;background:var(--soft);color:var(--accent);font-weight:700;font-size:.78rem}.blocked{background:#fbe9e4;color:#9a3e3e}
 .card-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);column-gap:30px;margin:0 18px;padding:12px 0 16px;border-top:1px solid var(--line)}.card-body>.col{grid-column:1}.card-body>dl{grid-column:2;grid-row:1/span 6;margin:0;align-self:start}
 .card dl{display:grid;grid-template-columns:130px 1fr;gap:7px 14px}.card dt{font-weight:700;color:var(--muted)}.card dd{margin:0}
 table{width:100%;table-layout:auto;border-collapse:collapse;margin:14px 0;font-size:.82rem;line-height:1.45;background:var(--card)}td{overflow-wrap:break-word;hyphens:manual}table.slate th:nth-child(-n+2),table.slate td:nth-child(-n+2),table.slate th:last-child,table.slate td:last-child{white-space:nowrap}table.slate th,table.slate td{padding:9px 6px}table.slate th{font-size:.76rem}table.slate th:nth-child(3){width:21%}table.slate th:nth-child(5){width:15%}table.slate th:nth-child(6),table.slate th:nth-child(7){width:22%}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:var(--soft)}
@@ -64,9 +68,11 @@ def card(candidate: dict, selected_id: str = "") -> str:
     question_html = (
         f'<p data-candidate-question="true"><b>Sub-question.</b> {esc(question["question"])}</p>' if question else ""
     )
+    selected_tag = '<span class="idea-tag">Selected</span>' if candidate["id"] == selected_id else ""
     return (
-        f'<article class="card" id="idea-{esc(candidate["id"])}"{attrs}><div class="eyebrow">{esc(candidate["id"])}</div>'
-        f'<h3>{esc(output["title"])}</h3>{question_html}'
+        f'<article class="card idea" id="idea-{esc(candidate["id"])}"{attrs}>'
+        f'<div class="idea-head"><span class="idea-id">{esc(candidate["id"])}</span>'
+        f'<h3>{esc(output["title"])}</h3>{selected_tag}</div>{question_html}'
         f'<p><b>Research focus.</b> {esc(output["research_focus"])}</p>'
         f'<p><b>Method.</b> {esc(output["method"])}</p>'
         f'<p><b>Validation.</b> {esc(output["validation"])}</p></article>'
@@ -103,7 +109,8 @@ def render(model: dict) -> str:
     )
     has_tier_a = any(c["tier"] == "A" and c["selectable"] for c in model["candidates"])
     if has_tier_a:
-        ranking_callout = f'<div class="callout"><b>Ranking note.</b><p>{esc(model["ranking_note"])}</p></div>'
+        ranking_callout = (f'<div class="callout"><b>Ranking note.</b><p>{esc(model["ranking_note"])}</p></div>'
+                           if model.get("ranking_note") else "")
     else:
         ranking_callout = f'<div class="callout warning"><b>No high-confidence novel recommendation.</b><p>{esc(model["ranking_note"])}</p></div>'
     selection = model.get("selection") or {}

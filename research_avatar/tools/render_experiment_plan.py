@@ -115,23 +115,33 @@ def figure_html(b: dict) -> str:
     colors = ["#c46b43", "#6b71b8", "#087f70", "#9a6511"]
     left, right, top, bottom = 56, 400, 24, 200
     n = len(b["rows"])
+    # Long category labels are rotated so they never overlap; the axis title and legend move down with them.
+    longest = max((len(str(r["label"])) for r in b["rows"]), default=0)
+    rotate = longest * 5.8 > (right - left) / max(n, 1)
+    dy = int(longest * 5.8 * 0.5) if rotate else 0
+    if rotate:
+        left = max(left, int(longest * 5.8 * 0.87) - 10)
     levels = pv.get("levels") or [[0.86 - 0.08 * si - 0.38 * k / max(n - 1, 1) for k in range(n)] for si in range(len(series))]
     xs = [left + (right - left) * (k + 0.5) / n for k in range(n)]
     parts = [f'<line stroke="#61747c" x1="{left}" x2="{right}" y1="{bottom}" y2="{bottom}"></line>',
              f'<line stroke="#61747c" x1="{left}" x2="{left}" y1="{top}" y2="{bottom}"></line>']
     for k, row in enumerate(b["rows"]):
-        parts.append(f'<text font-size="11" text-anchor="middle" x="{xs[k]:.1f}" y="{bottom + 16}">{esc(row["label"])}</text>')
+        if rotate:
+            parts.append(f'<text font-size="11" text-anchor="end" x="{xs[k]:.1f}" y="{bottom + 14}" '
+                         f'transform="rotate(-30 {xs[k]:.1f} {bottom + 14})">{esc(row["label"])}</text>')
+        else:
+            parts.append(f'<text font-size="11" text-anchor="middle" x="{xs[k]:.1f}" y="{bottom + 16}">{esc(row["label"])}</text>')
     for si, name in enumerate(series):
         pts = [(xs[k], top + (bottom - top) * (1 - levels[si][k])) for k in range(n)]
         parts.append(f'<polyline fill="none" stroke="{colors[si]}" stroke-dasharray="6 5" stroke-width="2" points="{" ".join(f"{x:.1f},{y:.1f}" for x, y in pts)}"></polyline>')
         for k, (x, y) in enumerate(pts):
             parts.append(f'<circle class="plot-mark" cx="{x:.1f}" cy="{y:.1f}" r="4.5" fill="#fff" stroke="{colors[si]}" stroke-width="2" data-target-id="{esc(b["rows"][k]["target_ids"][si])}"></circle>')
-        lx = left + 8 + si * 118
-        parts.append(f'<circle cx="{lx}" cy="{bottom + 44}" r="4.5" fill="#fff" stroke="{colors[si]}" stroke-width="2"></circle><text font-size="11" x="{lx + 9}" y="{bottom + 48}">{esc(name)}</text>')
-    parts.append(f'<text font-size="12" text-anchor="middle" x="{(left + right) / 2:.0f}" y="{bottom + 30}">{esc(pv["x_label"])}</text>')
+        lx = 64 + si * 118
+        parts.append(f'<circle cx="{lx}" cy="{bottom + 44 + dy}" r="4.5" fill="#fff" stroke="{colors[si]}" stroke-width="2"></circle><text font-size="11" x="{lx + 9}" y="{bottom + 48 + dy}">{esc(name)}</text>')
+    parts.append(f'<text font-size="12" text-anchor="middle" x="{(left + right) / 2:.0f}" y="{bottom + 30 + dy}">{esc(pv["x_label"])}</text>')
     parts.append(f'<text font-size="12" text-anchor="middle" transform="translate(14 {(top + bottom) / 2:.0f}) rotate(-90)">{esc(pv["y_label"])}</text>')
     parts.append(f'<text fill="#61747c" font-size="11" text-anchor="middle" x="{(left + right) / 2:.0f}" y="14">{esc(pv["caption"])}</text>')
-    svg = f'<svg aria-label="{esc(pv["aria"])}" role="img" viewBox="0 0 420 262">' + "".join(parts) + "</svg>"
+    svg = f'<svg aria-label="{esc(pv["aria"])}" role="img" viewBox="0 0 420 {262 + dy}">' + "".join(parts) + "</svg>"
     return (f'<div class="shell projected-figure"><div class="shell-title">{esc(b["id"])} · {esc(b["title"])}</div>'
             f'<p><b>PROJECTED SHAPE — NOT RESULTS.</b> The preview communicates chart geometry only and contains no experimental value.</p>'
             f'<section class="panel-pair" data-artifact-id="{esc(b["id"])}"><div class="required-data figure-source-data"><b>Source data table</b>'

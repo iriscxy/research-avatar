@@ -52,24 +52,31 @@ def table_tex(art: dict, span: str, caption: str) -> str:
     head = " & ".join(r"\textbf{%s}" % tex(h) for h in art["head"])
     rows = "".join(f"{tex(r['label'])} & " + " & ".join(r"\textcolor{orange!80!black}{[PENDING]}" for _ in r["target_ids"]) + r" \\" + "\n" for r in art["rows"])
     spec = "l" + "r" * (cols - 1)
-    return (f"\\begin{{{env}}}[t]\n\\centering\\footnotesize\n\\resizebox{{\\linewidth}}{{!}}{{\\begin{{tabular}}{{{spec}}}\n\\toprule\n{head} \\\\\n\\midrule\n{rows}\\bottomrule\n\\end{{tabular}}}}\n"
+    return (f"\\begin{{{env}}}[t]\n\\centering\\footnotesize\n\\resizebox{{\\ifdim\\width>\\linewidth\\linewidth\\else\\width\\fi}}{{!}}{{\\begin{{tabular}}{{{spec}}}\n\\toprule\n{head} \\\\\n\\midrule\n{rows}\\bottomrule\n\\end{{tabular}}}}\n"
             f"\\caption{{{tex(caption)} \\textbf{{[PROJECTED, all values pending]}}}}\n\\end{{{env}}}\n")
 
 
 def figure_tex(art: dict, shell: dict, caption: str) -> str:
     series, rows = art["head"][1:], art["rows"]
     n = len(rows)
-    lines = [r"\begin{figure}[t]", r"\centering", r"\begin{tikzpicture}[x=0.9cm,y=2.1cm,font=\scriptsize]", rf"\draw[->] (0,0) -- ({n + 0.3},0); \draw[->] (0,0) -- (0,1.15);"]
+    # Fit the x axis to the column; with many rows, label only every step-th one, rotated.
+    unit = min(0.9, 4.2 / (n + 0.6))
+    step = max(1, -(-n // 8))
+    lines = [r"\begin{figure}[t]", r"\centering", rf"\begin{{tikzpicture}}[x={unit:.3f}cm,y=2.1cm,font=\scriptsize]", rf"\draw[->] (0,0) -- ({n + 0.3},0); \draw[->] (0,0) -- (0,1.15);"]
     for k, row in enumerate(rows):
-        lines.append(rf"\node[below] at ({k + 0.7},0) {{{tex(row['label'])}}};")
+        if k % step == 0:
+            label = tex(row["label"]) if len(row["label"]) <= 14 else tex(row["label"][:13]) + "."
+            lines.append(rf"\node[below left,rotate=35,inner sep=1pt,font=\tiny] at ({k + 0.7},0) {{{label}}};")
+    # A preview without projected levels draws evenly spaced flat series: geometry only, never a result.
+    levels = shell.get("levels") or [[0.25 + 0.6 * si / max(len(series), 1)] * n for si in range(len(series))]
     for si, name in enumerate(series):
-        pts = [(k + 0.7, shell["levels"][si][k]) for k in range(n)]
+        pts = [(k + 0.7, levels[si][k]) for k in range(n)]
         lines.append(rf"\draw[{COLORS[si]},dashed,thick] " + " -- ".join(f"({x:.2f},{y:.2f})" for x, y in pts) + ";")
         for x, y in pts:
             lines.append(rf"\filldraw[fill=white,draw={COLORS[si]},thick] ({x:.2f},{y:.2f}) circle (0.07cm);")
-        lines.append(rf"\node[anchor=west,{COLORS[si]}] at ({n + 0.4},{1.0 - 0.18 * si}) {{{tex(name)}}};")
-    lines += [rf"\node[below] at ({(n + 0.3) / 2:.2f},-0.28) {{{tex(shell['x_label'])}}};", rf"\node[rotate=90] at (-0.55,0.55) {{{tex(shell['y_label'])}}};",
-              rf"\node[gray] at ({(n + 0.3) / 2:.2f},1.28) {{PROJECTED SHAPE --- NOT RESULTS}};", r"\end{tikzpicture}",
+        lines.append(rf"\node[anchor=south west,{COLORS[si]},font=\tiny] at (0.1,{1.30 + 0.12 * si}) {{{tex(name)}}};")
+    lines += [rf"\node[below] at ({(n + 0.3) / 2:.2f},-0.42) {{{tex(shell['x_label'])}}};", rf"\node[rotate=90] at (-0.55,0.55) {{{tex(shell['y_label'])}}};",
+              rf"\node[gray,font=\tiny] at ({(n + 0.3) / 2:.2f},1.18) {{PROJECTED SHAPE --- NOT RESULTS}};", r"\end{tikzpicture}",
               f"\\caption{{{tex(caption)} \\textbf{{[PROJECTED, values pending]}}}}", r"\end{figure}"]
     return "\n".join(lines) + "\n"
 
@@ -80,7 +87,12 @@ def count_only_figure(art: dict) -> str:
             + label + "}}}\n\\caption{" + label + " \\textbf{[PROJECTED, to be designed when writing]}}\n\\end{figure}\n")
 
 
-def build(source: Path, out_dir: Path, scale: float = 1.0) -> Path:
+def is_neurips(contract: dict) -> bool:
+    """NeurIPS targets use the official single-column style; every other venue keeps the ACL two-column layout."""
+    return "neurips" in str(contract.get("target", {}).get("venue", "")).lower()
+
+
+def build(source: Path, out_dir: Path, scale: float = 1.0, body_only: bool = False) -> Path:
     data = json.loads(source.read_text(encoding="utf-8"))
     page, contract = data["page"], data["contract"]
     shells = {a["id"]: a for a in page["artifacts"]}
@@ -95,15 +107,20 @@ def build(source: Path, out_dir: Path, scale: float = 1.0) -> Path:
             paragraph_words[para["id"]] = contract_shares[sec_c["id"]] * 1000 / n * scale
     seed = 0
     for section in page["outline"]:
-        title = section["title"]
+        title = re.sub(r"^\d+(\.\d+)*\s+", "", section["title"])
         if title == "Abstract":
             continue
+        if title == "Appendix":
+            # The page budget covers the body only; appendix floats must not count toward it.
+            if body_only:
+                break
+            body.append("\\FloatBarrier\n\\clearpage\n")
         body.append(f"\\section{{{tex(title)}}}\n")
         for para in section["paragraphs"]:
             seed += 1
             if para["heading"]:
                 body.append(f"\\subsection{{{tex(para['heading'])}}}\n")
-            cites = (3 if section["title"] == "Introduction" and para["id"] in {"I-P1", "I-P2", "I-P3"} else 8 if section["title"] == "Related Work" else 0)
+            cites = (3 if title == "Introduction" and para["id"] in {"I-P1", "I-P2", "I-P3"} else 8 if title == "Related Work" else 0)
             marks = " ".join(f"(Surname et al., 2025)" for _ in range(cites))
             body.append(f"\\textbf{{[{tex(para['id'])}]}} \\textcolor{{gray}}{{{filler(round(paragraph_words[para['id']]), seed)} {marks}}}\n")
             for ref in para["artifact_refs"]:
@@ -115,7 +132,9 @@ def build(source: Path, out_dir: Path, scale: float = 1.0) -> Path:
     # A Jinghui-generated abstract is already LaTeX; use it as returned instead of escaping it.
     generated = (contract.get("abstract_generation") or {}).get("output")
     abstract_tex = generated if generated else tex(page["abstract"])
-    doc = ("\\documentclass[11pt]{article}\n\\usepackage[review]{acl}\n\\usepackage{times}\n\\usepackage{latexsym}\n\\usepackage[T1]{fontenc}\n\\usepackage[utf8]{inputenc}\n"
+    preamble = ("\\documentclass{article}\n\\usepackage{neurips_2026}\n" if is_neurips(contract)
+                else "\\documentclass[11pt]{article}\n\\usepackage[review]{acl}\n\\usepackage{times}\n\\usepackage{latexsym}\n")
+    doc = (preamble + "\\usepackage[T1]{fontenc}\n\\usepackage[utf8]{inputenc}\n"
            "\\usepackage{microtype,graphicx,booktabs,xcolor,tikz,flafter,placeins}\n\\usepackage{xurl}\n"
            f"\\title{{{tex(page['paper_title'])}}}\n\\author{{Anonymous Author(s)}}\n\\date{{}}\n\\begin{{document}}\n\\maketitle\n"
            f"\\begin{{abstract}}\n\\textbf{{[PROJECTED]}} {abstract_tex}\n\\end{{abstract}}\n" + "\n".join(body) + "\n\\FloatBarrier\n\\end{document}\n")
@@ -125,8 +144,10 @@ def build(source: Path, out_dir: Path, scale: float = 1.0) -> Path:
         if sec_c["id"] != "abstract":
             section_words[sec_c["id"].replace("-", "_")] = round(contract_shares[sec_c["id"]] * 1000 / max(len(sec["paragraphs"]), 1) * scale * WRITTEN_PROSE_CALIBRATION)
     (out_dir / "budget.json").write_text(json.dumps({"scale": round(scale, 4), "paragraph_words": {k: round(v) for k, v in paragraph_words.items()}, "section_words": section_words, "abstract_words": len(re.sub(r"<[^>]+>", "", page["abstract"]).split())}, indent=1), encoding="utf-8")
-    shutil.copy(ROOT / "paper" / "acl.sty", out_dir / "acl.sty")
-    shutil.copy(ROOT / "paper" / "acl_natbib.bst", out_dir / "acl_natbib.bst")
+    for stale in ("acl.sty", "acl_natbib.bst", "neurips_2026.sty"):
+        (out_dir / stale).unlink(missing_ok=True)
+    for style in (["neurips_2026.sty"] if is_neurips(contract) else ["acl.sty", "acl_natbib.bst"]):
+        shutil.copy(ROOT / "paper" / style, out_dir / style)
     (out_dir / "main.tex").write_text(doc, encoding="utf-8")
     return out_dir / "main.tex"
 
@@ -140,7 +161,7 @@ def compile_pdf(tex_path: Path, out_dir: Path) -> bool:
     return True
 
 
-def effective_pages(out_dir: Path) -> float:
+def effective_pages(out_dir: Path, columns: int = 2) -> float:
     """Pages used by the body: full pages plus the filled share of the last page (two columns)."""
     from PIL import Image
     import numpy as np
@@ -160,7 +181,7 @@ def effective_pages(out_dir: Path) -> float:
         return (rows.max() + 1) / (bottom - top) if len(rows) else 0.0
 
     last = arrays[-1]
-    fill = (column_bottom(last, 0) + column_bottom(last, 1)) / 2
+    fill = (column_bottom(last, 0) + column_bottom(last, 1)) / 2 if columns == 2 else max(column_bottom(last, 0), column_bottom(last, 1))
     return len(arrays) - 1 + fill
 
 
@@ -172,17 +193,19 @@ def main() -> int:
     parser.add_argument("--fill", type=float, default=0.95, help="Planned fill of the last body page")
     args = parser.parse_args()
     goal = args.target_pages - 1 + args.fill
-    lo, hi = 0.2, 4.0
+    lo, hi = 0.2, max(4.0, args.target_pages)
     scale = 1.0
     for _ in range(9):
-        tex_path = build(args.source, args.out_dir, scale)
+        tex_path = build(args.source, args.out_dir, scale, body_only=True)
         if not compile_pdf(tex_path, args.out_dir):
             return 1
-        used = effective_pages(args.out_dir)
+        used = effective_pages(args.out_dir, 1 if is_neurips(json.loads(args.source.read_text(encoding="utf-8"))["contract"]) else 2)
         if abs(used - goal) < 0.02:
             break
         lo, hi = (scale, hi) if used < goal else (lo, scale)
         scale = (lo + hi) / 2
+    if not compile_pdf(build(args.source, args.out_dir, scale), args.out_dir):
+        return 1
     for old in args.out_dir.glob("page-*.png"):
         old.unlink()
     subprocess.run(["pdftoppm", "-r", "110", "-png", "main.pdf", "page"], cwd=args.out_dir, check=True)

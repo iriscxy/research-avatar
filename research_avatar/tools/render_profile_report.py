@@ -13,6 +13,7 @@ import argparse
 import html
 import json
 import os
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -76,6 +77,16 @@ def para(text: str) -> str:
     return f"<p>{inline(text)}</p>"
 
 
+def labeled(text: str) -> str:
+    """Lead sentence as a paragraph, then one list item per <strong>Label:</strong> dimension."""
+    parts = re.split(r"(?=<strong>[^<]{1,60}:</strong>)", str(text))
+    lead, items = parts[0].strip(), [p.strip() for p in parts[1:] if p.strip()]
+    if len(items) < 2:
+        return para(text)
+    return (para(lead) if lead else "") + '<ul class="profile-dimensions">' + "".join(
+        f"<li>{inline(item)}</li>" for item in items) + "</ul>"
+
+
 def check(model: dict) -> list[str]:
     errors = [f"unknown top-level slot: {k}" for k in model if k not in TOP_LEVEL]
     for key in ("name", "refreshed", "stats", "writing_style_papers", "identity", "lineage",
@@ -132,7 +143,7 @@ def render(model: dict) -> str:
     )
     lineage = '<div class="timeline">' + "".join(
         f'<article><h3>{esc(e["year"])} · {esc(e["title"])}</h3><p>{inline(e["text"])}</p></article>' for e in model["lineage"]) + "</div>"
-    idea = f'<article data-research-profile="idea">{para(model["idea_profile"])}</article>'
+    idea = f'<article data-research-profile="idea">{labeled(model["idea_profile"])}</article>'
     section_profiles = "".join(
         '<article data-writing-profile="section" '
         f'data-organization="{esc(item["organization"])}" '
@@ -145,10 +156,10 @@ def render(model: dict) -> str:
     writing = (
         "<h3>Abstract</h3>"
         '<article data-writing-profile="abstract" data-organization="Abstract" data-section-names="Abstract">'
-        f"<p>{inline(wr['abstract_profile'])}</p></article>"
+        f"{labeled(wr['abstract_profile'])}</article>"
         "<h3>Introduction</h3>"
         '<article data-writing-profile="introduction" data-organization="Introduction" data-section-names="Introduction">'
-        f"<p>{inline(wr['introduction_profile'])}</p></article>"
+        f"{labeled(wr['introduction_profile'])}</article>"
         f"{section_profiles}"
     )
     contents = dict(zip((sid for sid, _, _ in SECTIONS), (identity, lineage, idea, writing)))
