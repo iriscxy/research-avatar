@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-avatar"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+  "beautifulsoup4>=4.15,<5",
+  "google-auth>=2.40,<3",
+  "matplotlib>=3.9,<4",
+  "openai>=3.1,<4",
+  "Pillow>=12.3,<13",
+  "python-pptx>=1.0,<2",
+  "requests>=2.32,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "playwright>=1.50,<2",
+  "PyYAML>=6,<7",
+]
+
+[project.scripts]
+research-avatar = "research_avatar.tools.research_buddy_cli:main"
+# Compatibility alias for clones/scripts created before the project rename.
+research-buddy = "research_avatar.tools.research_buddy_cli:main"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["research_avatar*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+"research_avatar.paper_studio" = ["static/*", "*.mjs", "README.md"]
+"research_avatar.online_studio" = [
+  "static/*",
+  "README.md",
+  "demo_project/reports/*.html",
+  "demo_project/researcher-profile/*.html",
+  "demo_project/researcher-profile/*.json",
+  "demo_project/paper/.outline-approved",
+  "demo_project/paper/.paper_studio/state.json",
+  "demo_project/paper/*.bst",
+  "demo_project/paper/*.bib",
+  "demo_project/paper/paper_studio.json",
+  "demo_project/paper/reference_context.json",
+  "demo_project/paper/*.pdf",
+  "demo_project/paper/*.sty",
+  "demo_project/paper/*.tex",
+  "demo_project/paper/sections/*.tex",
+]
+"research_avatar.research_studio" = ["static/*"]
+"research_avatar.web.demo" = ["*.html", "*.js", "*.css", "*.json", "_routes.json", "assets/**/*"]
+"research_avatar.web.functions" = ["*.js"]
+"research_avatar.web" = ["*.jsonc", "migrations/*.sql"]

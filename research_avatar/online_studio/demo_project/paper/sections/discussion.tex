@@ -1,0 +1,15 @@
+\section{Discussion}
+
+\label{sec:discussion}
+
+% PAPER_STUDIO_PARAGRAPH:D-P1
+
+\subsection{Implications for Multiple-Choice Evaluation}
+
+Table~\ref{tab:main-results} and Figure~\ref{fig:planned-results} show that fixed-order multiple-choice accuracy is not a complete estimate of model behavior. MMLU is the clearest case: label-first accuracy remains 0.622 although only 0.487 of complete items preserve the same semantic answer across all four tested orders. Content-first recovery raises invariance to 0.615 but does not eliminate the effect, and its opposite behavior on ARC-Challenge shows that extraction strategy and dataset interact. Option order should therefore be treated as an evaluation intervention: reports should include within-item invariance, directional flips, invalid outputs, and the distribution over displayed positions alongside accuracy.
+
+% PAPER_STUDIO_PARAGRAPH:D-P2
+
+\subsection{Limitations and Threats to Validity}
+
+This study has four main limitations. The evidence comes from one black-box model and a reduced sample of 79 complete questions, so neither the absolute rates nor the relative advantage of a decision rule should be generalized to other model versions. Four tested orders cover only part of the permutation space, and cumulative invariance necessarily becomes stricter as more orders are added. Although inverse mapping holds option content fixed, API nondeterminism and answer parsing can still contribute variability; preserving raw responses and separating invalid outputs reduces but does not remove this threat. Finally, benchmark ambiguity or incorrect gold labels can affect accuracy, even when the within-item invariance comparison remains well defined.

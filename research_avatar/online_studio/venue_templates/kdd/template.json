@@ -1,0 +1,24 @@
+{
+  "family": "kdd",
+  "label": "ACM KDD",
+  "aliases": ["kdd", "acm kdd", "knowledge discovery and data mining"],
+  "documentclass": "\\documentclass[sigconf,review,anonymous]{acmart}",
+  "preamble": [
+    "\\usepackage{graphicx}",
+    "\\usepackage{amsmath,booktabs,flafter,placeins}",
+    "\\usepackage{xurl}",
+    "\\settopmatter{printacmref=true,printccs=true,printfolios=true}",
+    "\\renewcommand\\footnotetextcopyrightpermission[1]{}",
+    "\\acmConference[KDD '26]{ACM SIGKDD Conference on Knowledge Discovery and Data Mining}{August 9--13, 2026}{Jeju, Republic of Korea}",
+    "\\widowpenalty=10000",
+    "\\clubpenalty=10000",
+    "\\emergencystretch=2em"
+  ],
+  "assets": [],
+  "abstract_before_maketitle": true,
+  "keywords": "task-oriented dialogue, multi-objective learning, reinforcement learning, e-commerce",
+  "ccsdesc": "Computing methodologies~Natural language generation",
+  "bibliographystyle": "ACM-Reference-Format",
+  "bibliography_command": "\\bibliography{references}",
+  "needs_bibliographystyle": true
+}

@@ -1,0 +1,27 @@
+\section{Method}
+
+\label{sec:method}
+
+% PAPER_STUDIO_PARAGRAPH:M-P1
+
+\subsection{Overview}
+
+We evaluate whether a black-box language model preserves its semantic choice when only the order of multiple-choice options changes. The method has four stages: construct content-identical order variants, query the same model interface, map each returned position back to the original option identity, and compare the recovered semantic decisions. This separation is essential because a stable output label can denote different content after reordering, whereas different labels can denote the same content. Label-first, content-first, and permutation-vote decisions are therefore computed from the same response records, making answer recovery explicit and auditable. The method uses only observable inputs and outputs and does not infer unobserved internal representations.
+
+% PAPER_STUDIO_PARAGRAPH:M-P2
+
+\subsection{Semantics-Preserving Option Permutations}
+
+For item $i$, let $q_i$ be the question and $O_i=(o_{i1},\ldots,o_{iK})$ its semantic options in canonical order. A permutation $\pi$ creates the displayed sequence $O_i^{\pi}=(o_{i\pi(1)},\ldots,o_{i\pi(K)})$ without changing any option text. If the model returns displayed position $j$, inverse mapping recovers semantic option $s_i^{\pi}=\pi(j)$. All comparisons operate on $s_i^{\pi}$ rather than on the surface label attached to position $j$. Thus an intervention changes only presentation order, and semantic invariance requires $s_i^{\pi}=s_i^{\pi^{\prime}}$ for every tested pair of permutations of the same item.
+
+% PAPER_STUDIO_PARAGRAPH:M-P3
+
+\subsection{Answer Recovery and Decision Rules}
+
+The label-first rule extracts a unique displayed option label from the model response and then applies the inverse permutation map. The content-first rule instead matches the response text to one canonical option before consulting any displayed label, which separates content selection from label-token preference. A response is marked invalid when neither rule yields one unambiguous semantic option; parser failures are reported separately from answer flips. Permutation vote aggregates the valid inverse-mapped semantic choices for an item, and a tied vote is recorded as unresolved under a fixed rule rather than being silently resolved by option position. These definitions keep the three decision rules comparable while preserving the raw response needed for later audit.
+
+% PAPER_STUDIO_PARAGRAPH:M-P4
+
+\subsection{Invariance Measures}
+
+For each item, exact semantic invariance is the indicator that all valid inverse-mapped choices agree. Pairwise flip rate measures the fraction of permutation pairs whose semantic choices differ, while directional counts distinguish correct-to-wrong from wrong-to-correct changes relative to the gold option. Residual position preference is computed after inverse mapping by comparing how often selected content occupies each displayed position, so positional bias is not confused with the frequency of particular answers. We additionally report invalid-output rate and permutation-vote accuracy. Together these observable measures separate task performance, stability, answer-extraction failure, and position effects without attributing any pattern to inaccessible model internals.

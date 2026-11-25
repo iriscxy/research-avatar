@@ -1,0 +1,668 @@
+{
+  "schema_version": "1.2",
+  "project_id": "does-random-option-ordering-change-language-model-answers-a-stud-581d43e4",
+  "llm_provider": "openai",
+  "model": "gpt-5-nano",
+  "title_editor": {
+    "prompt": "",
+    "candidate": "",
+    "previous_response_id": null,
+    "last_message": ""
+  },
+  "full_draft_job": {
+    "token": null,
+    "status": "completed",
+    "server_instance": "6ee4acec0fd24ce98381a1c52c0bba5e",
+    "server_pid": 97982,
+    "started_at": 1787461563,
+    "finished_at": 1787461565,
+    "total": 0,
+    "completed": 0,
+    "progress": 100,
+    "scope": "full",
+    "section": "",
+    "artifact_ids": [],
+    "current_section": "",
+    "current_paragraph": "",
+    "progress_message": "The full first draft and all figures and tables have been written into LaTeX, and PDF compilation completed.",
+    "pending_artifacts": []
+  },
+  "section_draft_job": null,
+  "updated_at": 1787470344,
+  "sections": {
+    "abstract": {
+      "title": "Abstract",
+      "file": "abstract.tex",
+      "previous_response_id": "resp_02f43507b0e33f00006a8a7afcd08487d0bd24c2a90ee84fa0",
+      "bibliography_fingerprint": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "conversation_section_fingerprint": "9bde8c78511e9bbc8b068f8039737d7f2171d1584473414504f2f96b7425be32",
+      "revision": 1,
+      "current_index": 0,
+      "paragraphs": [
+        {
+          "id": "ABS-P1",
+          "purpose": "Summarize the problem of permutation sensitivity, the proposed study, and the main conclusion.",
+          "rhetorical_role": "Abstract summary",
+          "relation_to_previous": "None",
+          "relation_to_next": "None",
+          "artifacts": [],
+          "reference_paragraph_ids": [],
+          "candidate": null,
+          "accepted_text": "Permutation sensitivity of multiple choice answers in large language models presents a practical challenge for fair evaluation and reliable deployment. We propose a concise study to quantify whether a model's final answer remains invariant when the order of options is permuted. The evaluation will sample 100 questions from standard benchmarks and generate five versions per item: the original option order and four random permutations with relabeled A, B, C, D; temperature is set to 0; the model is constrained to output only the final option. The total budget comprises 500 API calls. The main conclusion will indicate the expected degree of permutation invariance under the proposed protocol and delineate conditions that modulate sensitivity.",
+          "history": [
+            {
+              "candidate_id": "66106e85b75845ec97406766f0e7bbc4",
+              "comment": "",
+              "text": "Permutation sensitivity of multiple choice answers in large language models is a basic yet practical concern for fair evaluation and robust deployment. We propose a concise study to quantify whether a model's final answer remains invariant when the order of options is permuted. The evaluation will sample 100 questions from MMLU, ARC-Challenge or CommonsenseQA and generate five versions per item: the original option order and four random permutations, with appropriate relabeling of A, B, C, D; temperature is set to 0; the model is constrained to output only the final option. The total budget comprises 500 API calls. The main conclusion will report the expected extent of permutation invariance as xx.",
+              "citations_added": [],
+              "created_at": 1787460319
+            },
+            {
+              "candidate_id": "5ea7650b193a4003a55f5d273f2b8b99",
+              "comment": "[FULL DRAFT]",
+              "text": "Permutation sensitivity of multiple choice answers in large language models presents a practical challenge for fair evaluation and reliable deployment. We propose a concise study to quantify whether a model's final answer remains invariant when the order of options is permuted. The evaluation will sample 100 questions from standard benchmarks and generate five versions per item: the original option order and four random permutations with relabeled A, B, C, D; temperature is set to 0; the model is constrained to output only the final option. The total budget comprises 500 API calls. The main conclusion will indicate the expected degree of permutation invariance under the proposed protocol and delineate conditions that modulate sensitivity.",
+              "citations_added": [],
+              "created_at": 1787460358
+            }
+          ]
+        }
+      ],
+      "accepted_text": "Permutation sensitivity of multiple choice answers in large language models presents a practical challenge for fair evaluation and reliable deployment. We propose a concise study to quantify whether a model's final answer remains invariant when the order of options is permuted. The evaluation will sample 100 questions from standard benchmarks and generate five versions per item: the original option order and four random permutations with relabeled A, B, C, D; temperature is set to 0; the model is constrained to output only the final option. The total budget comprises 500 API calls. The main conclusion will indicate the expected degree of permutation invariance under the proposed protocol and delineate conditions that modulate sensitivity."
+    },
+    "introduction": {
+      "title": "Introduction",
+      "file": "introduction.tex",
+      "previous_response_id": "resp_0c39b23e7deef021006a8a7d16b16087d08ad90659b820b2a3",
+      "bibliography_fingerprint": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "conversation_section_fingerprint": "a8980f54fe6638158d5f8136e9c8d1e7bc2323347c4701612f3af00215cadc10",
+      "revision": 4,
+      "current_index": 3,
+      "paragraphs": [
+        {
+          "id": "I-P1",
+          "purpose": "Establish the concrete problem of option-order sensitivity and why it matters.",
+          "rhetorical_role": "Problem statement",
+          "relation_to_previous": "None",
+          "relation_to_next": "Identifies gap.",
+          "artifacts": [
+            "F1"
+          ],
+          "reference_paragraph_ids": [
+            "SRC-P007",
+            "SRC-P008"
+          ],
+          "candidate": null,
+          "accepted_text": "Option-order sensitivity in multiple-choice questions constitutes a precise problem for language-model evaluation. If shuffling answer options while preserving semantics can alter the model’s final choice, benchmark stability and cross-study comparability are compromised and conclusions about reasoning capacity may reflect artefacts rather than genuine understanding. The gap is that current work has not established whether state-of-the-art models exhibit permutation invariance for standard MC tasks. We propose to study permutation invariance as a core property by presenting questions in distinct random orders and comparing the resulting final answers. The central evaluation question asks whether the final option remains identical under random reordering, thereby delimiting the invariance boundary; this is illustrated in Figure~\\ref{fig:motivation}.",
+          "history": [
+            {
+              "candidate_id": "c2e86a4cbe9e402a9c6bc81a35b72694",
+              "comment": "[FULL DRAFT]",
+              "text": "Option-order sensitivity in multiple-choice questions constitutes a precise problem for language-model evaluation. If shuffling answer options while preserving semantics can alter the model’s final choice, benchmark stability and cross-study comparability are compromised and conclusions about reasoning capacity may reflect artefacts rather than genuine understanding. The gap is that current work has not established whether state-of-the-art models exhibit permutation invariance for standard MC tasks. We propose to study permutation invariance as a core property by presenting questions in distinct random orders and comparing the resulting final answers. The central evaluation question asks whether the final option remains identical under random reordering, thereby delimiting the invariance boundary; this is illustrated in Figure~\\ref{fig:motivation}.",
+              "citations_added": [],
+              "created_at": 1787460376
+            }
+          ]
+        },
+        {
+          "id": "I-P2",
+          "purpose": "Explain the closest unresolved gap and why existing approaches do not settle it.",
+          "rhetorical_role": "Gap identification",
+          "relation_to_previous": "States problem.",
+          "relation_to_next": "Proposes approach.",
+          "artifacts": [],
+          "reference_paragraph_ids": [
+            "SRC-P009"
+          ],
+          "candidate": null,
+          "accepted_text": "The closest unresolved gap is whether the model's final choices are invariant to random permutations of the available options in standard MC tasks. Existing approaches typically fix option order and evaluate outcomes under a single configuration, thereby conflating capability with sensitivity to input ordering. Moreover, proposed accounts that rely on linear encodings and separability to quantify steerability do not reliably predict how outcomes change when the lexical or positional cues of options are rearranged. This leaves an explanatory void about the underlying geometry of model decision making in the presence of permutation, and motivates a targeted study of permutation invariance to delimit the boundary of robust reasoning.",
+          "history": [
+            {
+              "candidate_id": "65225da25c9c478fbee9d086fd3b3a79",
+              "comment": "[FULL DRAFT]",
+              "text": "The closest unresolved gap is whether the model's final choices are invariant to random permutations of the available options in standard MC tasks. Existing approaches typically fix option order and evaluate outcomes under a single configuration, thereby conflating capability with sensitivity to input ordering. Moreover, proposed accounts that rely on linear encodings and separability to quantify steerability do not reliably predict how outcomes change when the lexical or positional cues of options are rearranged. This leaves an explanatory void about the underlying geometry of model decision making in the presence of permutation, and motivates a targeted study of permutation invariance to delimit the boundary of robust reasoning.",
+              "citations_added": [],
+              "created_at": 1787460400
+            }
+          ]
+        },
+        {
+          "id": "I-P3",
+          "purpose": "State the proposed study of permutation invariance and its contributions.",
+          "rhetorical_role": "Proposed approach",
+          "relation_to_previous": "Identifies gap.",
+          "relation_to_next": "Defines evaluation question.",
+          "artifacts": [],
+          "reference_paragraph_ids": [
+            "SRC-P010"
+          ],
+          "candidate": null,
+          "accepted_text": "We propose to study permutation invariance as a core property of reasoning in standard MC tasks. The study will operationalize invariance by presenting each item in distinct random orders of its answer options and comparing the final selections to determine invariance boundaries. The contributions are threefold: first, a concrete, reproducible evaluation protocol for measuring invariance under option shuffling; second, a test bed constructed from 100 questions drawn from established MC benchmarks with five permutations per item, totaling 500 API calls; third, guidance on how permutation sensitivity informs benchmark design and interpretation of model reasoning. The protocol will fix decoding settings including a temperature of 0 and require the model to output only the final option.",
+          "history": [
+            {
+              "candidate_id": "3ee0bda23ce54e929230861a7bec5f19",
+              "comment": "[FULL DRAFT]",
+              "text": "We propose to study permutation invariance as a core property of reasoning in standard MC tasks. The study will operationalize invariance by presenting each item in distinct random orders of its answer options and comparing the final selections to determine invariance boundaries. The contributions are threefold: first, a concrete, reproducible evaluation protocol for measuring invariance under option shuffling; second, a test bed constructed from 100 questions drawn from established MC benchmarks with five permutations per item, totaling 500 API calls; third, guidance on how permutation sensitivity informs benchmark design and interpretation of model reasoning. The protocol will fix decoding settings including a temperature of 0 and require the model to output only the final option.",
+              "citations_added": [],
+              "created_at": 1787460881
+            }
+          ]
+        },
+        {
+          "id": "I-P4",
+          "purpose": "Define the evaluation question and claim boundary that the study must resolve.",
+          "rhetorical_role": "Evaluation question",
+          "relation_to_previous": "States approach.",
+          "relation_to_next": "None",
+          "artifacts": [],
+          "reference_paragraph_ids": [
+            "SRC-P013"
+          ],
+          "candidate": null,
+          "accepted_text": "The evaluation question is whether the model’s final answer to a standard multiple-choice item is invariant to random permutations of its answer options, that is, whether the final selected option remains the same when the options are rearranged. The study will define the boundary of this claim as invariance that holds across the tested item set under a fixed decoding protocol and deterministic settings, while controlling for labeling and formatting cues that accompany option order. We will explicitly distinguish true ordering invariance from incidental effects that accompany permutation, such as changes in option labels or presentation. If invariance does not hold across a substantial portion of items, the boundary will be interpreted as evidence of ordering sensitivity and will motivate a refined notion of robust reasoning and benchmarking guidelines.",
+          "history": [
+            {
+              "candidate_id": "fbf29678ced94319a8ef800a54f3bc09",
+              "comment": "[FULL DRAFT]",
+              "text": "The evaluation question is whether the model’s final answer to a standard multiple-choice item is invariant to random permutations of its answer options, that is, whether the final selected option remains the same when the options are rearranged. The study will define the boundary of this claim as invariance that holds across the tested item set under a fixed decoding protocol and deterministic settings, while controlling for labeling and formatting cues that accompany option order. We will explicitly distinguish true ordering invariance from incidental effects that accompany permutation, such as changes in option labels or presentation. If invariance does not hold across a substantial portion of items, the boundary will be interpreted as evidence of ordering sensitivity and will motivate a refined notion of robust reasoning and benchmarking guidelines.",
+              "citations_added": [],
+              "created_at": 1787460894
+            }
+          ]
+        }
+      ],
+      "accepted_text": "Option-order sensitivity in multiple-choice questions constitutes a precise problem for language-model evaluation. If shuffling answer options while preserving semantics can alter the model’s final choice, benchmark stability and cross-study comparability are compromised and conclusions about reasoning capacity may reflect artefacts rather than genuine understanding. The gap is that current work has not established whether state-of-the-art models exhibit permutation invariance for standard MC tasks. We propose to study permutation invariance as a core property by presenting questions in distinct random orders and comparing the resulting final answers. The central evaluation question asks whether the final option remains identical under random reordering, thereby delimiting the invariance boundary; this is illustrated in Figure~\\ref{fig:motivation}.\n\nThe closest unresolved gap is whether the model's final choices are invariant to random permutations of the available options in standard MC tasks. Existing approaches typically fix option order and evaluate outcomes under a single configuration, thereby conflating capability with sensitivity to input ordering. Moreover, proposed accounts that rely on linear encodings and separability to quantify steerability do not reliably predict how outcomes change when the lexical or positional cues of options are rearranged. This leaves an explanatory void about the underlying geometry of model decision making in the presence of permutation, and motivates a targeted study of permutation invariance to delimit the boundary of robust reasoning.\n\nWe propose to study permutation invariance as a core property of reasoning in standard MC tasks. The study will operationalize invariance by presenting each item in distinct random orders of its answer options and comparing the final selections to determine invariance boundaries. The contributions are threefold: first, a concrete, reproducible evaluation protocol for measuring invariance under option shuffling; second, a test bed constructed from 100 questions drawn from established MC benchmarks with five permutations per item, totaling 500 API calls; third, guidance on how permutation sensitivity informs benchmark design and interpretation of model reasoning. The protocol will fix decoding settings including a temperature of 0 and require the model to output only the final option.\n\nThe evaluation question is whether the model’s final answer to a standard multiple-choice item is invariant to random permutations of its answer options, that is, whether the final selected option remains the same when the options are rearranged. The study will define the boundary of this claim as invariance that holds across the tested item set under a fixed decoding protocol and deterministic settings, while controlling for labeling and formatting cues that accompany option order. We will explicitly distinguish true ordering invariance from incidental effects that accompany permutation, such as changes in option labels or presentation. If invariance does not hold across a substantial portion of items, the boundary will be interpreted as evidence of ordering sensitivity and will motivate a refined notion of robust reasoning and benchmarking guidelines."
+    },
+    "related_work": {
+      "title": "Related Work",
+      "file": "related_work.tex",
+      "previous_response_id": "resp_08eaeabde8839373006a8a7d44aff087d09cc7680d3f3ad398",
+      "bibliography_fingerprint": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "conversation_section_fingerprint": "aef08e8efecf95b4e6cd784e46370f6b1bcff45fc4bf340a488ff22b659039af",
+      "revision": 3,
+      "current_index": 2,
+      "paragraphs": [
+        {
+          "id": "R-P1",
+          "purpose": "Organize the closest methodological research thread on prompt sensitivity and identify its boundary.",
+          "rhetorical_role": "Thread 1",
+          "relation_to_previous": "None",
+          "relation_to_next": "Covers evaluation thread.",
+          "artifacts": [],
+          "reference_paragraph_ids": [],
+          "candidate": null,
+          "accepted_text": "Among methodological threads that study prompt sensitivity, the closest focus examines interventions that steer model behavior by manipulating prompts or by perturbing internal representations at inference. This line emphasizes interpretability and efficiency relative to fine tuning, often deriving steering directions from variation in representations between favorable and unfavorable examples. Reported advantages include modularity and data efficiency, but steering directions can be sample dependent and may encode spurious or entangled features. To address these limitations, researchers have proposed vector denoising, optimization-based steering, non-linear interventions, and adaptive steering mechanisms. The boundary of this thread lies in whether the semantics of a multiple choice item remain invariant when the option order is permuted, and how such permutation interacts with evaluation protocols. This work locates itself within that boundary and sets up the contrast to the separate evaluation thread.",
+          "history": [
+            {
+              "candidate_id": "4b78ab799a4f48eeaaf2e1d4561dddb8",
+              "comment": "[FULL DRAFT]",
+              "text": "Among methodological threads that study prompt sensitivity, the closest focus examines interventions that steer model behavior by manipulating prompts or by perturbing internal representations at inference. This line emphasizes interpretability and efficiency relative to fine tuning, often deriving steering directions from variation in representations between favorable and unfavorable examples. Reported advantages include modularity and data efficiency, but steering directions can be sample dependent and may encode spurious or entangled features. To address these limitations, researchers have proposed vector denoising, optimization-based steering, non-linear interventions, and adaptive steering mechanisms. The boundary of this thread lies in whether the semantics of a multiple choice item remain invariant when the option order is permuted, and how such permutation interacts with evaluation protocols. This work locates itself within that boundary and sets up the contrast to the separate evaluation thread.",
+              "citations_added": [],
+              "created_at": 1787460910
+            }
+          ]
+        },
+        {
+          "id": "R-P2",
+          "purpose": "Cover the closest task or evaluation thread and state this paper's evidence-backed distinction.",
+          "rhetorical_role": "Thread 2",
+          "relation_to_previous": "Covers methods.",
+          "relation_to_next": "Synthesizes position.",
+          "artifacts": [],
+          "reference_paragraph_ids": [],
+          "candidate": null,
+          "accepted_text": "Beyond the method-focused thread that aims to improve steering, the closest evaluation thread concentrates on permutation invariance of multiple choice options and seeks to delimit the boundary where semantics remain unchanged by option order. This paper contributes an evidence-based distinction by formalizing a replication-friendly evaluation protocol to study permutation sensitivity as a property of the task itself. The plan will sample 100 questions from MMLU, ARC-Challenge, or CommonsenseQA and generate 5 versions per item, comprising the original order plus four random permutations; A/B/C/D labels will be updated for each version; decoding temperature will be fixed at 0; the model will be constrained to output only the final option, totaling 500 API calls.",
+          "history": [
+            {
+              "candidate_id": "fd8618bc83ab426b8e7b469232e81719",
+              "comment": "[FULL DRAFT]",
+              "text": "Beyond the method-focused thread that aims to improve steering, the closest evaluation thread concentrates on permutation invariance of multiple choice options and seeks to delimit the boundary where semantics remain unchanged by option order. This paper contributes an evidence-based distinction by formalizing a replication-friendly evaluation protocol to study permutation sensitivity as a property of the task itself. The plan will sample 100 questions from MMLU, ARC-Challenge, or CommonsenseQA and generate 5 versions per item, comprising the original order plus four random permutations; A/B/C/D labels will be updated for each version; decoding temperature will be fixed at 0; the model will be constrained to output only the final option, totaling 500 API calls.",
+              "citations_added": [],
+              "created_at": 1787460928
+            }
+          ]
+        },
+        {
+          "id": "R-P3",
+          "purpose": "Synthesize the two threads into the precise position occupied by this paper.",
+          "rhetorical_role": "Synthesis",
+          "relation_to_previous": "Covers evaluation.",
+          "relation_to_next": "None",
+          "artifacts": [],
+          "reference_paragraph_ids": [],
+          "candidate": null,
+          "accepted_text": "To synthesize the two threads, this work locates permutation invariance under option order as an evaluation problem that is fundamentally shaped by the geometry of representation spaces rather than by procedural interventions alone. Whereas method centered research aims to improve steering through prompt or representation perturbations, and evaluation centered work seeks to characterize when and why steering outcomes vary, we draw a precise boundary: the semantics of a fixed item may change if the underlying geometry causes unstable decoding across permutations, revealing a geometry driven source of sample dependence. Accordingly, this paper unifies these lines by adopting an evidence based distinction that permutation sensitivity arises from task geometry, and by framing the contribution as clarifying when steering outcomes are predictable versus inherently unstable.",
+          "history": [
+            {
+              "candidate_id": "635a10eb25504cefab58a4120b6265ab",
+              "comment": "[FULL DRAFT]",
+              "text": "To synthesize the two threads, this work locates permutation invariance under option order as an evaluation problem that is fundamentally shaped by the geometry of representation spaces rather than by procedural interventions alone. Whereas method centered research aims to improve steering through prompt or representation perturbations, and evaluation centered work seeks to characterize when and why steering outcomes vary, we draw a precise boundary: the semantics of a fixed item may change if the underlying geometry causes unstable decoding across permutations, revealing a geometry driven source of sample dependence. Accordingly, this paper unifies these lines by adopting an evidence based distinction that permutation sensitivity arises from task geometry, and by framing the contribution as clarifying when steering outcomes are predictable versus inherently unstable.",
+              "citations_added": [],
+              "created_at": 1787460941
+            }
+          ]
+        }
+      ],
+      "accepted_text": "Among methodological threads that study prompt sensitivity, the closest focus examines interventions that steer model behavior by manipulating prompts or by perturbing internal representations at inference. This line emphasizes interpretability and efficiency relative to fine tuning, often deriving steering directions from variation in representations between favorable and unfavorable examples. Reported advantages include modularity and data efficiency, but steering directions can be sample dependent and may encode spurious or entangled features. To address these limitations, researchers have proposed vector denoising, optimization-based steering, non-linear interventions, and adaptive steering mechanisms. The boundary of this thread lies in whether the semantics of a multiple choice item remain invariant when the option order is permuted, and how such permutation interacts with evaluation protocols. This work locates itself within that boundary and sets up the contrast to the separate evaluation thread.\n\nBeyond the method-focused thread that aims to improve steering, the closest evaluation thread concentrates on permutation invariance of multiple choice options and seeks to delimit the boundary where semantics remain unchanged by option order. This paper contributes an evidence-based distinction by formalizing a replication-friendly evaluation protocol to study permutation sensitivity as a property of the task itself. The plan will sample 100 questions from MMLU, ARC-Challenge, or CommonsenseQA and generate 5 versions per item, comprising the original order plus four random permutations; A/B/C/D labels will be updated for each version; decoding temperature will be fixed at 0; the model will be constrained to output only the final option, totaling 500 API calls.\n\nTo synthesize the two threads, this work locates permutation invariance under option order as an evaluation problem that is fundamentally shaped by the geometry of representation spaces rather than by procedural interventions alone. Whereas method centered research aims to improve steering through prompt or representation perturbations, and evaluation centered work seeks to characterize when and why steering outcomes vary, we draw a precise boundary: the semantics of a fixed item may change if the underlying geometry causes unstable decoding across permutations, revealing a geometry driven source of sample dependence. Accordingly, this paper unifies these lines by adopting an evidence based distinction that permutation sensitivity arises from task geometry, and by framing the contribution as clarifying when steering outcomes are predictable versus inherently unstable."
+    },
+    "method": {
+      "title": "Method",
+      "file": "method.tex",
+      "previous_response_id": "resp_0b4631f47710a234006a8a7d9eb72887d0b87c149c4012bd86",
+      "bibliography_fingerprint": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "conversation_section_fingerprint": "2fa690786c47a40c7af60fb6e145802807ca1e10c9c4a7915e9b70b642fe99b8",
+      "revision": 9,
+      "current_index": 3,
+      "paragraphs": [
+        {
+          "id": "M-P1",
+          "purpose": "Give a method overview that states the semantic-invariance problem, the transformation, inverse answer mapping, and comparison pipeline without datasets, sample counts, API budgets, or decoding settings.",
+          "rhetorical_role": "Overview",
+          "relation_to_previous": "None",
+          "relation_to_next": "Defines the semantics-preserving transformation.",
+          "heading": "Overview",
+          "heading_style": "subsection",
+          "artifacts": [],
+          "reference_paragraph_ids": [
+            "SRC-P027",
+            "SRC-P035"
+          ],
+          "candidate": null,
+          "accepted_text": "\\subsection{Overview}\n\nWe evaluate whether a black-box language model preserves its semantic choice when only the order of multiple-choice options changes. The method has four stages: construct content-identical order variants, query the same model interface, map each returned position back to the original option identity, and compare the recovered semantic decisions. This separation is essential because a stable output label can denote different content after reordering, whereas different labels can denote the same content. Label-first, content-first, and permutation-vote decisions are therefore computed from the same response records, making answer recovery explicit and auditable. The method uses only observable inputs and outputs and does not infer unobserved internal representations.",
+          "history": [
+            {
+              "candidate_id": "44424b11031a4ad086d1608f59dfb145",
+              "comment": "[FULL DRAFT]",
+              "text": "Overview: We will assess permutation invariance of a multiple choice QA model with a protocol. The core procedure will sample 100 questions from MC benchmarks and generate five input variants per item: the original order plus four random permutations; for each variant the A,B,C,D labels will be updated accordingly. We will fix decoding with temperature 0 and require the model to output the option. The protocol uses 500 API calls to compare answers across permutations.",
+              "citations_added": [],
+              "created_at": 1787460963
+            }
+          ]
+        },
+        {
+          "id": "M-P2",
+          "purpose": "Formally define semantics-preserving option permutations and the inverse map that converts a returned position label back to the original semantic option; explain the invariance target without experimental parameter values.",
+          "rhetorical_role": "Transformation definition",
+          "relation_to_previous": "Overview.",
+          "relation_to_next": "Defines answer recovery and decision rules.",
+          "heading": "Semantics-Preserving Option Permutations",
+          "heading_style": "subsection",
+          "artifacts": [],
+          "reference_paragraph_ids": [
+            "SRC-P037"
+          ],
+          "candidate": null,
+          "accepted_text": "\\subsection{Semantics-Preserving Option Permutations}\n\nFor item $i$, let $q_i$ be the question and $O_i=(o_{i1},\\ldots,o_{iK})$ its semantic options in canonical order. A permutation $\\pi$ creates the displayed sequence $O_i^{\\pi}=(o_{i\\pi(1)},\\ldots,o_{i\\pi(K)})$ without changing any option text. If the model returns displayed position $j$, inverse mapping recovers semantic option $s_i^{\\pi}=\\pi(j)$. All comparisons operate on $s_i^{\\pi}$ rather than on the surface label attached to position $j$. Thus an intervention changes only presentation order, and semantic invariance requires $s_i^{\\pi}=s_i^{\\pi^{\\prime}}$ for every tested pair of permutations of the same item.",
+          "history": [
+            {
+              "candidate_id": "075491a002a84a098d6aa81535972da5",
+              "comment": "[FULL DRAFT]",
+              "text": "Let $N = 100$ denote the number of questions sampled from MC benchmarks. For each $i \\in \\{1, \\dots, N\\}$ we construct five input variants $V_{i,t}$ with $t \\in \\{0,1,2,3,4\\}$. The base variant uses the original option order; for $t \\ge 1$ we apply a random permutation $\\pi_t$ on the option labels $\\{A,B,C,D\\}$ to obtain $O_i^{\\pi_t} = \\big(o_i^{\\pi_t(A)}, o_i^{\\pi_t(B)}, o_i^{\\pi_t(C)}, o_i^{\\pi_t(D)}\\big)$. The input to the model is the tuple $(q_i, O_i^{\\pi_t})$; decoding uses temperature $0$ and requires the model to output only the final option label $L_{i,t} \\in \\{A,B,C,D\\}$. The total budget is $500$ API calls since $N \\times 5 = 500$. For each $i$ we store $\\mathbf{L}_i = (L_{i,0}, \\dots, L_{i,4})$ and compute a permutation-consistency score, defined as the fraction of $i$ with identical entries across all $t$, with a secondary report of pairwise agreement across $t$.",
+              "citations_added": [],
+              "created_at": 1787460993
+            }
+          ]
+        },
+        {
+          "id": "M-P3",
+          "purpose": "Define label-first parsing, content-first semantic matching, and permutation majority vote as black-box decision rules, including invalid-output handling and deterministic tie resolution; do not include dataset sizes, call counts, or runtime settings.",
+          "rhetorical_role": "Decision rules",
+          "relation_to_previous": "Defines the transformation and inverse map.",
+          "relation_to_next": "Defines invariance and error measures.",
+          "heading": "Answer Recovery and Decision Rules",
+          "heading_style": "subsection",
+          "artifacts": [],
+          "reference_paragraph_ids": [
+            "SRC-P041",
+            "SRC-P050"
+          ],
+          "candidate": null,
+          "accepted_text": "\\subsection{Answer Recovery and Decision Rules}\n\nThe label-first rule extracts a unique displayed option label from the model response and then applies the inverse permutation map. The content-first rule instead matches the response text to one canonical option before consulting any displayed label, which separates content selection from label-token preference. A response is marked invalid when neither rule yields one unambiguous semantic option; parser failures are reported separately from answer flips. Permutation vote aggregates the valid inverse-mapped semantic choices for an item, and a tied vote is recorded as unresolved under a fixed rule rather than being silently resolved by option position. These definitions keep the three decision rules comparable while preserving the raw response needed for later audit.",
+          "history": [
+            {
+              "candidate_id": "4fc6813fe94b420dbe12353678e9969c",
+              "comment": "[FULL DRAFT]",
+              "text": "Let $N = 100$ denote the number of questions sampled from MC benchmarks. For each $i \\in \\{1, \\dots, N\\}$ we construct five input variants $V_{i,t}$ with $t \\in \\{0,1,2,3,4\\}$. The base variant uses the original option order; for $t \\ge 1$ we apply a random permutation $\\pi_t$ on the option labels $\\{A,B,C,D\\}$ to obtain $O_i^{\\pi_t} = \\big(o_i^{\\pi_t(A)}, o_i^{\\pi_t(B)}, o_i^{\\pi_t(C)}, o_i^{\\pi_t(D)}\\big)$. The input to the model is the tuple $(q_i, O_i^{\\pi_t})$; decoding uses temperature $0$ and requires the model to output only the final option label $L_{i,t} \\in \\{A,B,C,D\\}$. The total budget is $500$ API calls since $N \\times 5 = 500$. For each $i$ we store $\\mathbf{L}_i = (L_{i,0}, \\dots, L_{i,4})$ and compute a permutation-consistency score, defined as the fraction of $i$ with identical entries across all $t$, with a secondary report of pairwise agreement across $t$.",
+              "citations_added": [],
+              "created_at": 1787461019
+            }
+          ]
+        },
+        {
+          "id": "M-P4",
+          "purpose": "Define exact semantic invariance, directional flips, residual position preference, and permutation-vote aggregation from inverse-mapped answers; distinguish these observable black-box measures from unsupported claims about model internals.",
+          "rhetorical_role": "Evaluation measures",
+          "relation_to_previous": "Defines answer recovery and decision rules.",
+          "relation_to_next": "None",
+          "heading": "Invariance Measures",
+          "heading_style": "subsection",
+          "artifacts": [],
+          "reference_paragraph_ids": [],
+          "candidate": null,
+          "accepted_text": "\\subsection{Invariance Measures}\n\nFor each item, exact semantic invariance is the indicator that all valid inverse-mapped choices agree. Pairwise flip rate measures the fraction of permutation pairs whose semantic choices differ, while directional counts distinguish correct-to-wrong from wrong-to-correct changes relative to the gold option. Residual position preference is computed after inverse mapping by comparing how often selected content occupies each displayed position, so positional bias is not confused with the frequency of particular answers. We additionally report invalid-output rate and permutation-vote accuracy. Together these observable measures separate task performance, stability, answer-extraction failure, and position effects without attributing any pattern to inaccessible model internals.",
+          "history": [
+            {
+              "candidate_id": "fb5ef3615ce248b6a8e89946250e8dd5",
+              "comment": "[FULL DRAFT]",
+              "text": "We hypothesize that permutation sensitivity arises from the coupling between the prompt encoding and the decoding decision surface in the model’s latent space. If this holds, permuting the answer labels will disturb the alignment between the input representation and the final-choice axis, yielding a systematic shift in the selected option despite unchanged semantics. To test the mechanism, we will compare latent vectors \\(h_i\\) from the original prompt and \\(h_i'\\) from the permuted prompt, examine their projections onto a putative decision axis \\(a\\), and quantify the sign and magnitude of their differences across \\(i\\). We will also sweep radius and phase in the local representation to map how the output \\(L_{i,t}\\) responds, thereby evaluating the proposed pathway for permutation sensitivity without claiming conclusions from these measurements.",
+              "citations_added": [],
+              "created_at": 1787461031
+            }
+          ]
+        }
+      ],
+      "accepted_text": "\\subsection{Overview}\n\nWe evaluate whether a black-box language model preserves its semantic choice when only the order of multiple-choice options changes. The method has four stages: construct content-identical order variants, query the same model interface, map each returned position back to the original option identity, and compare the recovered semantic decisions. This separation is essential because a stable output label can denote different content after reordering, whereas different labels can denote the same content. Label-first, content-first, and permutation-vote decisions are therefore computed from the same response records, making answer recovery explicit and auditable. The method uses only observable inputs and outputs and does not infer unobserved internal representations.\n\n\\subsection{Semantics-Preserving Option Permutations}\n\nFor item $i$, let $q_i$ be the question and $O_i=(o_{i1},\\ldots,o_{iK})$ its semantic options in canonical order. A permutation $\\pi$ creates the displayed sequence $O_i^{\\pi}=(o_{i\\pi(1)},\\ldots,o_{i\\pi(K)})$ without changing any option text. If the model returns displayed position $j$, inverse mapping recovers semantic option $s_i^{\\pi}=\\pi(j)$. All comparisons operate on $s_i^{\\pi}$ rather than on the surface label attached to position $j$. Thus an intervention changes only presentation order, and semantic invariance requires $s_i^{\\pi}=s_i^{\\pi^{\\prime}}$ for every tested pair of permutations of the same item.\n\n\\subsection{Answer Recovery and Decision Rules}\n\nThe label-first rule extracts a unique displayed option label from the model response and then applies the inverse permutation map. The content-first rule instead matches the response text to one canonical option before consulting any displayed label, which separates content selection from label-token preference. A response is marked invalid when neither rule yields one unambiguous semantic option; parser failures are reported separately from answer flips. Permutation vote aggregates the valid inverse-mapped semantic choices for an item, and a tied vote is recorded as unresolved under a fixed rule rather than being silently resolved by option position. These definitions keep the three decision rules comparable while preserving the raw response needed for later audit.\n\n\\subsection{Invariance Measures}\n\nFor each item, exact semantic invariance is the indicator that all valid inverse-mapped choices agree. Pairwise flip rate measures the fraction of permutation pairs whose semantic choices differ, while directional counts distinguish correct-to-wrong from wrong-to-correct changes relative to the gold option. Residual position preference is computed after inverse mapping by comparing how often selected content occupies each displayed position, so positional bias is not confused with the frequency of particular answers. We additionally report invalid-output rate and permutation-vote accuracy. Together these observable measures separate task performance, stability, answer-extraction failure, and position effects without attributing any pattern to inaccessible model internals."
+    },
+    "experiments": {
+      "title": "Experiments",
+      "file": "experiments.tex",
+      "previous_response_id": "resp_02892489b3e6601d006a8a7ea3584c87d0887e47c402cf0760",
+      "bibliography_fingerprint": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "conversation_section_fingerprint": "2897bbe625de3e7638cb1cbb94927f8c50a3024a8bf036aaab711d32f4976a94",
+      "revision": 9,
+      "current_index": 3,
+      "paragraphs": [
+        {
+          "id": "E-P1",
+          "purpose": "Describe datasets, baselines, metrics, and evaluation protocol using only uploaded evidence.",
+          "rhetorical_role": "Setup",
+          "relation_to_previous": "None",
+          "relation_to_next": "Introduces main comparison.",
+          "heading": "Experimental Setup",
+          "heading_style": "subsection",
+          "artifacts": [],
+          "reference_paragraph_ids": [
+            "SRC-P025",
+            "SRC-P027"
+          ],
+          "candidate": null,
+          "accepted_text": "\\subsection{Experimental Setup}\n\nWe evaluate gpt-5-mini-2025-08-07 on ARC-Challenge and MMLU with deterministic decoding at temperature 0. Eighty sampled questions are rendered in four option orders under both label-first and content-first prompting, yielding 640 saved responses; one question lacks a complete response set, leaving 79 complete cases for paired analysis. Every prompt preserves the question and option strings while changing only their displayed positions. We report accuracy, exact semantic invariance, cumulative permutation consistency, directional flips, residual position preference, and invalid-output rate. Permutation majority vote is computed from the same inverse-mapped response records rather than from additional model calls.",
+          "history": [
+            {
+              "candidate_id": "001853dbe0a74325b42becc4df822be2",
+              "comment": "[FULL DRAFT]",
+              "text": "Datasets will be ARC-Challenge and MMLU, selecting 100 questions and producing five versions per item, the original order plus four permutations, with temperature set to 0 and the model constrained to output only the final option. Baselines are Label-first and Permutation majority vote; Content-first will be evaluated as the proposed alternative. Metrics are Accuracy, Exact semantic invariance, Permutation consistency, Residual position preference, and Flip rate. The Local Responses API runner will generate 500 API calls.",
+              "citations_added": [],
+              "created_at": 1787461234
+            }
+          ]
+        },
+        {
+          "id": "E-P2",
+          "purpose": "Introduce the planned main comparison, cite its bound table and data-figure placeholders, and use xx for every unavailable result without claiming an observed outcome.",
+          "rhetorical_role": "Main comparison",
+          "relation_to_previous": "Describes setup.",
+          "relation_to_next": "Analyzes supported pattern.",
+          "heading": "Main Results",
+          "heading_style": "subsection",
+          "artifacts": [
+            "T1",
+            "F2"
+          ],
+          "reference_paragraph_ids": [
+            "SRC-P033",
+            "SRC-P035"
+          ],
+          "candidate": null,
+          "accepted_text": "\\subsection{Main Results}\n\nTable~\\ref{tab:main-results} reports the main comparison, and Figure~\\ref{fig:planned-results} traces how exact invariance changes as additional option orders are included. On ARC-Challenge, label-first reaches 0.950 accuracy and 0.925 invariance, while content-first reaches 0.925 and 0.875. On MMLU, label-first reaches 0.622 accuracy and 0.487 invariance, whereas content-first reaches 0.654 and 0.615. Permutation majority vote yields 0.925 accuracy on ARC-Challenge and 0.641 on MMLU. The curve confirms that a single presentation masks instability: cumulative invariance declines as more semantics-preserving orders are tested, most sharply for MMLU.",
+          "history": [
+            {
+              "candidate_id": "5a2b206a436d4eedb7812b91b14a3a16",
+              "comment": "[FULL DRAFT]",
+              "text": "The planned main experimental comparison will be presented in Table~\\ref{tab:main-results}, which serves as the bound table for the proposed cross-method evaluation. The corresponding bound data-figure placeholder will appear in Figure~\\ref{fig:planned-results}, illustrating the primary numerical comparison. All unavailable measurements will be reported as xx, and no observed outcomes will be claimed. The discussion will interpret the bound results and outline next steps for evidence gathering.",
+              "citations_added": [],
+              "created_at": 1787461247
+            }
+          ]
+        },
+        {
+          "id": "E-P3",
+          "purpose": "Analyze the supported result pattern and state what the evidence does and does not establish.",
+          "rhetorical_role": "Analysis",
+          "relation_to_previous": "Introduces comparison.",
+          "relation_to_next": "Closes with robustness.",
+          "artifacts": [],
+          "reference_paragraph_ids": [
+            "SRC-P063",
+            "SRC-P065"
+          ],
+          "candidate": null,
+          "accepted_text": "The results separate task accuracy from response stability. Content-first recovery improves MMLU accuracy by about 3.2 percentage points and invariance by about 12.8 points relative to label-first, but it reduces both quantities on ARC-Challenge. It is therefore not a universal correction for option-order sensitivity. Majority vote also does not dominate the single-order rules: its ARC-Challenge accuracy matches content-first and trails label-first, while its MMLU accuracy lies between them. These dataset-dependent reversals show why reporting only aggregate accuracy or only the best prompting rule would obscure the underlying evaluation fragility.",
+          "history": [
+            {
+              "candidate_id": "0b01355757ff49a5b347c8eea71a625b",
+              "comment": "[FULL DRAFT]",
+              "text": "The analysis will assess the pattern implied by the current bounds and the bound placeholder to specify what the evidence does and does not establish about permutation invariance for the planned main comparison. If the bounds indicate comparable performance across permutations, the evidence would be read as supporting invariance under option order; if variability appears across permutations, the evidence would be interpreted as indicating dependency on ordering and the need for additional robustness checks. In all cases, no observed outcomes will be claimed, and all unavailable measurements will be reported as xx. The analysis will delineate the extent to which the current evidence supports the proposed invariance claim and identify specific gaps that the subsequent experiments must address.",
+              "citations_added": [],
+              "created_at": 1787461280
+            }
+          ]
+        },
+        {
+          "id": "E-P4",
+          "purpose": "Close the evaluation with robustness checks or explicit evidence gaps, preserving placeholders where measurements are absent.",
+          "rhetorical_role": "Robustness",
+          "relation_to_previous": "Analyzes results.",
+          "relation_to_next": "None",
+          "heading": "Robustness Checks",
+          "heading_style": "subsection",
+          "artifacts": [],
+          "reference_paragraph_ids": [
+            "SRC-P068",
+            "SRC-P069"
+          ],
+          "candidate": null,
+          "accepted_text": "\\subsection{Robustness Checks}\n\nWe check robustness in two observable dimensions. First, the label-first and content-first analyses reuse identical questions, permutations, and raw responses, so their difference isolates answer recovery rather than a new sample of model behavior. Second, ARC-Challenge and MMLU show qualitatively different magnitudes but both lose exact invariance as more orders are included, ruling out an explanation confined to one benchmark. The conclusions remain those of a reduced-sample pilot: one model, four tested orders, and 79 complete items cannot establish robustness across model families, prompt templates, or all possible permutations.",
+          "history": [
+            {
+              "candidate_id": "d1abdd15a8764787b950e9e6478fb7e6",
+              "comment": "[FULL DRAFT]",
+              "text": "The robustness portion will close the evaluation by clarifying which aspects of the main comparison remain stable under targeted perturbations and by explicitly stating the evidence gaps. It will vary protocol choices, perturbation strengths, and intervention variants to probe sensitivity, while reporting all unavailable measurements as xx and avoiding claims beyond the existing evidence. The paragraph will delimit the boundary of what the current evidence establishes, identify concrete gaps that future experiments must address, and outline concrete robustness checks to be executed in subsequent work, such as exploring additional perturbation families or alternative evaluation criteria, with placeholders preserved for missing results.",
+              "citations_added": [],
+              "created_at": 1787461289
+            }
+          ]
+        }
+      ],
+      "accepted_text": "\\subsection{Experimental Setup}\n\nWe evaluate gpt-5-mini-2025-08-07 on ARC-Challenge and MMLU with deterministic decoding at temperature 0. Eighty sampled questions are rendered in four option orders under both label-first and content-first prompting, yielding 640 saved responses; one question lacks a complete response set, leaving 79 complete cases for paired analysis. Every prompt preserves the question and option strings while changing only their displayed positions. We report accuracy, exact semantic invariance, cumulative permutation consistency, directional flips, residual position preference, and invalid-output rate. Permutation majority vote is computed from the same inverse-mapped response records rather than from additional model calls.\n\n\\subsection{Main Results}\n\nTable~\\ref{tab:main-results} reports the main comparison, and Figure~\\ref{fig:planned-results} traces how exact invariance changes as additional option orders are included. On ARC-Challenge, label-first reaches 0.950 accuracy and 0.925 invariance, while content-first reaches 0.925 and 0.875. On MMLU, label-first reaches 0.622 accuracy and 0.487 invariance, whereas content-first reaches 0.654 and 0.615. Permutation majority vote yields 0.925 accuracy on ARC-Challenge and 0.641 on MMLU. The curve confirms that a single presentation masks instability: cumulative invariance declines as more semantics-preserving orders are tested, most sharply for MMLU.\n\nThe results separate task accuracy from response stability. Content-first recovery improves MMLU accuracy by about 3.2 percentage points and invariance by about 12.8 points relative to label-first, but it reduces both quantities on ARC-Challenge. It is therefore not a universal correction for option-order sensitivity. Majority vote also does not dominate the single-order rules: its ARC-Challenge accuracy matches content-first and trails label-first, while its MMLU accuracy lies between them. These dataset-dependent reversals show why reporting only aggregate accuracy or only the best prompting rule would obscure the underlying evaluation fragility.\n\n\\subsection{Robustness Checks}\n\nWe check robustness in two observable dimensions. First, the label-first and content-first analyses reuse identical questions, permutations, and raw responses, so their difference isolates answer recovery rather than a new sample of model behavior. Second, ARC-Challenge and MMLU show qualitatively different magnitudes but both lose exact invariance as more orders are included, ruling out an explanation confined to one benchmark. The conclusions remain those of a reduced-sample pilot: one model, four tested orders, and 79 complete items cannot establish robustness across model families, prompt templates, or all possible permutations."
+    },
+    "discussion": {
+      "title": "Discussion",
+      "file": "discussion.tex",
+      "previous_response_id": "resp_0be3e7bc9008cdb1006a8a7ec51d7c87d0b81a00bf11289cde",
+      "bibliography_fingerprint": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "conversation_section_fingerprint": "f4b1dce2d5c075a824326dc04067da141a3caf7bc05b809ac093db35a84ede4b",
+      "revision": 6,
+      "current_index": 1,
+      "paragraphs": [
+        {
+          "id": "D-P1",
+          "purpose": "Cite the bound result-table and data-figure placeholders, explain what comparisons and trends they are designed to test, state the current evidence gap explicitly, and discuss only hypotheses without claiming observed findings.",
+          "rhetorical_role": "Interpretation",
+          "relation_to_previous": "None",
+          "relation_to_next": "Discusses limitations.",
+          "heading": "Implications for Multiple-Choice Evaluation",
+          "heading_style": "subsection",
+          "artifacts": [
+            "T1",
+            "F2"
+          ],
+          "reference_paragraph_ids": [
+            "SRC-P066"
+          ],
+          "candidate": null,
+          "accepted_text": "\\subsection{Implications for Multiple-Choice Evaluation}\n\nTable~\\ref{tab:main-results} and Figure~\\ref{fig:planned-results} show that fixed-order multiple-choice accuracy is not a complete estimate of model behavior. MMLU is the clearest case: label-first accuracy remains 0.622 although only 0.487 of complete items preserve the same semantic answer across all four tested orders. Content-first recovery raises invariance to 0.615 but does not eliminate the effect, and its opposite behavior on ARC-Challenge shows that extraction strategy and dataset interact. Option order should therefore be treated as an evaluation intervention: reports should include within-item invariance, directional flips, invalid outputs, and the distribution over displayed positions alongside accuracy.",
+          "history": [
+            {
+              "candidate_id": "fae1f0ece04c48b28e49f014e69a1704",
+              "comment": "[FULL DRAFT]",
+              "text": "Table~\\ref{tab:main-results} and Figure~\\ref{fig:planned-results} bound the planned main experimental comparison and the planned primary result analysis, and are designed to test whether randomizing the order of answer options leaves the model's final choice invariant across methods and evaluation criteria. The plan will sample 100 questions from the candidate sources and generate five permutations per item, with each version updating the A/B/C/D labels and a decoding temperature of 0, yielding 500 API calls in total; the bound table will contrast outcomes across permutation schemes and evaluation criteria, and the data figure will illustrate the planned numerical comparison in Panel a. The current evidence gap is that no measurements have been collected in this hosted project yet, so both artifacts remain placeholders. The hypothesis to be tested is that the final answer remains invariant under permutation, with any deviations potentially modulated by question type or model family; no observed finding will be claimed here, and any missing numbers in the eventual results will be reported as xx.",
+              "citations_added": [],
+              "created_at": 1787461306
+            }
+          ]
+        },
+        {
+          "id": "D-P2",
+          "purpose": "Discuss limitations, failure modes, and threats to validity grounded in the project materials.",
+          "rhetorical_role": "Limitations",
+          "relation_to_previous": "Interprets findings.",
+          "relation_to_next": "None",
+          "heading": "Limitations and Threats to Validity",
+          "heading_style": "subsection",
+          "artifacts": [],
+          "reference_paragraph_ids": [
+            "SRC-P085"
+          ],
+          "candidate": null,
+          "accepted_text": "\\subsection{Limitations and Threats to Validity}\n\nThis study has four main limitations. The evidence comes from one black-box model and a reduced sample of 79 complete questions, so neither the absolute rates nor the relative advantage of a decision rule should be generalized to other model versions. Four tested orders cover only part of the permutation space, and cumulative invariance necessarily becomes stricter as more orders are added. Although inverse mapping holds option content fixed, API nondeterminism and answer parsing can still contribute variability; preserving raw responses and separating invalid outputs reduces but does not remove this threat. Finally, benchmark ambiguity or incorrect gold labels can affect accuracy, even when the within-item invariance comparison remains well defined.",
+          "history": [
+            {
+              "candidate_id": "aee58e57f8ba4803a2f7d479b5de30f7",
+              "comment": "[FULL DRAFT]",
+              "text": "Limitations and threats to validity stem from the reliance on plan-only materials and the narrow scope of the hosted project. First, no empirical measurements are yet reported in the materials, so interpretations must remain speculative until results are collected. Second, the 100-question sample may not be representative of broader item families or domains, limiting generalizability to other tasks or formats. Third, the analysis centers on the order of answer options as the sole perturbation and omits other factors such as prompt framing or label conventions that could influence outcomes. Fourth, external sources of variability such as model version, API fluctuations, or nondeterminism outside the fixed decoding setting could affect observed behavior. Fifth, theoretical considerations in the CRH literature indicate that certain response components may be predictable; the practical extent of such predictability in the present setting remains to be validated.",
+              "citations_added": [],
+              "created_at": 1787461326
+            }
+          ]
+        }
+      ],
+      "accepted_text": "\\subsection{Implications for Multiple-Choice Evaluation}\n\nTable~\\ref{tab:main-results} and Figure~\\ref{fig:planned-results} show that fixed-order multiple-choice accuracy is not a complete estimate of model behavior. MMLU is the clearest case: label-first accuracy remains 0.622 although only 0.487 of complete items preserve the same semantic answer across all four tested orders. Content-first recovery raises invariance to 0.615 but does not eliminate the effect, and its opposite behavior on ARC-Challenge shows that extraction strategy and dataset interact. Option order should therefore be treated as an evaluation intervention: reports should include within-item invariance, directional flips, invalid outputs, and the distribution over displayed positions alongside accuracy.\n\n\\subsection{Limitations and Threats to Validity}\n\nThis study has four main limitations. The evidence comes from one black-box model and a reduced sample of 79 complete questions, so neither the absolute rates nor the relative advantage of a decision rule should be generalized to other model versions. Four tested orders cover only part of the permutation space, and cumulative invariance necessarily becomes stricter as more orders are added. Although inverse mapping holds option content fixed, API nondeterminism and answer parsing can still contribute variability; preserving raw responses and separating invalid outputs reduces but does not remove this threat. Finally, benchmark ambiguity or incorrect gold labels can affect accuracy, even when the within-item invariance comparison remains well defined."
+    },
+    "conclusion": {
+      "title": "Conclusion",
+      "file": "conclusion.tex",
+      "previous_response_id": "resp_068b63408078a979006a8a7ed395f087d09157c6e414713881",
+      "bibliography_fingerprint": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "conversation_section_fingerprint": "41dfd9e2e0361608a2963c57bb2f2e1548d67343827d270ee185b13e426cb071",
+      "revision": 1,
+      "current_index": 0,
+      "paragraphs": [
+        {
+          "id": "C-P1",
+          "purpose": "Close the argument with supported findings, limitations, and concrete future work.",
+          "rhetorical_role": "Summary",
+          "relation_to_previous": "None",
+          "relation_to_next": "None",
+          "artifacts": [],
+          "reference_paragraph_ids": [
+            "SRC-P094"
+          ],
+          "candidate": null,
+          "accepted_text": "Across this work the central question remains whether a language model's answer to a fixed multiple choice item is invariant to the order of options. To address this, the planned evaluation will sample 100 questions from MMLU and ARC-Challenge and generate five versions per item: the original sequence plus four random permutations, with corresponding A/B/C/D labels updated. Each version will be evaluated with temperature set to 0 and the model constrained to output only the final option, for a total of 500 API calls. The analysis will quantify answer stability across permutations and identify factors linked to variability. Limitations include reliance on a single API and interface effects; future work will broaden question banks, add perturbations, and study cross-domain generalization.",
+          "history": [
+            {
+              "candidate_id": "4747aff58a9c48f7b48d71cce24fe11b",
+              "comment": "[FULL DRAFT]",
+              "text": "Across this work the central question remains whether a language model's answer to a fixed multiple choice item is invariant to the order of options. To address this, the planned evaluation will sample 100 questions from MMLU and ARC-Challenge and generate five versions per item: the original sequence plus four random permutations, with corresponding A/B/C/D labels updated. Each version will be evaluated with temperature set to 0 and the model constrained to output only the final option, for a total of 500 API calls. The analysis will quantify answer stability across permutations and identify factors linked to variability. Limitations include reliance on a single API and interface effects; future work will broaden question banks, add perturbations, and study cross-domain generalization.",
+              "citations_added": [],
+              "created_at": 1787461352
+            }
+          ]
+        }
+      ],
+      "accepted_text": "Across this work the central question remains whether a language model's answer to a fixed multiple choice item is invariant to the order of options. To address this, the planned evaluation will sample 100 questions from MMLU and ARC-Challenge and generate five versions per item: the original sequence plus four random permutations, with corresponding A/B/C/D labels updated. Each version will be evaluated with temperature set to 0 and the model constrained to output only the final option, for a total of 500 API calls. The analysis will quantify answer stability across permutations and identify factors linked to variability. Limitations include reliance on a single API and interface effects; future work will broaden question banks, add perturbations, and study cross-domain generalization."
+    }
+  },
+  "figures": {
+    "F1": {
+      "status": "approved",
+      "previous_response_id": "resp_00d39ef4d36fcc3e006a8a7b24f49487d0929e340ebfdee6ac",
+      "revision": 1,
+      "approved_at": 1787460554,
+      "prompt_approved_at": 1787460423,
+      "last_message": "The caption was saved and the manuscript was recompiled.",
+      "caption": "The same multiple-choice content under two option orders motivates testing semantic permutation invariance.",
+      "caption_source": "researcher",
+      "caption_generated_from_paragraph": "",
+      "caption_generated_from_sha256": "",
+      "caption_generated_at": null,
+      "caption_last_error": "",
+      "draw_prompt": "Create a single-column, publication-ready motivation figure (1024x1024) on a pure white background in a flat-vector ACL style. The composition conveys problem motivation via a side-by-side contrast between two concrete setups, culminating in a compact takeaway. Objects should be editable as PowerPoint elements: cards, labels, arrows, and small icons can be individually selected and resized without raster artifacts. Use thin dark strokes, restrained color accents, and sans-serif labels. Arrows are solid for primary flow; avoid decorative imagery or model internals. All text is short, print-ready, and readable at one-column width.\n\nCanvas and layout\n- Target: one-column figure, centered content, ample whitespace.\n- Top region: a single shared input card labeled Prompt that encodes the concrete problem input.\n- Middle region: two spacious, parallel visual groups (Case 1 and Case 2) arranged left and right. Each group is a vertical stack of short cards representing the input and alternatives. Each group is distinct in color but visually balanced (Case 1 blue; Case 2 orange).\n- Bottom region: a single shared takeaway element that contrasts with the input-to-output flow.\n\nObject inventory (distinct, reusable manuscript objects)\n- Prompt card (labeled: Prompt)\n- Question line (short: “Which option is best?”)\n- Option cards for A, B, C, D in each case\n- Case anchors (one highlighted option per branch, via a colored outline badge)\n- Chosen bubble per case (small rounded bubble with the chosen letter; label kept minimal)\n- Final convergence symbol (bottom center) showing the shared outcome (e.g., “Final: B” or a bold “B” with a convergence icon)\n- Takeaway card at the bottom (labeled: Takeaway) with a small invariant/equals icon or simple symmetry symbol\n\nReading order and visual grammar\n- Reading order: shared input (Prompt) → contrasted cases (Case 1 left, Case 2 right) → takeaway (bottom).\n- Each case preserves a common semantic anchor (the same Question and the same four options A–D) but differs structurally by option order.\n- One structural difference highlighted per branch:\n  - Case 1 (blue): topmost option is A (anchor badge) and order is A–D.\n  - Case 2 (orange): options are shuffled (e.g., B, D, A, C) with the topmost option B highlighted.\n- Short outcome indicators: each case shows a simple “Chosen: X” bubble near the bottom of that branch; both branches converge to the same final outcome symbol at the bottom to communicate the bounded takeaway without numerical results.\n- Takeaway: a compact graphic symbol (e.g., a convergence/equals icon) paired with the label Takeaway, indicating invariance or the bounded evaluation question.\n\nColor and typography\n- Colors for branches: Case 1 blue; Case 2 orange. Use color to reinforce meaning, not as the sole differentiator.\n- Outcome and anchor accents: green for the final convergence symbol; neutral gray for badges.\n- Text: short labels only (A, B, C, D, Prompt, Takeaway, Final). Font: clean sans-serif; label text no more than a few characters per element; ensure legibility at target width.\n\nArrows and connections\n- Solid, clearly labeled arrows for primary flow:\n  - From Prompt to each option in both cases\n  - From each case’s chosen option to the bottom final convergence symbol\n- No numeric results or empirical bars; no internal model blocks or depth cues; no dashed arrows unless explicitly used to denote the named relation (but here prefer solid arrows for the main flow).\n\nCaption intent (for later caption, not inside figure)\n- The figure communicates: input (the problem prompt), two contrasted orderings of answer options, and a non-empirical takeaway about whether the final option remains identical under permutation (invariance question). The caption will specify the evaluation question: “Does the final option remain identical under random reordering of answer choices?”\n\nFinal prompt text to generate\nGenerate a clean, vector ACL-style motivation figure as described above. Ensure each element is a separate, editable object (cards, labels, arrows, bubbles, and icons) suitable for export to PowerPoint. The two cases must be visually balanced, clearly distinct by color and layout, and converge to a single bottom outcome to illustrate the bounded takeaway. Keep all text short and legible, with a maximum of eight distinct textual labels across the figure, and preserve a strict one-column reading order: shared input, contrasted cases, takeaway. Do not include model stacks, numerical results, or any empirical plots.\n\nMandatory final rendering constraints: use no more than eight text labels total, each at most four words; omit any earlier label request that exceeds this limit. Put no caption, explanatory sentence, empirical chart, score ranking, or decorative unexplained glyph inside the figure.",
+      "prompt_instruction": "",
+      "prompt_history": [],
+      "agent_prompt": "",
+      "agent_history": [],
+      "layout_prompt": "",
+      "layout_prompt_is_default": false,
+      "layout_plan": {},
+      "composed_at": null,
+      "layout_width": null,
+      "layout_mode": "single-column",
+      "requested_layout_width": "single-column",
+      "panels": {},
+      "placement_after": "I-P1",
+      "progress": 100,
+      "progress_message": "The figure workspace was restored from the manuscript source.",
+      "job_token": null,
+      "job_revision": 8,
+      "job_started_at": null
+    },
+    "F2": {
+      "status": "approved",
+      "previous_response_id": null,
+      "revision": 0,
+      "approved_at": 1787461543,
+      "prompt_approved_at": null,
+      "last_message": "",
+      "caption": "Panel a shows four permutation-consistency curves (cumulative exact semantic invariance) across 1 to 4 option permutations for ARC-Challenge and MMLU, using label-first and content-first metrics; invariance declines with permutation count.",
+      "caption_source": "paragraph_accept",
+      "caption_generated_from_paragraph": "D-P1",
+      "caption_generated_from_sha256": "de6282aa9aae7f67121282ef91acd142d728d79dcc8402f7830e435afbe0612e",
+      "caption_generated_at": 1787470305067555000,
+      "caption_last_error": "",
+      "draw_prompt": "",
+      "prompt_instruction": "",
+      "prompt_history": [],
+      "agent_prompt": "",
+      "agent_history": [],
+      "layout_prompt": "",
+      "layout_prompt_is_default": false,
+      "layout_plan": {},
+      "composed_at": 1787461543,
+      "layout_width": null,
+      "layout_mode": "single-column",
+      "requested_layout_width": "single-column",
+      "panels": {
+        "a": {
+          "status": "built",
+          "revision": 0,
+          "agent_prompt": "[Recovered drawing instructions; the original Agent Prompt was not archived.]\nCreate the data panel 'Permutation consistency curve' for figure F2: Permutation consistency by tested option count.\nGoal: Plot the four measured consistency curves from the saved response records.\nUse only traceable result keys: f2_rows.\nFigure description: Measured cumulative exact semantic invariance across one to four tested option permutations for ARC-Challenge and MMLU.\nCaption contract: Cumulative exact semantic invariance as additional option permutations are tested. Every point is computed from the saved ARC-Challenge and MMLU API responses.\nKeep labels readable at the configured paper width and export an editable vector PDF/PPTX result.\nPreserve the data and visual organization of the currently approved figure.",
+          "last_message": "",
+          "progress": 100,
+          "progress_message": "Restored from the validated result figure."
+        }
+      },
+      "placement_after": "E-P2",
+      "progress": 100,
+      "progress_message": "The figure workspace was restored from the manuscript source.",
+      "job_token": null,
+      "job_revision": 0,
+      "job_started_at": null
+    }
+  },
+  "tables": {
+    "T1": {
+      "status": "approved",
+      "revision": 0,
+      "approved_at": 1787461563,
+      "last_message": "The table was moved after E-P2, switched to single-column, and the PDF was recompiled.",
+      "latex": "\\begin{table}[tb]\n  \\centering\n  \\small\n  \\sbox0{\\begin{tabular}{lcccc}\n    \\toprule\n    Method & ARC accuracy & ARC invariance & MMLU accuracy & MMLU invariance \\\\\n    \\midrule\n    Label-first & 0.95 & 0.925 & 0.622 & 0.487 \\\\\n    Content-first & 0.925 & 0.875 & 0.654 & 0.615 \\\\\n    Permutation majority vote & 0.925 & N/A & 0.641 & N/A \\\\\n    \\bottomrule\n  \\end{tabular}}\n  \\ifdim\\wd0>\\linewidth\\resizebox{\\linewidth}{!}{\\usebox0}\\else\\usebox0\\fi\n  \\caption{Measured accuracy and exact semantic invariance across datasets and decision rules.}\n  \\label{tab:main-results}\n\\end{table}",
+      "generation_prompt": "Data source: paper/metrics.json\nColumns: Method | ARC accuracy | ARC invariance | MMLU accuracy | MMLU invariance\nRows: source\nCaption: Measured accuracy and exact semantic invariance across datasets and decision rules.\nFont size: small\nBest-value highlighting: none",
+      "prompt_history": [],
+      "agent_prompt": "",
+      "agent_history": [],
+      "placement_after": "E-P2",
+      "progress": 100,
+      "progress_message": "The table workspace was restored from the manuscript source.",
+      "job_token": null,
+      "job_revision": 0,
+      "job_started_at": null,
+      "layout_mode": "single-column"
+    }
+  },
+  "compile": {
+    "status": "ok",
+    "message": "[1{/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map}{/usr/l\nocal/texlive/2025/texmf-dist/fonts/enc/dvips/base/8r.enc} <./fig/motivation.pdf\n>]) (./sections/related_work.tex\n) (./sections/method.tex\nUnderfull \\vbox (badness 10000) has occurred while \\output is active\n[2]) (./sections/experiments.tex\n\nUnderfull \\hbox (badness 1953) in paragraph at lines 9--10\n\\T1/ptm/m/n/10.95 (+20) We eval-u-ate gpt-5-mini-2025-08-07 on ARC-\n\n[3 <./fig/permutation_consistency.pdf>]) (./sections/discussion.tex\n) (./sections/conclusion.tex) (./sections/bibliography.tex)\n[4] (./main.aux) )\n(see the transcript file for additional information)</usr/local/texlive/2025/te\nxmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2025/tex\nmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2025/texmf\n-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2025/texmf-d\nist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2025/texmf-dist\n/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/local/texlive/2025/texmf-dist/f\nonts/type1/urw/helvetic/uhvb8a.pfb></usr/local/texlive/2025/texmf-dist/fonts/ty\npe1/urw/times/utmb8a.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/urw/ti\nmes/utmr8a.pfb>\nOutput written on main.pdf (4 pages, 163393 bytes).\nSyncTeX written on main.synctex.gz.\nTranscript written on main.log.\nLatexmk: Getting log file 'main.log'\nLatexmk: Examining 'main.fls'\nLatexmk: Examining 'main.log'\nLatexmk: Log file says output to 'main.pdf'\nLatexmk: All targets (main.pdf) are up-to-date",
+    "updated_at": 1787470344
+  }
+}

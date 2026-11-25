@@ -1,0 +1,16 @@
+{
+  "name": "research-avatar-cloudflare",
+  "private": true,
+  "scripts": {
+    "sync:static": "node scripts/sync-static.mjs",
+    "deploy": "npm run sync:static && wrangler deploy",
+    "check:worker": "npm run sync:static && wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.0.29"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "wrangler": "^4.30.0"
+  }
+}

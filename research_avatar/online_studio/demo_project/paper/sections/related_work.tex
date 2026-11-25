@@ -1,0 +1,15 @@
+\section{Related Work}
+
+\label{sec:related-work}
+
+% PAPER_STUDIO_PARAGRAPH:R-P1
+
+Among methodological threads that study prompt sensitivity, the closest focus examines interventions that steer model behavior by manipulating prompts or by perturbing internal representations at inference. This line emphasizes interpretability and efficiency relative to fine tuning, often deriving steering directions from variation in representations between favorable and unfavorable examples. Reported advantages include modularity and data efficiency, but steering directions can be sample dependent and may encode spurious or entangled features. To address these limitations, researchers have proposed vector denoising, optimization-based steering, non-linear interventions, and adaptive steering mechanisms. The boundary of this thread lies in whether the semantics of a multiple choice item remain invariant when the option order is permuted, and how such permutation interacts with evaluation protocols. This work locates itself within that boundary and sets up the contrast to the separate evaluation thread.
+
+% PAPER_STUDIO_PARAGRAPH:R-P2
+
+Beyond the method-focused thread that aims to improve steering, the closest evaluation thread concentrates on permutation invariance of multiple choice options and seeks to delimit the boundary where semantics remain unchanged by option order. This paper contributes an evidence-based distinction by formalizing a replication-friendly evaluation protocol to study permutation sensitivity as a property of the task itself. The plan will sample 100 questions from MMLU, ARC-Challenge, or CommonsenseQA and generate 5 versions per item, comprising the original order plus four random permutations; A/B/C/D labels will be updated for each version; decoding temperature will be fixed at 0; the model will be constrained to output only the final option, totaling 500 API calls.
+
+% PAPER_STUDIO_PARAGRAPH:R-P3
+
+To synthesize the two threads, this work locates permutation invariance under option order as an evaluation problem that is fundamentally shaped by the geometry of representation spaces rather than by procedural interventions alone. Whereas method centered research aims to improve steering through prompt or representation perturbations, and evaluation centered work seeks to characterize when and why steering outcomes vary, we draw a precise boundary: the semantics of a fixed item may change if the underlying geometry causes unstable decoding across permutations, revealing a geometry driven source of sample dependence. Accordingly, this paper unifies these lines by adopting an evidence based distinction that permutation sensitivity arises from task geometry, and by framing the contribution as clarifying when steering outcomes are predictable versus inherently unstable.

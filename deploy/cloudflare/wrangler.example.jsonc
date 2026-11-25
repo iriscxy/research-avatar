@@ -1,0 +1,365 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "research-avatar-studio",
+  "main": "index.ts",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  "compatibility_date": "2026-08-16",
+  "workers_dev": true,
+  "preview_urls": true,
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
+  "vars": {
+    "ONLINE_STUDIO_INSTANCE_NAME": "public-studio-ef9e705f-a0ff-4051-a590-7aea8af80841",
+    "ONLINE_STUDIO_USAGE_URL": "https://research-avatar-studio.yingtaomj.workers.dev/internal/account-usage"
+  },
+  "containers": [
+    {
+      "class_name": "OnlineStudioContainerV61",
+      "image": "registry.cloudflare.com/CLOUDFLARE_ACCOUNT_ID/research-avatar-studio-onlinestudiocontainer:REPLACE_WITH_IMAGE_TAG",
+      "instance_type": "standard-1",
+      "max_instances": 1,
+      "constraints": {
+        "regions": ["APAC"]
+      }
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ONLINE_STUDIO",
+        "class_name": "OnlineStudioContainerV61"
+      }
+    ]
+  },
+  "d1_databases": [
+    {
+      "binding": "AUTH_DB",
+      "database_name": "research-avatar-auth",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["OnlineStudioContainer"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["OnlineStudioContainerV2"]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["OnlineStudioContainerV3"]
+    },
+    {
+      "tag": "v4",
+      "new_sqlite_classes": ["OnlineStudioContainerV4"]
+    },
+    {
+      "tag": "v5",
+      "new_sqlite_classes": ["OnlineStudioContainerV5"]
+    },
+    {
+      "tag": "v6",
+      "new_sqlite_classes": ["OnlineStudioContainerV6"]
+    },
+    {
+      "tag": "v7",
+      "new_sqlite_classes": ["OnlineStudioContainerV7"]
+    },
+    {
+      "tag": "v8",
+      "new_sqlite_classes": ["OnlineStudioContainerV8"]
+    },
+    {
+      "tag": "v9",
+      "new_sqlite_classes": ["OnlineStudioContainerV9"]
+    },
+    {
+      "tag": "v10",
+      "new_sqlite_classes": ["OnlineStudioContainerV10"]
+    },
+    {
+      "tag": "v11",
+      "new_sqlite_classes": ["OnlineStudioContainerV11"]
+    },
+    {
+      "tag": "v12",
+      "new_sqlite_classes": ["OnlineStudioContainerV12"]
+    },
+    {
+      "tag": "v13",
+      "new_sqlite_classes": ["OnlineStudioContainerV13"]
+    },
+    {
+      "tag": "v14",
+      "new_sqlite_classes": ["OnlineStudioContainerV14"]
+    },
+    {
+      "tag": "v15",
+      "new_sqlite_classes": ["OnlineStudioContainerV15"]
+    },
+    {
+      "tag": "v16",
+      "new_sqlite_classes": ["OnlineStudioContainerV16"]
+    },
+    {
+      "tag": "v17",
+      "new_sqlite_classes": ["OnlineStudioContainerV17"]
+    },
+    {
+      "tag": "v18",
+      "new_sqlite_classes": ["OnlineStudioContainerV18"]
+    },
+    {
+      "tag": "v19",
+      "new_sqlite_classes": ["OnlineStudioContainerV19"]
+    },
+    {
+      "tag": "v20",
+      "new_sqlite_classes": ["OnlineStudioContainerV20"]
+    },
+    {
+      "tag": "v21",
+      "new_sqlite_classes": ["OnlineStudioContainerV21"]
+    },
+    {
+      "tag": "v22",
+      "new_sqlite_classes": ["OnlineStudioContainerV22"]
+    },
+    {
+      "tag": "v23",
+      "new_sqlite_classes": ["OnlineStudioContainerV23"]
+    },
+    {
+      "tag": "v24",
+      "new_sqlite_classes": ["OnlineStudioContainerV24"]
+    },
+    {
+      "tag": "v25",
+      "new_sqlite_classes": ["OnlineStudioContainerV25"]
+    },
+    {
+      "tag": "v26",
+      "new_sqlite_classes": ["OnlineStudioContainerV26"]
+    },
+    {
+      "tag": "v27",
+      "new_sqlite_classes": ["OnlineStudioContainerV27"]
+    },
+    {
+      "tag": "v28",
+      "new_sqlite_classes": ["OnlineStudioContainerV28"]
+    },
+    {
+      "tag": "v29",
+      "new_sqlite_classes": ["OnlineStudioContainerV29"]
+    },
+    {
+      "tag": "v30",
+      "new_sqlite_classes": ["OnlineStudioContainerV30"]
+    },
+    {
+      "tag": "v31",
+      "deleted_classes": [
+        "OnlineStudioContainer",
+        "OnlineStudioContainerV2",
+        "OnlineStudioContainerV3",
+        "OnlineStudioContainerV4",
+        "OnlineStudioContainerV5",
+        "OnlineStudioContainerV6",
+        "OnlineStudioContainerV7",
+        "OnlineStudioContainerV8",
+        "OnlineStudioContainerV9",
+        "OnlineStudioContainerV10",
+        "OnlineStudioContainerV11",
+        "OnlineStudioContainerV12",
+        "OnlineStudioContainerV13",
+        "OnlineStudioContainerV14",
+        "OnlineStudioContainerV15",
+        "OnlineStudioContainerV16",
+        "OnlineStudioContainerV17",
+        "OnlineStudioContainerV18",
+        "OnlineStudioContainerV19",
+        "OnlineStudioContainerV20",
+        "OnlineStudioContainerV21",
+        "OnlineStudioContainerV22",
+        "OnlineStudioContainerV23",
+        "OnlineStudioContainerV24",
+        "OnlineStudioContainerV25",
+        "OnlineStudioContainerV26",
+        "OnlineStudioContainerV27",
+        "OnlineStudioContainerV28",
+        "OnlineStudioContainerV29"
+      ]
+    },
+    {
+      "tag": "v32",
+      "new_sqlite_classes": ["OnlineStudioContainerV31"]
+    },
+    {
+      "tag": "v33",
+      "new_sqlite_classes": ["OnlineStudioContainerV32"]
+    },
+    {
+      "tag": "v34",
+      "new_sqlite_classes": ["OnlineStudioContainerV33"]
+    },
+    {
+      "tag": "v35",
+      "new_sqlite_classes": ["OnlineStudioContainerV34"]
+    },
+    {
+      "tag": "v36",
+      "new_sqlite_classes": ["OnlineStudioContainerV35"]
+    },
+    {
+      "tag": "v37",
+      "new_sqlite_classes": ["OnlineStudioContainerV36"]
+    },
+    {
+      "tag": "v38",
+      "new_sqlite_classes": ["OnlineStudioContainerV37"]
+    },
+    {
+      "tag": "v39",
+      "new_sqlite_classes": ["OnlineStudioContainerV38"]
+    },
+    {
+      "tag": "v40",
+      "new_sqlite_classes": ["OnlineStudioContainerV39"]
+    },
+    {
+      "tag": "v41",
+      "new_sqlite_classes": ["OnlineStudioContainerV40"]
+    },
+    {
+      "tag": "v42",
+      "new_sqlite_classes": ["OnlineStudioContainerV41"]
+    },
+    {
+      "tag": "v43",
+      "new_sqlite_classes": ["OnlineStudioContainerV42"]
+    },
+    {
+      "tag": "v44",
+      "new_sqlite_classes": ["OnlineStudioContainerV43"]
+    },
+    {
+      "tag": "v45",
+      "new_sqlite_classes": ["OnlineStudioContainerV44"]
+    },
+    {
+      "tag": "v46",
+      "new_sqlite_classes": ["OnlineStudioContainerV45"]
+    },
+    {
+      "tag": "v47",
+      "new_sqlite_classes": ["OnlineStudioContainerV46"]
+    },
+    {
+      "tag": "v48",
+      "new_sqlite_classes": ["OnlineStudioContainerV47"]
+    },
+    {
+      "tag": "v49",
+      "new_sqlite_classes": ["OnlineStudioContainerV48"]
+    },
+    {
+      "tag": "v50",
+      "new_sqlite_classes": ["OnlineStudioContainerV49"]
+    },
+    {
+      "tag": "v51",
+      "new_sqlite_classes": ["OnlineStudioContainerV50"]
+    },
+    {
+      "tag": "v52",
+      "new_sqlite_classes": ["OnlineStudioContainerV51"]
+    },
+    {
+      "tag": "v53",
+      "new_sqlite_classes": ["OnlineStudioContainerV52"]
+    },
+    {
+      "tag": "v54",
+      "new_sqlite_classes": ["OnlineStudioContainerV53"]
+    },
+    {
+      "tag": "v55",
+      "new_sqlite_classes": ["OnlineStudioContainerV54"]
+    },
+    {
+      "tag": "v56",
+      "new_sqlite_classes": ["OnlineStudioContainerV55"]
+    },
+    {
+      "tag": "v57",
+      "new_sqlite_classes": ["OnlineStudioContainerV56"]
+    },
+    {
+      "tag": "v58",
+      "new_sqlite_classes": ["OnlineStudioContainerV57"]
+    },
+    {
+      "tag": "v59",
+      "new_sqlite_classes": ["OnlineStudioContainerV58"]
+    },
+    {
+      "tag": "v60",
+      "new_sqlite_classes": ["OnlineStudioContainerV59"]
+    },
+    {
+      "tag": "v61",
+      "new_sqlite_classes": ["OnlineStudioContainerV60"]
+    },
+    {
+      "tag": "v62",
+      "new_sqlite_classes": ["OnlineStudioContainerV61"]
+    },
+    {
+      "tag": "v63",
+      "deleted_classes": [
+        "OnlineStudioContainerV30",
+        "OnlineStudioContainerV31",
+        "OnlineStudioContainerV32",
+        "OnlineStudioContainerV33",
+        "OnlineStudioContainerV34",
+        "OnlineStudioContainerV35",
+        "OnlineStudioContainerV36",
+        "OnlineStudioContainerV37",
+        "OnlineStudioContainerV38",
+        "OnlineStudioContainerV39",
+        "OnlineStudioContainerV40",
+        "OnlineStudioContainerV41",
+        "OnlineStudioContainerV42",
+        "OnlineStudioContainerV43",
+        "OnlineStudioContainerV44",
+        "OnlineStudioContainerV45",
+        "OnlineStudioContainerV46",
+        "OnlineStudioContainerV47",
+        "OnlineStudioContainerV48",
+        "OnlineStudioContainerV49",
+        "OnlineStudioContainerV50",
+        "OnlineStudioContainerV51",
+        "OnlineStudioContainerV52",
+        "OnlineStudioContainerV53",
+        "OnlineStudioContainerV54",
+        "OnlineStudioContainerV55",
+        "OnlineStudioContainerV56",
+        "OnlineStudioContainerV57",
+        "OnlineStudioContainerV58",
+        "OnlineStudioContainerV59",
+        "OnlineStudioContainerV60"
+      ]
+    }
+  ]
+}

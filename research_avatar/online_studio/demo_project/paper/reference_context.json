@@ -1,0 +1,144 @@
+{
+  "reference_title": "The Cylindrical Representation Hypothesis for Language Model Steering",
+  "reference_source": "",
+  "public_demo_distilled": true,
+  "sections": {
+    "abstract": {
+      "source_heading": "Abstract",
+      "logic_summary_zh": "The reference abstract first states the problem and limitations, then provides an explanation, evidence, and a cautious conclusion.",
+      "excerpts": [
+        {
+          "reference_paragraph_id": "REF-ABS-P1",
+          "text": "Open with the problem, identify the limitation of the prevailing account, introduce the proposed explanation, summarize the evidence, and close with a bounded implication.",
+          "distilled": true
+        }
+      ]
+    },
+    "introduction": {
+      "source_heading": "Introduction",
+      "logic_summary_zh": "The reference introduction narrows from importance to the gap, then presents the approach and its testable boundary.",
+      "excerpts": [
+        {
+          "reference_paragraph_id": "REF-I-P1",
+          "text": "Establish why the problem matters and define the concrete behavior under study.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-I-P2",
+          "text": "Narrow from the broad motivation to the unresolved empirical gap.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-I-P3",
+          "text": "State the proposed perspective and explain how it resolves the gap.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-I-P4",
+          "text": "Separate what the study can determine from what remains uncertain.",
+          "distilled": true
+        }
+      ]
+    },
+    "related_work": {
+      "source_heading": "Related Work",
+      "logic_summary_zh": "The reference paper first categorizes methods and theory, then positions its own contribution.",
+      "excerpts": [
+        {
+          "reference_paragraph_id": "REF-RW-P1",
+          "text": "Group the closest methodological work by shared objective and limitation.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-RW-P2",
+          "text": "Contrast the target contribution with methods that optimize performance rather than explain behavior.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-RW-P3",
+          "text": "Synthesize the theoretical thread and locate the paper's distinct scope.",
+          "distilled": true
+        }
+      ]
+    },
+    "method": {
+      "source_heading": "Method",
+      "logic_summary_zh": "The reference method first outlines the idea, then defines the procedure and implementation details.",
+      "excerpts": [
+        {
+          "reference_paragraph_id": "REF-PR-P1",
+          "text": "Introduce the controlled approximation used to connect the hypothesis to observable behavior.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-PR-P2",
+          "text": "Define the probing procedure before presenting implementation details.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-PR-P3",
+          "text": "Describe the ordered stages that construct and inspect the local analysis space.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-PR-P4",
+          "text": "Specify fixed settings, swept variables, and the resulting measurements.",
+          "distilled": true
+        }
+      ]
+    },
+    "experiments": {
+      "source_heading": "Experiments",
+      "logic_summary_zh": "The reference experiments describe the setup, data, comparison methods, and metrics in sequence.",
+      "excerpts": [
+        {
+          "reference_paragraph_id": "REF-V-P6",
+          "text": "Name the evaluated models and justify the selected intervention points.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-V-P7",
+          "text": "Describe dataset construction and the sampling protocol.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-V-P8",
+          "text": "Define the compared methods and the inference-time sweep.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-V-P9",
+          "text": "State the evaluation metric and how the response trend is summarized.",
+          "distilled": true
+        }
+      ]
+    },
+    "discussion": {
+      "source_heading": "Discussion",
+      "logic_summary_zh": "The reference discussion separates observable conclusions, unresolved questions, and scope boundaries.",
+      "excerpts": [
+        {
+          "reference_paragraph_id": "REF-P-P1",
+          "text": "Frame the interpretation around which quantities are observable and which are not.",
+          "distilled": true
+        },
+        {
+          "reference_paragraph_id": "REF-P-P2",
+          "text": "State the formal limitation that bounds predictability.",
+          "distilled": true
+        }
+      ]
+    },
+    "conclusion": {
+      "source_heading": "Conclusion",
+      "logic_summary_zh": "The reference conclusion summarizes the contribution, evidence boundary, and future directions.",
+      "excerpts": [
+        {
+          "reference_paragraph_id": "REF-CON-P1",
+          "text": "Recap the contribution, the explanatory mechanism, the evidence boundary, and concrete future work.",
+          "distilled": true
+        }
+      ]
+    }
+  }
+}

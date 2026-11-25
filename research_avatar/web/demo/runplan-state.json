@@ -1,0 +1,157 @@
+{
+  "schema_version": 2,
+  "source_plan": "reports/03_EXPERIMENT_PLAN.html",
+  "execution_mode": "sequential_all_goals",
+  "goal_confirmation": {
+    "status": "confirmed",
+    "scope": "all_goals",
+    "confirmed_goal_ids": [
+      "G1.1",
+      "G2.1",
+      "G3.1",
+      "G4.1",
+      "G5.1"
+    ]
+  },
+  "state": "completed",
+  "status": "completed",
+  "active_goal": null,
+  "proposed_goal_id": null,
+  "approved_artifact_ids": [
+    "F1",
+    "F2",
+    "T1"
+  ],
+  "parts": [
+    {
+      "id": "P1",
+      "title": "Freeze questions and permutation protocol",
+      "decision": "Complete and verify this evidence stage before advancing.",
+      "status": "completed",
+      "goals": [
+        "G1.1"
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Generate and validate five orderings per question",
+      "decision": "Complete and verify this evidence stage before advancing.",
+      "status": "completed",
+      "goals": [
+        "G2.1"
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Execute 500 deterministic model calls",
+      "decision": "Complete and verify this evidence stage before advancing.",
+      "status": "completed",
+      "goals": [
+        "G3.1"
+      ]
+    },
+    {
+      "id": "P4",
+      "title": "Compute paired invariance metrics and uncertainty",
+      "decision": "Complete and verify this evidence stage before advancing.",
+      "status": "completed",
+      "goals": [
+        "G4.1"
+      ]
+    },
+    {
+      "id": "P5",
+      "title": "Audit subgroups and representative answer flips",
+      "decision": "Complete and verify this evidence stage before advancing.",
+      "status": "completed",
+      "goals": [
+        "G5.1"
+      ]
+    }
+  ],
+  "goals": [
+    {
+      "id": "G1.1",
+      "part_id": "P1",
+      "title": "Freeze questions and permutation protocol",
+      "status": "completed",
+      "depends_on": [],
+      "artifact_ids": [
+        "F1"
+      ],
+      "decision_question": "Does the saved evidence satisfy the approved acquisition contract?",
+      "visible_work": "Run the recorded command and persist its manifest, logs, and raw outputs.",
+      "visible_evidence": "Verified structured records linked to every displayed value.",
+      "completion_check": "command exited successfully; raw records, provenance, and assigned artifacts validate",
+      "goal_command": "/goal G1.1"
+    },
+    {
+      "id": "G2.1",
+      "part_id": "P2",
+      "title": "Generate and validate five orderings per question",
+      "status": "completed",
+      "depends_on": [
+        "G1.1"
+      ],
+      "artifact_ids": [],
+      "decision_question": "Does the saved evidence satisfy the approved acquisition contract?",
+      "visible_work": "Run the recorded command and persist its manifest, logs, and raw outputs.",
+      "visible_evidence": "Verified structured records linked to every displayed value.",
+      "completion_check": "command exited successfully; raw records, provenance, and assigned artifacts validate",
+      "goal_command": "/goal G2.1"
+    },
+    {
+      "id": "G3.1",
+      "part_id": "P3",
+      "title": "Execute 500 deterministic model calls",
+      "status": "completed",
+      "depends_on": [
+        "G2.1"
+      ],
+      "artifact_ids": [
+        "T1"
+      ],
+      "decision_question": "Does the saved evidence satisfy the approved acquisition contract?",
+      "visible_work": "Run the recorded command and persist its manifest, logs, and raw outputs.",
+      "visible_evidence": "Verified structured records linked to every displayed value.",
+      "completion_check": "command exited successfully; raw records, provenance, and assigned artifacts validate",
+      "goal_command": "/goal G3.1"
+    },
+    {
+      "id": "G4.1",
+      "part_id": "P4",
+      "title": "Compute paired invariance metrics and uncertainty",
+      "status": "completed",
+      "depends_on": [
+        "G3.1"
+      ],
+      "artifact_ids": [
+        "T1",
+        "F2"
+      ],
+      "decision_question": "Does the saved evidence satisfy the approved acquisition contract?",
+      "visible_work": "Run the recorded command and persist its manifest, logs, and raw outputs.",
+      "visible_evidence": "Verified structured records linked to every displayed value.",
+      "completion_check": "command exited successfully; raw records, provenance, and assigned artifacts validate",
+      "goal_command": "/goal G4.1"
+    },
+    {
+      "id": "G5.1",
+      "part_id": "P5",
+      "title": "Audit subgroups and representative answer flips",
+      "status": "completed",
+      "depends_on": [
+        "G4.1"
+      ],
+      "artifact_ids": [
+        "F1",
+        "F2"
+      ],
+      "decision_question": "Does the saved evidence satisfy the approved acquisition contract?",
+      "visible_work": "Run the recorded command and persist its manifest, logs, and raw outputs.",
+      "visible_evidence": "Verified structured records linked to every displayed value.",
+      "completion_check": "command exited successfully; raw records, provenance, and assigned artifacts validate",
+      "goal_command": "/goal G5.1"
+    }
+  ]
+}
